@@ -1,0 +1,7 @@
+moderator.bedones.local {
+	# Enable automatic HTTPS with self-signed certificate for local development
+	tls internal
+
+	# Reverse proxy to Next.js development server
+	reverse_proxy localhost:3007
+}
