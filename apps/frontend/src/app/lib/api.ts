@@ -8,11 +8,22 @@ export type OrganisationSummary = components['schemas']['OrganisationSummaryDto'
 export type OrganisationResponse = components['schemas']['OrganisationResponseDto']
 export type SocialAccountDto = components['schemas']['SocialAccountDto']
 
+interface ApiError {
+  message?: string
+  error?: string
+  statusCode?: number
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  const apiError = error as ApiError
+  return apiError?.message || fallback
+}
+
 export async function fetchMe(): Promise<MeResponse> {
   const { data, error } = await apiClient.GET('/auth/me')
 
   if (error) {
-    throw new Error('Not authenticated')
+    throw new Error(getErrorMessage(error, 'Not authenticated'))
   }
 
   return data
@@ -24,7 +35,7 @@ export async function login(email: string, password: string): Promise<void> {
   })
 
   if (error) {
-    throw new Error('Erreur de connexion')
+    throw new Error(getErrorMessage(error, 'Erreur de connexion'))
   }
 }
 
@@ -38,7 +49,7 @@ export async function createOrganisation(name: string): Promise<OrganisationResp
   })
 
   if (error) {
-    throw new Error('Erreur lors de la création')
+    throw new Error(getErrorMessage(error, 'Erreur lors de la création'))
   }
 
   return data
@@ -54,7 +65,7 @@ export async function updateOrganisation(
   })
 
   if (error) {
-    throw new Error('Erreur lors de la mise à jour')
+    throw new Error(getErrorMessage(error, 'Erreur lors de la mise à jour'))
   }
 
   return data
@@ -71,7 +82,7 @@ export async function uploadLogo(file: File): Promise<string> {
   })
 
   if (error) {
-    throw new Error("Erreur lors de l'upload")
+    throw new Error(getErrorMessage(error, "Erreur lors de l'upload"))
   }
 
   return data.url

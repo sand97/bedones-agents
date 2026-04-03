@@ -7,8 +7,10 @@ interface SocialSetupProps {
   color: string
   title: string
   description: string
-  buttonLabel: string
-  onConnect?: () => void
+  buttonLabel?: string
+  buttonType?: 'primary' | 'default'
+  buttonIcon?: ReactNode
+  onAction?: () => void
   loading?: boolean
   children?: ReactNode
 }
@@ -19,7 +21,9 @@ export function SocialSetup({
   title,
   description,
   buttonLabel,
-  onConnect,
+  buttonType = 'primary',
+  buttonIcon = <Plus size={18} />,
+  onAction,
   loading,
   children,
 }: SocialSetupProps) {
@@ -27,30 +31,31 @@ export function SocialSetup({
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-24">
       <div className="flex max-w-md flex-col items-center text-center">
         <div
-          className="flex h-20 w-20 items-center justify-center rounded-3xl"
+          className="flex items-center justify-center rounded-3xl"
           style={{ background: `${color}14`, color }}
         >
           {icon}
         </div>
 
         <div className="mt-6 mb-6">
-          <h2 className="m-0 mb-2 text-2xl font-bold text-text-primary">{title}</h2>
-
-          <p className="m-0 text-base leading-relaxed text-text-secondary">{description}</p>
+          <h2 className="m-0 text-base font-bold text-text-primary">{title}</h2>
+          <p className="m-0 text-sm leading-relaxed text-text-secondary">{description}</p>
         </div>
 
         {children}
 
-        <Button
-          type="primary"
-          size="large"
-          loading={loading}
-          onClick={onConnect}
-          className="h-12 px-8 text-base font-semibold"
-          icon={<Plus size={18} />}
-        >
-          {buttonLabel}
-        </Button>
+        {buttonLabel && (
+          <Button
+            type={buttonType}
+            size="large"
+            loading={loading}
+            onClick={onAction}
+            className="h-12 px-8 text-base font-semibold"
+            icon={buttonIcon}
+          >
+            {buttonLabel}
+          </Button>
+        )}
       </div>
     </div>
   )

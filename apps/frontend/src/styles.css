@@ -199,6 +199,10 @@ a {
 }
 
 /* Ant Design Select overrides */
+.ant-select-item {
+  border-radius: 8px !important;
+}
+
 .ant-select-item-option-selected {
   background: var(--color-bg-subtle) !important;
   color: var(--color-text-primary) !important;
@@ -550,6 +554,67 @@ a {
   .comments-split__right--visible {
     display: flex;
   }
+}
+
+/* ═══════════════════════════════════════════
+   Comments config – stacked FAQ row (vertical)
+   ═══════════════════════════════════════════ */
+
+.comments-config-faq-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.comments-config-faq-row .comments-config-faq-question.ant-input {
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.comments-config-faq-row .comments-config-faq-answer.ant-input {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  margin-top: -1px;
+}
+
+.comments-config-faq-row .comments-config-faq-answer.ant-input:hover,
+.comments-config-faq-row .comments-config-faq-answer.ant-input:focus {
+  z-index: 1;
+  position: relative;
+}
+
+.comments-config-faq-row .comments-config-faq-question.ant-input:hover,
+.comments-config-faq-row .comments-config-faq-question.ant-input:focus {
+  z-index: 1;
+  position: relative;
+}
+
+.comments-config-faq-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--height-input);
+  border: 1px solid var(--color-border-default);
+  margin-top: -1px;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-bottom-left-radius: var(--radius-control);
+  border-bottom-right-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.comments-config-faq-delete-btn:hover {
+  color: var(--ant-color-error);
+  border-color: var(--ant-color-error);
+  z-index: 1;
+  position: relative;
 }
 
 /* ═══════════════════════════════════════════

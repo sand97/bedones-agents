@@ -13,7 +13,7 @@ export function CatalogEmpty({ onConnect }: CatalogEmptyProps) {
       title="Connectez votre catalogue"
       description="Importez vos articles depuis votre boutique en ligne ou ajoutez-les manuellement pour que votre agent IA puisse les proposer à vos clients."
       buttonLabel="Connecter un catalogue"
-      onConnect={onConnect}
+      onAction={onConnect}
     />
   )
 }

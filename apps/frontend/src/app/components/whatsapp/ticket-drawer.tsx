@@ -130,10 +130,10 @@ function formatPrice(price: number, currency: string) {
 
 export function TicketDrawer({
   ticket,
-  allTickets = [],
+  allTickets: _allTickets = [],
   open,
   onClose,
-  onSwitchTicket,
+  onSwitchTicket: _onSwitchTicket,
 }: TicketDrawerProps) {
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({})
 

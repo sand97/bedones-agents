@@ -1,17 +1,11 @@
 import { useMemo, useRef, useEffect, useCallback } from 'react'
-import { Avatar, Popover, Badge, Checkbox, Button } from 'antd'
+import { Avatar, Popover, Button } from 'antd'
 import { Play, Pause, ShoppingBag, ImageIcon, Film, Copy, Check } from 'lucide-react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import dayjs from 'dayjs'
 import { useState } from 'react'
-import {
-  DoubleCheckIcon,
-  OptionsIcon,
-  TagIcon,
-  LabelBadgeIcon,
-} from '@app/components/icons/social-icons'
+import { DoubleCheckIcon, OptionsIcon } from '@app/components/icons/social-icons'
 import type { Conversation, Message, Ticket } from './mock-data'
-import { AVAILABLE_LABELS } from './mock-data'
 import { TicketCard } from './ticket-card'
 import { TicketDrawer } from './ticket-drawer'
 import { ChatInput } from './chat-input'
@@ -289,9 +283,7 @@ function MessageBubble({
 
 function ChatHeader({ conversation }: { conversation: Conversation }) {
   const [optionsOpen, setOptionsOpen] = useState(false)
-  const [labelsOpen, setLabelsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [convLabels, setConvLabels] = useState(conversation.labels.map((l) => l.id))
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(conversation.contact.phone)
@@ -300,12 +292,6 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
       setCopied(false)
       setOptionsOpen(false)
     }, 1200)
-  }
-
-  const toggleLabel = (labelId: string) => {
-    setConvLabels((prev) =>
-      prev.includes(labelId) ? prev.filter((id) => id !== labelId) : [...prev, labelId],
-    )
   }
 
   return (

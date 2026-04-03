@@ -3,7 +3,8 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Button, Popover, Checkbox } from 'antd'
 import { ConversationList } from './conversation-list'
 import { ChatWindow } from './chat-window'
-import { EmptyChat } from './empty-chat'
+import { SocialSetup } from '@app/components/social/social-setup'
+import { WhatsAppIcon } from '@app/components/icons/social-icons'
 import { ConversationListSkeleton, ChatWindowSkeleton } from './chat-skeleton'
 import type { Conversation } from './mock-data'
 import { AVAILABLE_LABELS } from './mock-data'
@@ -155,7 +156,16 @@ export function ChatLayout({ conversations, loading = false }: ChatLayoutProps) 
       <div
         className={`chat-split__right ${selectedConversation ? 'chat-split__right--visible' : ''}`}
       >
-        {selectedConversation ? <ChatWindow conversation={selectedConversation} /> : <EmptyChat />}
+        {selectedConversation ? (
+          <ChatWindow conversation={selectedConversation} />
+        ) : (
+          <SocialSetup
+            icon={<WhatsAppIcon width={40} height={40} />}
+            color="var(--color-brand-whatsapp)"
+            title="Sélectionnez une conversation"
+            description="Choisissez un contact dans la liste pour voir ses messages"
+          />
+        )}
       </div>
     </div>
   )

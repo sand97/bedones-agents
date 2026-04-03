@@ -1,15 +1,9 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Button, Card, Divider, Input, Modal, Typography, message } from 'antd'
+import { Button, Card, Input, Modal, Typography, message } from 'antd'
 import { useState } from 'react'
 import { Lock, Mail } from 'lucide-react'
-import { FacebookIcon, InstagramIcon } from '@app/components/icons/social-icons'
 import { featuresConfig, type Feature } from '@app/data/features'
 import { login, fetchMe } from '@app/lib/api'
-import {
-  setAuthRedirect,
-  buildFacebookOAuthUrl,
-  buildInstagramOAuthUrl,
-} from '@app/lib/auth-redirect'
 
 const { Title, Text } = Typography
 
@@ -42,16 +36,6 @@ function LoginPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleFacebookLogin = () => {
-    setAuthRedirect({ intent: 'login' })
-    window.location.href = buildFacebookOAuthUrl()
-  }
-
-  const handleInstagramLogin = () => {
-    setAuthRedirect({ intent: 'login' })
-    window.location.href = buildInstagramOAuthUrl()
   }
 
   return (
@@ -107,46 +91,6 @@ function LoginPage() {
               </Button>
             </div>
 
-            <Divider plain style={{ margin: 0 }}>
-              <Text type="secondary" className="text-xs">
-                ou
-              </Text>
-            </Divider>
-
-            <div className="flex w-full flex-col gap-3">
-              <Button
-                size="large"
-                block
-                className="btn-social"
-                onClick={handleFacebookLogin}
-                icon={<FacebookIcon width={18} height={18} />}
-                style={{
-                  background: '#1877f2',
-                  borderColor: '#1877f2',
-                  color: '#fff',
-                  height: 48,
-                }}
-              >
-                Continuer avec Facebook
-              </Button>
-
-              <Button
-                size="large"
-                block
-                className="btn-social"
-                onClick={handleInstagramLogin}
-                icon={<InstagramIcon width={18} height={18} />}
-                style={{
-                  background: 'linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)',
-                  borderColor: 'transparent',
-                  color: '#fff',
-                  height: 48,
-                }}
-              >
-                Continuer avec Instagram
-              </Button>
-            </div>
-
             <Text type="secondary" className="text-center text-xs">
               En continuant, vous acceptez nos{' '}
               <a href="/auth/terms" className="link-underline-hover text-text-primary">
@@ -160,82 +104,6 @@ function LoginPage() {
             </Text>
           </div>
         </Card>
-
-        {/* Social-only login Card (commented out for Facebook validation) */}
-        {/*
-        <Card className="w-full" styles={{ body: { padding: 32 } }}>
-          <div className="flex flex-col items-center gap-6">
-            <div className="text-center">
-              <Title level={4} style={{ marginBottom: 4 }}>
-                Centralisez vos interactions sociales
-              </Title>
-              <Text type="secondary">Connectez-vous pour commencer</Text>
-            </div>
-
-            <div className="flex w-full flex-col gap-3">
-              <Button
-                size="large"
-                block
-                className="btn-social"
-                onClick={handleLogin}
-                icon={<FacebookIcon width={18} height={18} />}
-                style={{
-                  background: '#1877f2',
-                  borderColor: '#1877f2',
-                  color: '#fff',
-                  height: 48,
-                }}
-              >
-                Continuer avec Facebook
-              </Button>
-
-              <Button
-                size="large"
-                block
-                className="btn-social"
-                onClick={handleLogin}
-                icon={<InstagramIcon width={18} height={18} />}
-                style={{
-                  background: 'linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)',
-                  borderColor: 'transparent',
-                  color: '#fff',
-                  height: 48,
-                }}
-              >
-                Continuer avec Instagram
-              </Button>
-
-              <Button
-                size="large"
-                block
-                className="btn-social"
-                onClick={handleLogin}
-                icon={<TikTokIcon width={18} height={18} />}
-                style={{
-                  background: '#000000',
-                  borderColor: '#000000',
-                  color: '#fff',
-                  height: 48,
-                }}
-              >
-                Continuer avec TikTok
-              </Button>
-            </div>
-
-            <Text type="secondary" className="text-center text-xs">
-              En continuant, vous acceptez nos{' '}
-              <a href="/auth/terms" className="link-underline-hover text-text-primary">
-                conditions d&apos;utilisation
-              </a>{' '}
-              et notre{' '}
-              <a href="/auth/privacy" className="link-underline-hover text-text-primary">
-                politique de confidentialite
-              </a>
-              .
-            </Text>
-          </div>
-        </Card>
-        */}
       </div>
 
       {/* Features Section */}

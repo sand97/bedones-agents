@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
 import { useState, useEffect } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
-import { Button, Empty } from 'antd'
-import { ArrowLeft } from 'lucide-react'
+import { Button } from 'antd'
+import { ArrowLeft, CheckCircle, MessageSquareOff, Settings } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { AccountSwitcher, type SocialAccount } from '@app/components/social/account-switcher'
 import { CommentsLayout } from '@app/components/comments/comments-layout'
+import { CommentsConfigModal } from '@app/components/comments/comments-config'
 import { MOCK_POSTS } from '@app/components/comments/mock-data'
 import { FacebookIcon, InstagramIcon, TikTokIcon } from '@app/components/icons/social-icons'
 import { useLayout } from '@app/contexts/layout-context'
@@ -115,6 +116,91 @@ function TikTokPage({ config }: { config: (typeof COMMENT_CONFIG)[string] }) {
   )
 }
 
+type InstagramStep = 'idle' | 'connected' | 'configured'
+
+function InstagramPage({
+  config,
+  title,
+}: {
+  config: (typeof COMMENT_CONFIG)[string]
+  title: string
+}) {
+  const [step, setStep] = useState<InstagramStep>('idle')
+  const [configOpen, setConfigOpen] = useState(false)
+  const currentAccount = { id: '1', name: 'mboafashion_officiel' }
+
+  const headerAction =
+    step !== 'idle' ? (
+      <AccountSwitcher
+        accounts={[currentAccount]}
+        currentAccount={currentAccount}
+        connectLabel={config.connectLabel}
+      />
+    ) : undefined
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      <DashboardHeader title={title} action={headerAction} />
+
+      {/* Step 1 — Not connected yet */}
+      {step === 'idle' && (
+        <SocialSetup
+          icon={config.icon}
+          color={config.color}
+          title={config.title}
+          description={config.description}
+          buttonLabel={config.button}
+          onAction={() => setStep('connected')}
+        />
+      )}
+
+      {/* Step 2 — Connected, needs configuration */}
+      {step === 'connected' && (
+        <>
+          <SocialSetup
+            icon={<CheckCircle size={40} strokeWidth={1.5} />}
+            color={config.color}
+            title="Page ajoutée avec succès"
+            description="Configurez maintenant comment l'IA doit répondre aux commentaires"
+            buttonLabel="Configurer les réponses"
+            buttonIcon={<Settings size={18} />}
+            onAction={() => setConfigOpen(true)}
+          />
+          <CommentsConfigModal
+            pageName={currentAccount.name}
+            open={configOpen}
+            onClose={() => {
+              setConfigOpen(false)
+              setStep('configured')
+            }}
+          />
+        </>
+      )}
+
+      {/* Step 3 — Configured, waiting for comments */}
+      {step === 'configured' && (
+        <>
+          <SocialSetup
+            icon={<MessageSquareOff size={40} strokeWidth={1.5} />}
+            color={config.color}
+            title="Aucun commentaire reçu"
+            description="Les commentaires de vos publications Instagram apparaîtront ici"
+            buttonLabel="Modifier la configuration"
+            buttonType="default"
+            buttonIcon={<Settings size={18} />}
+            onAction={() => setConfigOpen(true)}
+          />
+          <CommentsConfigModal
+            pageName={currentAccount.name}
+            open={configOpen}
+            onClose={() => setConfigOpen(false)}
+          />
+        </>
+      )}
+    </div>
+  )
+}
+
 function CommentsPage() {
   const { id } = useParams({ from: '/app/$orgSlug/comments/$id' })
   const search = useSearch({ from: '/app/$orgSlug/comments/$id' })
@@ -151,37 +237,14 @@ function CommentsPage() {
           }
           mobileLeft={hasSelectedPost && !isDesktop ? <MobileBackButton /> : undefined}
         />
-        <CommentsLayout posts={MOCK_POSTS} />
+        <CommentsLayout posts={MOCK_POSTS} pageName={MOCK_FB_ACCOUNTS[0].name} />
       </div>
     )
   }
 
   // Instagram: connected but no comments yet
   if (id === 'instagram') {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <DashboardHeader
-          title={title}
-          action={
-            <AccountSwitcher
-              accounts={[{ id: '1', name: 'mboafashion_officiel' }]}
-              currentAccount={{ id: '1', name: 'mboafashion_officiel' }}
-              connectLabel={config.connectLabel}
-            />
-          }
-        />
-        <div className="flex flex-1 items-center justify-center">
-          <Empty description={false}>
-            <div className="text-center">
-              <div className="text-sm font-medium text-text-primary">Aucun commentaire reçu</div>
-              <div className="mt-1 text-xs text-text-muted">
-                Les commentaires de vos publications Instagram apparaîtront ici
-              </div>
-            </div>
-          </Empty>
-        </div>
-      </div>
-    )
+    return <InstagramPage config={config} title={title} />
   }
 
   // TikTok: loading skeleton use case

@@ -31,9 +31,10 @@ export function clearAuthRedirect() {
 }
 
 /**
- * Build the Facebook OAuth URL for login or page connection.
+ * Build the Facebook OAuth URL for business page connection (onboarding).
+ * Requires a config_id from a Facebook Login Configuration.
  */
-export function buildFacebookOAuthUrl(options?: { configId?: string }): string {
+export function buildFacebookOAuthUrl(configId: string): string {
   const appId = import.meta.env.VITE_FACEBOOK_APP_ID
   const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
   const redirectUri = `${apiUrl}/auth/callback/facebook`
@@ -42,13 +43,7 @@ export function buildFacebookOAuthUrl(options?: { configId?: string }): string {
   url.searchParams.set('client_id', appId)
   url.searchParams.set('redirect_uri', redirectUri)
   url.searchParams.set('response_type', 'code')
-
-  if (options?.configId) {
-    url.searchParams.set('config_id', options.configId)
-  } else {
-    // Default login scopes
-    url.searchParams.set('scope', 'public_profile,email')
-  }
+  url.searchParams.set('config_id', configId)
 
   return url.toString()
 }

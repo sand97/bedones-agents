@@ -334,7 +334,7 @@ function CreateOrganisationPage() {
     if (configId && (platformId === 'facebook' || platformId === 'instagram')) {
       // Real OAuth redirect — store current step so we come back here
       setAuthRedirect({ intent: 'onboarding', step: safeCurrentStep })
-      window.location.href = buildFacebookOAuthUrl({ configId })
+      window.location.href = buildFacebookOAuthUrl(configId)
       return
     }
 
