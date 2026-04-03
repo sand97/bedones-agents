@@ -107,18 +107,19 @@ function ConfigForm(): ReactNode {
                   <Form.Item name={[field.name, 'answer']} noStyle>
                     <Input.TextArea
                       placeholder="Réponse"
-                      rows={2}
+                      autoSize={{ minRows: 2, maxRows: 4 }}
                       className="comments-config-faq-answer"
                     />
                   </Form.Item>
-                  <button
-                    type="button"
+                  <Button
+                    type="text"
+                    danger
                     className="comments-config-faq-delete-btn"
                     onClick={() => remove(field.name)}
+                    icon={<Trash2 size={14} />}
                   >
-                    <Trash2 size={14} />
-                    <span className="text-sm">Supprimer</span>
-                  </button>
+                    Supprimer
+                  </Button>
                 </div>
               ))}
               <Button
@@ -133,6 +134,14 @@ function ConfigForm(): ReactNode {
           )}
         </Form.List>
       </div>
+
+      {/* Instructions personnalisées */}
+      <Form.Item name="customInstructions" label="Instructions personnalisées (optionnel)">
+        <Input.TextArea
+          autoSize={{ minRows: 3, maxRows: 6 }}
+          placeholder="Vous pouvez par ex décrire le ton des réponses : sérieux, drôle, jovial… pour personnaliser le style des réponses"
+        />
+      </Form.Item>
     </Form>
   )
 }

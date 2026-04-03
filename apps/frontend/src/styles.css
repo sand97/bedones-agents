@@ -592,27 +592,18 @@ a {
   position: relative;
 }
 
-.comments-config-faq-delete-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: var(--height-input);
-  border: 1px solid var(--color-border-default);
+.comments-config-faq-delete-btn.ant-btn {
+  width: 100%;
+  border: 1px solid var(--color-border-default) !important;
   margin-top: -1px;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-  border-bottom-left-radius: var(--radius-control);
-  border-bottom-right-radius: var(--radius-control);
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: all 0.15s ease;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-left-radius: var(--radius-control) !important;
+  border-bottom-right-radius: var(--radius-control) !important;
 }
 
-.comments-config-faq-delete-btn:hover {
-  color: var(--ant-color-error);
-  border-color: var(--ant-color-error);
+.comments-config-faq-delete-btn.ant-btn:hover {
+  border-color: var(--ant-color-error) !important;
   z-index: 1;
   position: relative;
 }
@@ -1774,8 +1765,8 @@ a {
    Global: consistent form field height
    ═══════════════════════════════════════════ */
 
-/* Standalone inputs — NOT those nested inside wrappers */
-.ant-input:not(.ant-input-affix-wrapper .ant-input):not(.ant-input-number-affix-wrapper .ant-input):not(.ant-input-number .ant-input),
+/* Standalone inputs — NOT those nested inside wrappers, NOT textareas */
+.ant-input:not(.ant-input-affix-wrapper .ant-input):not(.ant-input-number-affix-wrapper .ant-input):not(.ant-input-number .ant-input):not(textarea),
 .ant-select-selector,
 .ant-picker,
 .ant-input-number,

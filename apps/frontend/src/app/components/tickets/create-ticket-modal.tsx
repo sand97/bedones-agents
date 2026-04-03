@@ -197,7 +197,10 @@ export function CreateTicketModal({
           <Input placeholder="Ex: Commande Robe Wax — Taille M" />
         </Form.Item>
         <Form.Item label="Description" name="description">
-          <Input.TextArea rows={2} placeholder="Description optionnelle..." />
+          <Input.TextArea
+            autoSize={{ minRows: 2, maxRows: 6 }}
+            placeholder="Description optionnelle..."
+          />
         </Form.Item>
 
         <Form.Item label="Contact" required className="mb-4">
