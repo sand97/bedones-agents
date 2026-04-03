@@ -7,6 +7,11 @@ export type UserDto = components['schemas']['UserDto']
 export type OrganisationSummary = components['schemas']['OrganisationSummaryDto']
 export type OrganisationResponse = components['schemas']['OrganisationResponseDto']
 export type SocialAccountDto = components['schemas']['SocialAccountDto']
+export type SocialAccountResponse = components['schemas']['SocialAccountResponseDto']
+export type PostResponse = components['schemas']['PostResponseDto']
+export type CommentResponse = components['schemas']['CommentResponseDto']
+export type PageSettingsResponse = components['schemas']['PageSettingsResponseDto']
+export type UnreadCount = components['schemas']['UnreadCountDto']
 
 interface ApiError {
   message?: string
@@ -86,4 +91,141 @@ export async function uploadLogo(file: File): Promise<string> {
   }
 
   return data.url
+}
+
+// ─── Social / Comments ───
+
+export async function connectFacebook(
+  organisationId: string,
+  code: string,
+  redirectUri: string,
+): Promise<SocialAccountResponse[]> {
+  const { data, error } = await apiClient.POST('/social/connect/facebook', {
+    body: { organisationId, code, redirectUri },
+  })
+
+  if (error) {
+    throw new Error(getErrorMessage(error, 'Erreur de connexion Facebook'))
+  }
+
+  return data
+}
+
+export async function connectInstagram(
+  organisationId: string,
+  code: string,
+  redirectUri: string,
+): Promise<SocialAccountResponse> {
+  const { data, error } = await apiClient.POST('/social/connect/instagram', {
+    body: { organisationId, code, redirectUri },
+  })
+
+  if (error) {
+    throw new Error(getErrorMessage(error, 'Erreur de connexion Instagram'))
+  }
+
+  return data
+}
+
+export async function getSocialAccounts(organisationId: string): Promise<SocialAccountResponse[]> {
+  const { data, error } = await apiClient.GET('/social/accounts/{organisationId}', {
+    params: { path: { organisationId } },
+  })
+
+  if (error) {
+    throw new Error(getErrorMessage(error, 'Erreur lors du chargement des comptes'))
+  }
+
+  return data
+}
+
+export async function getPostsForAccount(accountId: string): Promise<PostResponse[]> {
+  const { data, error } = await apiClient.GET('/social/accounts/{accountId}/posts', {
+    params: { path: { accountId } },
+  })
+
+  if (error) {
+    throw new Error(getErrorMessage(error, 'Erreur lors du chargement des posts'))
+  }
+
+  return data
+}
+
+export async function updatePageSettings(
+  accountId: string,
+  settings: {
+    undesiredCommentsAction?: string
+    spamAction?: string
+    customInstructions?: string
+    faqRules?: { question: string; answer: string }[]
+  },
+): Promise<PageSettingsResponse> {
+  const { data, error } = await apiClient.PATCH('/social/accounts/{accountId}/settings', {
+    params: { path: { accountId } },
+    body: settings,
+  })
+
+  if (error) {
+    throw new Error(getErrorMessage(error, 'Erreur lors de la mise à jour'))
+  }
+
+  return data
+}
+
+export async function markPostAsRead(postId: string): Promise<void> {
+  const { error } = await apiClient.POST('/social/comments/mark-read', {
+    body: { postId },
+  })
+
+  if (error) {
+    throw new Error(getErrorMessage(error, 'Erreur lors du marquage'))
+  }
+}
+
+export async function replyToComment(commentId: string, message: string): Promise<CommentResponse> {
+  const { data, error } = await apiClient.POST('/social/comments/reply', {
+    body: { commentId, message },
+  })
+
+  if (error) {
+    throw new Error(getErrorMessage(error, 'Erreur lors de la réponse'))
+  }
+
+  return data
+}
+
+export async function hideComment(commentId: string): Promise<CommentResponse> {
+  const { data, error } = await apiClient.POST('/social/comments/hide', {
+    body: { commentId },
+  })
+
+  if (error) {
+    throw new Error(getErrorMessage(error, 'Erreur lors du masquage'))
+  }
+
+  return data
+}
+
+export async function deleteComment(commentId: string): Promise<CommentResponse> {
+  const { data, error } = await apiClient.POST('/social/comments/delete', {
+    body: { commentId },
+  })
+
+  if (error) {
+    throw new Error(getErrorMessage(error, 'Erreur lors de la suppression'))
+  }
+
+  return data
+}
+
+export async function getUnreadCounts(organisationId: string): Promise<UnreadCount[]> {
+  const { data, error } = await apiClient.GET('/social/unread-counts/{organisationId}', {
+    params: { path: { organisationId } },
+  })
+
+  if (error) {
+    return [] // Silent fail — sidebar shouldn't break if this fails
+  }
+
+  return data
 }

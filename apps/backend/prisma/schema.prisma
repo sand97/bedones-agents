@@ -28,6 +28,19 @@ enum OrgRole {
   MEMBER
 }
 
+enum CommentAction {
+  NONE
+  HIDE
+  DELETE
+  REPLY
+}
+
+enum CommentStatus {
+  VISIBLE
+  HIDDEN
+  DELETED
+}
+
 // ─── Models ───
 
 model User {
@@ -84,6 +97,8 @@ model SocialAccount {
   provider          SocialProvider
   providerAccountId String
   pageName          String?
+  username          String?
+  profilePictureUrl String?
   accessToken       String
   refreshToken      String?
   tokenExpiresAt    DateTime?
@@ -91,5 +106,73 @@ model SocialAccount {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
+  settings PageSettings?
+  posts    Post[]
+
   @@unique([provider, providerAccountId])
+}
+
+model PageSettings {
+  id                       String    @id @default(uuid())
+  socialAccountId          String    @unique
+  socialAccount            SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  isConfigured             Boolean   @default(false)
+  undesiredCommentsAction  String    @default("hide")
+  spamAction               String    @default("delete")
+  customInstructions       String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  faqRules FAQRule[]
+}
+
+model FAQRule {
+  id             String       @id @default(uuid())
+  pageSettingsId String
+  pageSettings   PageSettings @relation(fields: [pageSettingsId], references: [id], onDelete: Cascade)
+  question       String
+  answer         String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([pageSettingsId])
+}
+
+model Post {
+  id              String        @id // Facebook Post ID or Instagram Media ID
+  socialAccountId String
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  message         String?
+  imageUrl        String?
+  permalinkUrl    String?
+  comments        Comment[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([socialAccountId])
+}
+
+model Comment {
+  id            String        @id // Facebook/Instagram Comment ID
+  postId        String
+  post          Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parentId      String?
+  message       String
+  fromId        String
+  fromName      String
+  fromAvatar    String?
+  createdTime   DateTime
+  isRead        Boolean       @default(false)
+  isPageReply   Boolean       @default(false)
+  status        CommentStatus @default(VISIBLE)
+  action        CommentAction @default(NONE)
+  actionReason  String?
+  replyMessage  String?
+  permalinkUrl  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([postId])
+  @@index([fromId])
+  @@index([createdTime])
 }

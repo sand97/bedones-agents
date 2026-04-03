@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Spin, Typography, Button, Result } from 'antd'
-import { useEffect, useState } from 'react'
-import { fetchMe } from '@app/lib/api'
+import { useEffect, useRef, useState } from 'react'
+import { fetchMe, connectFacebook, connectInstagram } from '@app/lib/api'
 import { getAuthRedirect, clearAuthRedirect } from '@app/lib/auth-redirect'
 
 const { Text } = Typography
@@ -10,54 +10,104 @@ export const Route = createFileRoute('/auth/callback')({
   validateSearch: (search: Record<string, unknown>) => ({
     status: (search.status as string) || 'error',
     error: (search.error as string) || undefined,
+    code: (search.code as string) || undefined,
   }),
   component: AuthCallbackPage,
 })
 
 function AuthCallbackPage() {
-  const { status, error } = Route.useSearch()
+  const { status, error, code } = Route.useSearch()
   const navigate = useNavigate()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [loadingMessage, setLoadingMessage] = useState('Connexion en cours...')
+  const handledRef = useRef(false)
 
   useEffect(() => {
+    // Prevent double-execution (React StrictMode runs effects twice in dev)
+    if (handledRef.current) return
+    handledRef.current = true
+
     if (status !== 'success') {
-      setErrorMessage(getErrorMessage(error))
+      setErrorMessage(getErrorText(error))
       return
     }
 
-    // Auth succeeded — fetch user info and redirect
-    fetchMe()
-      .then((data) => {
-        const redirect = getAuthRedirect()
-        clearAuthRedirect()
+    const redirect = getAuthRedirect()
 
-        if (redirect?.intent === 'onboarding') {
-          navigate({
-            to: '/create-organisation',
-            search: redirect.step ? { step: redirect.step } : undefined,
-          })
-          return
-        }
+    // ─── OAuth code received — connect pages flow ───
+    if (code && redirect?.intent === 'connect_pages' && redirect.orgId) {
+      setLoadingMessage('Nous finalisons la connexion...')
 
-        // Login intent — find the best org to redirect to
-        const orgWithSocial = data.organisations.find((o) => o.socialAccounts.length > 0)
-        if (orgWithSocial) {
+      const provider = redirect.provider || 'facebook'
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+      const redirectUri = `${apiUrl}/auth/callback/${provider}`
+
+      const connectPromise =
+        provider === 'instagram'
+          ? connectInstagram(redirect.orgId, code, redirectUri)
+          : connectFacebook(redirect.orgId, code, redirectUri)
+
+      connectPromise
+        .then(() => {
+          clearAuthRedirect()
           navigate({
-            to: '/app/$orgSlug/dashboard',
-            params: { orgSlug: orgWithSocial.id },
+            to: '/app/$orgSlug/comments/$id',
+            params: { orgSlug: redirect.orgId!, id: provider },
           })
-        } else if (data.organisations.length > 0) {
-          // Has org but no social accounts → onboarding
-          navigate({ to: '/create-organisation' })
-        } else {
-          // No org at all → onboarding
-          navigate({ to: '/create-organisation' })
-        }
+        })
+        .catch((err) => {
+          clearAuthRedirect()
+          setErrorMessage(err instanceof Error ? err.message : 'Erreur de connexion de la page')
+        })
+      return
+    }
+
+    // ─── OAuth code received — onboarding flow ───
+    if (code && redirect?.intent === 'onboarding') {
+      clearAuthRedirect()
+      navigate({
+        to: '/create-organisation',
+        search: redirect.step ? { step: redirect.step } : undefined,
       })
-      .catch(() => {
-        setErrorMessage('Impossible de récupérer vos informations. Veuillez réessayer.')
-      })
-  }, [status, error, navigate])
+      return
+    }
+
+    // ─── Standard login callback (no code, just session cookie) ───
+    if (!code) {
+      fetchMe()
+        .then((data) => {
+          clearAuthRedirect()
+
+          if (redirect?.intent === 'onboarding') {
+            navigate({
+              to: '/create-organisation',
+              search: redirect.step ? { step: redirect.step } : undefined,
+            })
+            return
+          }
+
+          const orgWithSocial = data.organisations.find((o) => o.socialAccounts.length > 0)
+          if (orgWithSocial) {
+            navigate({
+              to: '/app/$orgSlug/dashboard',
+              params: { orgSlug: orgWithSocial.id },
+            })
+          } else if (data.organisations.length > 0) {
+            navigate({ to: '/create-organisation' })
+          } else {
+            navigate({ to: '/create-organisation' })
+          }
+        })
+        .catch(() => {
+          setErrorMessage('Impossible de récupérer vos informations. Veuillez réessayer.')
+        })
+      return
+    }
+
+    // Fallback — code present but no matching intent
+    clearAuthRedirect()
+    setErrorMessage("Code OAuth reçu mais aucune action n'est configurée. Veuillez réessayer.")
+  }, [status, error, code, navigate])
 
   if (errorMessage) {
     return (
@@ -79,12 +129,12 @@ function AuthCallbackPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4">
       <Spin size="large" />
-      <Text type="secondary">Connexion en cours...</Text>
+      <Text type="secondary">{loadingMessage}</Text>
     </div>
   )
 }
 
-function getErrorMessage(error?: string): string {
+function getErrorText(error?: string): string {
   switch (error) {
     case 'missing_code':
       return "Le code d'autorisation est manquant. Veuillez réessayer."

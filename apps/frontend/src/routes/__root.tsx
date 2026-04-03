@@ -1,8 +1,18 @@
 import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ComponentType, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 
 import appStyles from '../styles.css?url'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000, // 30s before data is considered stale
+      refetchOnWindowFocus: false,
+    },
+  },
+})
 
 export const Route = createRootRoute({
   head: () => ({
@@ -52,13 +62,15 @@ function RootComponent() {
 
   return (
     <RootDocument>
-      {AntdProviders ? (
-        <AntdProviders>
-          <Outlet />
-        </AntdProviders>
-      ) : (
-        <div />
-      )}
+      <QueryClientProvider client={queryClient}>
+        {AntdProviders ? (
+          <AntdProviders>
+            <Outlet />
+          </AntdProviders>
+        ) : (
+          <div />
+        )}
+      </QueryClientProvider>
     </RootDocument>
   )
 }

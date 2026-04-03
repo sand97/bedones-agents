@@ -35,7 +35,7 @@ export function PostList({ posts, selectedPostId, onSelect }: PostListProps) {
       {sorted.map((post) => {
         const isSelected = post.id === selectedPostId
         const hasUnread = post.unreadComments > 0
-        const displayText = post.content || 'Post sans message'
+        const displayText = post.message || 'Post sans message'
 
         return (
           <button
@@ -49,7 +49,7 @@ export function PostList({ posts, selectedPostId, onSelect }: PostListProps) {
             </Badge>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span
-                className={`truncate text-sm ${post.content ? 'text-text-primary' : 'italic text-text-muted'}`}
+                className={`truncate text-sm ${post.message ? 'text-text-primary' : 'italic text-text-muted'}`}
               >
                 {displayText}
               </span>

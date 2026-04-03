@@ -14,11 +14,34 @@ const EMPTY_ICON_SIZE = 40
 
 interface CommentsLayoutProps {
   posts: Post[]
+  provider: 'facebook' | 'instagram' | 'tiktok'
   loading?: boolean
   pageName?: string
+  accountId?: string
+  /** Whether the page settings have been configured by the user */
+  isConfigured?: boolean
+  onReply?: (commentId: string, message: string) => Promise<void>
+  onHide?: (commentId: string) => Promise<void>
+  onUnhide?: (commentId: string) => Promise<void>
+  onDelete?: (commentId: string) => Promise<void>
+  onMarkRead?: (postId: string) => Promise<void>
+  onSettingsSaved?: () => void
 }
 
-export function CommentsLayout({ posts, loading = false, pageName }: CommentsLayoutProps) {
+export function CommentsLayout({
+  posts,
+  provider,
+  loading = false,
+  pageName,
+  accountId,
+  isConfigured = false,
+  onReply,
+  onHide,
+  onUnhide,
+  onDelete,
+  onMarkRead,
+  onSettingsSaved,
+}: CommentsLayoutProps) {
   const navigate = useNavigate()
   const search = useSearch({ strict: false }) as { post?: string }
   const [configOpen, setConfigOpen] = useState(false)
@@ -34,12 +57,19 @@ export function CommentsLayout({ posts, loading = false, pageName }: CommentsLay
   const selectedPost = posts.find((p) => p.id === selectedPostId)
 
   const selectPost = (post: Post) => {
-    navigate({ search: { post: post.id } as never })
+    navigate({
+      search: (prev: Record<string, unknown>) => ({ ...prev, post: post.id }) as never,
+    })
+    // Mark as read when selecting a post
+    if (post.unreadComments > 0 && onMarkRead) {
+      onMarkRead(post.id)
+    }
   }
 
   const setFilter = (f: 'all' | 'unread') => {
     navigate({
-      search: (f === 'unread' ? { filter: 'unread' } : {}) as never,
+      search: (prev: Record<string, unknown>) =>
+        ({ ...prev, filter: f === 'unread' ? 'unread' : undefined }) as never,
     })
   }
 
@@ -90,7 +120,16 @@ export function CommentsLayout({ posts, loading = false, pageName }: CommentsLay
         className={`comments-split__right ${selectedPost ? 'comments-split__right--visible' : ''}`}
       >
         {selectedPost ? (
-          <CommentThread post={selectedPost} />
+          <CommentThread
+            post={selectedPost}
+            provider={provider}
+            accountId={accountId || ''}
+            isConfigured={isConfigured}
+            onReply={isConfigured ? onReply : undefined}
+            onHide={onHide}
+            onUnhide={onUnhide}
+            onDelete={onDelete}
+          />
         ) : (
           <SocialSetup
             icon={<CommentsIcon width={EMPTY_ICON_SIZE} height={EMPTY_ICON_SIZE} />}
@@ -105,11 +144,13 @@ export function CommentsLayout({ posts, loading = false, pageName }: CommentsLay
         )}
       </div>
 
-      {pageName && (
+      {pageName && accountId && (
         <CommentsConfigModal
           pageName={pageName}
+          accountId={accountId}
           open={configOpen}
           onClose={() => setConfigOpen(false)}
+          onSaved={onSettingsSaved}
         />
       )}
     </div>

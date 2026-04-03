@@ -25,7 +25,10 @@ export class AuthService {
   // ─── Email/Password Login ───
 
   async loginWithPassword(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } })
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      omit: { passwordHash: false },
+    })
 
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Email ou mot de passe incorrect')

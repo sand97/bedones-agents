@@ -14,6 +14,7 @@ import {
   Bell,
 } from 'lucide-react'
 import { useLayout } from '@app/contexts/layout-context'
+import { useUnreadCounts } from '@app/contexts/unread-context'
 import { OrgSwitcher } from './org-switcher'
 
 const ICON_SIZE = 18
@@ -25,6 +26,8 @@ interface NavItem {
   icon: React.ReactNode
   path: string
   badge?: number
+  /** Provider key to dynamically resolve the badge from unread counts */
+  unreadProvider?: string
 }
 
 interface NavGroup {
@@ -115,7 +118,7 @@ const mainGroups: NavGroup[] = [
           />
         ),
         path: 'comments/facebook',
-        badge: 24,
+        unreadProvider: 'FACEBOOK',
       },
       {
         key: 'instagram',
@@ -127,7 +130,7 @@ const mainGroups: NavGroup[] = [
           />
         ),
         path: 'comments/instagram',
-        badge: 5,
+        unreadProvider: 'INSTAGRAM',
       },
       {
         key: 'tiktok',
@@ -173,6 +176,7 @@ const bottomItems: NavItem[] = [
 
 export function Sidebar() {
   const { collapsed, isDesktop, mobileMenuOpen, setMobileMenuOpen } = useLayout()
+  const { counts: unreadCounts } = useUnreadCounts()
   const navigate = useNavigate()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
   const location = useLocation()
@@ -226,6 +230,9 @@ export function Sidebar() {
               {group.items.map((item) => {
                 const active = isActive(item.path)
                 const isCollapsed = collapsed && isDesktop
+                const badge = item.unreadProvider
+                  ? unreadCounts[item.unreadProvider] || undefined
+                  : item.badge
                 const btn = (
                   <button
                     key={item.key}
@@ -236,15 +243,13 @@ export function Sidebar() {
                   >
                     <span className="relative flex-shrink-0">
                       {item.icon}
-                      {isCollapsed && item.badge ? (
+                      {isCollapsed && badge ? (
                         <span className="absolute -top-1 -right-1 h-1.5 w-1.5 rounded-full bg-text-primary" />
                       ) : null}
                     </span>
                     {!isCollapsed && <span className="flex-1 truncate">{item.label}</span>}
-                    {!isCollapsed && item.badge ? (
-                      <span className="sidebar__nav-badge">
-                        {item.badge > 99 ? '99+' : item.badge}
-                      </span>
+                    {!isCollapsed && badge ? (
+                      <span className="sidebar__nav-badge">{badge > 99 ? '99+' : badge}</span>
                     ) : null}
                   </button>
                 )

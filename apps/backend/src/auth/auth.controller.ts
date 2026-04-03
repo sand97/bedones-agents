@@ -47,54 +47,40 @@ export class AuthController {
   }
 
   // ─── Facebook OAuth Callback ───
+  //
+  // This callback receives the OAuth code from Facebook after the user
+  // authorises. It forwards the code to the frontend which decides what
+  // to do based on the intent stored in localStorage:
+  //   • "connect_pages" → frontend calls POST /social/connect/facebook
+  //   • "login"         → (not implemented yet — email/password only for now)
+  //   • "onboarding"    → frontend calls POST /social/connect/facebook
 
   @Get('callback/facebook')
-  async facebookCallback(@Query('code') code: string, @Req() req: Request, @Res() res: Response) {
-    try {
-      if (!code) {
-        this.logger.error('[Facebook Callback] Missing code parameter')
-        return res.redirect(`${this.frontendUrl}/auth/callback?status=error&error=missing_code`)
-      }
-
-      // Build the redirect URI that was used when initiating the OAuth flow
-      const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol
-      const host = (req.headers['x-forwarded-host'] as string) || req.get('host')
-      const redirectUri = `${protocol}://${host}/auth/callback/facebook`
-
-      const { jwt, expiresAt } = await this.authService.handleFacebookCallback(code, redirectUri)
-      this.setSessionCookie(res, jwt, expiresAt)
-
-      return res.redirect(`${this.frontendUrl}/auth/callback?status=success`)
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'unexpected_error'
-      this.logger.error(`[Facebook Callback] Error: ${errorMsg}`)
-      return res.redirect(`${this.frontendUrl}/auth/callback?status=error&error=${errorMsg}`)
+  async facebookCallback(@Query('code') code: string, @Res() res: Response) {
+    if (!code) {
+      this.logger.error('[Facebook Callback] Missing code parameter')
+      return res.redirect(`${this.frontendUrl}/auth/callback?status=error&error=missing_code`)
     }
+
+    this.logger.log(`[Facebook Callback] Received code, forwarding to frontend`)
+    return res.redirect(
+      `${this.frontendUrl}/auth/callback?status=success&code=${encodeURIComponent(code)}`,
+    )
   }
 
   // ─── Instagram OAuth Callback ───
 
   @Get('callback/instagram')
-  async instagramCallback(@Query('code') code: string, @Req() req: Request, @Res() res: Response) {
-    try {
-      if (!code) {
-        this.logger.error('[Instagram Callback] Missing code parameter')
-        return res.redirect(`${this.frontendUrl}/auth/callback?status=error&error=missing_code`)
-      }
-
-      const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol
-      const host = (req.headers['x-forwarded-host'] as string) || req.get('host')
-      const redirectUri = `${protocol}://${host}/auth/callback/instagram`
-
-      const { jwt, expiresAt } = await this.authService.handleInstagramCallback(code, redirectUri)
-      this.setSessionCookie(res, jwt, expiresAt)
-
-      return res.redirect(`${this.frontendUrl}/auth/callback?status=success`)
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'unexpected_error'
-      this.logger.error(`[Instagram Callback] Error: ${errorMsg}`)
-      return res.redirect(`${this.frontendUrl}/auth/callback?status=error&error=${errorMsg}`)
+  async instagramCallback(@Query('code') code: string, @Res() res: Response) {
+    if (!code) {
+      this.logger.error('[Instagram Callback] Missing code parameter')
+      return res.redirect(`${this.frontendUrl}/auth/callback?status=error&error=missing_code`)
     }
+
+    this.logger.log(`[Instagram Callback] Received code, forwarding to frontend`)
+    return res.redirect(
+      `${this.frontendUrl}/auth/callback?status=success&code=${encodeURIComponent(code)}`,
+    )
   }
 
   // ─── Get current user ───

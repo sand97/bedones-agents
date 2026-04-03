@@ -273,6 +273,396 @@
           "Upload"
         ]
       }
+    },
+    "/social/connect/facebook": {
+      "post": {
+        "operationId": "SocialController_connectFacebook",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectPagesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SocialAccountResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/connect/instagram": {
+      "post": {
+        "operationId": "SocialController_connectInstagram",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectPagesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialAccountResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/accounts/{organisationId}": {
+      "get": {
+        "operationId": "SocialController_getAccounts",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SocialAccountResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/unread-counts/{organisationId}": {
+      "get": {
+        "operationId": "SocialController_getUnreadCounts",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UnreadCountDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/accounts/{accountId}/posts": {
+      "get": {
+        "operationId": "SocialController_getPosts",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/accounts/{accountId}/settings": {
+      "patch": {
+        "operationId": "SocialController_updateSettings",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePageSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageSettingsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/accounts/{accountId}/user-stats/{fromId}": {
+      "get": {
+        "operationId": "SocialController_getUserStats",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserStatsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/comments/mark-read": {
+      "post": {
+        "operationId": "SocialController_markRead",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkReadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/comments/reply": {
+      "post": {
+        "operationId": "SocialController_reply",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplyToCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/comments/hide": {
+      "post": {
+        "operationId": "SocialController_hide",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/comments/unhide": {
+      "post": {
+        "operationId": "SocialController_unhide",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/comments/delete": {
+      "post": {
+        "operationId": "SocialController_delete",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
     }
   },
   "info": {
@@ -607,6 +997,347 @@
         },
         "required": [
           "url"
+        ]
+      },
+      "ConnectPagesDto": {
+        "type": "object",
+        "properties": {
+          "organisationId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "redirectUri": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "organisationId",
+          "code",
+          "redirectUri"
+        ]
+      },
+      "FAQRuleResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "answer"
+        ]
+      },
+      "PageSettingsResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "isConfigured": {
+            "type": "boolean"
+          },
+          "undesiredCommentsAction": {
+            "type": "string"
+          },
+          "spamAction": {
+            "type": "string"
+          },
+          "customInstructions": {
+            "type": "string"
+          },
+          "faqRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FAQRuleResponseDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "isConfigured",
+          "undesiredCommentsAction",
+          "spamAction",
+          "faqRules"
+        ]
+      },
+      "SocialAccountResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "FACEBOOK",
+              "INSTAGRAM",
+              "WHATSAPP",
+              "TIKTOK"
+            ]
+          },
+          "providerAccountId": {
+            "type": "string"
+          },
+          "pageName": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "profilePictureUrl": {
+            "type": "string"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/PageSettingsResponseDto"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "providerAccountId"
+        ]
+      },
+      "UnreadCountDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "provider",
+          "count"
+        ]
+      },
+      "CommentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "postId": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "fromId": {
+            "type": "string"
+          },
+          "fromName": {
+            "type": "string"
+          },
+          "fromAvatar": {
+            "type": "string"
+          },
+          "createdTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "isPageReply": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "VISIBLE",
+              "HIDDEN",
+              "DELETED"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "HIDE",
+              "DELETE",
+              "REPLY"
+            ]
+          },
+          "actionReason": {
+            "type": "string"
+          },
+          "replyMessage": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "postId",
+          "message",
+          "fromId",
+          "fromName",
+          "createdTime",
+          "isRead",
+          "isPageReply",
+          "status",
+          "action"
+        ]
+      },
+      "PostResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "permalinkUrl": {
+            "type": "string"
+          },
+          "totalComments": {
+            "type": "number"
+          },
+          "unreadComments": {
+            "type": "number"
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommentResponseDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "totalComments",
+          "unreadComments",
+          "comments"
+        ]
+      },
+      "FAQRuleDto": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "answer"
+        ]
+      },
+      "UpdatePageSettingsDto": {
+        "type": "object",
+        "properties": {
+          "undesiredCommentsAction": {
+            "type": "string",
+            "enum": [
+              "hide",
+              "delete",
+              "none"
+            ]
+          },
+          "spamAction": {
+            "type": "string",
+            "enum": [
+              "hide",
+              "delete",
+              "none"
+            ]
+          },
+          "customInstructions": {
+            "type": "string"
+          },
+          "faqRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FAQRuleDto"
+            }
+          }
+        }
+      },
+      "UserStatsResponseDto": {
+        "type": "object",
+        "properties": {
+          "fromId": {
+            "type": "string"
+          },
+          "fromName": {
+            "type": "string"
+          },
+          "fromAvatar": {
+            "type": "string"
+          },
+          "totalComments": {
+            "type": "number"
+          },
+          "hiddenComments": {
+            "type": "number"
+          },
+          "deletedComments": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "fromId",
+          "fromName",
+          "totalComments",
+          "hiddenComments",
+          "deletedComments"
+        ]
+      },
+      "MarkReadDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "postId"
+        ]
+      },
+      "ReplyToCommentDto": {
+        "type": "object",
+        "properties": {
+          "commentId": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "commentId",
+          "message"
+        ]
+      },
+      "CommentActionDto": {
+        "type": "object",
+        "properties": {
+          "commentId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "commentId"
         ]
       }
     }

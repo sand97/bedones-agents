@@ -1,11 +1,25 @@
 import type { ReactNode } from 'react'
-import { Button, Card, Form, Input, Modal, Select } from 'antd'
+import { useEffect, useState } from 'react'
+import { App, Button, Card, Form, Input, Modal, Select } from 'antd'
 import { ShieldAlert, ShieldBan, Plus, Trash2 } from 'lucide-react'
+import { updatePageSettings } from '@app/lib/api'
+import type { PageSettingsResponse } from '@app/lib/api'
 
 interface CommentsConfigModalProps {
   pageName: string
+  accountId: string
   open: boolean
   onClose: () => void
+  onSaved?: () => void
+  /** Pre-loaded settings to avoid extra fetch */
+  initialSettings?: PageSettingsResponse
+}
+
+interface FormValues {
+  unwantedAction: string
+  spamAction: string
+  quickReplies: { question: string; answer: string }[]
+  customInstructions: string
 }
 
 const moderationOptions = [
@@ -47,9 +61,9 @@ function ConfigTitle({ pageName }: { pageName: string }) {
   )
 }
 
-function ConfigForm(): ReactNode {
+function ConfigForm({ form }: { form: ReturnType<typeof Form.useForm<FormValues>>[0] }): ReactNode {
   return (
-    <Form layout="vertical" className="flex flex-col gap-5">
+    <Form form={form} layout="vertical" className="flex flex-col gap-5">
       {/* Commentaires indésirables */}
       <Card size="small">
         <div className="mb-3">
@@ -96,7 +110,7 @@ function ConfigForm(): ReactNode {
           </div>
         </div>
 
-        <Form.List name="quickReplies" initialValue={[{ question: '', answer: '' }]}>
+        <Form.List name="quickReplies">
           {(fields, { add, remove }) => (
             <div className="flex flex-col gap-3">
               {fields.map((field) => (
@@ -146,7 +160,68 @@ function ConfigForm(): ReactNode {
   )
 }
 
-export function CommentsConfigModal({ pageName, open, onClose }: CommentsConfigModalProps) {
+export function CommentsConfigModal({
+  pageName,
+  accountId,
+  open,
+  onClose,
+  onSaved,
+  initialSettings,
+}: CommentsConfigModalProps) {
+  const [form] = Form.useForm<FormValues>()
+  const [saving, setSaving] = useState(false)
+  const { message: messageApi } = App.useApp()
+
+  // Load existing settings when modal opens
+  useEffect(() => {
+    if (!open) return
+
+    // If we have pre-loaded settings that were explicitly configured, populate the form
+    if (initialSettings?.isConfigured) {
+      form.setFieldsValue({
+        unwantedAction: initialSettings.undesiredCommentsAction,
+        spamAction: initialSettings.spamAction,
+        quickReplies: initialSettings.faqRules?.length
+          ? initialSettings.faqRules.map((r) => ({ question: r.question, answer: r.answer }))
+          : [],
+        customInstructions: initialSettings.customInstructions || '',
+      })
+      return
+    }
+
+    // If initialSettings exist but not configured, or no settings at all → empty form
+    if (initialSettings || initialSettings === undefined) {
+      form.resetFields()
+      return
+    }
+  }, [open, initialSettings, form])
+
+  const handleSave = async () => {
+    const values = form.getFieldsValue()
+    setSaving(true)
+
+    try {
+      const faqRules = (values.quickReplies || []).filter(
+        (r) => r.question.trim() && r.answer.trim(),
+      )
+
+      await updatePageSettings(accountId, {
+        undesiredCommentsAction: values.unwantedAction,
+        spamAction: values.spamAction,
+        customInstructions: values.customInstructions || undefined,
+        faqRules: faqRules.length > 0 ? faqRules : undefined,
+      })
+
+      messageApi.success('Configuration sauvegardée')
+      onSaved?.()
+      onClose()
+    } catch (err) {
+      messageApi.error(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <Modal
       open={open}
@@ -159,14 +234,14 @@ export function CommentsConfigModal({ pageName, open, onClose }: CommentsConfigM
         <Button key="cancel" onClick={onClose}>
           Annuler
         </Button>,
-        <Button key="save" type="primary" onClick={onClose}>
+        <Button key="save" type="primary" onClick={handleSave} loading={saving}>
           Sauvegarder
         </Button>,
       ]}
       width={520}
       destroyOnClose
     >
-      <ConfigForm />
+      <ConfigForm form={form} />
     </Modal>
   )
 }

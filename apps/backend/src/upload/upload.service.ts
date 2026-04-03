@@ -36,6 +36,45 @@ export class UploadService {
     return `http://${endpoint}:${port}/${this.bucket}/${filename}`
   }
 
+  /**
+   * Download an image from a URL and upload it to Minio.
+   * Returns the public URL of the uploaded file, or null on failure.
+   */
+  async uploadFromUrl(imageUrl: string, folder: string): Promise<string | null> {
+    try {
+      const response = await fetch(imageUrl)
+      if (!response.ok) {
+        this.logger.warn(`[Upload] Failed to download image (HTTP ${response.status}): ${imageUrl}`)
+        return null
+      }
+
+      const contentType = response.headers.get('content-type') || 'image/jpeg'
+      const ext = contentType.includes('png')
+        ? 'png'
+        : contentType.includes('webp')
+          ? 'webp'
+          : 'jpg'
+      const buffer = Buffer.from(await response.arrayBuffer())
+
+      await this.ensureBucket()
+
+      const filename = `${folder}/${crypto.randomUUID()}.${ext}`
+      await this.client.putObject(this.bucket, filename, buffer, buffer.length, {
+        'Content-Type': contentType,
+      })
+
+      const endpoint = this.configService.getOrThrow<string>('MINIO_ENDPOINT')
+      const port = this.configService.getOrThrow<string>('MINIO_PORT')
+
+      const url = `http://${endpoint}:${port}/${this.bucket}/${filename}`
+      this.logger.log(`[Upload] Uploaded ${imageUrl.substring(0, 80)}... → ${url}`)
+      return url
+    } catch (error) {
+      this.logger.error(`[Upload] Failed to upload from URL: ${imageUrl}`, error)
+      return null
+    }
+  }
+
   private async ensureBucket() {
     const exists = await this.client.bucketExists(this.bucket)
     if (!exists) {

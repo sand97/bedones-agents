@@ -149,6 +149,198 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/social/connect/facebook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SocialController_connectFacebook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/connect/instagram": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SocialController_connectInstagram"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/accounts/{organisationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SocialController_getAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/unread-counts/{organisationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SocialController_getUnreadCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/accounts/{accountId}/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SocialController_getPosts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/accounts/{accountId}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["SocialController_updateSettings"];
+        trace?: never;
+    };
+    "/social/accounts/{accountId}/user-stats/{fromId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SocialController_getUserStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/comments/mark-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SocialController_markRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/comments/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SocialController_reply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/comments/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SocialController_hide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/comments/unhide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SocialController_unhide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/comments/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SocialController_delete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -236,6 +428,96 @@ export interface components {
         UploadResponseDto: {
             /** @example https://minio.bedones.local/logos/abc123.png */
             url: string;
+        };
+        ConnectPagesDto: {
+            organisationId: string;
+            code: string;
+            redirectUri: string;
+        };
+        FAQRuleResponseDto: {
+            id: string;
+            question: string;
+            answer: string;
+        };
+        PageSettingsResponseDto: {
+            id: string;
+            isConfigured: boolean;
+            undesiredCommentsAction: string;
+            spamAction: string;
+            customInstructions?: string;
+            faqRules: components["schemas"]["FAQRuleResponseDto"][];
+        };
+        SocialAccountResponseDto: {
+            id: string;
+            /** @enum {string} */
+            provider: "FACEBOOK" | "INSTAGRAM" | "WHATSAPP" | "TIKTOK";
+            providerAccountId: string;
+            pageName?: string;
+            username?: string;
+            profilePictureUrl?: string;
+            settings?: components["schemas"]["PageSettingsResponseDto"];
+        };
+        UnreadCountDto: {
+            provider: string;
+            count: number;
+        };
+        CommentResponseDto: {
+            id: string;
+            postId: string;
+            parentId?: string;
+            message: string;
+            fromId: string;
+            fromName: string;
+            fromAvatar?: string;
+            /** Format: date-time */
+            createdTime: string;
+            isRead: boolean;
+            isPageReply: boolean;
+            /** @enum {string} */
+            status: "VISIBLE" | "HIDDEN" | "DELETED";
+            /** @enum {string} */
+            action: "NONE" | "HIDE" | "DELETE" | "REPLY";
+            actionReason?: string;
+            replyMessage?: string;
+        };
+        PostResponseDto: {
+            id: string;
+            message?: string;
+            imageUrl?: string;
+            permalinkUrl?: string;
+            totalComments: number;
+            unreadComments: number;
+            comments: components["schemas"]["CommentResponseDto"][];
+        };
+        FAQRuleDto: {
+            question: string;
+            answer: string;
+        };
+        UpdatePageSettingsDto: {
+            /** @enum {string} */
+            undesiredCommentsAction?: "hide" | "delete" | "none";
+            /** @enum {string} */
+            spamAction?: "hide" | "delete" | "none";
+            customInstructions?: string;
+            faqRules?: components["schemas"]["FAQRuleDto"][];
+        };
+        UserStatsResponseDto: {
+            fromId: string;
+            fromName: string;
+            fromAvatar?: string;
+            totalComments: number;
+            hiddenComments: number;
+            deletedComments: number;
+        };
+        MarkReadDto: {
+            postId: string;
+        };
+        ReplyToCommentDto: {
+            commentId: string;
+            message: string;
+        };
+        CommentActionDto: {
+            commentId: string;
         };
     };
     responses: never;
@@ -453,6 +735,275 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UploadResponseDto"];
+                };
+            };
+        };
+    };
+    SocialController_connectFacebook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectPagesDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountResponseDto"][];
+                };
+            };
+        };
+    };
+    SocialController_connectInstagram: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectPagesDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountResponseDto"];
+                };
+            };
+        };
+    };
+    SocialController_getAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountResponseDto"][];
+                };
+            };
+        };
+    };
+    SocialController_getUnreadCounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadCountDto"][];
+                };
+            };
+        };
+    };
+    SocialController_getPosts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostResponseDto"][];
+                };
+            };
+        };
+    };
+    SocialController_updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePageSettingsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageSettingsResponseDto"];
+                };
+            };
+        };
+    };
+    SocialController_getUserStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+                fromId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserStatsResponseDto"];
+                };
+            };
+        };
+    };
+    SocialController_markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkReadDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SocialController_reply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplyToCommentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentResponseDto"];
+                };
+            };
+        };
+    };
+    SocialController_hide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentActionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentResponseDto"];
+                };
+            };
+        };
+    };
+    SocialController_unhide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentActionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentResponseDto"];
+                };
+            };
+        };
+    };
+    SocialController_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentActionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentResponseDto"];
                 };
             };
         };

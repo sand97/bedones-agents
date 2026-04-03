@@ -6,10 +6,14 @@
 
 const AUTH_REDIRECT_KEY = 'auth_redirect'
 
+export type InstagramScope = 'comments' | 'messages' | 'comments+messages'
+
 export interface AuthRedirectIntent {
-  intent: 'login' | 'onboarding'
+  intent: 'login' | 'onboarding' | 'connect_pages'
   step?: number
   orgId?: string
+  provider?: 'facebook' | 'instagram'
+  igScope?: InstagramScope
 }
 
 export function setAuthRedirect(data: AuthRedirectIntent) {
@@ -31,7 +35,7 @@ export function clearAuthRedirect() {
 }
 
 /**
- * Build the Facebook OAuth URL for business page connection (onboarding).
+ * Build the Facebook OAuth URL for business page connection.
  * Requires a config_id from a Facebook Login Configuration.
  */
 export function buildFacebookOAuthUrl(configId: string): string {
@@ -49,18 +53,28 @@ export function buildFacebookOAuthUrl(configId: string): string {
 }
 
 /**
- * Build the Instagram OAuth URL for login.
+ * Build the Instagram OAuth URL for business account connection.
+ * Uses the Instagram OAuth endpoint with scopes based on the feature context.
  */
-export function buildInstagramOAuthUrl(): string {
-  const appId = import.meta.env.VITE_FACEBOOK_APP_ID // Instagram uses Facebook App ID
+export function buildInstagramOAuthUrl(scope: InstagramScope = 'comments'): string {
+  const appId = import.meta.env.VITE_INSTAGRAM_APP_ID
   const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
   const redirectUri = `${apiUrl}/auth/callback/instagram`
+
+  const scopes = ['instagram_business_basic']
+  if (scope === 'comments' || scope === 'comments+messages') {
+    scopes.push('instagram_business_manage_comments')
+  }
+  if (scope === 'messages' || scope === 'comments+messages') {
+    scopes.push('instagram_business_manage_messages')
+  }
 
   const url = new URL('https://www.instagram.com/oauth/authorize')
   url.searchParams.set('client_id', appId)
   url.searchParams.set('redirect_uri', redirectUri)
-  url.searchParams.set('scope', 'instagram_business_basic')
   url.searchParams.set('response_type', 'code')
+  url.searchParams.set('scope', scopes.join(','))
+  url.searchParams.set('force_reauth', 'true')
 
   return url.toString()
 }

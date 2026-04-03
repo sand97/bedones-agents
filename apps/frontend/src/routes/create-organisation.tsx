@@ -17,7 +17,11 @@ import {
   TikTokIcon,
   WhatsAppIcon,
 } from '@app/components/icons/social-icons'
-import { setAuthRedirect, buildFacebookOAuthUrl } from '@app/lib/auth-redirect'
+import {
+  setAuthRedirect,
+  buildFacebookOAuthUrl,
+  buildInstagramOAuthUrl,
+} from '@app/lib/auth-redirect'
 
 export const Route = createFileRoute('/create-organisation')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -221,12 +225,8 @@ function getConfigIdForPlatform(
     if (hasMessaging) return import.meta.env.VITE_FB_MESSAGES_CONFIGGURATION_ID
   }
 
-  if (platformId === 'instagram') {
-    if (hasComments && hasMessaging)
-      return import.meta.env.VITE_IG_COMMENTS_MESSAGES_CONFIGGURATION_ID
-    if (hasComments) return import.meta.env.VITE_IG_COMMENTS_CONFIGGURATION_ID
-    if (hasMessaging) return import.meta.env.VITE_IG_MESSAGES_CONFIGGURATION_ID
-  }
+  // Instagram uses its own OAuth with scopes, no config_id needed
+  if (platformId === 'instagram') return null
 
   return null
 }
@@ -331,10 +331,24 @@ function CreateOrganisationPage() {
     // Determine the correct Facebook Login Configuration ID based on platform + features
     const configId = getConfigIdForPlatform(platformId, selectedFeatures)
 
-    if (configId && (platformId === 'facebook' || platformId === 'instagram')) {
-      // Real OAuth redirect — store current step so we come back here
+    if (platformId === 'facebook' && configId) {
       setAuthRedirect({ intent: 'onboarding', step: safeCurrentStep })
       window.location.href = buildFacebookOAuthUrl(configId)
+      return
+    }
+
+    if (platformId === 'instagram') {
+      const hasComments = selectedFeatures.comments.has('instagram')
+      const hasMessaging = selectedFeatures.messaging.has('instagram')
+      const igScope =
+        hasComments && hasMessaging
+          ? ('comments+messages' as const)
+          : hasMessaging
+            ? ('messages' as const)
+            : ('comments' as const)
+
+      setAuthRedirect({ intent: 'onboarding', step: safeCurrentStep, igScope })
+      window.location.href = buildInstagramOAuthUrl(igScope)
       return
     }
 

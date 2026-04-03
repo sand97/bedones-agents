@@ -1,0 +1,737 @@
+import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { PrismaService } from '../prisma/prisma.service'
+import { EncryptionService } from '../auth/encryption.service'
+import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
+
+interface FacebookPage {
+  id: string
+  name: string
+  access_token: string
+  picture?: { data?: { url?: string } }
+}
+
+@Injectable()
+export class SocialService {
+  private readonly logger = new Logger(SocialService.name)
+
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService,
+    private encryptionService: EncryptionService,
+  ) {}
+
+  // ─── Connect Facebook Pages ───
+
+  async connectFacebookPages(
+    userId: string,
+    organisationId: string,
+    code: string,
+    redirectUri: string,
+  ) {
+    this.logger.log(
+      `[Facebook] connectFacebookPages called — userId=${userId}, orgId=${organisationId}, redirectUri=${redirectUri}, code=${code.substring(0, 15)}...`,
+    )
+    await this.assertMembership(userId, organisationId)
+
+    const appId = this.configService.getOrThrow<string>('FACEBOOK_APP_ID')
+    const appSecret = this.configService.getOrThrow<string>('FACEBOOK_APP_SECRET')
+
+    // Exchange code for user access token
+    const tokenUrl = new URL(
+      `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/oauth/access_token`,
+    )
+    tokenUrl.searchParams.set('client_id', appId)
+    tokenUrl.searchParams.set('client_secret', appSecret)
+    tokenUrl.searchParams.set('redirect_uri', redirectUri)
+    tokenUrl.searchParams.set('code', code)
+
+    this.logger.log(`[Facebook] Exchanging code for access token...`)
+    const tokenResponse = await fetch(tokenUrl.toString())
+    const tokenBody = await tokenResponse.text()
+
+    if (!tokenResponse.ok) {
+      this.logger.error(
+        `[Facebook] Token exchange failed (HTTP ${tokenResponse.status}): ${tokenBody}`,
+      )
+      throw new BadRequestException('token_exchange_failed')
+    }
+
+    const { access_token: userAccessToken } = JSON.parse(tokenBody) as { access_token: string }
+    this.logger.log(`[Facebook] Token exchange OK — fetching /me/accounts...`)
+
+    // Fetch user's pages
+    const pagesUrl = new URL(`https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/me/accounts`)
+    pagesUrl.searchParams.set('access_token', userAccessToken)
+    pagesUrl.searchParams.set('fields', 'id,name,access_token,picture{url}')
+
+    const pagesResponse = await fetch(pagesUrl.toString())
+    const pagesBody = await pagesResponse.text()
+
+    if (!pagesResponse.ok) {
+      this.logger.error(
+        `[Facebook] Failed to fetch pages (HTTP ${pagesResponse.status}): ${pagesBody}`,
+      )
+      throw new BadRequestException('Failed to fetch Facebook pages')
+    }
+
+    const { data: pages } = JSON.parse(pagesBody) as { data: FacebookPage[] }
+    this.logger.log(
+      `[Facebook] Found ${pages?.length || 0} pages: ${JSON.stringify(pages, null, 2)}`,
+    )
+
+    if (!pages?.length) {
+      throw new BadRequestException('No Facebook pages found for this account')
+    }
+
+    // Save each page and subscribe to webhook
+    const savedPages = []
+    for (const page of pages) {
+      this.logger.log(`[Facebook] Saving page "${page.name}" (${page.id})...`)
+      const encryptedToken = await this.encryptionService.encrypt(page.access_token)
+      const pictureUrl = page.picture?.data?.url || null
+
+      const socialAccount = await this.prisma.socialAccount.upsert({
+        where: {
+          provider_providerAccountId: {
+            provider: 'FACEBOOK',
+            providerAccountId: page.id,
+          },
+        },
+        create: {
+          organisationId,
+          provider: 'FACEBOOK',
+          providerAccountId: page.id,
+          pageName: page.name,
+          profilePictureUrl: pictureUrl,
+          accessToken: encryptedToken,
+          scopes: [],
+        },
+        update: {
+          pageName: page.name,
+          profilePictureUrl: pictureUrl,
+          accessToken: encryptedToken,
+        },
+      })
+
+      // Create default settings if they don't exist
+      await this.prisma.pageSettings.upsert({
+        where: { socialAccountId: socialAccount.id },
+        create: { socialAccountId: socialAccount.id },
+        update: {},
+      })
+
+      // Subscribe page to webhook
+      await this.subscribePageToWebhook(page.id, page.access_token)
+
+      savedPages.push(socialAccount)
+    }
+
+    this.logger.log(`[Facebook] ✅ Connected ${savedPages.length} pages for org ${organisationId}`)
+    return savedPages
+  }
+
+  // ─── Connect Instagram Account ───
+
+  async connectInstagramAccount(
+    userId: string,
+    organisationId: string,
+    code: string,
+    redirectUri: string,
+  ) {
+    this.logger.log(
+      `[Instagram] connectInstagramAccount called — userId=${userId}, orgId=${organisationId}, redirectUri=${redirectUri}, code=${code.substring(0, 15)}...`,
+    )
+    await this.assertMembership(userId, organisationId)
+
+    const appId = this.configService.getOrThrow<string>('INSTAGRAM_APP_ID')
+    const appSecret = this.configService.getOrThrow<string>('INSTAGRAM_APP_SECRET')
+
+    // Exchange code for short-lived token
+    this.logger.log(`[Instagram] Exchanging code for short-lived token...`)
+    const tokenResponse = await fetch('https://api.instagram.com/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: appId,
+        client_secret: appSecret,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri,
+        code,
+      }),
+    })
+
+    const tokenBody = await tokenResponse.text()
+    if (!tokenResponse.ok) {
+      this.logger.error(
+        `[Instagram] Token exchange failed (HTTP ${tokenResponse.status}): ${tokenBody}`,
+      )
+      throw new BadRequestException('token_exchange_failed')
+    }
+
+    const tokenData = JSON.parse(tokenBody)
+    this.logger.log(
+      `[Instagram] Token exchange response: ${JSON.stringify({ ...tokenData, access_token: '***' }, null, 2)}`,
+    )
+    const { access_token: shortLivedToken, user_id } = tokenData as {
+      access_token: string
+      user_id: number
+    }
+    this.logger.log(`[Instagram] Short-lived token OK — user_id=${user_id}`)
+
+    // Exchange for long-lived token
+    let accessToken = shortLivedToken
+    this.logger.log(`[Instagram] Exchanging for long-lived token...`)
+    const longLivedUrl = new URL('https://graph.instagram.com/access_token')
+    longLivedUrl.searchParams.set('grant_type', 'ig_exchange_token')
+    longLivedUrl.searchParams.set('client_secret', appSecret)
+    longLivedUrl.searchParams.set('access_token', shortLivedToken)
+
+    const longLivedResponse = await fetch(longLivedUrl.toString())
+    if (longLivedResponse.ok) {
+      const data: { access_token: string } = await longLivedResponse.json()
+      accessToken = data.access_token
+      this.logger.log(`[Instagram] Long-lived token OK`)
+    } else {
+      const llError = await longLivedResponse.text()
+      this.logger.warn(
+        `[Instagram] Long-lived token exchange failed (HTTP ${longLivedResponse.status}), using short-lived: ${llError}`,
+      )
+    }
+
+    // Fetch Instagram profile — user_id is the Instagram Professional Account ID used in webhooks
+    this.logger.log(`[Instagram] Fetching /me profile...`)
+    const meUrl = new URL('https://graph.instagram.com/me')
+    meUrl.searchParams.set('fields', 'id,user_id,username,profile_picture_url,name')
+    meUrl.searchParams.set('access_token', accessToken)
+
+    const meResponse = await fetch(meUrl.toString())
+    const meBody = await meResponse.text()
+    if (!meResponse.ok) {
+      this.logger.error(`[Instagram] Profile fetch failed (HTTP ${meResponse.status}): ${meBody}`)
+      throw new BadRequestException('Failed to fetch Instagram profile')
+    }
+
+    const profileRaw = JSON.parse(meBody) as {
+      id: string
+      user_id: number
+      username?: string
+      name?: string
+      profile_picture_url?: string
+    }
+    this.logger.log(`[Instagram] Profile response: ${JSON.stringify(profileRaw, null, 2)}`)
+
+    // user_id is the Instagram Professional Account ID (matches webhook entry.id)
+    // id is the app-scoped Facebook user ID (different!)
+    const igAccountId = profileRaw.user_id.toString()
+    const encryptedToken = await this.encryptionService.encrypt(accessToken)
+
+    const socialAccount = await this.prisma.socialAccount.upsert({
+      where: {
+        provider_providerAccountId: {
+          provider: 'INSTAGRAM',
+          providerAccountId: igAccountId,
+        },
+      },
+      create: {
+        organisationId,
+        provider: 'INSTAGRAM',
+        providerAccountId: igAccountId,
+        pageName: profileRaw.name || profileRaw.username,
+        username: profileRaw.username,
+        profilePictureUrl: profileRaw.profile_picture_url || null,
+        accessToken: encryptedToken,
+        scopes: [],
+      },
+      update: {
+        pageName: profileRaw.name || profileRaw.username,
+        username: profileRaw.username,
+        profilePictureUrl: profileRaw.profile_picture_url || null,
+        accessToken: encryptedToken,
+      },
+    })
+
+    // Create default settings
+    await this.prisma.pageSettings.upsert({
+      where: { socialAccountId: socialAccount.id },
+      create: { socialAccountId: socialAccount.id },
+      update: {},
+    })
+
+    // Instagram webhooks are configured at the app level in the Meta App Dashboard.
+    // No per-account subscription is needed (unlike Facebook Pages).
+    this.logger.log(`[Instagram] Webhook subscription is app-level — no per-account call needed`)
+
+    this.logger.log(
+      `[Instagram] ✅ Connected account "${profileRaw.username}" (${socialAccount.id}) for org ${organisationId}`,
+    )
+    return socialAccount
+  }
+
+  // ─── Webhook subscriptions ───
+
+  private async subscribePageToWebhook(pageId: string, pageAccessToken: string) {
+    try {
+      const response = await fetch(
+        `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${pageId}/subscribed_apps?subscribed_fields=feed&access_token=${pageAccessToken}`,
+        { method: 'POST' },
+      )
+
+      if (!response.ok) {
+        const error = await response.text()
+        this.logger.error(`[Facebook Webhook] Failed to subscribe page ${pageId}: ${error}`)
+        return
+      }
+
+      this.logger.log(`[Facebook Webhook] Subscribed page ${pageId}`)
+    } catch (error) {
+      this.logger.error(`[Facebook Webhook] Error subscribing page ${pageId}:`, error)
+    }
+  }
+
+  // ─── Page settings ───
+
+  async updatePageSettings(
+    userId: string,
+    socialAccountId: string,
+    data: {
+      undesiredCommentsAction?: string
+      spamAction?: string
+      customInstructions?: string
+      faqRules?: { question: string; answer: string }[]
+    },
+  ) {
+    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+      where: { id: socialAccountId },
+      select: { organisationId: true },
+    })
+
+    await this.assertMembership(userId, account.organisationId)
+
+    const settings = await this.prisma.pageSettings.upsert({
+      where: { socialAccountId },
+      create: {
+        socialAccountId,
+        isConfigured: true,
+        undesiredCommentsAction: data.undesiredCommentsAction || 'hide',
+        spamAction: data.spamAction || 'delete',
+        customInstructions: data.customInstructions,
+      },
+      update: {
+        isConfigured: true,
+        undesiredCommentsAction: data.undesiredCommentsAction,
+        spamAction: data.spamAction,
+        customInstructions: data.customInstructions,
+      },
+    })
+
+    // Replace FAQ rules if provided
+    if (data.faqRules) {
+      await this.prisma.fAQRule.deleteMany({ where: { pageSettingsId: settings.id } })
+
+      if (data.faqRules.length > 0) {
+        await this.prisma.fAQRule.createMany({
+          data: data.faqRules.map((rule) => ({
+            pageSettingsId: settings.id,
+            question: rule.question,
+            answer: rule.answer,
+          })),
+        })
+      }
+    }
+
+    return this.prisma.pageSettings.findUniqueOrThrow({
+      where: { id: settings.id },
+      include: { faqRules: true },
+    })
+  }
+
+  // ─── Get social accounts for org ───
+
+  async getAccountsForOrg(userId: string, organisationId: string) {
+    await this.assertMembership(userId, organisationId)
+
+    return this.prisma.socialAccount.findMany({
+      where: { organisationId },
+      include: {
+        settings: { include: { faqRules: true } },
+        _count: { select: { posts: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+  }
+
+  // ─── Get posts with comments for a social account ───
+
+  async getPostsForAccount(userId: string, socialAccountId: string) {
+    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+      where: { id: socialAccountId },
+      select: { organisationId: true },
+    })
+
+    await this.assertMembership(userId, account.organisationId)
+
+    const posts = await this.prisma.post.findMany({
+      where: { socialAccountId },
+      include: {
+        comments: {
+          orderBy: { createdTime: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return posts.map((post) => ({
+      ...post,
+      totalComments: post.comments.length,
+      unreadComments: post.comments.filter((c) => !c.isRead && !c.isPageReply).length,
+    }))
+  }
+
+  // ─── User stats ───
+
+  async getUserStats(userId: string, accountId: string, fromId: string) {
+    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+      where: { id: accountId },
+      select: { organisationId: true },
+    })
+
+    await this.assertMembership(userId, account.organisationId)
+
+    const comments = await this.prisma.comment.findMany({
+      where: {
+        fromId,
+        isPageReply: false,
+        post: { socialAccountId: accountId },
+      },
+      select: { status: true, fromName: true, fromAvatar: true },
+    })
+
+    const first = comments[0]
+
+    return {
+      fromId,
+      fromName: first?.fromName || fromId,
+      fromAvatar: first?.fromAvatar || null,
+      totalComments: comments.length,
+      hiddenComments: comments.filter((c) => c.status === 'HIDDEN').length,
+      deletedComments: comments.filter((c) => c.status === 'DELETED').length,
+    }
+  }
+
+  // ─── Mark comments as read ───
+
+  async markCommentsAsRead(userId: string, postId: string) {
+    const post = await this.prisma.post.findUniqueOrThrow({
+      where: { id: postId },
+      select: { socialAccount: { select: { organisationId: true } } },
+    })
+
+    await this.assertMembership(userId, post.socialAccount.organisationId)
+
+    await this.prisma.comment.updateMany({
+      where: { postId, isRead: false },
+      data: { isRead: true },
+    })
+  }
+
+  // ─── Reply to a comment ───
+
+  async replyToComment(userId: string, commentId: string, message: string) {
+    const comment = await this.prisma.comment.findUniqueOrThrow({
+      where: { id: commentId },
+      include: {
+        post: {
+          include: {
+            socialAccount: { select: { id: true, provider: true, organisationId: true } },
+          },
+        },
+      },
+    })
+
+    await this.assertMembership(userId, comment.post.socialAccount.organisationId)
+
+    const accessToken = await this.getDecryptedToken(comment.post.socialAccount.id)
+    const provider = comment.post.socialAccount.provider
+
+    // Tag the user so they get a notification
+    const taggedMessage =
+      provider === 'FACEBOOK'
+        ? `@[${comment.fromId}] ${message}`
+        : `@${comment.fromName} ${message}`
+
+    if (provider === 'FACEBOOK') {
+      await this.facebookReplyToComment(commentId, taggedMessage, accessToken)
+    } else if (provider === 'INSTAGRAM') {
+      await this.instagramReplyToComment(commentId, taggedMessage, accessToken)
+    }
+
+    // Save the reply as a new comment (with tag)
+    const replyId = `reply_${Date.now()}_${commentId}`
+    return this.prisma.comment.create({
+      data: {
+        id: replyId,
+        postId: comment.postId,
+        parentId: commentId,
+        message: taggedMessage,
+        fromId: comment.post.socialAccount.id,
+        fromName: 'Page',
+        createdTime: new Date(),
+        isRead: true,
+        isPageReply: true,
+      },
+    })
+  }
+
+  // ─── Hide a comment ───
+
+  async hideComment(userId: string, commentId: string) {
+    const comment = await this.prisma.comment.findUniqueOrThrow({
+      where: { id: commentId },
+      include: {
+        post: {
+          include: {
+            socialAccount: { select: { id: true, provider: true, organisationId: true } },
+          },
+        },
+      },
+    })
+
+    await this.assertMembership(userId, comment.post.socialAccount.organisationId)
+
+    const accessToken = await this.getDecryptedToken(comment.post.socialAccount.id)
+    const provider = comment.post.socialAccount.provider
+
+    if (provider === 'FACEBOOK') {
+      await this.facebookHideComment(commentId, accessToken)
+    } else if (provider === 'INSTAGRAM') {
+      await this.instagramHideComment(commentId, accessToken)
+    }
+
+    return this.prisma.comment.update({
+      where: { id: commentId },
+      data: { status: 'HIDDEN', action: 'HIDE' },
+    })
+  }
+
+  // ─── Unhide a comment ───
+
+  async unhideComment(userId: string, commentId: string) {
+    const comment = await this.prisma.comment.findUniqueOrThrow({
+      where: { id: commentId },
+      include: {
+        post: {
+          include: {
+            socialAccount: { select: { id: true, provider: true, organisationId: true } },
+          },
+        },
+      },
+    })
+
+    await this.assertMembership(userId, comment.post.socialAccount.organisationId)
+
+    const accessToken = await this.getDecryptedToken(comment.post.socialAccount.id)
+    const provider = comment.post.socialAccount.provider
+
+    if (provider === 'FACEBOOK') {
+      await this.facebookUnhideComment(commentId, accessToken)
+    } else if (provider === 'INSTAGRAM') {
+      await this.instagramUnhideComment(commentId, accessToken)
+    }
+
+    return this.prisma.comment.update({
+      where: { id: commentId },
+      data: { status: 'VISIBLE', action: 'NONE', actionReason: null },
+    })
+  }
+
+  // ─── Delete a comment ───
+
+  async deleteComment(userId: string, commentId: string) {
+    const comment = await this.prisma.comment.findUniqueOrThrow({
+      where: { id: commentId },
+      include: {
+        post: {
+          include: {
+            socialAccount: { select: { id: true, provider: true, organisationId: true } },
+          },
+        },
+      },
+    })
+
+    await this.assertMembership(userId, comment.post.socialAccount.organisationId)
+
+    const accessToken = await this.getDecryptedToken(comment.post.socialAccount.id)
+    const provider = comment.post.socialAccount.provider
+
+    if (provider === 'FACEBOOK') {
+      await this.facebookDeleteComment(commentId, accessToken)
+    } else if (provider === 'INSTAGRAM') {
+      await this.instagramDeleteComment(commentId, accessToken)
+    }
+
+    return this.prisma.comment.update({
+      where: { id: commentId },
+      data: { status: 'DELETED', action: 'DELETE' },
+    })
+  }
+
+  // ─── Facebook API actions ───
+
+  private async facebookReplyToComment(commentId: string, message: string, accessToken: string) {
+    const response = await fetch(
+      `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${commentId}/comments?access_token=${accessToken}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+      },
+    )
+    if (!response.ok) {
+      this.logger.error(`[Facebook] Reply failed: ${await response.text()}`)
+      throw new BadRequestException('Failed to reply to comment')
+    }
+  }
+
+  private async facebookHideComment(commentId: string, accessToken: string) {
+    const response = await fetch(
+      `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${commentId}?access_token=${accessToken}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_hidden: true }),
+      },
+    )
+    if (!response.ok) {
+      this.logger.error(`[Facebook] Hide failed: ${await response.text()}`)
+      throw new BadRequestException('Failed to hide comment')
+    }
+  }
+
+  private async facebookUnhideComment(commentId: string, accessToken: string) {
+    const response = await fetch(
+      `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${commentId}?access_token=${accessToken}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_hidden: false }),
+      },
+    )
+    if (!response.ok) {
+      this.logger.error(`[Facebook] Unhide failed: ${await response.text()}`)
+      throw new BadRequestException('Failed to unhide comment')
+    }
+  }
+
+  private async facebookDeleteComment(commentId: string, accessToken: string) {
+    const response = await fetch(
+      `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${commentId}?access_token=${accessToken}`,
+      { method: 'DELETE' },
+    )
+    if (!response.ok) {
+      this.logger.error(`[Facebook] Delete failed: ${await response.text()}`)
+      throw new BadRequestException('Failed to delete comment')
+    }
+  }
+
+  // ─── Instagram API actions ───
+
+  private async instagramReplyToComment(commentId: string, message: string, accessToken: string) {
+    const response = await fetch(
+      `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/${commentId}/replies?access_token=${accessToken}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+      },
+    )
+    if (!response.ok) {
+      this.logger.error(`[Instagram] Reply failed: ${await response.text()}`)
+      throw new BadRequestException('Failed to reply to comment')
+    }
+  }
+
+  private async instagramHideComment(commentId: string, accessToken: string) {
+    const response = await fetch(
+      `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/${commentId}?hide=true&access_token=${accessToken}`,
+      { method: 'POST' },
+    )
+    if (!response.ok) {
+      this.logger.error(`[Instagram] Hide failed: ${await response.text()}`)
+      throw new BadRequestException('Failed to hide comment')
+    }
+  }
+
+  private async instagramUnhideComment(commentId: string, accessToken: string) {
+    const response = await fetch(
+      `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/${commentId}?hide=false&access_token=${accessToken}`,
+      { method: 'POST' },
+    )
+    if (!response.ok) {
+      this.logger.error(`[Instagram] Unhide failed: ${await response.text()}`)
+      throw new BadRequestException('Failed to unhide comment')
+    }
+  }
+
+  private async instagramDeleteComment(commentId: string, accessToken: string) {
+    const response = await fetch(
+      `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/${commentId}?access_token=${accessToken}`,
+      { method: 'DELETE' },
+    )
+    if (!response.ok) {
+      this.logger.error(`[Instagram] Delete failed: ${await response.text()}`)
+      throw new BadRequestException('Failed to delete comment')
+    }
+  }
+
+  // ─── Unread comment counts per provider ───
+
+  async getUnreadCounts(userId: string, organisationId: string) {
+    await this.assertMembership(userId, organisationId)
+
+    const accounts = await this.prisma.socialAccount.findMany({
+      where: { organisationId },
+      select: {
+        provider: true,
+        posts: {
+          select: {
+            comments: {
+              where: { isRead: false, isPageReply: false },
+              select: { id: true },
+            },
+          },
+        },
+      },
+    })
+
+    const counts: Record<string, number> = {}
+    for (const account of accounts) {
+      const unread = account.posts.reduce((sum, post) => sum + post.comments.length, 0)
+      counts[account.provider] = (counts[account.provider] || 0) + unread
+    }
+
+    return Object.entries(counts).map(([provider, count]) => ({ provider, count }))
+  }
+
+  // ─── Get decrypted access token ───
+
+  async getDecryptedToken(socialAccountId: string): Promise<string> {
+    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+      where: { id: socialAccountId },
+      select: { accessToken: true },
+    })
+    return this.encryptionService.decrypt(account.accessToken)
+  }
+
+  // ─── Helpers ───
+
+  private async assertMembership(userId: string, organisationId: string) {
+    const membership = await this.prisma.organisationMember.findUnique({
+      where: { userId_organisationId: { userId, organisationId } },
+    })
+
+    if (!membership) {
+      throw new ForbiddenException("Vous n'êtes pas membre de cette organisation")
+    }
+  }
+}

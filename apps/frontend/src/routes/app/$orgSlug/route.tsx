@@ -1,5 +1,7 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router'
 import { LayoutProvider, useLayout } from '@app/contexts/layout-context'
+import { UnreadProvider } from '@app/contexts/unread-context'
+import { SocketProvider } from '@app/contexts/socket-context'
 import { Sidebar } from '@app/components/layout/sidebar'
 
 export const Route = createFileRoute('/app/$orgSlug')({
@@ -30,7 +32,11 @@ function DashboardLayoutContent() {
 function DashboardLayout() {
   return (
     <LayoutProvider>
-      <DashboardLayoutContent />
+      <SocketProvider>
+        <UnreadProvider>
+          <DashboardLayoutContent />
+        </UnreadProvider>
+      </SocketProvider>
     </LayoutProvider>
   )
 }

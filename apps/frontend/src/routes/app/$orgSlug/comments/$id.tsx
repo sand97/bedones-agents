@@ -1,22 +1,31 @@
 import type { ReactNode } from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
-import { Button } from 'antd'
+import { useQueryClient } from '@tanstack/react-query'
+import { App, Button, Progress } from 'antd'
 import { ArrowLeft, CheckCircle, MessageSquareOff, Settings } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { AccountSwitcher, type SocialAccount } from '@app/components/social/account-switcher'
 import { CommentsLayout } from '@app/components/comments/comments-layout'
 import { CommentsConfigModal } from '@app/components/comments/comments-config'
-import { MOCK_POSTS } from '@app/components/comments/mock-data'
 import { FacebookIcon, InstagramIcon, TikTokIcon } from '@app/components/icons/social-icons'
 import { useLayout } from '@app/contexts/layout-context'
+import { useUnreadCounts } from '@app/contexts/unread-context'
+import { $api } from '@app/lib/api/$api'
+import type { Post } from '@app/components/comments/mock-data'
+import {
+  setAuthRedirect,
+  buildFacebookOAuthUrl,
+  buildInstagramOAuthUrl,
+} from '@app/lib/auth-redirect'
 
 export const Route = createFileRoute('/app/$orgSlug/comments/$id')({
   component: CommentsPage,
   validateSearch: (search: Record<string, unknown>) => ({
     post: (search.post as string) || undefined,
     filter: (search.filter as string) || undefined,
+    account: (search.account as string) || undefined,
   }),
 })
 
@@ -33,6 +42,7 @@ const COMMENT_CONFIG: Record<
     description: string
     button: string
     connectLabel: string
+    provider: 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK'
   }
 > = {
   facebook: {
@@ -45,6 +55,7 @@ const COMMENT_CONFIG: Record<
       'Reliez votre page Facebook pour suivre et répondre aux commentaires de vos publications directement depuis Bedones.',
     button: 'Connecter une page Facebook',
     connectLabel: 'Connecter une page',
+    provider: 'FACEBOOK',
   },
   instagram: {
     label: 'Commentaires Instagram',
@@ -56,6 +67,7 @@ const COMMENT_CONFIG: Record<
       'Reliez votre compte Instagram professionnel pour gérer les commentaires de vos publications directement depuis Bedones.',
     button: 'Connecter un compte Instagram',
     connectLabel: 'Connecter un compte',
+    provider: 'INSTAGRAM',
   },
   tiktok: {
     label: 'Commentaires TikTok',
@@ -67,13 +79,60 @@ const COMMENT_CONFIG: Record<
       'Reliez votre compte TikTok Business pour suivre et répondre aux commentaires de vos vidéos directement depuis Bedones.',
     button: 'Connecter un compte TikTok',
     connectLabel: 'Connecter un compte',
+    provider: 'TIKTOK',
   },
 }
 
-const MOCK_FB_ACCOUNTS: SocialAccount[] = [
-  { id: '1', name: 'Mboa Fashion' },
-  { id: '2', name: 'Chez Fatou Boutique' },
-]
+/** Map API post response to component Post type */
+function mapPost(p: {
+  id: string
+  message?: string
+  imageUrl?: string
+  permalinkUrl?: string
+  totalComments: number
+  unreadComments: number
+  comments: {
+    id: string
+    postId: string
+    parentId?: string
+    message: string
+    fromId: string
+    fromName: string
+    fromAvatar?: string
+    createdTime: string
+    isRead: boolean
+    isPageReply: boolean
+    status: string
+    action: string
+    actionReason?: string
+    replyMessage?: string
+  }[]
+}): Post {
+  return {
+    id: p.id,
+    message: p.message ?? undefined,
+    imageUrl: p.imageUrl ?? undefined,
+    permalinkUrl: p.permalinkUrl ?? undefined,
+    totalComments: p.totalComments,
+    unreadComments: p.unreadComments,
+    comments: p.comments.map((c) => ({
+      id: c.id,
+      postId: c.postId,
+      parentId: c.parentId ?? undefined,
+      message: c.message,
+      fromId: c.fromId,
+      fromName: c.fromName,
+      fromAvatar: c.fromAvatar ?? undefined,
+      createdTime: c.createdTime as string,
+      isRead: c.isRead,
+      isPageReply: c.isPageReply,
+      status: c.status as 'VISIBLE' | 'HIDDEN' | 'DELETED',
+      action: c.action as 'NONE' | 'HIDE' | 'DELETE' | 'REPLY',
+      actionReason: c.actionReason ?? undefined,
+      replyMessage: c.replyMessage ?? undefined,
+    })),
+  }
+}
 
 function MobileBackButton() {
   const navigate = useNavigate()
@@ -81,7 +140,11 @@ function MobileBackButton() {
   return (
     <Button
       type="text"
-      onClick={() => navigate({ search: {} as never })}
+      onClick={() =>
+        navigate({
+          search: (prev: Record<string, unknown>) => ({ ...prev, post: undefined }) as never,
+        })
+      }
       icon={<ArrowLeft size={18} strokeWidth={1.5} />}
       className="p-0!"
     >
@@ -90,126 +153,162 @@ function MobileBackButton() {
   )
 }
 
-function TikTokPage({ config }: { config: (typeof COMMENT_CONFIG)[string] }) {
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 3000)
-    return () => clearTimeout(t)
-  }, [])
-
-  return (
-    <div className="flex h-screen flex-col overflow-hidden">
-      <DashboardHeader
-        title={config.label}
-        mobileTitle={config.mobileLabel}
-        action={
-          <AccountSwitcher
-            accounts={[{ id: '1', name: 'mboafashion_tiktok' }]}
-            currentAccount={{ id: '1', name: 'mboafashion_tiktok' }}
-            connectLabel={config.connectLabel}
-          />
-        }
-      />
-      <CommentsLayout posts={[]} loading={loading} />
-    </div>
-  )
-}
-
-type InstagramStep = 'idle' | 'connected' | 'configured'
-
-function InstagramPage({
-  config,
-  title,
-}: {
-  config: (typeof COMMENT_CONFIG)[string]
-  title: string
-}) {
-  const [step, setStep] = useState<InstagramStep>('idle')
-  const [configOpen, setConfigOpen] = useState(false)
-  const currentAccount = { id: '1', name: 'mboafashion_officiel' }
-
-  const headerAction =
-    step !== 'idle' ? (
-      <AccountSwitcher
-        accounts={[currentAccount]}
-        currentAccount={currentAccount}
-        connectLabel={config.connectLabel}
-      />
-    ) : undefined
-
-  return (
-    <div className="flex min-h-screen flex-col">
-      <DashboardHeader title={title} action={headerAction} />
-
-      {/* Step 1 — Not connected yet */}
-      {step === 'idle' && (
-        <SocialSetup
-          icon={config.icon}
-          color={config.color}
-          title={config.title}
-          description={config.description}
-          buttonLabel={config.button}
-          onAction={() => setStep('connected')}
-        />
-      )}
-
-      {/* Step 2 — Connected, needs configuration */}
-      {step === 'connected' && (
-        <>
-          <SocialSetup
-            icon={<CheckCircle size={40} strokeWidth={1.5} />}
-            color={config.color}
-            title="Page ajoutée avec succès"
-            description="Configurez maintenant comment l'IA doit répondre aux commentaires"
-            buttonLabel="Configurer les réponses"
-            buttonIcon={<Settings size={18} />}
-            onAction={() => setConfigOpen(true)}
-          />
-          <CommentsConfigModal
-            pageName={currentAccount.name}
-            open={configOpen}
-            onClose={() => {
-              setConfigOpen(false)
-              setStep('configured')
-            }}
-          />
-        </>
-      )}
-
-      {/* Step 3 — Configured, waiting for comments */}
-      {step === 'configured' && (
-        <>
-          <SocialSetup
-            icon={<MessageSquareOff size={40} strokeWidth={1.5} />}
-            color={config.color}
-            title="Aucun commentaire reçu"
-            description="Les commentaires de vos publications Instagram apparaîtront ici"
-            buttonLabel="Modifier la configuration"
-            buttonType="default"
-            buttonIcon={<Settings size={18} />}
-            onAction={() => setConfigOpen(true)}
-          />
-          <CommentsConfigModal
-            pageName={currentAccount.name}
-            open={configOpen}
-            onClose={() => setConfigOpen(false)}
-          />
-        </>
-      )}
-    </div>
-  )
-}
-
 function CommentsPage() {
-  const { id } = useParams({ from: '/app/$orgSlug/comments/$id' })
+  const { id, orgSlug } = useParams({ from: '/app/$orgSlug/comments/$id' })
   const search = useSearch({ from: '/app/$orgSlug/comments/$id' })
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { isDesktop } = useLayout()
+  const { refresh: refreshUnread } = useUnreadCounts()
+  const { message: messageApi } = App.useApp()
   const config = COMMENT_CONFIG[id]
   const title = config?.label || `Commentaires — ${id}`
 
   const hasSelectedPost = !!search.post
 
+  // The selected account comes from URL search param
+  const currentAccountId = search.account || null
+
+  const [configOpen, setConfigOpen] = useState(false)
+  const [configJustConnected, setConfigJustConnected] = useState(false)
+  const [connecting, setConnecting] = useState(false)
+
+  // ─── Accounts query ───
+  const accountsQuery = $api.useQuery('get', '/social/accounts/{organisationId}', {
+    params: { path: { organisationId: orgSlug } },
+  })
+
+  // Filter accounts by provider
+  const accounts = useMemo(
+    () => (accountsQuery.data ?? []).filter((a) => a.provider === config?.provider),
+    [accountsQuery.data, config?.provider],
+  )
+
+  // Auto-select first account if none in URL
+  const setAccountInUrl = useCallback(
+    (accountId: string) => {
+      navigate({
+        search: (prev: Record<string, unknown>) =>
+          ({ ...prev, account: accountId, post: undefined }) as never,
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  // Auto-select on first load
+  if (accounts.length > 0 && !currentAccountId) {
+    setAccountInUrl(accounts[0].id)
+  }
+
+  // ─── Posts query ───
+  const postsQuery = $api.useQuery(
+    'get',
+    '/social/accounts/{accountId}/posts',
+    { params: { path: { accountId: currentAccountId! } } },
+    { enabled: !!currentAccountId },
+  )
+
+  const posts: Post[] = useMemo(
+    () => (postsQuery.data ?? []).map((p) => mapPost(p as Parameters<typeof mapPost>[0])),
+    [postsQuery.data],
+  )
+
+  // ─── Derived ───
+  const currentAccount = accounts.find((a) => a.id === currentAccountId)
+  const hasAccounts = accounts.length > 0
+  const isConfigured = !!currentAccount?.settings?.isConfigured
+  const hasPosts = posts.length > 0
+  const isRefreshing = postsQuery.isFetching && !postsQuery.isLoading
+
+  // ─── Invalidation helper ───
+  const invalidatePosts = useCallback(() => {
+    if (!currentAccountId) return
+    queryClient.invalidateQueries({
+      queryKey: [
+        'get',
+        '/social/accounts/{accountId}/posts',
+        { params: { path: { accountId: currentAccountId } } },
+      ],
+    })
+  }, [queryClient, currentAccountId])
+
+  const invalidateAccounts = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: ['get', '/social/accounts/{organisationId}'],
+    })
+  }, [queryClient])
+
+  // ─── Mutations ───
+  const replyMutation = $api.useMutation('post', '/social/comments/reply')
+  const hideMutation = $api.useMutation('post', '/social/comments/hide')
+  const unhideMutation = $api.useMutation('post', '/social/comments/unhide')
+  const deleteMutation = $api.useMutation('post', '/social/comments/delete')
+  const markReadMutation = $api.useMutation('post', '/social/comments/mark-read')
+
+  // ─── Actions ───
+  const handleReply = async (commentId: string, message: string) => {
+    await replyMutation.mutateAsync({ body: { commentId, message } })
+    invalidatePosts()
+  }
+
+  const handleHide = async (commentId: string) => {
+    await hideMutation.mutateAsync({ body: { commentId } })
+    invalidatePosts()
+  }
+
+  const handleUnhide = async (commentId: string) => {
+    await unhideMutation.mutateAsync({ body: { commentId } })
+    invalidatePosts()
+  }
+
+  const handleDelete = async (commentId: string) => {
+    await deleteMutation.mutateAsync({ body: { commentId } })
+    invalidatePosts()
+  }
+
+  const handleMarkRead = async (postId: string) => {
+    try {
+      await markReadMutation.mutateAsync({ body: { postId } })
+      invalidatePosts()
+      refreshUnread()
+    } catch {
+      // silent
+    }
+  }
+
+  const handleConnect = () => {
+    if (id === 'tiktok') {
+      messageApi.info('TikTok sera disponible prochainement')
+      return
+    }
+
+    setConnecting(true)
+
+    setAuthRedirect({
+      intent: 'connect_pages',
+      orgId: orgSlug,
+      provider: id as 'facebook' | 'instagram',
+    })
+
+    if (id === 'facebook') {
+      const configId = import.meta.env.VITE_FB_COMMENTS_CONFIGGURATION_ID
+      if (!configId) {
+        messageApi.error('Configuration Facebook manquante (VITE_FB_COMMENTS_CONFIGGURATION_ID)')
+        setConnecting(false)
+        return
+      }
+      window.location.href = buildFacebookOAuthUrl(configId)
+    } else if (id === 'instagram') {
+      window.location.href = buildInstagramOAuthUrl('comments')
+    }
+  }
+
+  const handleSwitchAccount = (account: SocialAccount) => {
+    setAccountInUrl(account.id)
+  }
+
+  // ─── Not found ───
   if (!config) {
     return (
       <div className="flex min-h-screen flex-col">
@@ -221,47 +320,156 @@ function CommentsPage() {
     )
   }
 
-  // Facebook: full comments UI with mock data
-  if (id === 'facebook') {
+  // ─── Loading (first load, no cache) ───
+  if (accountsQuery.isLoading) {
     return (
       <div className="flex h-screen flex-col overflow-hidden">
-        <DashboardHeader
-          title={config.label}
-          mobileTitle={config.mobileLabel}
-          action={
-            <AccountSwitcher
-              accounts={MOCK_FB_ACCOUNTS}
-              currentAccount={MOCK_FB_ACCOUNTS[0]}
-              connectLabel={config.connectLabel}
-            />
-          }
-          mobileLeft={hasSelectedPost && !isDesktop ? <MobileBackButton /> : undefined}
-        />
-        <CommentsLayout posts={MOCK_POSTS} pageName={MOCK_FB_ACCOUNTS[0].name} />
+        <DashboardHeader title={config.label} mobileTitle={config.mobileLabel} />
+        <CommentsLayout posts={[]} provider={id as 'facebook' | 'instagram' | 'tiktok'} loading />
       </div>
     )
   }
 
-  // Instagram: connected but no comments yet
-  if (id === 'instagram') {
-    return <InstagramPage config={config} title={title} />
+  // ─── No account connected → Setup screen ───
+  if (!hasAccounts) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <DashboardHeader title={config.label} mobileTitle={config.mobileLabel} />
+        <SocialSetup
+          icon={config.icon}
+          color={config.color}
+          title={config.title}
+          description={config.description}
+          buttonLabel={config.button}
+          loading={connecting}
+          onAction={handleConnect}
+        />
+      </div>
+    )
   }
 
-  // TikTok: loading skeleton use case
-  if (id === 'tiktok') {
-    return <TikTokPage config={config} />
+  // ─── Build account switcher items ───
+  const accountSwitcherItems: SocialAccount[] = accounts.map((a) => ({
+    id: a.id,
+    name: a.pageName || a.username || a.providerAccountId,
+    avatarUrl: a.profilePictureUrl ?? undefined,
+  }))
+
+  const currentSwitcherItem =
+    accountSwitcherItems.find((a) => a.id === currentAccountId) || accountSwitcherItems[0]
+
+  const accountSwitcher = (
+    <AccountSwitcher
+      accounts={accountSwitcherItems}
+      currentAccount={currentSwitcherItem}
+      connectLabel={config.connectLabel}
+      onSwitch={handleSwitchAccount}
+      onConnect={handleConnect}
+    />
+  )
+
+  // ─── Account connected but no settings configured → Config prompt ───
+  if (!isConfigured || configJustConnected) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <DashboardHeader
+          title={config.label}
+          mobileTitle={config.mobileLabel}
+          action={accountSwitcher}
+        />
+        <SocialSetup
+          icon={<CheckCircle size={40} strokeWidth={1.5} />}
+          color={config.color}
+          title="Page ajoutée avec succès"
+          description="Configurez maintenant comment l'IA doit répondre aux commentaires"
+          buttonLabel="Configurer les réponses"
+          buttonIcon={<Settings size={18} />}
+          onAction={() => setConfigOpen(true)}
+        />
+        {currentAccountId && (
+          <CommentsConfigModal
+            pageName={currentSwitcherItem.name}
+            accountId={currentAccountId}
+            open={configOpen}
+            onClose={() => setConfigOpen(false)}
+            onSaved={() => {
+              setConfigJustConnected(false)
+              invalidateAccounts()
+            }}
+          />
+        )}
+      </div>
+    )
   }
 
-  // Others: setup screen
+  // ─── No posts yet → empty state ───
+  if (!hasPosts && !postsQuery.isFetching && postsQuery.isFetched) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <DashboardHeader
+          title={config.label}
+          mobileTitle={config.mobileLabel}
+          action={accountSwitcher}
+        />
+        <SocialSetup
+          icon={<MessageSquareOff size={40} strokeWidth={1.5} />}
+          color={config.color}
+          title="Aucun commentaire reçu"
+          description={`Les commentaires de vos publications ${config.mobileLabel} apparaîtront ici`}
+          buttonLabel="Modifier la configuration"
+          buttonType="default"
+          buttonIcon={<Settings size={18} />}
+          onAction={() => setConfigOpen(true)}
+        />
+        {currentAccountId && (
+          <CommentsConfigModal
+            pageName={currentSwitcherItem.name}
+            accountId={currentAccountId}
+            open={configOpen}
+            onClose={() => setConfigOpen(false)}
+            onSaved={() => invalidateAccounts()}
+            initialSettings={currentAccount?.settings ?? undefined}
+          />
+        )}
+      </div>
+    )
+  }
+
+  // ─── Full comments UI ───
   return (
-    <div className="flex min-h-screen flex-col">
-      <DashboardHeader title={title} />
-      <SocialSetup
-        icon={config.icon}
-        color={config.color}
-        title={config.title}
-        description={config.description}
-        buttonLabel={config.button}
+    <div className="flex h-screen flex-col overflow-hidden">
+      <DashboardHeader
+        title={config.label}
+        mobileTitle={config.mobileLabel}
+        action={accountSwitcher}
+        mobileLeft={hasSelectedPost && !isDesktop ? <MobileBackButton /> : undefined}
+      />
+
+      {/* Background refresh indicator */}
+      {isRefreshing && (
+        <Progress
+          percent={100}
+          status="active"
+          showInfo={false}
+          strokeLinecap="square"
+          size={[undefined as unknown as number, 2]}
+          className="comments-refresh-progress"
+        />
+      )}
+
+      <CommentsLayout
+        posts={posts}
+        provider={id as 'facebook' | 'instagram' | 'tiktok'}
+        loading={postsQuery.isLoading}
+        pageName={currentSwitcherItem.name}
+        accountId={currentAccountId || undefined}
+        isConfigured={isConfigured}
+        onReply={handleReply}
+        onHide={handleHide}
+        onUnhide={handleUnhide}
+        onDelete={handleDelete}
+        onMarkRead={handleMarkRead}
+        onSettingsSaved={() => invalidateAccounts()}
       />
     </div>
   )
