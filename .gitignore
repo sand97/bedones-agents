@@ -8,3 +8,4 @@
 /.claude/
 /apps/backend/.env
 /apps/frontend/.env
+/apps/frontend/dist/

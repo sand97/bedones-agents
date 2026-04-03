@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useMemo, type ReactNode } from 'react'
-import { Avatar, Button, Card, Checkbox, Input, Steps, Tooltip, Upload } from 'antd'
+import { Button, Card, Checkbox, Input, Steps, Tooltip, Upload } from 'antd'
 import {
   ArrowLeft,
   ArrowRight,
@@ -9,7 +9,6 @@ import {
   MessagesSquare,
   Plus,
   Trash2,
-  User,
 } from 'lucide-react'
 import {
   FacebookIcon,
@@ -18,8 +17,12 @@ import {
   TikTokIcon,
   WhatsAppIcon,
 } from '@app/components/icons/social-icons'
+import { setAuthRedirect, buildFacebookOAuthUrl } from '@app/lib/auth-redirect'
 
 export const Route = createFileRoute('/create-organisation')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    step: search.step ? Number(search.step) : undefined,
+  }),
   component: CreateOrganisationPage,
 })
 
@@ -200,6 +203,34 @@ function getPlatformStepDescription(
   return `Connectez ${branding.name} à notre système pour qu'il réponde à vos clients. Pas de panique il ne sera actif qu'après configuration`
 }
 
+/**
+ * Get the Facebook Login Configuration ID for a given platform based on selected features.
+ * These configuration IDs are set up in Meta Business Suite and define which permissions to request.
+ */
+function getConfigIdForPlatform(
+  platformId: string,
+  selectedFeatures: Record<FeatureType, Set<string>>,
+): string | null {
+  const hasComments = selectedFeatures.comments.has(platformId)
+  const hasMessaging = selectedFeatures.messaging.has(platformId)
+
+  if (platformId === 'facebook') {
+    if (hasComments && hasMessaging)
+      return import.meta.env.VITE_FB_COMMENTS_MESSAGES_CONFIGGURATION_ID
+    if (hasComments) return import.meta.env.VITE_FB_COMMENTS_CONFIGGURATION_ID
+    if (hasMessaging) return import.meta.env.VITE_FB_MESSAGES_CONFIGGURATION_ID
+  }
+
+  if (platformId === 'instagram') {
+    if (hasComments && hasMessaging)
+      return import.meta.env.VITE_IG_COMMENTS_MESSAGES_CONFIGGURATION_ID
+    if (hasComments) return import.meta.env.VITE_IG_COMMENTS_CONFIGGURATION_ID
+    if (hasMessaging) return import.meta.env.VITE_IG_MESSAGES_CONFIGGURATION_ID
+  }
+
+  return null
+}
+
 /** Format connected pages for stepper description */
 function formatConnectedPages(pages: string[], platformId?: string): string {
   if (pages.length === 0) {
@@ -211,18 +242,11 @@ function formatConnectedPages(pages: string[], platformId?: string): string {
   return `${pages.slice(0, 2).join(', ')} +${pages.length - 2}`
 }
 
-/* ─── Mock user ─── */
-
-const MOCK_USER = {
-  name: 'Konan Achi',
-  email: 'konan@example.com',
-  avatar: null as string | null,
-}
-
 /* ─── Main component ─── */
 
 function CreateOrganisationPage() {
-  const [currentStep, setCurrentStep] = useState(0)
+  const { step: initialStep } = Route.useSearch()
+  const [currentStep, setCurrentStep] = useState(initialStep || 0)
   const [orgName, setOrgName] = useState('')
   const [orgLogo, setOrgLogo] = useState<string | null>(null)
 
@@ -303,12 +327,22 @@ function CreateOrganisationPage() {
     })
   }
 
-  const handleSimulateConnect = (platformId: string) => {
+  const handleConnect = (platformId: string) => {
+    // Determine the correct Facebook Login Configuration ID based on platform + features
+    const configId = getConfigIdForPlatform(platformId, selectedFeatures)
+
+    if (configId && (platformId === 'facebook' || platformId === 'instagram')) {
+      // Real OAuth redirect — store current step so we come back here
+      setAuthRedirect({ intent: 'onboarding', step: safeCurrentStep })
+      window.location.href = buildFacebookOAuthUrl({ configId })
+      return
+    }
+
+    // WhatsApp uses Embedded Signup (handled separately) / TikTok not yet implemented
+    // For now keep mock behavior
     const mockPages: Record<string, string[]> = {
       whatsapp: ['+237 691 000 001'],
-      facebook: ['Mboa Fashion', 'Test Page'],
       tiktok: ['@mboa_fashion'],
-      instagram: ['mboa.fashion'],
     }
     setConnectedPages((prev) => ({
       ...prev,
@@ -403,7 +437,7 @@ function CreateOrganisationPage() {
               platform={requiredPlatforms[safeCurrentStep - 2]}
               selectedFeatures={selectedFeatures}
               connectedPages={connectedPages[requiredPlatforms[safeCurrentStep - 2]?.id] || []}
-              onConnect={() => handleSimulateConnect(requiredPlatforms[safeCurrentStep - 2]?.id)}
+              onConnect={() => handleConnect(requiredPlatforms[safeCurrentStep - 2]?.id)}
               onRemovePage={(page) =>
                 handleRemovePage(requiredPlatforms[safeCurrentStep - 2]?.id, page)
               }

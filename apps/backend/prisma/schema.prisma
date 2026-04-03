@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───
+
+enum AuthType {
+  PASSWORD
+  FACEBOOK
+  INSTAGRAM
+}
+
+enum SocialProvider {
+  FACEBOOK
+  INSTAGRAM
+  WHATSAPP
+  TIKTOK
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ─── Models ───
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  name           String
+  avatar         String?
+  passwordHash   String?
+  authType       AuthType
+  providerUserId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  memberships OrganisationMember[]
+  sessions    Session[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Organisation {
+  id        String   @id @default(uuid())
+  name      String
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members        OrganisationMember[]
+  socialAccounts SocialAccount[]
+}
+
+model OrganisationMember {
+  id             String       @id @default(uuid())
+  userId         String
+  organisationId String
+  role           OrgRole      @default(OWNER)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, organisationId])
+}
+
+model SocialAccount {
+  id                String         @id @default(uuid())
+  organisationId    String
+  organisation      Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  provider          SocialProvider
+  providerAccountId String
+  pageName          String?
+  accessToken       String
+  refreshToken      String?
+  tokenExpiresAt    DateTime?
+  scopes            String[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([provider, providerAccountId])
+}

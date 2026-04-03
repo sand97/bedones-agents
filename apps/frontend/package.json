@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 3007",
+    "generate:api": "node scripts/generate-api.mjs",
+    "generate:api:watch": "node scripts/generate-api.mjs --watch",
     "build": "vite build",
     "start": "node .output/server/index.mjs",
     "lint": "eslint .",
@@ -20,6 +22,7 @@
     "antd": "^5.29.3",
     "dayjs": "^1.11.19",
     "lucide-react": "^0.545.0",
+    "openapi-fetch": "^0.17.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "recharts": "^3.8.1"
@@ -30,9 +33,11 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.1.4",
+    "chokidar": "^5.0.0",
     "eslint": "^9.21.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.7.2",

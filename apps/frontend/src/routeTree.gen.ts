@@ -15,6 +15,7 @@ import { Route as LegalPrivacyRouteImport } from './routes/legal/privacy'
 import { Route as LegalMentionsRouteImport } from './routes/legal/mentions'
 import { Route as LegalConditionsRouteImport } from './routes/legal/conditions'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
+import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AppOrgSlugRouteRouteImport } from './routes/app/$orgSlug/route'
 import { Route as AppOrgSlugWebsiteRouteImport } from './routes/app/$orgSlug/website'
 import { Route as AppOrgSlugTicketsRouteImport } from './routes/app/$orgSlug/tickets'
@@ -59,6 +60,11 @@ const LegalConditionsRoute = LegalConditionsRouteImport.update({
 const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/auth/login',
   path: '/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppOrgSlugRouteRoute = AppOrgSlugRouteRouteImport.update({
@@ -141,6 +147,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/create-organisation': typeof CreateOrganisationRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
+  '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/legal/conditions': typeof LegalConditionsRoute
   '/legal/mentions': typeof LegalMentionsRoute
@@ -164,6 +171,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/create-organisation': typeof CreateOrganisationRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
+  '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/legal/conditions': typeof LegalConditionsRoute
   '/legal/mentions': typeof LegalMentionsRoute
@@ -188,6 +196,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/create-organisation': typeof CreateOrganisationRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
+  '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/legal/conditions': typeof LegalConditionsRoute
   '/legal/mentions': typeof LegalMentionsRoute
@@ -213,6 +222,7 @@ export interface FileRouteTypes {
     | '/'
     | '/create-organisation'
     | '/app/$orgSlug'
+    | '/auth/callback'
     | '/auth/login'
     | '/legal/conditions'
     | '/legal/mentions'
@@ -236,6 +246,7 @@ export interface FileRouteTypes {
     | '/'
     | '/create-organisation'
     | '/app/$orgSlug'
+    | '/auth/callback'
     | '/auth/login'
     | '/legal/conditions'
     | '/legal/mentions'
@@ -259,6 +270,7 @@ export interface FileRouteTypes {
     | '/'
     | '/create-organisation'
     | '/app/$orgSlug'
+    | '/auth/callback'
     | '/auth/login'
     | '/legal/conditions'
     | '/legal/mentions'
@@ -283,6 +295,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CreateOrganisationRoute: typeof CreateOrganisationRoute
   AppOrgSlugRouteRoute: typeof AppOrgSlugRouteRouteWithChildren
+  AuthCallbackRoute: typeof AuthCallbackRoute
   AuthLoginRoute: typeof AuthLoginRoute
   LegalConditionsRoute: typeof LegalConditionsRoute
   LegalMentionsRoute: typeof LegalMentionsRoute
@@ -331,6 +344,13 @@ declare module '@tanstack/react-router' {
       path: '/auth/login'
       fullPath: '/auth/login'
       preLoaderRoute: typeof AuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/$orgSlug': {
@@ -483,6 +503,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CreateOrganisationRoute: CreateOrganisationRoute,
   AppOrgSlugRouteRoute: AppOrgSlugRouteRouteWithChildren,
+  AuthCallbackRoute: AuthCallbackRoute,
   AuthLoginRoute: AuthLoginRoute,
   LegalConditionsRoute: LegalConditionsRoute,
   LegalMentionsRoute: LegalMentionsRoute,

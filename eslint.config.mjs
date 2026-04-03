@@ -20,6 +20,11 @@ export default tseslint.config(
       'dist/**',
       '.output/**',
       'apps/frontend/src/routeTree.gen.ts',
+      'apps/frontend/src/app/lib/api/v1.d.ts',
+      'apps/frontend/scripts/**',
+      'apps/backend/swagger-output/**',
+      'apps/backend/generated/**',
+      '**/*.d.ts',
     ],
   },
 )

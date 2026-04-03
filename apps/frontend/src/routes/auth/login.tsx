@@ -1,9 +1,15 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Button, Card, Divider, Input, Modal, Typography } from 'antd'
+import { Button, Card, Divider, Input, Modal, Typography, message } from 'antd'
 import { useState } from 'react'
 import { Lock, Mail } from 'lucide-react'
-import { FacebookIcon, InstagramIcon, TikTokIcon } from '@app/components/icons/social-icons'
+import { FacebookIcon, InstagramIcon } from '@app/components/icons/social-icons'
 import { featuresConfig, type Feature } from '@app/data/features'
+import { login, fetchMe } from '@app/lib/api'
+import {
+  setAuthRedirect,
+  buildFacebookOAuthUrl,
+  buildInstagramOAuthUrl,
+} from '@app/lib/auth-redirect'
 
 const { Title, Text } = Typography
 
@@ -14,9 +20,38 @@ export const Route = createFileRoute('/auth/login')({
 function LoginPage() {
   const navigate = useNavigate()
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = () => {
-    navigate({ to: '/app/$orgSlug/dashboard', params: { orgSlug: 'demo-org' } })
+  const handleLogin = async () => {
+    if (!email || !password) return
+    setLoading(true)
+    try {
+      await login(email, password)
+      const data = await fetchMe()
+
+      const orgWithSocial = data.organisations.find((o) => o.socialAccounts.length > 0)
+      if (orgWithSocial) {
+        navigate({ to: '/app/$orgSlug/dashboard', params: { orgSlug: orgWithSocial.id } })
+      } else {
+        navigate({ to: '/create-organisation' })
+      }
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : 'Erreur de connexion')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleFacebookLogin = () => {
+    setAuthRedirect({ intent: 'login' })
+    window.location.href = buildFacebookOAuthUrl()
+  }
+
+  const handleInstagramLogin = () => {
+    setAuthRedirect({ intent: 'login' })
+    window.location.href = buildInstagramOAuthUrl()
   }
 
   return (
@@ -46,18 +81,26 @@ function LoginPage() {
                 placeholder="Adresse email"
                 prefix={<Mail size={16} className="text-text-soft" />}
                 style={{ height: 48 }}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onPressEnter={handleLogin}
               />
               <Input.Password
                 size="large"
                 placeholder="Mot de passe"
                 prefix={<Lock size={16} className="text-text-soft" />}
                 style={{ height: 48 }}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onPressEnter={handleLogin}
               />
               <Button
                 type="primary"
                 size="large"
                 block
                 onClick={handleLogin}
+                loading={loading}
+                disabled={!email || !password}
                 style={{ height: 48 }}
               >
                 Se connecter
@@ -75,7 +118,7 @@ function LoginPage() {
                 size="large"
                 block
                 className="btn-social"
-                onClick={handleLogin}
+                onClick={handleFacebookLogin}
                 icon={<FacebookIcon width={18} height={18} />}
                 style={{
                   background: '#1877f2',
@@ -91,7 +134,7 @@ function LoginPage() {
                 size="large"
                 block
                 className="btn-social"
-                onClick={handleLogin}
+                onClick={handleInstagramLogin}
                 icon={<InstagramIcon width={18} height={18} />}
                 style={{
                   background: 'linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)',

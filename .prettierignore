@@ -3,3 +3,6 @@ dist
 .output
 pnpm-lock.yaml
 apps/frontend/src/routeTree.gen.ts
+apps/frontend/src/app/lib/api/v1.d.ts
+apps/backend/swagger-output
+apps/backend/generated

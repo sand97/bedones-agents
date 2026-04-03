@@ -1,0 +1,614 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "AppController_getHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Health check",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/callback/facebook": {
+      "get": {
+        "operationId": "AuthController_facebookCallback",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/callback/instagram": {
+      "get": {
+        "operationId": "AuthController_instagramCallback",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/organisations": {
+      "post": {
+        "operationId": "OrganisationController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrganisationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganisationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/organisations/{id}": {
+      "patch": {
+        "operationId": "OrganisationController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganisationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganisationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "get": {
+        "operationId": "OrganisationController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganisationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/upload/logo": {
+      "post": {
+        "operationId": "UploadController_uploadLogo",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Upload"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Bedones Agents API",
+    "description": "API backend pour le CRM social Bedones",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "session"
+      }
+    },
+    "schemas": {
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "test@bedones.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "test1234"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "StatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "UserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "object",
+            "nullable": true
+          },
+          "authType": {
+            "type": "string",
+            "enum": [
+              "PASSWORD",
+              "FACEBOOK",
+              "INSTAGRAM"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "avatar",
+          "authType"
+        ]
+      },
+      "SocialAccountDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "FACEBOOK",
+              "INSTAGRAM",
+              "WHATSAPP",
+              "TIKTOK"
+            ]
+          },
+          "pageName": {
+            "type": "object",
+            "nullable": true
+          },
+          "providerAccountId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "pageName",
+          "providerAccountId"
+        ]
+      },
+      "OrganisationSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "OWNER",
+              "ADMIN",
+              "MEMBER"
+            ]
+          },
+          "socialAccounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SocialAccountDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "logoUrl",
+          "role",
+          "socialAccounts"
+        ]
+      },
+      "MeResponseDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserDto"
+          },
+          "organisations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganisationSummaryDto"
+            }
+          }
+        },
+        "required": [
+          "user",
+          "organisations"
+        ]
+      },
+      "CreateOrganisationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Mon entreprise"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "OrgSocialAccountDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "FACEBOOK",
+              "INSTAGRAM",
+              "WHATSAPP",
+              "TIKTOK"
+            ]
+          },
+          "providerAccountId": {
+            "type": "string"
+          },
+          "pageName": {
+            "type": "object",
+            "nullable": true
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "providerAccountId",
+          "pageName",
+          "scopes",
+          "createdAt"
+        ]
+      },
+      "OrgMemberUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "avatar"
+        ]
+      },
+      "OrgMemberDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "OWNER",
+              "ADMIN",
+              "MEMBER"
+            ]
+          },
+          "user": {
+            "$ref": "#/components/schemas/OrgMemberUserDto"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "user"
+        ]
+      },
+      "OrganisationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "socialAccounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrgSocialAccountDto"
+            }
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrgMemberDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "logoUrl",
+          "createdAt",
+          "updatedAt",
+          "socialAccounts",
+          "members"
+        ]
+      },
+      "UpdateOrganisationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Nouveau nom"
+          },
+          "logoUrl": {
+            "type": "string",
+            "example": "https://minio.bedones.local/logos/logo.png"
+          }
+        }
+      },
+      "UploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "example": "https://minio.bedones.local/logos/abc123.png"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    }
+  }
+}

@@ -17,6 +17,13 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['src/routeTree.gen.ts', 'dist/**', '.output/**', 'node_modules/**'],
+    ignores: [
+      'src/routeTree.gen.ts',
+      'src/app/lib/api/v1.d.ts',
+      'scripts/**',
+      'dist/**',
+      '.output/**',
+      'node_modules/**',
+    ],
   },
 )

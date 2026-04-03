@@ -8,6 +8,7 @@ import svgr from 'vite-plugin-svgr'
 export default defineConfig({
   envDir: '../../',
   server: {
+    host: '0.0.0.0',
     allowedHosts: ['localhost', 'moderator.bedones.local'],
   },
   plugins: [
