@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Button, Card, Input, Modal, Typography, message } from 'antd'
 import { useState } from 'react'
-import { Lock, Mail } from 'lucide-react'
+import { Lock, Mail, BookOpen } from 'lucide-react'
 import { featuresConfig, type Feature } from '@app/data/features'
 import { login, fetchMe } from '@app/lib/api'
 
@@ -104,6 +104,16 @@ function LoginPage() {
             </Text>
           </div>
         </Card>
+
+        <Button
+          type="default"
+          icon={<BookOpen size={16} />}
+          href="/blog"
+          size="large"
+          style={{ height: 44 }}
+        >
+          Conseils pour votre business
+        </Button>
       </div>
 
       {/* Features Section */}

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" fill="none">
+  <rect width="800" height="450" fill="#ffffff"/>
+  <!-- Phone with screenshot -->
+  <rect x="80" y="60" width="180" height="320" rx="18" stroke="#111" stroke-width="2" fill="none"/>
+  <rect x="95" y="95" width="150" height="250" rx="4" stroke="#111" stroke-width="1" fill="#f5f5f5"/>
+  <!-- Screenshot of product -->
+  <rect x="110" y="110" width="120" height="90" rx="6" stroke="#111" stroke-width="1" fill="none"/>
+  <text x="145" y="158" font-family="system-ui" font-size="36" text-anchor="middle">👟</text>
+  <text x="110" y="220" font-family="system-ui" font-size="9" fill="#111">Client envoie un</text>
+  <text x="110" y="233" font-family="system-ui" font-size="9" fill="#111">screenshot 📸</text>
+  <!-- Chat bubble -->
+  <rect x="105" y="250" width="130" height="28" rx="10" stroke="#111" stroke-width="1" fill="#e8e8e8"/>
+  <text x="115" y="269" font-family="system-ui" font-size="9" fill="#111">C'est dispo en 43 ?</text>
+  <!-- Arrow from phone to brain -->
+  <path d="M270 220 C310 220, 340 200, 370 185" stroke="#111" stroke-width="2" stroke-dasharray="6 4" stroke-linecap="round" fill="none" marker-end="url(#aw2)"/>
+  <!-- AI Brain analyzing -->
+  <circle cx="440" cy="150" r="60" stroke="#111" stroke-width="2" fill="none"/>
+  <text x="415" y="135" font-family="system-ui" font-size="11" fill="#111">Analyse</text>
+  <text x="415" y="155" font-family="system-ui" font-size="11" fill="#111">image...</text>
+  <text x="415" y="175" font-family="system-ui" font-size="11" fill="#111">🔍 → 👟</text>
+  <!-- Sparkle around brain -->
+  <text x="380" y="95" font-family="system-ui" font-size="14">✨</text>
+  <text x="490" y="105" font-family="system-ui" font-size="14">✨</text>
+  <text x="490" y="195" font-family="system-ui" font-size="14">✨</text>
+  <!-- Arrow from brain to catalog -->
+  <path d="M500 155 C530 160, 550 165, 575 170" stroke="#111" stroke-width="2" stroke-dasharray="6 4" stroke-linecap="round" fill="none" marker-end="url(#aw2)"/>
+  <!-- Catalog match -->
+  <rect x="580" y="80" width="160" height="200" rx="12" stroke="#111" stroke-width="2" fill="none"/>
+  <text x="610" y="110" font-family="system-ui" font-size="12" font-weight="600" fill="#111">📋 Catalogue</text>
+  <line x1="590" y1="120" x2="730" y2="120" stroke="#e5e5e5" stroke-width="1"/>
+  <rect x="595" y="130" width="130" height="35" rx="6" stroke="#111" stroke-width="1.5" fill="#f5f5f5"/>
+  <text x="605" y="145" font-family="system-ui" font-size="9" fill="#111">👟 Baskets Sport Pro</text>
+  <text x="605" y="158" font-family="system-ui" font-size="9" fill="#494949">15 000 FCFA · 41-45</text>
+  <text x="725" y="150" font-family="system-ui" font-size="12">✅</text>
+  <rect x="595" y="175" width="130" height="35" rx="6" stroke="#111" stroke-width="1" fill="none"/>
+  <text x="605" y="190" font-family="system-ui" font-size="9" fill="#494949">👗 Robe Ankara</text>
+  <text x="605" y="203" font-family="system-ui" font-size="9" fill="#494949">8 000 FCFA · S-XL</text>
+  <rect x="595" y="220" width="130" height="35" rx="6" stroke="#111" stroke-width="1" fill="none"/>
+  <text x="605" y="235" font-family="system-ui" font-size="9" fill="#494949">👜 Sac cuir tressé</text>
+  <text x="605" y="248" font-family="system-ui" font-size="9" fill="#494949">22 000 FCFA</text>
+  <!-- Arrow down to response -->
+  <path d="M440 215 C440 260, 400 300, 400 320" stroke="#111" stroke-width="2" stroke-linecap="round" fill="none" marker-end="url(#aw2)"/>
+  <!-- Response bubble -->
+  <rect x="280" y="330" width="280" height="70" rx="14" stroke="#111" stroke-width="2" fill="#f5f5f5"/>
+  <text x="300" y="355" font-family="system-ui" font-size="11" fill="#111">🤖 C'est la Baskets Sport Pro !</text>
+  <text x="300" y="372" font-family="system-ui" font-size="11" fill="#111">15 000 FCFA — Dispo en 43 ✅</text>
+  <text x="300" y="389" font-family="system-ui" font-size="11" fill="#111">Je vous envoie le lien commande ?</text>
+  <defs>
+    <marker id="aw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#111"/>
+    </marker>
+  </defs>
+</svg>

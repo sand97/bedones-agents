@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" fill="none">
+  <rect width="800" height="450" fill="#ffffff"/>
+  <!-- 5 warning signs as hand-drawn cards -->
+  <!-- Sign 1 -->
+  <rect x="80" y="60" width="180" height="100" rx="12" stroke="#111" stroke-width="2" fill="none"/>
+  <text x="115" y="95" font-family="system-ui" font-size="28">📝</text>
+  <text x="150" y="96" font-family="system-ui" font-size="12" font-weight="600" fill="#111">Oubli de</text>
+  <text x="148" y="114" font-family="system-ui" font-size="12" font-weight="600" fill="#111">commandes</text>
+  <path d="M165 130 C168 140, 175 145, 172 148" stroke="#111" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <!-- Sign 2 -->
+  <rect x="300" y="60" width="180" height="100" rx="12" stroke="#111" stroke-width="2" fill="none"/>
+  <text x="335" y="95" font-family="system-ui" font-size="28">🔄</text>
+  <text x="370" y="96" font-family="system-ui" font-size="12" font-weight="600" fill="#111">Mêmes</text>
+  <text x="368" y="114" font-family="system-ui" font-size="12" font-weight="600" fill="#111">questions</text>
+  <!-- Sign 3 -->
+  <rect x="520" y="60" width="180" height="100" rx="12" stroke="#111" stroke-width="2" fill="none"/>
+  <text x="555" y="95" font-family="system-ui" font-size="28">💰</text>
+  <text x="590" y="96" font-family="system-ui" font-size="12" font-weight="600" fill="#111">Revenus</text>
+  <text x="590" y="114" font-family="system-ui" font-size="12" font-weight="600" fill="#111">flous</text>
+  <!-- Sign 4 -->
+  <rect x="190" y="200" width="180" height="100" rx="12" stroke="#111" stroke-width="2" fill="none"/>
+  <text x="225" y="238" font-family="system-ui" font-size="28">📱</text>
+  <text x="260" y="236" font-family="system-ui" font-size="12" font-weight="600" fill="#111">Collé au</text>
+  <text x="260" y="254" font-family="system-ui" font-size="12" font-weight="600" fill="#111">téléphone</text>
+  <!-- Sign 5 -->
+  <rect x="420" y="200" width="180" height="100" rx="12" stroke="#111" stroke-width="2" fill="none"/>
+  <text x="455" y="238" font-family="system-ui" font-size="28">⏰</text>
+  <text x="490" y="236" font-family="system-ui" font-size="12" font-weight="600" fill="#111">Réponses</text>
+  <text x="495" y="254" font-family="system-ui" font-size="12" font-weight="600" fill="#111">lentes</text>
+  <!-- Arrow pointing down to solution -->
+  <path d="M400 330 L400 360" stroke="#111" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arw)"/>
+  <!-- Solution box -->
+  <rect x="250" y="370" width="300" height="55" rx="14" stroke="#111" stroke-width="2.5" fill="#f5f5f5"/>
+  <text x="310" y="403" font-family="system-ui" font-size="15" font-weight="600" fill="#111">Centraliser + Automatiser</text>
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#111"/>
+    </marker>
+  </defs>
+</svg>

@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Send,
   MessageSquare,
+  BookOpen,
 } from 'lucide-react'
 
 const { Title, Text } = Typography
@@ -243,6 +244,30 @@ function HelpPage() {
             </div>
           </Form>
         </Modal>
+
+        {/* ── Blog / Ressources ── */}
+        <section className="mb-10">
+          <div className="help-support-cta">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-subtle">
+              <BookOpen size={24} strokeWidth={1} className="text-text-secondary" />
+            </div>
+            <Title level={5} style={{ margin: '12px 0 4px' }}>
+              Conseils pour votre business
+            </Title>
+            <Text type="secondary" className="mb-5 block text-sm leading-relaxed">
+              Découvrez nos articles pratiques sur l&apos;automatisation, la gestion des commandes
+              et les meilleures stratégies pour développer votre activité en ligne en Afrique.
+            </Text>
+            <Button
+              type="primary"
+              icon={<BookOpen size={14} strokeWidth={1.5} />}
+              href="/blog"
+              target="_blank"
+            >
+              Lire le blog
+            </Button>
+          </div>
+        </section>
 
         {/* ── Informations légales ── */}
         <section>

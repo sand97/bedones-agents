@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" fill="none">
+  <rect width="800" height="450" fill="#ffffff"/>
+  <!-- Messy inbox left side -->
+  <rect x="100" y="80" width="200" height="280" rx="16" stroke="#111" stroke-width="2" fill="none"/>
+  <text x="140" y="115" font-family="system-ui" font-size="13" font-weight="600" fill="#111">📥 DM Instagram</text>
+  <line x1="110" y1="128" x2="290" y2="128" stroke="#e5e5e5" stroke-width="1"/>
+  <!-- Messy messages -->
+  <rect x="115" y="138" width="170" height="32" rx="8" stroke="#111" stroke-width="1" fill="#f5f5f5"/>
+  <text x="125" y="158" font-family="system-ui" font-size="10" fill="#111">Amina: C'est combien ?</text>
+  <rect x="115" y="178" width="170" height="32" rx="8" stroke="#111" stroke-width="1" fill="#f5f5f5"/>
+  <text x="125" y="198" font-family="system-ui" font-size="10" fill="#111">Kofi: Vous livrez à Accra ?</text>
+  <rect x="115" y="218" width="170" height="32" rx="8" stroke="#111" stroke-width="1" fill="#f5f5f5"/>
+  <text x="125" y="238" font-family="system-ui" font-size="10" fill="#111">Fatou: Je veux la rouge M</text>
+  <rect x="115" y="258" width="170" height="32" rx="8" stroke="#111" stroke-width="1" fill="#f5f5f5"/>
+  <text x="125" y="278" font-family="system-ui" font-size="10" fill="#111">Moussa: Toujours dispo ?</text>
+  <rect x="115" y="298" width="170" height="32" rx="8" stroke="#111" stroke-width="1" fill="#f5f5f5"/>
+  <text x="125" y="318" font-family="system-ui" font-size="10" fill="#494949">+12 messages...</text>
+  <!-- Exclamation marks for chaos -->
+  <text x="295" y="160" font-family="system-ui" font-size="22" fill="#111">⚡</text>
+  <text x="298" y="240" font-family="system-ui" font-size="22" fill="#111">😰</text>
+  <!-- Arrow -->
+  <path d="M340 210 C370 210, 400 210, 430 210" stroke="#111" stroke-width="2" stroke-linecap="round" marker-end="url(#arr)"/>
+  <!-- Organized right side -->
+  <rect x="470" y="80" width="240" height="280" rx="16" stroke="#111" stroke-width="2" fill="none"/>
+  <text x="510" y="115" font-family="system-ui" font-size="13" font-weight="600" fill="#111">✨ Tableau Bedones</text>
+  <line x1="480" y1="128" x2="700" y2="128" stroke="#e5e5e5" stroke-width="1"/>
+  <!-- Organized rows with status -->
+  <rect x="485" y="140" width="210" height="38" rx="8" stroke="#111" stroke-width="1" fill="#f5f5f5"/>
+  <text x="495" y="156" font-family="system-ui" font-size="10" fill="#111">Amina — Robe bleue L</text>
+  <rect x="620" y="148" width="60" height="20" rx="10" fill="#e8e8e8" stroke="#111" stroke-width="0.8"/>
+  <text x="631" y="162" font-family="system-ui" font-size="9" fill="#111">✅ Payée</text>
+  <rect x="485" y="186" width="210" height="38" rx="8" stroke="#111" stroke-width="1" fill="#f5f5f5"/>
+  <text x="495" y="202" font-family="system-ui" font-size="10" fill="#111">Kofi — Baskets 43</text>
+  <rect x="610" y="194" width="70" height="20" rx="10" fill="#e8e8e8" stroke="#111" stroke-width="0.8"/>
+  <text x="618" y="208" font-family="system-ui" font-size="9" fill="#111">⏳ En attente</text>
+  <rect x="485" y="232" width="210" height="38" rx="8" stroke="#111" stroke-width="1" fill="#f5f5f5"/>
+  <text x="495" y="248" font-family="system-ui" font-size="10" fill="#111">Fatou — T-shirt rouge M</text>
+  <rect x="618" y="240" width="65" height="20" rx="10" fill="#e8e8e8" stroke="#111" stroke-width="0.8"/>
+  <text x="627" y="254" font-family="system-ui" font-size="9" fill="#111">📦 Envoyé</text>
+  <rect x="485" y="278" width="210" height="38" rx="8" stroke="#111" stroke-width="1" fill="#f5f5f5"/>
+  <text x="495" y="294" font-family="system-ui" font-size="10" fill="#111">Moussa — Sac cuir</text>
+  <rect x="610" y="286" width="70" height="20" rx="10" fill="#e8e8e8" stroke="#111" stroke-width="0.8"/>
+  <text x="617" y="300" font-family="system-ui" font-size="9" fill="#111">💬 Répondu</text>
+  <!-- Smile -->
+  <text x="560" y="370" font-family="system-ui" font-size="22" fill="#111">😌</text>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#111"/>
+    </marker>
+  </defs>
+</svg>

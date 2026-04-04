@@ -11,9 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as CreateOrganisationRouteImport } from './routes/create-organisation'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BlogIndexRouteImport } from './routes/blog/index'
 import { Route as LegalPrivacyRouteImport } from './routes/legal/privacy'
 import { Route as LegalMentionsRouteImport } from './routes/legal/mentions'
 import { Route as LegalConditionsRouteImport } from './routes/legal/conditions'
+import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AppOrgSlugRouteRouteImport } from './routes/app/$orgSlug/route'
@@ -42,6 +44,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BlogIndexRoute = BlogIndexRouteImport.update({
+  id: '/blog/',
+  path: '/blog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LegalPrivacyRoute = LegalPrivacyRouteImport.update({
   id: '/legal/privacy',
   path: '/legal/privacy',
@@ -55,6 +62,11 @@ const LegalMentionsRoute = LegalMentionsRouteImport.update({
 const LegalConditionsRoute = LegalConditionsRouteImport.update({
   id: '/legal/conditions',
   path: '/legal/conditions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BlogSlugRoute = BlogSlugRouteImport.update({
+  id: '/blog/$slug',
+  path: '/blog/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
@@ -149,9 +161,11 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
+  '/blog/$slug': typeof BlogSlugRoute
   '/legal/conditions': typeof LegalConditionsRoute
   '/legal/mentions': typeof LegalMentionsRoute
   '/legal/privacy': typeof LegalPrivacyRoute
+  '/blog/': typeof BlogIndexRoute
   '/app/$orgSlug/agent': typeof AppOrgSlugAgentRoute
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
   '/app/$orgSlug/dashboard': typeof AppOrgSlugDashboardRoute
@@ -173,9 +187,11 @@ export interface FileRoutesByTo {
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
+  '/blog/$slug': typeof BlogSlugRoute
   '/legal/conditions': typeof LegalConditionsRoute
   '/legal/mentions': typeof LegalMentionsRoute
   '/legal/privacy': typeof LegalPrivacyRoute
+  '/blog': typeof BlogIndexRoute
   '/app/$orgSlug/agent': typeof AppOrgSlugAgentRoute
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
   '/app/$orgSlug/dashboard': typeof AppOrgSlugDashboardRoute
@@ -198,9 +214,11 @@ export interface FileRoutesById {
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
+  '/blog/$slug': typeof BlogSlugRoute
   '/legal/conditions': typeof LegalConditionsRoute
   '/legal/mentions': typeof LegalMentionsRoute
   '/legal/privacy': typeof LegalPrivacyRoute
+  '/blog/': typeof BlogIndexRoute
   '/app/$orgSlug/agent': typeof AppOrgSlugAgentRoute
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
   '/app/$orgSlug/dashboard': typeof AppOrgSlugDashboardRoute
@@ -224,9 +242,11 @@ export interface FileRouteTypes {
     | '/app/$orgSlug'
     | '/auth/callback'
     | '/auth/login'
+    | '/blog/$slug'
     | '/legal/conditions'
     | '/legal/mentions'
     | '/legal/privacy'
+    | '/blog/'
     | '/app/$orgSlug/agent'
     | '/app/$orgSlug/catalog'
     | '/app/$orgSlug/dashboard'
@@ -248,9 +268,11 @@ export interface FileRouteTypes {
     | '/app/$orgSlug'
     | '/auth/callback'
     | '/auth/login'
+    | '/blog/$slug'
     | '/legal/conditions'
     | '/legal/mentions'
     | '/legal/privacy'
+    | '/blog'
     | '/app/$orgSlug/agent'
     | '/app/$orgSlug/catalog'
     | '/app/$orgSlug/dashboard'
@@ -272,9 +294,11 @@ export interface FileRouteTypes {
     | '/app/$orgSlug'
     | '/auth/callback'
     | '/auth/login'
+    | '/blog/$slug'
     | '/legal/conditions'
     | '/legal/mentions'
     | '/legal/privacy'
+    | '/blog/'
     | '/app/$orgSlug/agent'
     | '/app/$orgSlug/catalog'
     | '/app/$orgSlug/dashboard'
@@ -297,9 +321,11 @@ export interface RootRouteChildren {
   AppOrgSlugRouteRoute: typeof AppOrgSlugRouteRouteWithChildren
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthLoginRoute: typeof AuthLoginRoute
+  BlogSlugRoute: typeof BlogSlugRoute
   LegalConditionsRoute: typeof LegalConditionsRoute
   LegalMentionsRoute: typeof LegalMentionsRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
+  BlogIndexRoute: typeof BlogIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -316,6 +342,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog/': {
+      id: '/blog/'
+      path: '/blog'
+      fullPath: '/blog/'
+      preLoaderRoute: typeof BlogIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/legal/privacy': {
@@ -337,6 +370,13 @@ declare module '@tanstack/react-router' {
       path: '/legal/conditions'
       fullPath: '/legal/conditions'
       preLoaderRoute: typeof LegalConditionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog/$slug': {
+      id: '/blog/$slug'
+      path: '/blog/$slug'
+      fullPath: '/blog/$slug'
+      preLoaderRoute: typeof BlogSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/login': {
@@ -505,9 +545,11 @@ const rootRouteChildren: RootRouteChildren = {
   AppOrgSlugRouteRoute: AppOrgSlugRouteRouteWithChildren,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthLoginRoute: AuthLoginRoute,
+  BlogSlugRoute: BlogSlugRoute,
   LegalConditionsRoute: LegalConditionsRoute,
   LegalMentionsRoute: LegalMentionsRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
+  BlogIndexRoute: BlogIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

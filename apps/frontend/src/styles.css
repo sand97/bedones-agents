@@ -1557,6 +1557,124 @@ a {
 }
 
 /* ═══════════════════════════════════════════
+   Blog pages
+   ═══════════════════════════════════════════ */
+
+.blog-public {
+  min-height: 100vh;
+  background: var(--color-bg-page);
+  padding: 40px 24px 80px;
+}
+
+.blog-public__container {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.blog-public__container--wide {
+  max-width: 1100px;
+}
+
+.blog-public__header {
+  margin-bottom: 40px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+/* Grid: 3 cols on desktop, 1 on mobile */
+.blog-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .blog-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .blog-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.blog-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+  text-decoration: none;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.blog-card:hover {
+  border-color: var(--color-border-default);
+  box-shadow: var(--shadow-card);
+}
+
+.blog-card__image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #fff;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.blog-card__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.blog-card__body {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.blog-card__tag {
+  border-radius: var(--radius-pill) !important;
+  font-size: 11px !important;
+}
+
+/* Article page illustration */
+.blog-article__image {
+  width: 100%;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  margin-bottom: 32px;
+  background: #fff;
+}
+
+.blog-article__image img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.blog-cta-footer {
+  margin-top: 40px;
+  padding: 28px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-card);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .blog-public {
+    padding: 24px 16px 60px;
+  }
+}
+
+/* ═══════════════════════════════════════════
    Stats page
    ═══════════════════════════════════════════ */
 
