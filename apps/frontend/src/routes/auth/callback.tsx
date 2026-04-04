@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Spin, Typography, Button, Result } from 'antd'
 import { useEffect, useRef, useState } from 'react'
-import { fetchMe, connectFacebook, connectInstagram } from '@app/lib/api'
+import { fetchMe, connectFacebook, connectInstagram, connectTikTok } from '@app/lib/api'
 import { getAuthRedirect, clearAuthRedirect } from '@app/lib/auth-redirect'
 
 const { Text } = Typography
@@ -42,17 +42,25 @@ function AuthCallbackPage() {
       const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
       const redirectUri = `${apiUrl}/auth/callback/${provider}`
 
+      const featureScopes = redirect.scopes
       const connectPromise =
-        provider === 'instagram'
-          ? connectInstagram(redirect.orgId, code, redirectUri)
-          : connectFacebook(redirect.orgId, code, redirectUri)
+        provider === 'tiktok'
+          ? connectTikTok(redirect.orgId, code, redirectUri, featureScopes)
+          : provider === 'instagram'
+            ? connectInstagram(redirect.orgId, code, redirectUri, featureScopes)
+            : connectFacebook(redirect.orgId, code, redirectUri, featureScopes)
+
+      // Determine redirect destination after connect
+      const pageId = redirect.pageId || provider
+      const isChat = pageId === 'messenger' || pageId === 'instagram-dm'
+      const redirectPath = isChat ? '/app/$orgSlug/chats/$id' : '/app/$orgSlug/comments/$id'
 
       connectPromise
         .then(() => {
           clearAuthRedirect()
           navigate({
-            to: '/app/$orgSlug/comments/$id',
-            params: { orgSlug: redirect.orgId!, id: provider },
+            to: redirectPath,
+            params: { orgSlug: redirect.orgId!, id: pageId },
           })
         })
         .catch((err) => {

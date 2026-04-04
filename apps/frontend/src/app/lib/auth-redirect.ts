@@ -12,8 +12,12 @@ export interface AuthRedirectIntent {
   intent: 'login' | 'onboarding' | 'connect_pages'
   step?: number
   orgId?: string
-  provider?: 'facebook' | 'instagram'
+  provider?: 'facebook' | 'instagram' | 'tiktok'
   igScope?: InstagramScope
+  /** The page route id to redirect after connect (e.g. 'messenger', 'instagram-dm', 'facebook') */
+  pageId?: string
+  /** Feature scopes to store on the account (e.g. ['comments'], ['messages']) */
+  scopes?: string[]
 }
 
 export function setAuthRedirect(data: AuthRedirectIntent) {
@@ -75,6 +79,23 @@ export function buildInstagramOAuthUrl(scope: InstagramScope = 'comments'): stri
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('scope', scopes.join(','))
   url.searchParams.set('force_reauth', 'true')
+
+  return url.toString()
+}
+
+/**
+ * Build the TikTok OAuth URL for business account connection.
+ */
+export function buildTikTokOAuthUrl(): string {
+  const clientKey = import.meta.env.VITE_TIKTOK_CLIENT_KEY
+  const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+  const redirectUri = `${apiUrl}/auth/callback/tiktok`
+
+  const url = new URL('https://www.tiktok.com/v2/auth/authorize/')
+  url.searchParams.set('client_key', clientKey)
+  url.searchParams.set('redirect_uri', redirectUri)
+  url.searchParams.set('response_type', 'code')
+  url.searchParams.set('scope', 'user.info.basic,video.list,comment.list,comment.list.manage')
 
   return url.toString()
 }

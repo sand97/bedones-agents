@@ -9,6 +9,12 @@ export class ConnectPagesDto {
 
   @ApiProperty()
   redirectUri: string
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Feature scopes granted (e.g. comments, messages)',
+  })
+  scopes?: string[]
 }
 
 export class FAQRuleDto {
@@ -149,6 +155,9 @@ export class SocialAccountResponseDto {
 
   @ApiPropertyOptional()
   profilePictureUrl?: string
+
+  @ApiProperty({ type: [String], description: 'Feature scopes (e.g. comments, messages)' })
+  scopes: string[]
 
   @ApiPropertyOptional({ type: PageSettingsResponseDto })
   settings?: PageSettingsResponseDto

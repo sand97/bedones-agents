@@ -18,6 +18,7 @@ import {
   setAuthRedirect,
   buildFacebookOAuthUrl,
   buildInstagramOAuthUrl,
+  buildTikTokOAuthUrl,
 } from '@app/lib/auth-redirect'
 
 export const Route = createFileRoute('/app/$orgSlug/comments/$id')({
@@ -178,9 +179,12 @@ function CommentsPage() {
     params: { path: { organisationId: orgSlug } },
   })
 
-  // Filter accounts by provider
+  // Filter accounts by provider AND comments scope
   const accounts = useMemo(
-    () => (accountsQuery.data ?? []).filter((a) => a.provider === config?.provider),
+    () =>
+      (accountsQuery.data ?? []).filter(
+        (a) => a.provider === config?.provider && a.scopes?.includes('comments'),
+      ),
     [accountsQuery.data, config?.provider],
   )
 
@@ -241,6 +245,7 @@ function CommentsPage() {
 
   // ─── Mutations ───
   const replyMutation = $api.useMutation('post', '/social/comments/reply')
+  const tiktokReplyMutation = $api.useMutation('post', '/social/tiktok/comments/reply')
   const hideMutation = $api.useMutation('post', '/social/comments/hide')
   const unhideMutation = $api.useMutation('post', '/social/comments/unhide')
   const deleteMutation = $api.useMutation('post', '/social/comments/delete')
@@ -248,7 +253,11 @@ function CommentsPage() {
 
   // ─── Actions ───
   const handleReply = async (commentId: string, message: string) => {
-    await replyMutation.mutateAsync({ body: { commentId, message } })
+    if (id === 'tiktok') {
+      await tiktokReplyMutation.mutateAsync({ body: { commentId, message } })
+    } else {
+      await replyMutation.mutateAsync({ body: { commentId, message } })
+    }
     invalidatePosts()
   }
 
@@ -278,17 +287,13 @@ function CommentsPage() {
   }
 
   const handleConnect = () => {
-    if (id === 'tiktok') {
-      messageApi.info('TikTok sera disponible prochainement')
-      return
-    }
-
     setConnecting(true)
 
     setAuthRedirect({
       intent: 'connect_pages',
       orgId: orgSlug,
-      provider: id as 'facebook' | 'instagram',
+      provider: id as 'facebook' | 'instagram' | 'tiktok',
+      scopes: ['comments'],
     })
 
     if (id === 'facebook') {
@@ -301,6 +306,14 @@ function CommentsPage() {
       window.location.href = buildFacebookOAuthUrl(configId)
     } else if (id === 'instagram') {
       window.location.href = buildInstagramOAuthUrl('comments')
+    } else if (id === 'tiktok') {
+      const clientKey = import.meta.env.VITE_TIKTOK_CLIENT_KEY
+      if (!clientKey) {
+        messageApi.error('Configuration TikTok manquante (VITE_TIKTOK_CLIENT_KEY)')
+        setConnecting(false)
+        return
+      }
+      window.location.href = buildTikTokOAuthUrl()
     }
   }
 

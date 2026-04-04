@@ -106,8 +106,9 @@ model SocialAccount {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
-  settings PageSettings?
-  posts    Post[]
+  settings      PageSettings?
+  posts         Post[]
+  conversations Conversation[]
 
   @@unique([provider, providerAccountId])
 }
@@ -174,5 +175,47 @@ model Comment {
 
   @@index([postId])
   @@index([fromId])
+  @@index([createdTime])
+}
+
+// ─── Messaging (Messenger, Instagram DM) ───
+
+model Conversation {
+  id                String         @id @default(uuid())
+  socialAccountId   String
+  socialAccount     SocialAccount  @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  platformThreadId  String?        // Platform-specific thread/conversation ID
+  participantId     String         // Platform user ID of the other party
+  participantName   String
+  participantAvatar String?
+  lastMessageText   String?
+  lastMessageAt     DateTime?
+  unreadCount       Int            @default(0)
+  messages          DirectMessage[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([socialAccountId, participantId])
+  @@index([socialAccountId])
+  @@index([lastMessageAt])
+}
+
+model DirectMessage {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  platformMsgId  String?      @unique // Platform-specific message ID
+  message        String
+  senderId       String
+  senderName     String
+  isFromPage     Boolean      @default(false)
+  mediaUrl       String?
+  mediaType      String?      // text, image, video, audio, sticker
+  createdTime    DateTime
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([conversationId])
   @@index([createdTime])
 }

@@ -5,11 +5,13 @@ import { SocialController } from './social.controller'
 import { SocialService } from './social.service'
 import { WebhookController } from './webhook.controller'
 import { WebhookService } from './webhook.service'
+import { MessagingController } from './messaging.controller'
+import { MessagingService } from './messaging.service'
 import { AIService } from './ai.service'
 
 @Module({
   imports: [AuthModule, UploadModule],
-  controllers: [SocialController, WebhookController],
-  providers: [SocialService, WebhookService, AIService],
+  controllers: [SocialController, WebhookController, MessagingController],
+  providers: [SocialService, WebhookService, MessagingService, AIService],
 })
 export class SocialModule {}

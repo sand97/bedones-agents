@@ -67,12 +67,14 @@ function AttachmentPopover({ children }: { children: React.ReactNode }) {
 
 /* ── Main input ── */
 
-export function ChatInput() {
+export function ChatInput({ onSend }: { onSend?: (message: string) => Promise<void> }) {
   const [mode, setMode] = useState<InputMode>('text')
   const [inputValue, setInputValue] = useState('')
   const handleSend = () => {
     if (!inputValue.trim()) return
+    const msg = inputValue.trim()
     setInputValue('')
+    onSend?.(msg)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

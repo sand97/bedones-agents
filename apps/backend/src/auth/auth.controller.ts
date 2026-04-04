@@ -83,6 +83,21 @@ export class AuthController {
     )
   }
 
+  // ─── TikTok OAuth Callback ───
+
+  @Get('callback/tiktok')
+  async tiktokCallback(@Query('code') code: string, @Res() res: Response) {
+    if (!code) {
+      this.logger.error('[TikTok Callback] Missing code parameter')
+      return res.redirect(`${this.frontendUrl}/auth/callback?status=error&error=missing_code`)
+    }
+
+    this.logger.log(`[TikTok Callback] Received code, forwarding to frontend`)
+    return res.redirect(
+      `${this.frontendUrl}/auth/callback?status=success&code=${encodeURIComponent(code)}`,
+    )
+  }
+
   // ─── Get current user ───
 
   @Get('me')

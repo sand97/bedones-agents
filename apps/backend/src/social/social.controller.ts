@@ -34,6 +34,7 @@ export class SocialController {
       body.organisationId,
       body.code,
       body.redirectUri,
+      body.scopes,
     )
   }
 
@@ -48,6 +49,7 @@ export class SocialController {
       body.organisationId,
       body.code,
       body.redirectUri,
+      body.scopes,
     )
   }
 
@@ -146,5 +148,50 @@ export class SocialController {
   @ApiOkResponse({ type: CommentResponseDto })
   async delete(@CurrentUser() user: { id: string }, @Body() body: CommentActionDto) {
     return this.socialService.deleteComment(user.id, body.commentId)
+  }
+
+  // ─── Connect TikTok ───
+
+  @Post('connect/tiktok')
+  @ApiBody({ type: ConnectPagesDto })
+  @ApiCreatedResponse({ type: SocialAccountResponseDto })
+  async connectTikTok(@CurrentUser() user: { id: string }, @Body() body: ConnectPagesDto) {
+    return this.socialService.connectTikTokAccount(
+      user.id,
+      body.organisationId,
+      body.code,
+      body.redirectUri,
+      body.scopes,
+    )
+  }
+
+  // ─── TikTok: Sync videos ───
+
+  @Post('tiktok/:accountId/sync-videos')
+  async syncTikTokVideos(
+    @CurrentUser() user: { id: string },
+    @Param('accountId') accountId: string,
+  ) {
+    return this.socialService.syncTikTokVideos(user.id, accountId)
+  }
+
+  // ─── TikTok: Sync comments for a video ───
+
+  @Post('tiktok/:accountId/sync-comments/:videoId')
+  async syncTikTokComments(
+    @CurrentUser() user: { id: string },
+    @Param('accountId') accountId: string,
+    @Param('videoId') videoId: string,
+  ) {
+    return this.socialService.syncTikTokComments(user.id, accountId, videoId)
+  }
+
+  // ─── TikTok: Reply to comment ───
+
+  @Post('tiktok/comments/reply')
+  @ApiBody({ type: ReplyToCommentDto })
+  @ApiCreatedResponse({ type: CommentResponseDto })
+  async replyTikTok(@CurrentUser() user: { id: string }, @Body() body: ReplyToCommentDto) {
+    return this.socialService.replyTikTokComment(user.id, body.commentId, body.message)
   }
 }

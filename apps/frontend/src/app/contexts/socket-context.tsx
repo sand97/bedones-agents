@@ -80,14 +80,29 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       })
     }
 
+    const handleMessageNew = () => {
+      queryClient.invalidateQueries({
+        queryKey: ['get', '/messaging/conversations/{accountId}'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['get', '/messaging/conversations/{conversationId}/messages'],
+      })
+
+      if (document.hidden) {
+        playNotificationSound()
+      }
+    }
+
     socket.on('comment:new', handleCommentNew)
     socket.on('comment:updated', handleCommentUpdated)
     socket.on('comment:removed', handleCommentRemoved)
+    socket.on('message:new', handleMessageNew)
 
     return () => {
       socket.off('comment:new', handleCommentNew)
       socket.off('comment:updated', handleCommentUpdated)
       socket.off('comment:removed', handleCommentRemoved)
+      socket.off('message:new', handleMessageNew)
       disconnectSocket()
     }
   }, [orgSlug, queryClient])

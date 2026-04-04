@@ -93,6 +93,29 @@
         ]
       }
     },
+    "/auth/callback/tiktok": {
+      "get": {
+        "operationId": "AuthController_tiktokCallback",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/me": {
       "get": {
         "operationId": "AuthController_me",
@@ -663,6 +686,276 @@
           "Social"
         ]
       }
+    },
+    "/social/connect/tiktok": {
+      "post": {
+        "operationId": "SocialController_connectTikTok",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectPagesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialAccountResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/tiktok/{accountId}/sync-videos": {
+      "post": {
+        "operationId": "SocialController_syncTikTokVideos",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/tiktok/{accountId}/sync-comments/{videoId}": {
+      "post": {
+        "operationId": "SocialController_syncTikTokComments",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "videoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/tiktok/comments/reply": {
+      "post": {
+        "operationId": "SocialController_replyTikTok",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplyToCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/messaging/conversations/{accountId}": {
+      "get": {
+        "operationId": "MessagingController_getConversations",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
+    "/messaging/conversations/{conversationId}/messages": {
+      "get": {
+        "operationId": "MessagingController_getMessages",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DirectMessageResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
+    "/messaging/send": {
+      "post": {
+        "operationId": "MessagingController_sendMessage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectMessageResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
+    "/messaging/mark-read": {
+      "post": {
+        "operationId": "MessagingController_markRead",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkConversationReadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
+    "/messaging/sync/{accountId}": {
+      "post": {
+        "operationId": "MessagingController_syncConversations",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
     }
   },
   "info": {
@@ -1010,6 +1303,13 @@
           },
           "redirectUri": {
             "type": "string"
+          },
+          "scopes": {
+            "description": "Feature scopes granted (e.g. comments, messages)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -1097,6 +1397,13 @@
           "profilePictureUrl": {
             "type": "string"
           },
+          "scopes": {
+            "description": "Feature scopes (e.g. comments, messages)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "settings": {
             "$ref": "#/components/schemas/PageSettingsResponseDto"
           }
@@ -1104,7 +1411,8 @@
         "required": [
           "id",
           "provider",
-          "providerAccountId"
+          "providerAccountId",
+          "scopes"
         ]
       },
       "UnreadCountDto": {
@@ -1338,6 +1646,121 @@
         },
         "required": [
           "commentId"
+        ]
+      },
+      "ConversationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "socialAccountId": {
+            "type": "string"
+          },
+          "platformThreadId": {
+            "type": "string"
+          },
+          "participantId": {
+            "type": "string"
+          },
+          "participantName": {
+            "type": "string"
+          },
+          "participantAvatar": {
+            "type": "string"
+          },
+          "lastMessageText": {
+            "type": "string"
+          },
+          "lastMessageAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "unreadCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "socialAccountId",
+          "participantId",
+          "participantName",
+          "unreadCount"
+        ]
+      },
+      "DirectMessageResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "conversationId": {
+            "type": "string"
+          },
+          "platformMsgId": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "senderId": {
+            "type": "string"
+          },
+          "senderName": {
+            "type": "string"
+          },
+          "isFromPage": {
+            "type": "boolean"
+          },
+          "mediaUrl": {
+            "type": "string"
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "createdTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "isRead": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "conversationId",
+          "message",
+          "senderId",
+          "senderName",
+          "isFromPage",
+          "createdTime",
+          "isRead"
+        ]
+      },
+      "SendMessageDto": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversationId",
+          "message"
+        ]
+      },
+      "MarkConversationReadDto": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversationId"
         ]
       }
     }

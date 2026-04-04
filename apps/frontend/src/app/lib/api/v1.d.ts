@@ -69,6 +69,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/callback/tiktok": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AuthController_tiktokCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/me": {
         parameters: {
             query?: never;
@@ -341,6 +357,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/social/connect/tiktok": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SocialController_connectTikTok"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/tiktok/{accountId}/sync-videos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SocialController_syncTikTokVideos"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/tiktok/{accountId}/sync-comments/{videoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SocialController_syncTikTokComments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/tiktok/comments/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SocialController_replyTikTok"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messaging/conversations/{accountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MessagingController_getConversations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messaging/conversations/{conversationId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MessagingController_getMessages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messaging/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MessagingController_sendMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messaging/mark-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MessagingController_markRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messaging/sync/{accountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MessagingController_syncConversations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -433,6 +593,8 @@ export interface components {
             organisationId: string;
             code: string;
             redirectUri: string;
+            /** @description Feature scopes granted (e.g. comments, messages) */
+            scopes?: string[];
         };
         FAQRuleResponseDto: {
             id: string;
@@ -455,6 +617,8 @@ export interface components {
             pageName?: string;
             username?: string;
             profilePictureUrl?: string;
+            /** @description Feature scopes (e.g. comments, messages) */
+            scopes: string[];
             settings?: components["schemas"]["PageSettingsResponseDto"];
         };
         UnreadCountDto: {
@@ -518,6 +682,39 @@ export interface components {
         };
         CommentActionDto: {
             commentId: string;
+        };
+        ConversationResponseDto: {
+            id: string;
+            socialAccountId: string;
+            platformThreadId?: string;
+            participantId: string;
+            participantName: string;
+            participantAvatar?: string;
+            lastMessageText?: string;
+            /** Format: date-time */
+            lastMessageAt?: string;
+            unreadCount: number;
+        };
+        DirectMessageResponseDto: {
+            id: string;
+            conversationId: string;
+            platformMsgId?: string;
+            message: string;
+            senderId: string;
+            senderName: string;
+            isFromPage: boolean;
+            mediaUrl?: string;
+            mediaType?: string;
+            /** Format: date-time */
+            createdTime: string;
+            isRead: boolean;
+        };
+        SendMessageDto: {
+            conversationId: string;
+            message: string;
+        };
+        MarkConversationReadDto: {
+            conversationId: string;
         };
     };
     responses: never;
@@ -588,6 +785,25 @@ export interface operations {
         };
     };
     AuthController_instagramCallback: {
+        parameters: {
+            query: {
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_tiktokCallback: {
         parameters: {
             query: {
                 code: string;
@@ -1004,6 +1220,198 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommentResponseDto"];
+                };
+            };
+        };
+    };
+    SocialController_connectTikTok: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectPagesDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountResponseDto"];
+                };
+            };
+        };
+    };
+    SocialController_syncTikTokVideos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SocialController_syncTikTokComments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+                videoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SocialController_replyTikTok: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplyToCommentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentResponseDto"];
+                };
+            };
+        };
+    };
+    MessagingController_getConversations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponseDto"][];
+                };
+            };
+        };
+    };
+    MessagingController_getMessages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectMessageResponseDto"][];
+                };
+            };
+        };
+    };
+    MessagingController_sendMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendMessageDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectMessageResponseDto"];
+                };
+            };
+        };
+    };
+    MessagingController_markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkConversationReadDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MessagingController_syncConversations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponseDto"][];
                 };
             };
         };

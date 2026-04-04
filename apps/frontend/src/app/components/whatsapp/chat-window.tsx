@@ -12,6 +12,7 @@ import { ChatInput } from './chat-input'
 
 interface ChatWindowProps {
   conversation: Conversation
+  onSend?: (message: string) => Promise<void>
 }
 
 function formatTime(timestamp: string): string {
@@ -338,7 +339,7 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
 
 /* ── Main component ── */
 
-export function ChatWindow({ conversation }: ChatWindowProps) {
+export function ChatWindow({ conversation, onSend }: ChatWindowProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const search = useSearch({ strict: false }) as { conv?: string; ticket?: string }
@@ -440,7 +441,7 @@ export function ChatWindow({ conversation }: ChatWindowProps) {
       </div>
 
       {/* Input area */}
-      <ChatInput />
+      <ChatInput onSend={onSend} />
 
       {/* Ticket drawer */}
       <TicketDrawer

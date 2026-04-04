@@ -13,6 +13,10 @@ import { LabelBadgeIcon } from '@app/components/icons/social-icons'
 interface ChatLayoutProps {
   conversations: Conversation[]
   loading?: boolean
+  onSend?: (message: string) => Promise<void>
+  onSelectConversation?: (convId: string) => void
+  onSync?: () => void
+  syncing?: boolean
 }
 
 /* ── Labels filter popover ── */
@@ -65,7 +69,14 @@ function LabelsFilterPopover({
   )
 }
 
-export function ChatLayout({ conversations, loading = false }: ChatLayoutProps) {
+export function ChatLayout({
+  conversations,
+  loading = false,
+  onSend,
+  onSelectConversation,
+  onSync: _onSync,
+  syncing: _syncing,
+}: ChatLayoutProps) {
   const navigate = useNavigate()
   const search = useSearch({ strict: false }) as { conv?: string }
   const selectedConvId = search.conv
@@ -75,7 +86,11 @@ export function ChatLayout({ conversations, loading = false }: ChatLayoutProps) 
   const selectedConversation = conversations.find((c) => c.id === selectedConvId)
 
   const selectConversation = (conv: Conversation) => {
-    navigate({ search: { conv: conv.id } as never })
+    if (onSelectConversation) {
+      onSelectConversation(conv.id)
+    } else {
+      navigate({ search: { conv: conv.id } as never })
+    }
   }
 
   const toggleLabel = (labelId: string) => {
@@ -157,7 +172,7 @@ export function ChatLayout({ conversations, loading = false }: ChatLayoutProps) 
         className={`chat-split__right ${selectedConversation ? 'chat-split__right--visible' : ''}`}
       >
         {selectedConversation ? (
-          <ChatWindow conversation={selectedConversation} />
+          <ChatWindow conversation={selectedConversation} onSend={onSend} />
         ) : (
           <SocialSetup
             icon={<WhatsAppIcon width={40} height={40} />}

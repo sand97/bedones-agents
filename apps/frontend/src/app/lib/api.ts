@@ -99,9 +99,10 @@ export async function connectFacebook(
   organisationId: string,
   code: string,
   redirectUri: string,
+  scopes?: string[],
 ): Promise<SocialAccountResponse[]> {
   const { data, error } = await apiClient.POST('/social/connect/facebook', {
-    body: { organisationId, code, redirectUri },
+    body: { organisationId, code, redirectUri, scopes },
   })
 
   if (error) {
@@ -115,13 +116,31 @@ export async function connectInstagram(
   organisationId: string,
   code: string,
   redirectUri: string,
+  scopes?: string[],
 ): Promise<SocialAccountResponse> {
   const { data, error } = await apiClient.POST('/social/connect/instagram', {
-    body: { organisationId, code, redirectUri },
+    body: { organisationId, code, redirectUri, scopes },
   })
 
   if (error) {
     throw new Error(getErrorMessage(error, 'Erreur de connexion Instagram'))
+  }
+
+  return data
+}
+
+export async function connectTikTok(
+  organisationId: string,
+  code: string,
+  redirectUri: string,
+  scopes?: string[],
+): Promise<SocialAccountResponse> {
+  const { data, error } = await apiClient.POST('/social/connect/tiktok', {
+    body: { organisationId, code, redirectUri, scopes },
+  })
+
+  if (error) {
+    throw new Error(getErrorMessage(error, 'Erreur de connexion TikTok'))
   }
 
   return data

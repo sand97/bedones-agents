@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
 import { UploadService } from '../upload/upload.service'
 import { AIService, type AIAnalysisResult } from './ai.service'
+import { MessagingService } from './messaging.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
 
@@ -19,6 +20,7 @@ export class WebhookService {
     private encryptionService: EncryptionService,
     private uploadService: UploadService,
     private aiService: AIService,
+    private messagingService: MessagingService,
     private eventsGateway: EventsGateway,
   ) {
     this.facebookAppSecret = this.configService.getOrThrow<string>('FACEBOOK_APP_SECRET')
@@ -80,6 +82,7 @@ export class WebhookService {
       const accessToken = await this.encryptionService.decrypt(socialAccount.accessToken)
       const orgId = socialAccount.organisationId
 
+      // ─── Feed/comment changes ───
       for (const change of entry.changes || []) {
         if (change.field !== 'feed') continue
 
@@ -94,6 +97,11 @@ export class WebhookService {
         if (value.verb === 'add' || value.verb === 'edited') {
           await this.handleFacebookComment(socialAccount.id, pageId, value, accessToken, orgId)
         }
+      }
+
+      // ─── Messenger messages ───
+      for (const messaging of entry.messaging || []) {
+        await this.handleMessengerMessage(socialAccount.id, pageId, messaging, orgId)
       }
     }
   }
@@ -280,6 +288,7 @@ export class WebhookService {
 
       const orgId = socialAccount.organisationId
 
+      // ─── Comment changes ───
       for (const change of entry.changes || []) {
         if (change.field !== 'comments') continue
 
@@ -289,6 +298,11 @@ export class WebhookService {
         const isOwnComment = value.from?.id === accountId
 
         await this.handleInstagramComment(socialAccount.id, accountId, value, isOwnComment, orgId)
+      }
+
+      // ─── Instagram DM messages ───
+      for (const messaging of entry.messaging || []) {
+        await this.handleInstagramDM(socialAccount.id, accountId, messaging, orgId)
       }
     }
   }
@@ -409,6 +423,162 @@ export class WebhookService {
       message: value.text || '',
       fromName: value.from?.username || 'Unknown',
       fromId: value.from?.id || 'unknown',
+    })
+  }
+
+  // ─── Messenger message handling ───
+
+  private async handleMessengerMessage(
+    socialAccountId: string,
+    pageId: string,
+    messaging: MessagingEvent,
+    orgId: string,
+  ) {
+    const senderId = messaging.sender?.id
+    const recipientId = messaging.recipient?.id
+    if (!senderId || !recipientId) return
+
+    const message = messaging.message
+    if (!message) return
+
+    const timestamp = new Date(messaging.timestamp)
+
+    // Echo = message sent by the page
+    if (message.is_echo) {
+      await this.messagingService.handleEchoMessage(
+        socialAccountId,
+        recipientId === pageId ? senderId : recipientId,
+        message.text || '',
+        message.mid || null,
+        timestamp,
+      )
+      return
+    }
+
+    // Incoming message from a user
+    const isFromPage = senderId === pageId
+    if (isFromPage) return
+
+    // Get sender name from Graph API
+    let senderName = 'Utilisateur'
+    try {
+      const accessToken = await this.encryptionService.decrypt(
+        (
+          await this.prisma.socialAccount.findUniqueOrThrow({
+            where: { id: socialAccountId },
+            select: { accessToken: true },
+          })
+        ).accessToken,
+      )
+      const profileRes = await fetch(
+        `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${senderId}?fields=name,profile_pic&access_token=${accessToken}`,
+      )
+      if (profileRes.ok) {
+        const profile = (await profileRes.json()) as { name?: string; profile_pic?: string }
+        senderName = profile.name || senderName
+      }
+    } catch {
+      // fallback to default name
+    }
+
+    let mediaUrl: string | null = null
+    let mediaType: string | null = null
+
+    if (message.attachments?.length) {
+      const attachment = message.attachments[0]
+      mediaType = attachment.type || null
+      mediaUrl = attachment.payload?.url || null
+    }
+
+    const conversation = await this.messagingService.handleIncomingMessage(
+      socialAccountId,
+      senderId,
+      senderName,
+      message.text || '',
+      message.mid || null,
+      mediaUrl,
+      mediaType,
+      timestamp,
+      orgId,
+    )
+
+    this.logger.log(
+      `[Messenger] New message from ${senderName} (${senderId}): "${message.text?.substring(0, 50) || '[media]'}"`,
+    )
+
+    this.eventsGateway.emitToOrg(orgId, 'message:new', {
+      conversationId: conversation.id,
+      socialAccountId,
+      provider: 'FACEBOOK',
+    })
+  }
+
+  // ─── Instagram DM handling ───
+
+  private async handleInstagramDM(
+    socialAccountId: string,
+    igAccountId: string,
+    messaging: MessagingEvent,
+    orgId: string,
+  ) {
+    const senderId = messaging.sender?.id
+    const recipientId = messaging.recipient?.id
+    if (!senderId || !recipientId) return
+
+    const message = messaging.message
+    if (!message) return
+
+    const timestamp = new Date(messaging.timestamp)
+
+    // Echo = message sent by the page
+    if (message.is_echo) {
+      await this.messagingService.handleEchoMessage(
+        socialAccountId,
+        recipientId === igAccountId ? senderId : recipientId,
+        message.text || '',
+        message.mid || null,
+        timestamp,
+      )
+      return
+    }
+
+    // Incoming message from a user
+    const isFromPage = senderId === igAccountId
+    if (isFromPage) return
+
+    // For Instagram DMs, sender name is not in the webhook — use sender ID
+    // The sync will fetch proper names from the conversations API
+    const senderName = `instagram_user_${senderId}`
+
+    let mediaUrl: string | null = null
+    let mediaType: string | null = null
+
+    if (message.attachments?.length) {
+      const attachment = message.attachments[0]
+      mediaType = attachment.type || null
+      mediaUrl = attachment.payload?.url || null
+    }
+
+    const conversation = await this.messagingService.handleIncomingMessage(
+      socialAccountId,
+      senderId,
+      senderName,
+      message.text || '',
+      message.mid || null,
+      mediaUrl,
+      mediaType,
+      timestamp,
+      orgId,
+    )
+
+    this.logger.log(
+      `[Instagram DM] New message from ${senderId}: "${message.text?.substring(0, 50) || '[media]'}"`,
+    )
+
+    this.eventsGateway.emitToOrg(orgId, 'message:new', {
+      conversationId: conversation.id,
+      socialAccountId,
+      provider: 'INSTAGRAM',
     })
   }
 
@@ -616,6 +786,7 @@ interface FacebookWebhookPayload {
       field: string
       value: FacebookChangeValue
     }>
+    messaging?: MessagingEvent[]
   }>
 }
 
@@ -645,6 +816,7 @@ interface InstagramWebhookPayload {
       field: string
       value: InstagramChangeValue
     }>
+    messaging?: MessagingEvent[]
   }>
 }
 
@@ -659,4 +831,23 @@ interface InstagramChangeValue {
     permalink?: string
   }
   timestamp?: string
+}
+
+// ─── Messaging event types (Messenger + Instagram DM) ───
+
+interface MessagingEvent {
+  sender?: { id: string }
+  recipient?: { id: string }
+  timestamp: number
+  message?: {
+    mid?: string
+    text?: string
+    is_echo?: boolean
+    attachments?: Array<{
+      type?: string
+      payload?: {
+        url?: string
+      }
+    }>
+  }
 }

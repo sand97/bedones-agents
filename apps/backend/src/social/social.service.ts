@@ -28,6 +28,7 @@ export class SocialService {
     organisationId: string,
     code: string,
     redirectUri: string,
+    scopes?: string[],
   ) {
     this.logger.log(
       `[Facebook] connectFacebookPages called — userId=${userId}, orgId=${organisationId}, redirectUri=${redirectUri}, code=${code.substring(0, 15)}...`,
@@ -86,10 +87,23 @@ export class SocialService {
 
     // Save each page and subscribe to webhook
     const savedPages = []
+    const newScopes = scopes ?? []
     for (const page of pages) {
       this.logger.log(`[Facebook] Saving page "${page.name}" (${page.id})...`)
       const encryptedToken = await this.encryptionService.encrypt(page.access_token)
       const pictureUrl = page.picture?.data?.url || null
+
+      // Fetch existing scopes to merge
+      const existing = await this.prisma.socialAccount.findUnique({
+        where: {
+          provider_providerAccountId: {
+            provider: 'FACEBOOK',
+            providerAccountId: page.id,
+          },
+        },
+        select: { scopes: true },
+      })
+      const mergedScopes = [...new Set([...(existing?.scopes ?? []), ...newScopes])]
 
       const socialAccount = await this.prisma.socialAccount.upsert({
         where: {
@@ -105,12 +119,13 @@ export class SocialService {
           pageName: page.name,
           profilePictureUrl: pictureUrl,
           accessToken: encryptedToken,
-          scopes: [],
+          scopes: mergedScopes,
         },
         update: {
           pageName: page.name,
           profilePictureUrl: pictureUrl,
           accessToken: encryptedToken,
+          scopes: mergedScopes,
         },
       })
 
@@ -138,6 +153,7 @@ export class SocialService {
     organisationId: string,
     code: string,
     redirectUri: string,
+    scopes?: string[],
   ) {
     this.logger.log(
       `[Instagram] connectInstagramAccount called — userId=${userId}, orgId=${organisationId}, redirectUri=${redirectUri}, code=${code.substring(0, 15)}...`,
@@ -225,6 +241,19 @@ export class SocialService {
     // id is the app-scoped Facebook user ID (different!)
     const igAccountId = profileRaw.user_id.toString()
     const encryptedToken = await this.encryptionService.encrypt(accessToken)
+    const newScopes = scopes ?? []
+
+    // Fetch existing scopes to merge
+    const existing = await this.prisma.socialAccount.findUnique({
+      where: {
+        provider_providerAccountId: {
+          provider: 'INSTAGRAM',
+          providerAccountId: igAccountId,
+        },
+      },
+      select: { scopes: true },
+    })
+    const mergedScopes = [...new Set([...(existing?.scopes ?? []), ...newScopes])]
 
     const socialAccount = await this.prisma.socialAccount.upsert({
       where: {
@@ -241,13 +270,14 @@ export class SocialService {
         username: profileRaw.username,
         profilePictureUrl: profileRaw.profile_picture_url || null,
         accessToken: encryptedToken,
-        scopes: [],
+        scopes: mergedScopes,
       },
       update: {
         pageName: profileRaw.name || profileRaw.username,
         username: profileRaw.username,
         profilePictureUrl: profileRaw.profile_picture_url || null,
         accessToken: encryptedToken,
+        scopes: mergedScopes,
       },
     })
 
@@ -268,12 +298,408 @@ export class SocialService {
     return socialAccount
   }
 
+  // ─── Connect TikTok Account ───
+
+  async connectTikTokAccount(
+    userId: string,
+    organisationId: string,
+    code: string,
+    redirectUri: string,
+    scopes?: string[],
+  ) {
+    this.logger.log(
+      `[TikTok] connectTikTokAccount called — userId=${userId}, orgId=${organisationId}`,
+    )
+    await this.assertMembership(userId, organisationId)
+
+    const clientKey = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
+    const clientSecret = this.configService.getOrThrow<string>('TIKTOK_CLIENT_SECRET')
+
+    // Exchange code for access token
+    this.logger.log(`[TikTok] Exchanging code for access token...`)
+    const tokenResponse = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_key: clientKey,
+        client_secret: clientSecret,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri,
+      }),
+    })
+
+    const tokenBody = await tokenResponse.text()
+    if (!tokenResponse.ok) {
+      this.logger.error(
+        `[TikTok] Token exchange failed (HTTP ${tokenResponse.status}): ${tokenBody}`,
+      )
+      throw new BadRequestException('tiktok_token_exchange_failed')
+    }
+
+    const tokenData = JSON.parse(tokenBody) as {
+      access_token: string
+      refresh_token?: string
+      open_id: string
+      expires_in: number
+    }
+    this.logger.log(`[TikTok] Token exchange OK — open_id=${tokenData.open_id}`)
+
+    // Fetch user info
+    const userRes = await fetch(
+      'https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url,username',
+      {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      },
+    )
+
+    let displayName = tokenData.open_id
+    let username: string | undefined
+    let avatarUrl: string | null = null
+
+    if (userRes.ok) {
+      const userData = (await userRes.json()) as {
+        data: {
+          user: {
+            open_id: string
+            display_name?: string
+            avatar_url?: string
+            username?: string
+          }
+        }
+      }
+      displayName = userData.data.user.display_name || displayName
+      username = userData.data.user.username
+      avatarUrl = userData.data.user.avatar_url || null
+    }
+
+    const encryptedToken = await this.encryptionService.encrypt(tokenData.access_token)
+    const encryptedRefresh = tokenData.refresh_token
+      ? await this.encryptionService.encrypt(tokenData.refresh_token)
+      : null
+    const newScopes = scopes ?? ['comments']
+
+    // Fetch existing scopes to merge
+    const existingTk = await this.prisma.socialAccount.findUnique({
+      where: {
+        provider_providerAccountId: {
+          provider: 'TIKTOK',
+          providerAccountId: tokenData.open_id,
+        },
+      },
+      select: { scopes: true },
+    })
+    const mergedScopes = [...new Set([...(existingTk?.scopes ?? []), ...newScopes])]
+
+    const socialAccount = await this.prisma.socialAccount.upsert({
+      where: {
+        provider_providerAccountId: {
+          provider: 'TIKTOK',
+          providerAccountId: tokenData.open_id,
+        },
+      },
+      create: {
+        organisationId,
+        provider: 'TIKTOK',
+        providerAccountId: tokenData.open_id,
+        pageName: displayName,
+        username,
+        profilePictureUrl: avatarUrl,
+        accessToken: encryptedToken,
+        refreshToken: encryptedRefresh,
+        tokenExpiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+        scopes: mergedScopes,
+      },
+      update: {
+        pageName: displayName,
+        username,
+        profilePictureUrl: avatarUrl,
+        accessToken: encryptedToken,
+        refreshToken: encryptedRefresh,
+        tokenExpiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+        scopes: mergedScopes,
+      },
+    })
+
+    // Create default settings
+    await this.prisma.pageSettings.upsert({
+      where: { socialAccountId: socialAccount.id },
+      create: { socialAccountId: socialAccount.id },
+      update: {},
+    })
+
+    this.logger.log(
+      `[TikTok] ✅ Connected account "${displayName}" (${socialAccount.id}) for org ${organisationId}`,
+    )
+    return socialAccount
+  }
+
+  // ─── TikTok: Refresh token ───
+
+  private async refreshTikTokToken(socialAccountId: string): Promise<string> {
+    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+      where: { id: socialAccountId },
+      select: { refreshToken: true, tokenExpiresAt: true, accessToken: true },
+    })
+
+    // Check if token is still valid
+    if (account.tokenExpiresAt && account.tokenExpiresAt > new Date()) {
+      return this.encryptionService.decrypt(account.accessToken)
+    }
+
+    if (!account.refreshToken) {
+      throw new BadRequestException('TikTok token expired and no refresh token available')
+    }
+
+    const clientKey = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
+    const clientSecret = this.configService.getOrThrow<string>('TIKTOK_CLIENT_SECRET')
+    const refreshToken = await this.encryptionService.decrypt(account.refreshToken)
+
+    const response = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_key: clientKey,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new BadRequestException('Failed to refresh TikTok token')
+    }
+
+    const data = (await response.json()) as {
+      access_token: string
+      refresh_token?: string
+      expires_in: number
+    }
+
+    const encryptedToken = await this.encryptionService.encrypt(data.access_token)
+    const encryptedRefresh = data.refresh_token
+      ? await this.encryptionService.encrypt(data.refresh_token)
+      : account.refreshToken
+
+    await this.prisma.socialAccount.update({
+      where: { id: socialAccountId },
+      data: {
+        accessToken: encryptedToken,
+        refreshToken: encryptedRefresh,
+        tokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
+      },
+    })
+
+    return data.access_token
+  }
+
+  // ─── TikTok: Fetch videos (posts) ───
+
+  async syncTikTokVideos(userId: string, accountId: string) {
+    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+      where: { id: accountId },
+      select: { id: true, provider: true, organisationId: true },
+    })
+    if (account.provider !== 'TIKTOK') {
+      throw new BadRequestException('Not a TikTok account')
+    }
+    await this.assertMembership(userId, account.organisationId)
+
+    const accessToken = await this.refreshTikTokToken(accountId)
+
+    // Fetch videos
+    const response = await fetch(
+      'https://open.tiktokapis.com/v2/video/list/?fields=id,title,cover_image_url,share_url,create_time,comment_count',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ max_count: 50 }),
+      },
+    )
+
+    if (!response.ok) {
+      const error = await response.text()
+      this.logger.error(`[TikTok] Fetch videos failed: ${error}`)
+      throw new BadRequestException('Failed to fetch TikTok videos')
+    }
+
+    const body = (await response.json()) as {
+      data: {
+        videos: Array<{
+          id: string
+          title?: string
+          cover_image_url?: string
+          share_url?: string
+          create_time?: number
+          comment_count?: number
+        }>
+      }
+    }
+
+    // Upsert videos as posts
+    for (const video of body.data.videos || []) {
+      await this.prisma.post.upsert({
+        where: { id: video.id },
+        create: {
+          id: video.id,
+          socialAccountId: accountId,
+          message: video.title || null,
+          imageUrl: video.cover_image_url || null,
+          permalinkUrl: video.share_url || null,
+        },
+        update: {
+          message: video.title || undefined,
+          imageUrl: video.cover_image_url || undefined,
+          permalinkUrl: video.share_url || undefined,
+        },
+      })
+    }
+
+    this.logger.log(
+      `[TikTok] Synced ${body.data.videos?.length || 0} videos for account ${accountId}`,
+    )
+    return { synced: body.data.videos?.length || 0 }
+  }
+
+  // ─── TikTok: Fetch comments for a video ───
+
+  async syncTikTokComments(userId: string, accountId: string, videoId: string) {
+    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+      where: { id: accountId },
+      select: { id: true, provider: true, organisationId: true },
+    })
+    if (account.provider !== 'TIKTOK') {
+      throw new BadRequestException('Not a TikTok account')
+    }
+    await this.assertMembership(userId, account.organisationId)
+
+    const accessToken = await this.refreshTikTokToken(accountId)
+
+    const response = await fetch(
+      'https://open.tiktokapis.com/v2/comment/list/?fields=id,text,create_time,user,like_count,reply_count,parent_comment_id',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ video_id: videoId, max_count: 100 }),
+      },
+    )
+
+    if (!response.ok) {
+      const error = await response.text()
+      this.logger.error(`[TikTok] Fetch comments failed: ${error}`)
+      throw new BadRequestException('Failed to fetch TikTok comments')
+    }
+
+    const body = (await response.json()) as {
+      data: {
+        comments: Array<{
+          id: string
+          text: string
+          create_time: number
+          user?: { open_id: string; display_name: string; avatar_url?: string }
+          parent_comment_id?: string
+        }>
+      }
+    }
+
+    // Upsert comments
+    for (const comment of body.data.comments || []) {
+      const existing = await this.prisma.comment.findUnique({ where: { id: comment.id } })
+
+      await this.prisma.comment.upsert({
+        where: { id: comment.id },
+        create: {
+          id: comment.id,
+          postId: videoId,
+          parentId: comment.parent_comment_id || null,
+          message: comment.text,
+          fromId: comment.user?.open_id || 'unknown',
+          fromName: comment.user?.display_name || 'Utilisateur TikTok',
+          fromAvatar: comment.user?.avatar_url || null,
+          createdTime: new Date(comment.create_time * 1000),
+          isRead: !!existing,
+        },
+        update: {
+          message: comment.text,
+        },
+      })
+    }
+
+    this.logger.log(
+      `[TikTok] Synced ${body.data.comments?.length || 0} comments for video ${videoId}`,
+    )
+    return { synced: body.data.comments?.length || 0 }
+  }
+
+  // ─── TikTok: Reply to a comment ───
+
+  async replyTikTokComment(userId: string, commentId: string, message: string) {
+    const comment = await this.prisma.comment.findUniqueOrThrow({
+      where: { id: commentId },
+      include: {
+        post: {
+          include: {
+            socialAccount: { select: { id: true, provider: true, organisationId: true } },
+          },
+        },
+      },
+    })
+
+    if (comment.post.socialAccount.provider !== 'TIKTOK') {
+      throw new BadRequestException('Not a TikTok comment')
+    }
+
+    await this.assertMembership(userId, comment.post.socialAccount.organisationId)
+    const accessToken = await this.refreshTikTokToken(comment.post.socialAccount.id)
+
+    const response = await fetch('https://open.tiktokapis.com/v2/comment/reply/', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        video_id: comment.postId,
+        comment_id: commentId,
+        text: message,
+      }),
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      this.logger.error(`[TikTok] Reply failed: ${error}`)
+      throw new BadRequestException('Failed to reply to TikTok comment')
+    }
+
+    // Save the reply locally
+    const replyId = `tiktok_reply_${Date.now()}_${commentId}`
+    return this.prisma.comment.create({
+      data: {
+        id: replyId,
+        postId: comment.postId,
+        parentId: commentId,
+        message,
+        fromId: comment.post.socialAccount.id,
+        fromName: 'Page',
+        createdTime: new Date(),
+        isRead: true,
+        isPageReply: true,
+      },
+    })
+  }
+
   // ─── Webhook subscriptions ───
 
   private async subscribePageToWebhook(pageId: string, pageAccessToken: string) {
     try {
       const response = await fetch(
-        `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${pageId}/subscribed_apps?subscribed_fields=feed&access_token=${pageAccessToken}`,
+        `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${pageId}/subscribed_apps?subscribed_fields=feed,messages&access_token=${pageAccessToken}`,
         { method: 'POST' },
       )
 

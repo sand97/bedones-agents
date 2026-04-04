@@ -77,7 +77,6 @@ const mainGroups: NavGroup[] = [
           />
         ),
         path: 'chats/whatsapp',
-        badge: 12,
       },
       {
         key: 'instagram-dm',
@@ -89,7 +88,6 @@ const mainGroups: NavGroup[] = [
           />
         ),
         path: 'chats/instagram-dm',
-        badge: 3,
       },
       {
         key: 'messenger',
@@ -101,7 +99,6 @@ const mainGroups: NavGroup[] = [
           />
         ),
         path: 'chats/messenger',
-        badge: 7,
       },
     ],
   },
@@ -142,6 +139,7 @@ const mainGroups: NavGroup[] = [
           />
         ),
         path: 'comments/tiktok',
+        unreadProvider: 'TIKTOK',
       },
     ],
   },
