@@ -54,8 +54,9 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  memberships OrganisationMember[]
-  sessions    Session[]
+  memberships              OrganisationMember[]
+  sessions                 Session[]
+  notificationPreference   NotificationPreference?
 }
 
 model Session {
@@ -218,4 +219,30 @@ model DirectMessage {
 
   @@index([conversationId])
   @@index([createdTime])
+}
+
+// ─── Notification Preferences ───
+
+model NotificationPreference {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // WhatsApp notifications
+  waNewMessage     Boolean @default(true)
+  waNewComment     Boolean @default(false)
+  waTicketAssigned Boolean @default(true)
+  waTicketUrgent   Boolean @default(true)
+  waAgentAlert     Boolean @default(true)
+  waDailySummary   Boolean @default(false)
+
+  // Email notifications (features & marketing)
+  emailNewFeatures  Boolean @default(true)
+  emailNewOffers    Boolean @default(true)
+  emailTutorials    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId])
 }

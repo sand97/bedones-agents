@@ -1,4 +1,4 @@
-import { useNavigate, useParams, useLocation } from '@tanstack/react-router'
+import { useNavigate, useParams, useLocation, useRouter } from '@tanstack/react-router'
 import { Avatar, Button, Divider, Popover, Tooltip } from 'antd'
 import {
   Sparkles,
@@ -13,6 +13,7 @@ import {
   LogOut,
   Bell,
 } from 'lucide-react'
+import { logout } from '@app/lib/api'
 import { useLayout } from '@app/contexts/layout-context'
 import { useUnreadCounts } from '@app/contexts/unread-context'
 import { OrgSwitcher } from './org-switcher'
@@ -178,7 +179,14 @@ export function Sidebar() {
   const navigate = useNavigate()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
   const location = useLocation()
+  const router = useRouter()
   const isProfileActive = location.pathname.includes(`/${orgSlug}/notifications`)
+
+  const handleLogout = async () => {
+    await logout()
+    await router.invalidate()
+    navigate({ to: '/auth/login' })
+  }
 
   const isActive = (path: string) => {
     return location.pathname.includes(`/${orgSlug}/${path}`)
@@ -311,7 +319,12 @@ export function Sidebar() {
                     Préférences de notification
                   </Button>
                   <Divider className={'my-1!'} />
-                  <Button danger type={'text'} icon={<LogOut size={16} strokeWidth={1} />}>
+                  <Button
+                    danger
+                    type={'text'}
+                    icon={<LogOut size={16} strokeWidth={1} />}
+                    onClick={handleLogout}
+                  >
                     Déconnexion
                   </Button>
                 </div>
