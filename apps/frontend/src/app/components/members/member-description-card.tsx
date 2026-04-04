@@ -5,8 +5,15 @@ import { MemberCell } from './member-cell'
 import { MemberActions } from './member-actions'
 import { MEMBER_ROLE_CONFIG, type Member } from './mock-data'
 
-export function MemberDescriptionCard({ member }: { member: Member }) {
+interface MemberDescriptionCardProps {
+  member: Member
+  onDelete?: (memberId: string) => Promise<void>
+}
+
+export function MemberDescriptionCard({ member, onDelete }: MemberDescriptionCardProps) {
   const roleConfig = MEMBER_ROLE_CONFIG[member.role]
+  const isInvited = member.status === 'invited'
+
   return (
     <Descriptions
       bordered
@@ -21,12 +28,20 @@ export function MemberDescriptionCard({ member }: { member: Member }) {
       <Descriptions.Item label="Rôle">
         <StatusTag label={roleConfig.label} color={roleConfig.color} />
       </Descriptions.Item>
+      <Descriptions.Item label="Statut">
+        <StatusTag
+          label={isInvited ? 'Invité' : 'Actif'}
+          color={isInvited ? '#f59e0b' : '#10b981'}
+        />
+      </Descriptions.Item>
       <Descriptions.Item label="Ajouté le">
         <span className="text-text-secondary">{formatDate(member.joinedAt)}</span>
       </Descriptions.Item>
-      <Descriptions.Item span={2}>
-        <MemberActions />
-      </Descriptions.Item>
+      {member.role !== 'owner' && (
+        <Descriptions.Item>
+          <MemberActions member={member} onDelete={onDelete} />
+        </Descriptions.Item>
+      )}
     </Descriptions>
   )
 }

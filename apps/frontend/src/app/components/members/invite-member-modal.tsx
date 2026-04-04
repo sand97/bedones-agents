@@ -1,16 +1,29 @@
-import { Button, Form, Input, Modal, Select } from 'antd'
-import { ALL_ROLES, MEMBER_ROLE_CONFIG } from './mock-data'
+import { Button, Form, Modal, Select, Input } from 'antd'
+import { ALL_ROLES, MEMBER_ROLE_CONFIG, type MemberRole } from './mock-data'
+import { CountryPhoneInput } from '@app/components/shared/country-phone-input'
 
 interface InviteMemberModalProps {
   open: boolean
   onClose: () => void
+  onSubmit?: (values: {
+    firstName: string
+    lastName: string
+    phone: string
+    role: MemberRole
+  }) => void
 }
 
-export function InviteMemberModal({ open, onClose }: InviteMemberModalProps) {
+export function InviteMemberModal({ open, onClose, onSubmit }: InviteMemberModalProps) {
   const [form] = Form.useForm()
 
-  const handleSubmit = () => {
-    form.validateFields().then(() => {
+  const handleCancel = () => {
+    form.resetFields()
+    onClose()
+  }
+
+  const handleOk = () => {
+    form.validateFields().then((values) => {
+      onSubmit?.(values)
       form.resetFields()
       onClose()
     })
@@ -20,30 +33,56 @@ export function InviteMemberModal({ open, onClose }: InviteMemberModalProps) {
     <Modal
       title="Inviter un membre"
       open={open}
-      onCancel={() => {
-        form.resetFields()
-        onClose()
-      }}
-      footer={null}
+      onCancel={handleCancel}
+      footer={[
+        <Button key="cancel" onClick={handleCancel}>
+          Annuler
+        </Button>,
+        <Button key="submit" type="primary" onClick={handleOk}>
+          Créer l&apos;invitation
+        </Button>,
+      ]}
       width={480}
     >
-      <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-2">
+      <Form form={form} layout="vertical" className="pt-2">
+        <div className="flex gap-3">
+          <Form.Item
+            label="Prénom"
+            name="firstName"
+            rules={[{ required: true, message: 'Le prénom est requis' }]}
+            className="flex-1"
+          >
+            <Input placeholder="Ex: Aminata" />
+          </Form.Item>
+          <Form.Item
+            label="Nom"
+            name="lastName"
+            rules={[{ required: true, message: 'Le nom est requis' }]}
+            className="flex-1"
+          >
+            <Input placeholder="Ex: Diallo" />
+          </Form.Item>
+        </div>
         <Form.Item
-          label="Nom complet"
-          name="name"
-          rules={[{ required: true, message: 'Le nom est requis' }]}
-        >
-          <Input placeholder="Ex: Aminata Diallo" />
-        </Form.Item>
-        <Form.Item
-          label="Email"
-          name="email"
+          label="Numéro WhatsApp"
+          name="phone"
+          validateTrigger="onSubmit"
           rules={[
-            { required: true, message: "L'email est requis" },
-            { type: 'email', message: 'Email invalide' },
+            { required: true, message: 'Le numéro WhatsApp est requis' },
+            {
+              validator: (_, value) => {
+                if (!value) return Promise.resolve()
+                // Remove country code prefix (+1 to +4 digits) and check remaining number length
+                const numberPart = value.replace(/^\+\d{1,4}/, '')
+                if (numberPart.length >= 6) {
+                  return Promise.resolve()
+                }
+                return Promise.reject(new Error('Numéro invalide'))
+              },
+            },
           ]}
         >
-          <Input placeholder="Ex: aminata@example.com" />
+          <CountryPhoneInput />
         </Form.Item>
         <Form.Item
           label="Rôle"
@@ -51,26 +90,13 @@ export function InviteMemberModal({ open, onClose }: InviteMemberModalProps) {
           rules={[{ required: true, message: 'Le rôle est requis' }]}
         >
           <Select placeholder="Sélectionner un rôle">
-            {ALL_ROLES.map((role) => (
+            {ALL_ROLES.filter((r) => r !== 'owner').map((role) => (
               <Select.Option key={role} value={role}>
                 {MEMBER_ROLE_CONFIG[role].label}
               </Select.Option>
             ))}
           </Select>
         </Form.Item>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button
-            onClick={() => {
-              form.resetFields()
-              onClose()
-            }}
-          >
-            Annuler
-          </Button>
-          <Button type="primary" htmlType="submit">
-            Envoyer l&apos;invitation
-          </Button>
-        </div>
       </Form>
     </Modal>
   )

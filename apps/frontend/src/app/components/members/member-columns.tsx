@@ -5,39 +5,56 @@ import { MemberCell } from './member-cell'
 import { MemberActions } from './member-actions'
 import { MEMBER_ROLE_CONFIG, type Member, type MemberRole } from './mock-data'
 
-export const memberColumns: ColumnsType<Member> = [
-  {
-    title: 'Membre',
-    key: 'member',
-    ellipsis: true,
-    render: (_: unknown, record: Member) => <MemberCell member={record} />,
-  },
-  {
-    title: 'Rôle',
-    dataIndex: 'role',
-    key: 'role',
-    width: 120,
-    render: (role: MemberRole) => {
-      const config = MEMBER_ROLE_CONFIG[role]
-      return <StatusTag label={config.label} color={config.color} />
+export function getMemberColumns(onDelete: (memberId: string) => void): ColumnsType<Member> {
+  return [
+    {
+      title: 'Membre',
+      key: 'member',
+      ellipsis: true,
+      render: (_: unknown, record: Member) => <MemberCell member={record} />,
     },
-  },
-  {
-    title: 'Ajouté le',
-    dataIndex: 'joinedAt',
-    key: 'joinedAt',
-    width: 200,
-    render: (date: string) => (
-      <span className="text-sm text-text-secondary">{formatDate(date)}</span>
-    ),
-    sorter: (a: Member, b: Member) =>
-      new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime(),
-    defaultSortOrder: 'descend',
-  },
-  {
-    title: '',
-    key: 'actions',
-    width: 270,
-    render: () => <MemberActions />,
-  },
-]
+    {
+      title: 'Rôle',
+      dataIndex: 'role',
+      key: 'role',
+      width: 140,
+      render: (role: MemberRole) => {
+        const config = MEMBER_ROLE_CONFIG[role]
+        return <StatusTag label={config.label} color={config.color} />
+      },
+    },
+    {
+      title: 'Statut',
+      dataIndex: 'status',
+      key: 'status',
+      width: 120,
+      render: (status: string) => {
+        const isInvited = status === 'invited'
+        return (
+          <StatusTag
+            label={isInvited ? 'Invité' : 'Actif'}
+            color={isInvited ? '#f59e0b' : '#10b981'}
+          />
+        )
+      },
+    },
+    {
+      title: 'Ajouté le',
+      dataIndex: 'joinedAt',
+      key: 'joinedAt',
+      width: 200,
+      render: (date: string) => (
+        <span className="text-sm text-text-secondary">{formatDate(date)}</span>
+      ),
+      sorter: (a: Member, b: Member) =>
+        new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime(),
+      defaultSortOrder: 'descend',
+    },
+    {
+      title: '',
+      key: 'actions',
+      width: 150,
+      render: (_: unknown, record: Member) => <MemberActions member={record} onDelete={onDelete} />,
+    },
+  ]
+}

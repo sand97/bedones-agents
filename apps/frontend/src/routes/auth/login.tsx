@@ -25,9 +25,16 @@ function LoginPage() {
       await login(email, password)
       const data = await fetchMe()
 
-      const orgWithSocial = data.organisations.find((o) => o.socialAccounts.length > 0)
-      if (orgWithSocial) {
-        navigate({ to: '/app/$orgSlug/dashboard', params: { orgSlug: orgWithSocial.id } })
+      // If user has pending invitations, show the organisations hub
+      const hasPendingInvitations =
+        (data as { pendingInvitations?: unknown[] }).pendingInvitations?.length ?? 0 > 0
+      if (hasPendingInvitations) {
+        navigate({ to: '/organisations' })
+      } else if (data.organisations.length > 0) {
+        navigate({
+          to: '/app/$orgSlug/dashboard',
+          params: { orgSlug: data.organisations[0].id },
+        })
       } else {
         navigate({ to: '/create-organisation' })
       }

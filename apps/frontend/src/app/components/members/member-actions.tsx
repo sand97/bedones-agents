@@ -1,15 +1,39 @@
-import { Button, Space } from 'antd'
-import { Ban, Trash2 } from 'lucide-react'
+import { Button, Modal } from 'antd'
+import { Trash2 } from 'lucide-react'
+import type { Member } from './mock-data'
 
-export function MemberActions() {
+interface MemberActionsProps {
+  member: Member
+  onDelete?: (memberId: string) => Promise<void>
+}
+
+export function MemberActions({ member, onDelete }: MemberActionsProps) {
+  if (member.role === 'owner') {
+    return null
+  }
+
+  const handleDelete = () => {
+    Modal.confirm({
+      title: 'Supprimer ce membre ?',
+      content: `${member.name} sera retiré de l'organisation. Cette action est irréversible.`,
+      okText: 'Supprimer',
+      okType: 'danger',
+      cancelText: 'Annuler',
+      onOk() {
+        return onDelete?.(member.id)
+      },
+    })
+  }
+
   return (
-    <Space size={4}>
-      <Button variant={'outlined'} icon={<Ban size={15} />} size={'small'}>
-        Bloquer
-      </Button>
-      <Button variant={'outlined'} size={'small'} danger icon={<Trash2 size={15} />}>
-        Supprimer
-      </Button>
-    </Space>
+    <Button
+      variant="outlined"
+      size="small"
+      danger
+      icon={<Trash2 size={15} />}
+      onClick={handleDelete}
+    >
+      Supprimer
+    </Button>
   )
 }

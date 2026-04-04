@@ -1,16 +1,18 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { Table, Input, Button } from 'antd'
-import { Search, ChevronDown, UserPlus } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Table, Input, Button, Modal, message } from 'antd'
+import { Search, ChevronDown, UserPlus, Copy, Check } from 'lucide-react'
+import { $api } from '@app/lib/api/$api'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { TablePagination } from '@app/components/shared/table-pagination'
 import { FilterPopover } from '@app/components/shared/filter-popover'
 import { useLayout } from '@app/contexts/layout-context'
 import { MemberDescriptionCard } from '@app/components/members/member-description-card'
 import { InviteMemberModal } from '@app/components/members/invite-member-modal'
-import { memberColumns } from '@app/components/members/member-columns'
+import { getMemberColumns } from '@app/components/members/member-columns'
 import {
-  MOCK_MEMBERS,
+  mapApiMember,
   MEMBER_ROLE_CONFIG,
   ALL_ROLES,
   type MemberRole,
@@ -29,12 +31,101 @@ const ROLE_FILTER_OPTIONS = ALL_ROLES.map((role) => ({
 }))
 
 function MembersPage() {
+  const { orgSlug } = Route.useParams()
   const { isDesktop } = useLayout()
+  const queryClient = useQueryClient()
   const [searchText, setSearchText] = useState('')
   const [selectedRoles, setSelectedRoles] = useState<MemberRole[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteLinkModal, setInviteLinkModal] = useState<{
+    open: boolean
+    link: string
+    name: string
+  }>({ open: false, link: '', name: '' })
+  const [copied, setCopied] = useState(false)
+
+  const membersQuery = $api.useQuery('get', '/organisations/{orgId}/members', {
+    params: { path: { orgId: orgSlug } },
+  })
+
+  const inviteMutation = $api.useMutation('post', '/organisations/{orgId}/members/invite')
+  const deleteMutation = $api.useMutation('delete', '/organisations/{orgId}/members/{memberId}')
+
+  const members = useMemo(
+    () =>
+      (membersQuery.data ?? []).map((m, i) =>
+        mapApiMember(m as Parameters<typeof mapApiMember>[0], i),
+      ),
+    [membersQuery.data],
+  )
+
+  const invalidateMembers = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: ['get', '/organisations/{orgId}/members', { params: { path: { orgId: orgSlug } } }],
+    })
+  }, [queryClient, orgSlug])
+
+  const handleInvite = async (values: {
+    firstName: string
+    lastName: string
+    phone: string
+    role: MemberRole
+  }) => {
+    try {
+      const result = await inviteMutation.mutateAsync({
+        params: { path: { orgId: orgSlug } },
+        body: {
+          firstName: values.firstName,
+          lastName: values.lastName,
+          phone: values.phone,
+          role: values.role.toUpperCase() as 'ADMIN' | 'MEMBER',
+        },
+      })
+
+      invalidateMembers()
+
+      // Show the invite link modal
+      const inviteToken = (result as unknown as { inviteToken?: string }).inviteToken
+      if (inviteToken) {
+        const link = `${window.location.origin}/invitation?token=${encodeURIComponent(inviteToken)}`
+        setInviteLinkModal({
+          open: true,
+          link,
+          name: `${values.firstName} ${values.lastName}`,
+        })
+        setCopied(false)
+      } else {
+        message.success('Invitation créée')
+      }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Erreur lors de la création de l'invitation"
+      message.error(errorMessage)
+    }
+  }
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(inviteLinkModal.link)
+    setCopied(true)
+    message.success('Lien copié')
+  }
+
+  const handleDelete = async (memberId: string) => {
+    try {
+      await deleteMutation.mutateAsync({
+        params: { path: { orgId: orgSlug, memberId } },
+      })
+      message.success('Membre supprimé')
+      invalidateMembers()
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la suppression'
+      message.error(errorMessage)
+    }
+  }
+
+  const columns = useMemo(() => getMemberColumns(handleDelete), [orgSlug])
 
   const toggleRole = (role: string) => {
     setSelectedRoles((prev) =>
@@ -46,12 +137,12 @@ function MembersPage() {
   }
 
   const filteredMembers = useMemo(() => {
-    let result = MOCK_MEMBERS
+    let result = members
 
     if (searchText) {
       const q = searchText.toLowerCase()
       result = result.filter(
-        (m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q),
+        (m) => m.name.toLowerCase().includes(q) || (m.phone && m.phone.includes(q)),
       )
     }
 
@@ -60,7 +151,7 @@ function MembersPage() {
     }
 
     return result
-  }, [searchText, selectedRoles])
+  }, [members, searchText, selectedRoles])
 
   const paginatedMembers = useMemo(() => {
     const start = (currentPage - 1) * pageSize
@@ -86,7 +177,7 @@ function MembersPage() {
       <div className="flex-1 p-4 pb-16 lg:p-6 lg:pb-16">
         <div className="tickets-filters">
           <Input
-            placeholder="Rechercher par nom ou email..."
+            placeholder="Rechercher par nom ou téléphone..."
             prefix={<Search size={16} className="text-text-muted" />}
             value={searchText}
             onChange={(e) => {
@@ -112,12 +203,13 @@ function MembersPage() {
         {isDesktop ? (
           <Table
             dataSource={paginatedMembers}
-            columns={memberColumns}
+            columns={columns}
             bordered
             rowKey="id"
             pagination={false}
             className="tickets-table"
             size="middle"
+            loading={membersQuery.isLoading}
           />
         ) : (
           <div className="flex flex-col gap-3">
@@ -127,7 +219,7 @@ function MembersPage() {
               </div>
             ) : (
               paginatedMembers.map((member) => (
-                <MemberDescriptionCard key={member.id} member={member} />
+                <MemberDescriptionCard key={member.id} member={member} onDelete={handleDelete} />
               ))
             )}
           </div>
@@ -145,7 +237,43 @@ function MembersPage() {
         />
       </div>
 
-      <InviteMemberModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
+      <InviteMemberModal
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        onSubmit={handleInvite}
+      />
+
+      {/* Invite link modal */}
+      <Modal
+        title="Invitation créée"
+        open={inviteLinkModal.open}
+        onCancel={() => setInviteLinkModal((prev) => ({ ...prev, open: false }))}
+        footer={[
+          <Button
+            key="copy"
+            type="primary"
+            icon={copied ? <Check size={16} /> : <Copy size={16} />}
+            onClick={handleCopyLink}
+          >
+            {copied ? 'Copié' : 'Copier le lien'}
+          </Button>,
+        ]}
+        width={520}
+      >
+        <div className="flex flex-col gap-3 py-2">
+          <p className="text-sm text-text-secondary">
+            L&apos;invitation pour <strong>{inviteLinkModal.name}</strong> a été créée. Partagez ce
+            lien pour qu&apos;il puisse rejoindre l&apos;organisation.
+          </p>
+          <Input.TextArea
+            value={inviteLinkModal.link}
+            readOnly
+            autoSize={{ minRows: 2 }}
+            className="!cursor-text"
+            onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+          />
+        </div>
+      </Modal>
     </div>
   )
 }
