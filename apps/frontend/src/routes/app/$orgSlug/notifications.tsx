@@ -269,77 +269,81 @@ function NotificationsPage() {
           whatsappSettings,
         )}
 
-        {/* ─── Email Templates Preview ─── */}
-        <div className="mt-10">
-          <div className="mb-5 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-bg-subtle">
-              <Eye size={20} strokeWidth={1} className="text-text-secondary" />
-            </div>
-            <div>
-              <Title level={5} style={{ margin: 0 }}>
-                Templates d'emails
-              </Title>
-              <Text type="secondary" className="text-xs">
-                Prévisualisez les emails qui seront envoyés à vos utilisateurs
-              </Text>
-            </div>
-          </div>
-
-          <div className="notif-list">
-            {emailTemplates.map((tpl, i) => (
-              <div key={tpl.key}>
-                <div className="notif-row">
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="text-sm font-medium text-text-primary">{tpl.title}</span>
-                    <span className="text-xs leading-relaxed text-text-secondary">
-                      {tpl.description}
-                    </span>
-                  </div>
-                  <Button size="small" onClick={() => setPreviewTemplate(tpl)}>
-                    Prévisualiser
-                  </Button>
-                </div>
-                {i < emailTemplates.length - 1 && <div className="notif-divider" />}
+        {/* ─── Email Templates Preview (dev only) ─── */}
+        {import.meta.env.DEV && (
+          <div className="mt-10">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-bg-subtle">
+                <Eye size={20} strokeWidth={1} className="text-text-secondary" />
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Template Preview Modal ─── */}
-      <Modal
-        open={!!previewTemplate}
-        onCancel={() => setPreviewTemplate(null)}
-        footer={null}
-        title={previewTemplate?.subject}
-        width={680}
-        centered
-      >
-        {previewTemplate && (
-          <div className="mt-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Text type="secondary" className="text-xs">
-                Sujet :
-              </Text>
-              <Text className="text-sm">{previewTemplate.subject}</Text>
+              <div>
+                <Title level={5} style={{ margin: 0 }}>
+                  Templates d'emails
+                </Title>
+                <Text type="secondary" className="text-xs">
+                  Prévisualisez les emails qui seront envoyés à vos utilisateurs
+                </Text>
+              </div>
             </div>
-            <div
-              style={{
-                border: '1px solid var(--color-border-subtle)',
-                borderRadius: 8,
-                overflow: 'hidden',
-                background: '#f5f5f5',
-                padding: 16,
-              }}
-            >
-              <div
-                dangerouslySetInnerHTML={{ __html: previewTemplate.html }}
-                style={{ background: '#ffffff', borderRadius: 4 }}
-              />
+
+            <div className="notif-list">
+              {emailTemplates.map((tpl, i) => (
+                <div key={tpl.key}>
+                  <div className="notif-row">
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="text-sm font-medium text-text-primary">{tpl.title}</span>
+                      <span className="text-xs leading-relaxed text-text-secondary">
+                        {tpl.description}
+                      </span>
+                    </div>
+                    <Button size="small" onClick={() => setPreviewTemplate(tpl)}>
+                      Prévisualiser
+                    </Button>
+                  </div>
+                  {i < emailTemplates.length - 1 && <div className="notif-divider" />}
+                </div>
+              ))}
             </div>
           </div>
         )}
-      </Modal>
+      </div>
+
+      {/* ─── Template Preview Modal (dev only) ─── */}
+      {import.meta.env.DEV && (
+        <Modal
+          open={!!previewTemplate}
+          onCancel={() => setPreviewTemplate(null)}
+          footer={null}
+          title={previewTemplate?.subject}
+          width={680}
+          centered
+        >
+          {previewTemplate && (
+            <div className="mt-4">
+              <div className="mb-3 flex items-center gap-2">
+                <Text type="secondary" className="text-xs">
+                  Sujet :
+                </Text>
+                <Text className="text-sm">{previewTemplate.subject}</Text>
+              </div>
+              <div
+                style={{
+                  border: '1px solid var(--color-border-subtle)',
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  background: '#f5f5f5',
+                  padding: 16,
+                }}
+              >
+                <div
+                  dangerouslySetInnerHTML={{ __html: previewTemplate.html }}
+                  style={{ background: '#ffffff', borderRadius: 4 }}
+                />
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
     </div>
   )
 }
