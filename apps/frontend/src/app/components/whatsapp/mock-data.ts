@@ -5,7 +5,9 @@ export interface Contact {
   avatarUrl?: string
 }
 
-export type MessageType = 'text' | 'audio' | 'video' | 'image' | 'catalog' | 'button'
+export type MessageType = 'text' | 'audio' | 'video' | 'image' | 'file' | 'catalog' | 'button'
+
+export type MessageStatus = 'sending' | 'sent' | 'error'
 
 export interface ReplyContext {
   id: string
@@ -33,6 +35,10 @@ export interface Message {
   timestamp: string
   isRead: boolean
 
+  // Optimistic messaging
+  localId?: string
+  status?: MessageStatus
+
   // Context reply
   replyTo?: ReplyContext
 
@@ -48,12 +54,21 @@ export interface Message {
   imageUrl?: string
   imageCaption?: string
 
+  // File / generic media
+  mediaUrl?: string
+  fileUrl?: string
+  fileName?: string
+  fileSize?: number
+
   // Catalog
   catalogItem?: CatalogItem
 
   // Buttons
   buttons?: MessageButton[]
   buttonHeader?: string
+
+  // Reactions
+  reactions?: { senderId: string; emoji: string }[]
 }
 
 export interface Label {

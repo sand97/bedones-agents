@@ -165,6 +165,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/upload/chat-media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UploadController_uploadChatMedia"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/social/connect/facebook": {
         parameters: {
             query?: never;
@@ -501,6 +517,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organisations/{orgId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MemberController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organisations/{orgId}/members/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MemberController_invite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organisations/{orgId}/members/{memberId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["MemberController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvitationController_getInvitation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/send-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvitationController_sendOtp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/verify-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvitationController_verifyOtp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvitationController_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvitationController_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -517,11 +661,14 @@ export interface components {
         };
         UserDto: {
             id: string;
-            email: string;
+            email?: Record<string, never> | null;
+            phone?: Record<string, never> | null;
             name: string;
             avatar: Record<string, never> | null;
             /** @enum {string} */
             authType: "PASSWORD" | "FACEBOOK" | "INSTAGRAM";
+            /** @enum {string} */
+            status: "PENDING" | "VERIFIED";
         };
         SocialAccountDto: {
             id: string;
@@ -538,9 +685,19 @@ export interface components {
             role: "OWNER" | "ADMIN" | "MEMBER";
             socialAccounts: components["schemas"]["SocialAccountDto"][];
         };
+        PendingInvitationDto: {
+            organisationId: string;
+            organisationName: string;
+            organisationLogo?: Record<string, never> | null;
+            /** @enum {string} */
+            role: "ADMIN" | "MEMBER";
+            /** Format: date-time */
+            invitedAt: string;
+        };
         MeResponseDto: {
             user: components["schemas"]["UserDto"];
             organisations: components["schemas"]["OrganisationSummaryDto"][];
+            pendingInvitations: components["schemas"]["PendingInvitationDto"][];
         };
         CreateOrganisationDto: {
             /** @example Mon entreprise */
@@ -695,6 +852,15 @@ export interface components {
             lastMessageAt?: string;
             unreadCount: number;
         };
+        ReplyToDto: {
+            id: string;
+            text: string;
+            from: string;
+        };
+        ReactionDto: {
+            senderId: string;
+            emoji: string;
+        };
         DirectMessageResponseDto: {
             id: string;
             conversationId: string;
@@ -705,16 +871,76 @@ export interface components {
             isFromPage: boolean;
             mediaUrl?: string;
             mediaType?: string;
+            fileName?: string;
+            fileSize?: number;
+            /** @description Reply context */
+            replyTo?: components["schemas"]["ReplyToDto"];
+            /** @description Reactions on this message */
+            reactions?: components["schemas"]["ReactionDto"][];
             /** Format: date-time */
             createdTime: string;
             isRead: boolean;
         };
         SendMessageDto: {
             conversationId: string;
-            message: string;
+            message?: string;
+            /** @description Public URL of the media file to send */
+            mediaUrl?: string;
+            /** @enum {string} */
+            mediaType?: "image" | "video" | "audio" | "file";
+            /** @description Original file name */
+            fileName?: string;
+            /** @description File size in bytes */
+            fileSize?: number;
+            /** @description ID of the message to reply to */
+            replyToId?: string;
         };
         MarkConversationReadDto: {
             conversationId: string;
+        };
+        MemberUserDto: {
+            id: string;
+            name: string;
+            email?: Record<string, never> | null;
+            phone?: Record<string, never> | null;
+            avatar?: Record<string, never> | null;
+            /** @enum {string} */
+            status: "PENDING" | "VERIFIED";
+        };
+        MemberResponseDto: {
+            id: string;
+            userId: string;
+            organisationId: string;
+            /** @enum {string} */
+            role: "OWNER" | "ADMIN" | "MEMBER";
+            /** @enum {string} */
+            status: "ACTIVE" | "INVITED";
+            user: components["schemas"]["MemberUserDto"];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        InviteMemberDto: {
+            /** @example Aminata */
+            firstName: string;
+            /** @example Diallo */
+            lastName: string;
+            /** @example +2250701020304 */
+            phone: string;
+            /**
+             * @example MEMBER
+             * @enum {string}
+             */
+            role: "ADMIN" | "MEMBER";
+        };
+        VerifyInviteOtpDto: {
+            /** @example 123456 */
+            code: string;
+        };
+        AcceptInvitationDto: {
+            /** @example Aminata */
+            firstName?: string;
+            /** @example Diallo */
+            lastName?: string;
         };
     };
     responses: never;
@@ -930,6 +1156,32 @@ export interface operations {
         };
     };
     UploadController_uploadLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResponseDto"];
+                };
+            };
+        };
+    };
+    UploadController_uploadChatMedia: {
         parameters: {
             query?: never;
             header?: never;
@@ -1413,6 +1665,183 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ConversationResponseDto"][];
                 };
+            };
+        };
+    };
+    MemberController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberResponseDto"][];
+                };
+            };
+        };
+    };
+    MemberController_invite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteMemberDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberResponseDto"];
+                };
+            };
+        };
+    };
+    MemberController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                memberId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Membre supprimé */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvitationController_getInvitation: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvitationController_sendOtp: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header: {
+                "accept-language": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OTP sent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvitationController_verifyOtp: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyInviteOtpDto"];
+            };
+        };
+        responses: {
+            /** @description OTP verified, user authenticated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvitationController_accept: {
+        parameters: {
+            query: {
+                orgId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptInvitationDto"];
+            };
+        };
+        responses: {
+            /** @description Invitation accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvitationController_reject: {
+        parameters: {
+            query: {
+                orgId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation rejected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

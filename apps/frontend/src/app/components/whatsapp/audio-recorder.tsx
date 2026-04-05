@@ -152,7 +152,8 @@ export function AudioRecorder({ onSend, onCancel }: AudioRecorderProps) {
   const [selectedDevice, setSelectedDevice] = useState('')
   const [micPopoverOpen, setMicPopoverOpen] = useState(false)
 
-  // Use a ref for the stream so cleanup functions always see the latest value
+  // All streams ever created — we track them all to ensure cleanup
+  const allStreamsRef = useRef<Set<MediaStream>>(new Set())
   const streamRef = useRef<MediaStream | null>(null)
 
   // Recording
@@ -179,10 +180,22 @@ export function AudioRecorder({ onSend, onCancel }: AudioRecorderProps) {
   const selectedDeviceLabel =
     devices.find((d) => d.deviceId === selectedDevice)?.label || 'Microphone'
 
-  /** Stop all tracks on the current stream ref */
-  const releaseStream = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop())
+  /** Nuclear cleanup — kill every stream we ever created */
+  const stopEverything = useCallback(() => {
+    // Stop the MediaRecorder
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop()
+    }
+    mediaRecorderRef.current = null
+
+    // Kill ALL streams we ever created
+    allStreamsRef.current.forEach((s) => {
+      s.getTracks().forEach((t) => t.stop())
+    })
+    allStreamsRef.current.clear()
     streamRef.current = null
+    setStream(null)
   }, [])
 
   /* ── Start mic stream + MediaRecorder ── */
@@ -192,11 +205,14 @@ export function AudioRecorder({ onSend, onCancel }: AudioRecorderProps) {
       const s = await navigator.mediaDevices.getUserMedia({
         audio: deviceId ? { deviceId: { exact: deviceId } } : true,
       })
+      allStreamsRef.current.add(s)
       streamRef.current = s
       setStream(s)
 
-      // Start MediaRecorder
-      const recorder = new MediaRecorder(s)
+      // Start MediaRecorder — prefer mp4 (supported by Instagram/Messenger APIs)
+      const preferredTypes = ['audio/mp4', 'audio/m4a', 'audio/webm', 'audio/ogg']
+      const mimeType = preferredTypes.find((t) => MediaRecorder.isTypeSupported(t))
+      const recorder = mimeType ? new MediaRecorder(s, { mimeType }) : new MediaRecorder(s)
       chunksRef.current = []
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
@@ -218,33 +234,41 @@ export function AudioRecorder({ onSend, onCancel }: AudioRecorderProps) {
   useEffect(() => {
     startStream()
     return () => {
-      mediaRecorderRef.current?.stop()
-      releaseStream()
+      stopEverything()
       if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current)
     }
-  }, [startStream, releaseStream])
+  }, [startStream, stopEverything])
 
-  // Timer — only counts while recording
+  const MAX_DURATION = 180 // 3 minutes
+
+  // Timer — only counts while recording, auto-stop at max
   useEffect(() => {
     if (state !== 'recording') return
     intervalRef.current = setInterval(() => {
-      setDuration((d) => d + 1)
+      setDuration((prev) => {
+        if (prev + 1 >= MAX_DURATION) {
+          // Auto-stop recording at 3 min
+          handleStop()
+          return prev + 1
+        }
+        return prev + 1
+      })
     }, 1000)
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [state])
+  }, [state]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDeviceChange = (deviceId: string) => {
     setSelectedDevice(deviceId)
     setMicPopoverOpen(false)
-    mediaRecorderRef.current?.stop()
-    releaseStream()
+    stopEverything()
     setDuration(0)
     startStream(deviceId)
   }
 
   const handleStop = () => {
+    // Capture chunks before stopping
     const recorder = mediaRecorderRef.current
     if (recorder && recorder.state !== 'inactive') {
       recorder.onstop = () => {
@@ -253,7 +277,6 @@ export function AudioRecorder({ onSend, onCancel }: AudioRecorderProps) {
         })
         setAudioBlob(blob)
 
-        // Create audio element for playback
         const url = URL.createObjectURL(blob)
         audioUrlRef.current = url
         const audio = new Audio(url)
@@ -263,26 +286,20 @@ export function AudioRecorder({ onSend, onCancel }: AudioRecorderProps) {
         }
         audioRef.current = audio
       }
-      recorder.stop()
     }
-    releaseStream()
-    setStream(null)
+    stopEverything()
     setState('preview')
   }
 
   const handleCancel = () => {
-    mediaRecorderRef.current?.stop()
-    releaseStream()
-    setStream(null)
+    stopEverything()
     audioRef.current?.pause()
     if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current)
     onCancel()
   }
 
   const handleSend = () => {
-    mediaRecorderRef.current?.stop()
-    releaseStream()
-    setStream(null)
+    stopEverything()
     audioRef.current?.pause()
     if (audioBlob) {
       onSend(audioBlob, duration)
@@ -336,7 +353,7 @@ export function AudioRecorder({ onSend, onCancel }: AudioRecorderProps) {
         >
           <Button
             type="text"
-            className="flex w-10 flex-shrink-0 items-center justify-center rounded-l-2xl rounded-r-none! bg-bg-subtle! hover:bg-bg-muted!"
+            className="flex w-10 flex-shrink-0 items-center justify-center rounded-l-2xl rounded-r-none! text-text-primary! bg-bg-subtle! hover:bg-bg-muted!"
           >
             <div className="relative">
               <Mic size={16} />
@@ -367,27 +384,29 @@ export function AudioRecorder({ onSend, onCancel }: AudioRecorderProps) {
         )}
       </div>
 
-      {/* ── Right: Control buttons (full-height bg like mic) ── */}
-      <div className="flex items-stretch flex-shrink-0 bg-bg-subtle rounded-r-2xl">
+      {/* ── Right: Control buttons ── */}
+      <div className="flex items-center gap-1 px-1.5">
         {state === 'recording' ? (
           <>
-            <Tooltip title="Arreter" placement="top">
+            <Tooltip title="Arrêter" placement="top">
               <Button
                 type="text"
+                danger
+                shape="circle"
+                size="small"
                 onClick={handleStop}
-                className="flex w-9 items-center justify-center text-red-500! hover:bg-red-50! h-full! rounded-none!"
-              >
-                <Square size={14} fill="currentColor" />
-              </Button>
+                icon={<Square size={14} fill="currentColor" />}
+              />
             </Tooltip>
             <Tooltip title="Annuler" placement="top">
               <Button
                 type="text"
+                danger
+                shape="circle"
+                size="small"
                 onClick={handleCancel}
-                className="flex w-9 items-center justify-center rounded-r-2xl rounded-l-none! hover:bg-red-50! hover:text-red-500! h-full!"
-              >
-                <X size={15} />
-              </Button>
+                icon={<X size={15} />}
+              />
             </Tooltip>
           </>
         ) : (
@@ -395,29 +414,30 @@ export function AudioRecorder({ onSend, onCancel }: AudioRecorderProps) {
             <Tooltip title={isPlaying ? 'Pause' : 'Lecture'} placement="top">
               <Button
                 type="text"
+                shape="circle"
+                size="small"
                 onClick={togglePlayback}
-                className="flex w-9 items-center justify-center h-full! rounded-none!"
-              >
-                {isPlaying ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
-              </Button>
+                icon={isPlaying ? <Pause size={15} /> : <Play size={15} />}
+              />
             </Tooltip>
             <Tooltip title="Envoyer" placement="top">
               <Button
-                type="text"
+                type="primary"
+                shape="circle"
+                size="small"
                 onClick={handleSend}
-                className="flex w-9 items-center justify-center hover:bg-green-50! hover:text-brand-whatsapp! h-full! rounded-none!"
-              >
-                <Send size={14} />
-              </Button>
+                icon={<Send size={14} />}
+              />
             </Tooltip>
             <Tooltip title="Annuler" placement="top">
               <Button
                 type="text"
+                danger
+                shape="circle"
+                size="small"
                 onClick={handleCancel}
-                className="flex w-9 items-center justify-center rounded-r-2xl rounded-l-none! hover:bg-red-50! hover:text-red-500! h-full!"
-              >
-                <X size={15} />
-              </Button>
+                icon={<X size={15} />}
+              />
             </Tooltip>
           </>
         )}

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from 'antd'
@@ -9,6 +9,7 @@ import { SocialSetup } from '@app/components/social/social-setup'
 import { AccountSwitcher, type SocialAccount } from '@app/components/social/account-switcher'
 import { ChatLayout } from '@app/components/whatsapp/chat-layout'
 import { MOCK_CONVERSATIONS } from '@app/components/whatsapp/mock-data'
+import { uploadChatMedia } from '@app/lib/api'
 import { WhatsAppIcon, InstagramIcon, MessengerIcon } from '@app/components/icons/social-icons'
 import { useLayout } from '@app/contexts/layout-context'
 import { $api } from '@app/lib/api/$api'
@@ -17,7 +18,7 @@ import {
   buildFacebookOAuthUrl,
   buildInstagramOAuthUrl,
 } from '@app/lib/auth-redirect'
-import type { Conversation } from '@app/components/whatsapp/mock-data'
+import type { Conversation, Message } from '@app/components/whatsapp/mock-data'
 
 export const Route = createFileRoute('/app/$orgSlug/chats/$id')({
   component: ChatsPage,
@@ -122,6 +123,10 @@ function mapApiConversation(
     isFromPage: boolean
     mediaUrl?: string | null
     mediaType?: string | null
+    fileName?: string | null
+    fileSize?: number | null
+    replyTo?: { id: string; text: string; from: string } | null
+    reactions?: { senderId: string; emoji: string }[] | null
     createdTime: string
     isRead: boolean
   }>,
@@ -132,18 +137,42 @@ function mapApiConversation(
       id: conv.participantId,
       name: conv.participantName,
       phone: '',
-      avatar: conv.participantAvatar ?? undefined,
+      avatarUrl: conv.participantAvatar ?? undefined,
     },
-    messages: messages.map((m) => ({
-      id: m.id,
-      type: (m.mediaType as 'text' | 'image' | 'video' | 'audio') || 'text',
-      content: m.message,
-      timestamp: m.createdTime,
-      isOutgoing: m.isFromPage,
-      mediaUrl: m.mediaUrl ?? undefined,
-    })),
+    messages: messages.map((m) => {
+      const raw = m as Record<string, unknown>
+      const status = raw._status as 'sending' | 'sent' | 'error' | undefined
+      const localId = raw._localId as string | undefined
+      return {
+        id: m.id,
+        type: (m.mediaType as 'text' | 'image' | 'video' | 'audio' | 'file') || 'text',
+        from: (m.isFromPage ? 'business' : 'customer') as 'business' | 'customer',
+        text: m.message,
+        timestamp: m.createdTime,
+        isRead: m.isRead,
+        localId,
+        status,
+        imageUrl: m.mediaType === 'image' ? (m.mediaUrl ?? undefined) : undefined,
+        audioUrl: m.mediaType === 'audio' ? (m.mediaUrl ?? undefined) : undefined,
+        videoUrl: m.mediaType === 'video' ? (m.mediaUrl ?? undefined) : undefined,
+        videoThumbnail: m.mediaType === 'video' ? (m.mediaUrl ?? undefined) : undefined,
+        fileUrl: m.mediaType === 'file' ? (m.mediaUrl ?? undefined) : undefined,
+        fileName: m.fileName ?? undefined,
+        fileSize: m.fileSize ?? undefined,
+        mediaUrl: m.mediaUrl ?? undefined,
+        replyTo: m.replyTo
+          ? {
+              id: m.replyTo.id,
+              text: m.replyTo.text,
+              from: m.replyTo.from as 'customer' | 'business',
+            }
+          : undefined,
+        reactions: m.reactions?.length ? m.reactions : undefined,
+      }
+    }),
     unreadCount: conv.unreadCount,
     labels: [],
+    tickets: [],
     lastMessage: conv.lastMessageText || '',
     lastMessageTime: conv.lastMessageAt || new Date().toISOString(),
   }
@@ -231,25 +260,263 @@ function ChatsPage() {
     })
   }, [conversationsQuery.data, messagesQuery.data, search.conv, id])
 
+  // ─── Cache keys ───
+  const conversationsKey = [
+    'get',
+    '/messaging/conversations/{accountId}',
+    { params: { path: { accountId: currentAccountId! } } },
+  ]
+  const messagesKey = (convId: string) => [
+    'get',
+    '/messaging/conversations/{conversationId}/messages',
+    { params: { path: { conversationId: convId } } },
+  ]
+
+  // ─── Pending messages for retry ───
+  const pendingMessagesRef = useRef<
+    Map<
+      string,
+      {
+        message: string
+        mediaUrl?: string
+        mediaType?: 'image' | 'video' | 'audio' | 'file'
+        fileName?: string
+        fileSize?: number
+        file?: File
+      }
+    >
+  >(new Map())
+
+  // ─── Helper: insert optimistic message ───
+  const insertOptimisticMessage = useCallback(
+    (convId: string, localId: string, msg: Partial<Message>) => {
+      const optimistic: Record<string, unknown> = {
+        id: `optimistic-${localId}`,
+        _localId: localId,
+        conversationId: convId,
+        message: msg.text || '',
+        senderId: 'page',
+        senderName: 'Page',
+        isFromPage: true,
+        isRead: true,
+        mediaUrl: msg.imageUrl || msg.audioUrl || msg.videoUrl || msg.fileUrl || null,
+        mediaType: msg.type === 'text' ? null : msg.type,
+        fileName: msg.fileName || null,
+        fileSize: msg.fileSize || null,
+        createdTime: new Date().toISOString(),
+        _status: 'sending',
+      }
+
+      queryClient.setQueryData(messagesKey(convId), (old: unknown[] | undefined) => [
+        ...(old ?? []),
+        optimistic,
+      ])
+
+      const displayText = msg.text || (msg.type !== 'text' ? `[${msg.type}]` : '')
+      queryClient.setQueryData(conversationsKey, (old: unknown[] | undefined) =>
+        (old ?? []).map((c: Record<string, unknown>) =>
+          c.id === convId
+            ? { ...c, lastMessageText: displayText, lastMessageAt: new Date().toISOString() }
+            : c,
+        ),
+      )
+    },
+    [queryClient, conversationsKey],
+  )
+
+  // ─── Helper: reconcile optimistic → real ───
+  const reconcileMessage = useCallback(
+    (convId: string, localId: string, savedMsg: Record<string, unknown>) => {
+      queryClient.setQueryData(messagesKey(convId), (old: unknown[] | undefined) =>
+        (old ?? []).map((m: Record<string, unknown>) => {
+          if (m._localId !== localId) return m
+          // Keep local blob URLs for image/video to avoid re-downloading the same file
+          const mediaType = savedMsg.mediaType as string | undefined
+          const keepLocal =
+            (mediaType === 'image' || mediaType === 'video') && typeof m.mediaUrl === 'string'
+          return {
+            ...savedMsg,
+            _status: undefined,
+            ...(keepLocal ? { mediaUrl: m.mediaUrl } : {}),
+          }
+        }),
+      )
+      pendingMessagesRef.current.delete(localId)
+    },
+    [queryClient],
+  )
+
+  // ─── Helper: mark optimistic as error ───
+  const markMessageError = useCallback(
+    (convId: string, localId: string) => {
+      queryClient.setQueryData(messagesKey(convId), (old: unknown[] | undefined) =>
+        (old ?? []).map((m: Record<string, unknown>) =>
+          m._localId === localId ? { ...m, _status: 'error' } : m,
+        ),
+      )
+    },
+    [queryClient],
+  )
+
   // ─── Handlers ───
-  const handleSend = async (message: string) => {
+  const handleSend = async (
+    message: string,
+    media?: { url: string; type: 'image' | 'video' | 'audio' | 'file' },
+    replyToId?: string,
+  ) => {
     if (!search.conv) return
-    await sendMutation.mutateAsync({ body: { conversationId: search.conv, message } })
-    // Invalidate messages and conversations
-    queryClient.invalidateQueries({
-      queryKey: ['get', '/messaging/conversations/{conversationId}/messages'],
+    const localId = crypto.randomUUID()
+    const convId = search.conv
+
+    // Store for retry
+    pendingMessagesRef.current.set(localId, {
+      message,
+      mediaUrl: media?.url,
+      mediaType: media?.type,
     })
-    queryClient.invalidateQueries({
-      queryKey: ['get', '/messaging/conversations/{accountId}'],
+
+    // Insert optimistic message
+    insertOptimisticMessage(convId, localId, {
+      type: media?.type || 'text',
+      text: message || undefined,
+      imageUrl: media?.type === 'image' ? media.url : undefined,
+      audioUrl: media?.type === 'audio' ? media.url : undefined,
+      videoUrl: media?.type === 'video' ? media.url : undefined,
+      fileUrl: media?.type === 'file' ? media.url : undefined,
     })
+
+    try {
+      const savedMsg = await sendMutation.mutateAsync({
+        body: {
+          conversationId: convId,
+          message: message || undefined,
+          mediaUrl: media?.url,
+          mediaType: media?.type,
+          replyToId,
+        },
+      })
+      reconcileMessage(convId, localId, savedMsg as Record<string, unknown>)
+    } catch {
+      markMessageError(convId, localId)
+    }
   }
+
+  const handleUploadAndSend = async (
+    file: File,
+    type: 'image' | 'video' | 'audio' | 'file',
+    replyToId?: string,
+  ) => {
+    if (!search.conv) return
+    const localId = crypto.randomUUID()
+    const convId = search.conv
+
+    // Create a local preview URL for images/videos to avoid re-downloading after upload
+    const localUrl = type === 'image' || type === 'video' ? URL.createObjectURL(file) : undefined
+
+    // Store for retry
+    pendingMessagesRef.current.set(localId, {
+      message: '',
+      mediaType: type,
+      fileName: file.name,
+      fileSize: file.size,
+      file,
+    })
+
+    // Insert optimistic message
+    insertOptimisticMessage(convId, localId, {
+      type,
+      imageUrl: type === 'image' ? localUrl : undefined,
+      videoUrl: type === 'video' ? localUrl : undefined,
+      fileUrl: type === 'file' ? undefined : undefined,
+      fileName: file.name,
+      fileSize: file.size,
+    })
+
+    try {
+      const url = await uploadChatMedia(file)
+      const savedMsg = await sendMutation.mutateAsync({
+        body: {
+          conversationId: convId,
+          message: undefined,
+          mediaUrl: url,
+          mediaType: type,
+          fileName: file.name,
+          fileSize: file.size,
+          replyToId,
+        },
+      })
+      reconcileMessage(convId, localId, savedMsg as Record<string, unknown>)
+    } catch {
+      markMessageError(convId, localId)
+    }
+  }
+
+  // ─── Retry handler ───
+  const handleRetry = useCallback(
+    (messageId: string) => {
+      // messageId here is the localId
+      const pending = pendingMessagesRef.current.get(messageId)
+      if (!pending || !search.conv) return
+      const convId = search.conv
+
+      // Remove the failed message from cache
+      queryClient.setQueryData(messagesKey(convId), (old: unknown[] | undefined) =>
+        (old ?? []).filter((m: Record<string, unknown>) => m._localId !== messageId),
+      )
+      pendingMessagesRef.current.delete(messageId)
+
+      // Re-send
+      if (pending.file) {
+        handleUploadAndSend(pending.file, pending.mediaType!)
+      } else if (pending.mediaUrl) {
+        handleSend(pending.message, { url: pending.mediaUrl, type: pending.mediaType! })
+      } else {
+        handleSend(pending.message)
+      }
+    },
+    [search.conv, queryClient],
+  )
+
+  // ─── Mark as read when conv is opened or tab becomes visible ───
+  const markAsRead = useCallback(
+    (convId: string) => {
+      const convs = conversationsQuery.data as Record<string, unknown>[] | undefined
+      const conv = convs?.find((c) => c.id === convId)
+      if (!conv || (conv.unreadCount as number) === 0) return
+
+      markReadMutation.mutate({ body: { conversationId: convId } })
+      queryClient.setQueryData(conversationsKey, (old: unknown[] | undefined) =>
+        (old ?? []).map((c: Record<string, unknown>) =>
+          c.id === convId ? { ...c, unreadCount: 0 } : c,
+        ),
+      )
+    },
+    [conversationsQuery.data, markReadMutation, queryClient, conversationsKey],
+  )
+
+  const markReadConvRef = useRef(search.conv)
+  markReadConvRef.current = search.conv
+
+  // Mark as read when conversation URL changes
+  useEffect(() => {
+    if (search.conv) markAsRead(search.conv)
+  }, [search.conv, markAsRead])
+
+  // Mark as read when tab becomes visible again
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && markReadConvRef.current) {
+        markAsRead(markReadConvRef.current)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [markAsRead])
 
   const handleSelectConv = (convId: string) => {
     navigate({
       search: (prev: Record<string, unknown>) => ({ ...prev, conv: convId }) as never,
     })
-    // Mark as read
-    markReadMutation.mutate({ body: { conversationId: convId } })
   }
 
   const handleSync = () => {
@@ -325,7 +592,7 @@ function ChatsPage() {
           }
           mobileLeft={hasSelectedConv && !isDesktop ? <MobileBackButton /> : undefined}
         />
-        <ChatLayout conversations={MOCK_CONVERSATIONS} />
+        <ChatLayout conversations={MOCK_CONVERSATIONS} provider="whatsapp" />
       </div>
     )
   }
@@ -335,7 +602,11 @@ function ChatsPage() {
     return (
       <div className="flex h-screen flex-col overflow-hidden">
         <DashboardHeader title={config.label} mobileTitle={config.mobileLabel} />
-        <ChatLayout conversations={[]} loading />
+        <ChatLayout
+          conversations={[]}
+          loading
+          provider={id as 'whatsapp' | 'instagram-dm' | 'messenger'}
+        />
       </div>
     )
   }
@@ -388,10 +659,13 @@ function ChatsPage() {
       <ChatLayout
         conversations={apiConversations}
         loading={conversationsQuery.isLoading}
+        provider={id as 'whatsapp' | 'instagram-dm' | 'messenger'}
         onSend={handleSend}
+        onUploadAndSend={handleUploadAndSend}
         onSelectConversation={handleSelectConv}
         onSync={handleSync}
         syncing={syncMutation.isPending}
+        onRetry={handleRetry}
       />
     </div>
   )

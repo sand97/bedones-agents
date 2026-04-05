@@ -29,6 +29,25 @@ export class ConversationResponseDto {
   unreadCount: number
 }
 
+export class ReactionDto {
+  @ApiProperty()
+  senderId: string
+
+  @ApiProperty()
+  emoji: string
+}
+
+export class ReplyToDto {
+  @ApiProperty()
+  id: string
+
+  @ApiProperty()
+  text: string
+
+  @ApiProperty()
+  from: string
+}
+
 export class DirectMessageResponseDto {
   @ApiProperty()
   id: string
@@ -57,6 +76,18 @@ export class DirectMessageResponseDto {
   @ApiPropertyOptional()
   mediaType?: string
 
+  @ApiPropertyOptional()
+  fileName?: string
+
+  @ApiPropertyOptional()
+  fileSize?: number
+
+  @ApiPropertyOptional({ description: 'Reply context', type: ReplyToDto })
+  replyTo?: ReplyToDto
+
+  @ApiPropertyOptional({ description: 'Reactions on this message', type: [ReactionDto] })
+  reactions?: ReactionDto[]
+
   @ApiProperty()
   createdTime: Date
 
@@ -68,8 +99,23 @@ export class SendMessageDto {
   @ApiProperty()
   conversationId: string
 
-  @ApiProperty()
-  message: string
+  @ApiPropertyOptional()
+  message?: string
+
+  @ApiPropertyOptional({ description: 'Public URL of the media file to send' })
+  mediaUrl?: string
+
+  @ApiPropertyOptional({ enum: ['image', 'video', 'audio', 'file'] })
+  mediaType?: 'image' | 'video' | 'audio' | 'file'
+
+  @ApiPropertyOptional({ description: 'Original file name' })
+  fileName?: string
+
+  @ApiPropertyOptional({ description: 'File size in bytes' })
+  fileSize?: number
+
+  @ApiPropertyOptional({ description: 'ID of the message to reply to' })
+  replyToId?: string
 }
 
 export class MarkConversationReadDto {

@@ -39,15 +39,42 @@ export class MessagingService {
     })
     await this.assertMembership(userId, conversation.socialAccount.organisationId)
 
-    return this.prisma.directMessage.findMany({
+    const messages = await this.prisma.directMessage.findMany({
       where: { conversationId },
       orderBy: { createdTime: 'asc' },
+      include: {
+        replyTo: {
+          select: { id: true, message: true, isFromPage: true, mediaType: true },
+        },
+      },
     })
+
+    // Map replyTo relation and reactions
+    return messages.map((m) => ({
+      ...m,
+      replyTo: m.replyTo
+        ? {
+            id: m.replyTo.id,
+            text: m.replyTo.message || (m.replyTo.mediaType ? `[${m.replyTo.mediaType}]` : ''),
+            from: m.replyTo.isFromPage ? 'business' : 'customer',
+          }
+        : undefined,
+      reactions: (m.reactions as { senderId: string; emoji: string }[]) || [],
+    }))
   }
 
   // ─── Send a message ───
 
-  async sendMessage(userId: string, conversationId: string, message: string) {
+  async sendMessage(
+    userId: string,
+    conversationId: string,
+    message?: string,
+    mediaUrl?: string,
+    mediaType?: 'image' | 'video' | 'audio' | 'file',
+    fileName?: string,
+    fileSize?: number,
+    replyToId?: string,
+  ) {
     const conversation = await this.prisma.conversation.findUniqueOrThrow({
       where: { id: conversationId },
       include: {
@@ -68,34 +95,74 @@ export class MessagingService {
     const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
     const provider = conversation.socialAccount.provider
 
+    // Resolve the platform message ID of the replied message (for API reply_to)
+    // Instagram API with Instagram Login does not support reply_to — only Facebook does
+    let replyToPlatformMid: string | null = null
+    if (replyToId && provider === 'FACEBOOK') {
+      const repliedMsg = await this.prisma.directMessage.findUnique({
+        where: { id: replyToId },
+        select: { platformMsgId: true },
+      })
+      replyToPlatformMid = repliedMsg?.platformMsgId || null
+      if (!replyToPlatformMid) {
+        this.logger.warn(
+          `[${provider}] Reply target ${replyToId} has no platformMsgId, skipping reply_to`,
+        )
+      }
+    }
+
     let platformMsgId: string | null = null
 
-    if (provider === 'FACEBOOK') {
-      platformMsgId = await this.sendFacebookMessage(
-        conversation.socialAccount.providerAccountId,
-        conversation.participantId,
-        message,
-        accessToken,
+    try {
+      if (provider === 'FACEBOOK') {
+        platformMsgId = await this.sendFacebookMessage(
+          conversation.socialAccount.providerAccountId,
+          conversation.participantId,
+          accessToken,
+          message,
+          mediaUrl,
+          mediaType,
+          replyToPlatformMid,
+        )
+      } else if (provider === 'INSTAGRAM') {
+        platformMsgId = await this.sendInstagramMessage(
+          conversation.participantId,
+          accessToken,
+          message,
+          mediaUrl,
+          mediaType,
+        )
+      }
+    } catch (error) {
+      this.logger.error(
+        `[${provider}] Failed to send message to platform: ${error instanceof Error ? error.message : error}`,
       )
-    } else if (provider === 'INSTAGRAM') {
-      platformMsgId = await this.sendInstagramMessage(
-        conversation.participantId,
-        message,
-        accessToken,
-      )
+      throw error
     }
+
+    const displayText = message || (mediaType ? `[${mediaType}]` : '')
 
     // Save the sent message
     const savedMessage = await this.prisma.directMessage.create({
       data: {
         conversationId,
         platformMsgId,
-        message,
+        message: message || '',
         senderId: conversation.socialAccount.providerAccountId,
         senderName: 'Page',
         isFromPage: true,
         isRead: true,
+        mediaUrl: mediaUrl || null,
+        mediaType: mediaType || null,
+        fileName: fileName || null,
+        fileSize: fileSize || null,
+        replyToId: replyToId || null,
         createdTime: new Date(),
+      },
+      include: {
+        replyTo: {
+          select: { id: true, message: true, isFromPage: true, mediaType: true },
+        },
       },
     })
 
@@ -103,12 +170,23 @@ export class MessagingService {
     await this.prisma.conversation.update({
       where: { id: conversationId },
       data: {
-        lastMessageText: message,
+        lastMessageText: displayText,
         lastMessageAt: new Date(),
       },
     })
 
-    return savedMessage
+    return {
+      ...savedMessage,
+      replyTo: savedMessage.replyTo
+        ? {
+            id: savedMessage.replyTo.id,
+            text:
+              savedMessage.replyTo.message ||
+              (savedMessage.replyTo.mediaType ? `[${savedMessage.replyTo.mediaType}]` : ''),
+            from: savedMessage.replyTo.isFromPage ? 'business' : 'customer',
+          }
+        : undefined,
+    }
   }
 
   // ─── Mark conversation as read ───
@@ -165,30 +243,63 @@ export class MessagingService {
   private async sendFacebookMessage(
     pageId: string,
     recipientId: string,
-    message: string,
     accessToken: string,
+    message?: string,
+    mediaUrl?: string,
+    mediaType?: string,
+    replyToMid?: string | null,
   ): Promise<string | null> {
-    const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${pageId}/messages`
+    const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${pageId}/messages?access_token=${accessToken}`
+
+    // Build message payload
+    let messagePayload: Record<string, unknown>
+    if (mediaUrl && mediaType) {
+      const typeMap: Record<string, string> = {
+        audio: 'audio',
+        video: 'video',
+        image: 'image',
+        file: 'file',
+      }
+      const fbType = typeMap[mediaType] || 'file'
+      messagePayload = {
+        attachment: {
+          type: fbType,
+          payload: { url: mediaUrl, is_reusable: true },
+        },
+      }
+    } else {
+      messagePayload = { text: message || '' }
+    }
+
+    const body: Record<string, unknown> = {
+      recipient: { id: recipientId },
+      message: messagePayload,
+      messaging_type: 'RESPONSE',
+    }
+    if (replyToMid) {
+      body.reply_to = { mid: replyToMid }
+    }
 
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        recipient: { id: recipientId },
-        message: { text: message },
-        messaging_type: 'RESPONSE',
-        access_token: accessToken,
-      }),
+      body: JSON.stringify(body),
     })
 
+    const data = await response.json()
+
     if (!response.ok) {
-      const error = await response.text()
-      this.logger.error(`[Messenger] Send failed: ${error}`)
-      throw new BadRequestException('Failed to send message')
+      this.logger.error(
+        `[Messenger] Send failed (${response.status})\n` +
+          `  Payload: ${JSON.stringify(body)}\n` +
+          `  Response: ${JSON.stringify(data)}`,
+      )
+      throw new BadRequestException(
+        `Failed to send message: ${JSON.stringify(data?.error?.message || data)}`,
+      )
     }
 
-    const data = (await response.json()) as { message_id?: string }
-    return data.message_id || null
+    return (data as { message_id?: string }).message_id || null
   }
 
   private async syncFacebookConversations(
@@ -301,29 +412,64 @@ export class MessagingService {
 
   private async sendInstagramMessage(
     recipientId: string,
-    message: string,
     accessToken: string,
+    message?: string,
+    mediaUrl?: string,
+    mediaType?: string,
   ): Promise<string | null> {
     const url = `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/me/messages`
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        recipient: { id: recipientId },
-        message: { text: message },
-        access_token: accessToken,
-      }),
-    })
-
-    if (!response.ok) {
-      const error = await response.text()
-      this.logger.error(`[Instagram DM] Send failed: ${error}`)
-      throw new BadRequestException('Failed to send Instagram message')
+    // Build message payload
+    let messagePayload: Record<string, unknown>
+    if (mediaUrl && mediaType) {
+      const typeMap: Record<string, string> = {
+        audio: 'audio',
+        video: 'video',
+        image: 'image',
+        file: 'file',
+      }
+      const igType = typeMap[mediaType] || 'file'
+      messagePayload = {
+        attachment: {
+          type: igType,
+          payload: { url: mediaUrl },
+        },
+      }
+    } else {
+      messagePayload = { text: message || '' }
     }
 
-    const data = (await response.json()) as { message_id?: string }
-    return data.message_id || null
+    const body: Record<string, unknown> = {
+      recipient: { id: recipientId },
+      message: messagePayload,
+    }
+
+    this.logger.log(`[Instagram DM] Sending to ${recipientId}`)
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      // Log the full payload we sent so we can debug (access_token is in URL, not body)
+      this.logger.error(
+        `[Instagram DM] Send failed (${response.status})\n` +
+          `  Payload: ${JSON.stringify(body)}\n` +
+          `  Response: ${JSON.stringify(data)}`,
+      )
+      throw new BadRequestException(
+        `Failed to send Instagram message: ${JSON.stringify(data?.error?.message || data)}`,
+      )
+    }
+
+    return (data as { message_id?: string }).message_id || null
   }
 
   private async syncInstagramConversations(
@@ -446,6 +592,10 @@ export class MessagingService {
     mediaType: string | null,
     timestamp: Date,
     _orgId: string,
+    senderAvatar?: string | null,
+    fileName?: string | null,
+    fileSize?: number | null,
+    replyToMid?: string | null,
   ) {
     // Upsert conversation
     const conversation = await this.prisma.conversation.upsert({
@@ -459,12 +609,14 @@ export class MessagingService {
         socialAccountId,
         participantId: senderId,
         participantName: senderName,
+        participantAvatar: senderAvatar || null,
         lastMessageText: messageText || (mediaType ? `[${mediaType}]` : ''),
         lastMessageAt: timestamp,
         unreadCount: 1,
       },
       update: {
         participantName: senderName,
+        ...(senderAvatar ? { participantAvatar: senderAvatar } : {}),
         lastMessageText: messageText || (mediaType ? `[${mediaType}]` : undefined),
         lastMessageAt: timestamp,
         unreadCount: { increment: 1 },
@@ -479,6 +631,16 @@ export class MessagingService {
       if (existing) return conversation
     }
 
+    // Resolve reply_to mid → id
+    let replyToId: string | null = null
+    if (replyToMid) {
+      const repliedMsg = await this.prisma.directMessage.findUnique({
+        where: { platformMsgId: replyToMid },
+        select: { id: true },
+      })
+      replyToId = repliedMsg?.id || null
+    }
+
     await this.prisma.directMessage.create({
       data: {
         conversationId: conversation.id,
@@ -489,6 +651,9 @@ export class MessagingService {
         isFromPage: false,
         mediaUrl,
         mediaType,
+        fileName: fileName || null,
+        fileSize: fileSize || null,
+        replyToId,
         createdTime: timestamp,
       },
     })
@@ -504,6 +669,10 @@ export class MessagingService {
     messageText: string,
     platformMsgId: string | null,
     timestamp: Date,
+    mediaUrl?: string | null,
+    mediaType?: string | null,
+    fileName?: string | null,
+    fileSize?: number | null,
   ) {
     // Check if message already exists (e.g. sent from our app)
     if (platformMsgId) {
@@ -524,6 +693,8 @@ export class MessagingService {
 
     if (!conversation) return
 
+    const displayText = messageText || (mediaType ? `[${mediaType}]` : '')
+
     await this.prisma.directMessage.create({
       data: {
         conversationId: conversation.id,
@@ -533,6 +704,10 @@ export class MessagingService {
         senderName: 'Page',
         isFromPage: true,
         isRead: true,
+        mediaUrl: mediaUrl || null,
+        mediaType: mediaType || null,
+        fileName: fileName || null,
+        fileSize: fileSize || null,
         createdTime: timestamp,
       },
     })
@@ -540,7 +715,7 @@ export class MessagingService {
     await this.prisma.conversation.update({
       where: { id: conversation.id },
       data: {
-        lastMessageText: messageText,
+        lastMessageText: displayText,
         lastMessageAt: timestamp,
       },
     })

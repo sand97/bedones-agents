@@ -1,18 +1,40 @@
-import { useMemo, useRef, useEffect, useCallback } from 'react'
-import { Avatar, Popover, Button } from 'antd'
-import { Play, Pause, ShoppingBag, ImageIcon, Film, Copy, Check } from 'lucide-react'
+import { useMemo, useRef, useEffect, useCallback, useState } from 'react'
+import { Avatar, Popover, Button, Spin } from 'antd'
+import {
+  Play,
+  Pause,
+  ShoppingBag,
+  ImageIcon,
+  Copy,
+  Check,
+  FileText,
+  RotateCcw,
+  Reply,
+} from 'lucide-react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import dayjs from 'dayjs'
-import { useState } from 'react'
 import { DoubleCheckIcon, OptionsIcon } from '@app/components/icons/social-icons'
 import type { Conversation, Message, Ticket } from './mock-data'
 import { TicketCard } from './ticket-card'
 import { TicketDrawer } from './ticket-drawer'
 import { ChatInput } from './chat-input'
 
+type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger'
+
 interface ChatWindowProps {
   conversation: Conversation
-  onSend?: (message: string) => Promise<void>
+  provider?: ChatProvider
+  onSend?: (
+    message: string,
+    media?: { url: string; type: 'image' | 'video' | 'audio' | 'file' },
+    replyToId?: string,
+  ) => Promise<void>
+  onUploadAndSend?: (
+    file: File,
+    type: 'image' | 'video' | 'audio' | 'file',
+    replyToId?: string,
+  ) => Promise<void>
+  onRetry?: (messageId: string) => void
 }
 
 function formatTime(timestamp: string): string {
@@ -47,38 +69,108 @@ function groupMessagesByDate(messages: Message[]): { date: string; messages: Mes
 
 /* ── Audio message player ── */
 
-function AudioPlayer({ duration }: { duration: number }) {
+function AudioPlayer({
+  audioUrl,
+  timestamp,
+  isOutgoing,
+  isSending,
+  isError,
+  isRead,
+  onRetry,
+}: {
+  audioUrl?: string
+  timestamp?: string
+  isOutgoing?: boolean
+  isSending?: boolean
+  isError?: boolean
+  isRead?: boolean
+  onRetry?: () => void
+}) {
+  const audioRef = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [duration, setDuration] = useState(0)
 
   useEffect(() => {
-    if (!playing) return
-    const interval = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 100) {
-          setPlaying(false)
-          return 0
-        }
-        return p + 100 / (duration * 10)
-      })
-    }, 100)
-    return () => clearInterval(interval)
-  }, [playing, duration])
+    const audio = audioRef.current
+    if (!audio) return
+
+    const onTimeUpdate = () => {
+      if (audio.duration) setProgress((audio.currentTime / audio.duration) * 100)
+    }
+    const onLoadedMetadata = () => setDuration(audio.duration)
+    const onEnded = () => {
+      setPlaying(false)
+      setProgress(0)
+    }
+
+    audio.addEventListener('timeupdate', onTimeUpdate)
+    audio.addEventListener('loadedmetadata', onLoadedMetadata)
+    audio.addEventListener('ended', onEnded)
+    return () => {
+      audio.removeEventListener('timeupdate', onTimeUpdate)
+      audio.removeEventListener('loadedmetadata', onLoadedMetadata)
+      audio.removeEventListener('ended', onEnded)
+    }
+  }, [])
+
+  const togglePlay = () => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (playing) {
+      audio.pause()
+    } else {
+      audio.play()
+    }
+    setPlaying(!playing)
+  }
+
+  const formatDuration = (s: number) => {
+    const mins = Math.floor(s / 60)
+    const secs = Math.floor(s % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
 
   return (
-    <div className="flex items-center gap-3">
-      <Button
-        type="text"
-        shape="circle"
-        onClick={() => setPlaying(!playing)}
-        icon={playing ? <Pause size={14} /> : <Play size={14} />}
-        className="flex-shrink-0 border border-text-primary text-text-primary!"
-      />
-      <div className="h-1 flex-1 overflow-hidden rounded-full bg-bg-muted">
-        <div
-          className="h-full rounded-full bg-text-primary transition-all"
-          style={{ width: `${progress}%` }}
+    <div className="flex flex-col gap-1">
+      {audioUrl && <audio ref={audioRef} src={audioUrl} preload="metadata" />}
+      <div className="flex items-center gap-3">
+        <Button
+          type="text"
+          shape="circle"
+          onClick={togglePlay}
+          icon={playing ? <Pause size={14} /> : <Play size={14} />}
+          className="flex-shrink-0 border border-text-primary text-text-primary!"
         />
+        <div className="h-1 flex-1 overflow-hidden rounded-full bg-bg-muted">
+          <div
+            className="h-full rounded-full bg-text-primary transition-all"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+      <div className="flex items-center justify-between pl-13 text-[10px] text-text-muted">
+        <span>{duration > 0 ? formatDuration(duration) : '0:00'}</span>
+        {isError ? (
+          <Button
+            type={'text'}
+            danger
+            size="small"
+            iconPosition={'end'}
+            onClick={onRetry}
+            icon={<RotateCcw size={10} />}
+          >
+            Non envoyé · Réessayer
+          </Button>
+        ) : (
+          <span className="flex items-center gap-1">
+            {timestamp}
+            {isOutgoing && isSending && <Spin size="small" />}
+            {isOutgoing && !isSending && isRead && (
+              <DoubleCheckIcon width={14} height={14} className="text-text-muted" />
+            )}
+          </span>
+        )}
       </div>
     </div>
   )
@@ -88,50 +180,54 @@ function AudioPlayer({ duration }: { duration: number }) {
 
 function ReplyContextBubble({
   replyTo,
-  isOutgoing,
   onClick,
 }: {
   replyTo: Message['replyTo']
-  isOutgoing: boolean
+  isOutgoing?: boolean
   onClick?: () => void
 }) {
   if (!replyTo) return null
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className={`mb-1 w-full rounded-xl rounded-b-md border-l-2 px-2.5 py-1.5 text-xs text-left border-none cursor-pointer transition-colors ${
-        isOutgoing
-          ? 'border-l-text-primary/30 bg-text-primary/8 text-text-secondary hover:bg-text-primary/12'
-          : 'border-l-text-primary/30 bg-bg-subtle text-text-secondary hover:bg-bg-muted'
-      }`}
-      style={{
-        borderLeftWidth: 2,
-        borderLeftStyle: 'solid',
-        borderLeftColor: isOutgoing ? 'rgba(17,27,33,0.3)' : 'rgba(17,27,33,0.3)',
-      }}
+      onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
+      className="chat-reply-context mb-1 cursor-pointer"
     >
       <div className="font-semibold text-text-primary">
         {replyTo.from === 'business' ? 'Vous' : 'Client'}
       </div>
       <div className="truncate">{replyTo.text}</div>
-    </button>
+    </div>
   )
 }
 
 /* ── Message bubble ── */
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} o`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
+}
+
 function MessageBubble({
   message,
   position,
   onScrollToMessage,
+  onRetry,
+  onReply,
 }: {
   message: Message
   position: 'first' | 'middle' | 'last' | 'single'
   onScrollToMessage?: (id: string) => void
+  onRetry?: (messageId: string) => void
+  onReply?: (message: Message) => void
 }) {
   const isOutgoing = message.from === 'business'
+  const isSending = message.status === 'sending'
+  const isError = message.status === 'error'
   const hasMedia =
     message.type === 'image' || message.type === 'video' || message.type === 'catalog'
 
@@ -139,7 +235,9 @@ function MessageBubble({
     'chat-bubble',
     isOutgoing ? 'chat-bubble--outgoing' : 'chat-bubble--incoming',
     hasMedia || message.replyTo ? 'chat-bubble--media' : '',
+    message.type === 'video' ? 'chat-bubble--video' : '',
     message.type === 'audio' ? 'chat-bubble--audio' : '',
+    isSending ? 'opacity-70' : '',
     // Stacking classes
     isOutgoing ? `chat-bubble--outgoing-${position}` : `chat-bubble--incoming-${position}`,
   ]
@@ -155,7 +253,63 @@ function MessageBubble({
   const renderContent = () => {
     switch (message.type) {
       case 'audio':
-        return <AudioPlayer duration={message.audioDuration || 0} />
+        return (
+          <AudioPlayer
+            audioUrl={message.audioUrl}
+            timestamp={formatTime(message.timestamp)}
+            isOutgoing={isOutgoing}
+            isSending={isSending}
+            isError={isError}
+            isRead={message.isRead}
+            onRetry={() => onRetry?.(message.localId || message.id)}
+          />
+        )
+
+      case 'file':
+        return (
+          <div className="flex flex-col gap-1">
+            <a
+              href={message.fileUrl || message.mediaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 no-underline"
+            >
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-50 text-red-500">
+                <FileText size={16} />
+              </div>
+              <div className="min-w-0 flex-1 truncate text-sm text-text-primary">
+                {message.fileName || 'Document'}
+              </div>
+            </a>
+            <div className="flex items-center justify-between pl-11 text-[10px] text-text-muted">
+              <span>
+                {message.fileSize != null && message.fileSize > 0
+                  ? formatFileSize(message.fileSize)
+                  : ''}
+              </span>
+              {isError ? (
+                <Button
+                  type={'text'}
+                  danger
+                  size="small"
+                  onClick={() => onRetry?.(message.localId || message.id)}
+                  icon={<RotateCcw size={10} />}
+                  iconPosition={'end'}
+                >
+                  Non envoyé · Réessayer
+                </Button>
+              ) : (
+                <span className="flex items-center gap-1">
+                  {formatTime(message.timestamp)}
+                  {isOutgoing && isSending && <Spin size="small" />}
+                  {isOutgoing && !isSending && message.isRead && (
+                    <DoubleCheckIcon width={14} height={14} className="text-text-muted" />
+                  )}
+                </span>
+              )}
+            </div>
+          </div>
+        )
 
       case 'image':
         return (
@@ -179,21 +333,12 @@ function MessageBubble({
       case 'video':
         return (
           <div>
-            <div className="chat-media-container">
-              <div className="chat-media-placeholder">
-                <Film size={32} />
-              </div>
-              <img
-                src={message.videoThumbnail}
-                alt=""
-                className="relative z-1 max-h-48 w-full rounded-control object-cover"
-              />
-              <div className="absolute inset-0 z-2 flex items-center justify-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/50">
-                  <Play size={20} className="ml-1 text-white" fill="white" />
-                </div>
-              </div>
-            </div>
+            <video
+              src={message.videoUrl || message.videoThumbnail}
+              controls
+              preload="metadata"
+              className="w-full rounded-control aspect-video bg-bg-muted"
+            />
             {message.text && <p className="m-0 mt-2 text-sm text-text-primary">{message.text}</p>}
           </div>
         )
@@ -247,9 +392,20 @@ function MessageBubble({
   return (
     <div
       id={`msg-${message.id}`}
-      className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} chat-message-row`}
+      className={`group flex items-center gap-1 ${isOutgoing ? 'justify-end' : 'justify-start'} chat-message-row`}
       data-from={message.from}
     >
+      {/* Reply button — left of outgoing messages */}
+      {isOutgoing && onReply && (
+        <Button
+          variant="text"
+          size="small"
+          shape="circle"
+          icon={<Reply size={14} />}
+          onClick={() => onReply(message)}
+          className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        />
+      )}
       <div className={bubbleClasses}>
         {message.replyTo && (
           <ReplyContextBubble
@@ -259,23 +415,51 @@ function MessageBubble({
           />
         )}
         {renderContent()}
-        <div
-          className={`pl-11 mt-1 flex items-center text-[10px] text-text-muted ${message.type === 'audio' ? 'justify-between' : 'justify-end gap-1'}`}
-        >
-          {message.type === 'audio' && message.audioDuration != null && (
-            <span>
-              {Math.floor(message.audioDuration / 60)}:
-              {(message.audioDuration % 60).toString().padStart(2, '0')}
-            </span>
-          )}
-          <span className="flex items-center gap-1">
-            {formatTime(message.timestamp)}
-            {isOutgoing && message.isRead && (
-              <DoubleCheckIcon width={14} height={14} className="text-text-muted" />
+        {message.reactions && message.reactions.length > 0 && (
+          <div className="chat-reactions">
+            {message.reactions.map((r, i) => (
+              <span key={i} className="chat-reaction">
+                {r.emoji}
+              </span>
+            ))}
+          </div>
+        )}
+        {message.type !== 'audio' && message.type !== 'file' && (
+          <div className="mt-1 flex items-center justify-end gap-1 pl-11 text-[10px] text-text-muted">
+            {isError ? (
+              <Button
+                type={'text'}
+                danger
+                size="small"
+                onClick={() => onRetry?.(message.localId || message.id)}
+                icon={<RotateCcw size={10} />}
+                iconPosition={'end'}
+              >
+                Non envoyé · Réessayer
+              </Button>
+            ) : (
+              <span className="flex items-center gap-1">
+                {formatTime(message.timestamp)}
+                {isOutgoing && isSending && <Spin size="small" className="ml-0.5" />}
+                {isOutgoing && !isSending && message.isRead && (
+                  <DoubleCheckIcon width={14} height={14} className="text-text-muted" />
+                )}
+              </span>
             )}
-          </span>
-        </div>
+          </div>
+        )}
       </div>
+      {/* Reply button — right of incoming messages */}
+      {!isOutgoing && onReply && (
+        <Button
+          variant="text"
+          size="small"
+          shape="circle"
+          icon={<Reply size={14} />}
+          onClick={() => onReply(message)}
+          className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        />
+      )}
     </div>
   )
 }
@@ -339,14 +523,28 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
 
 /* ── Main component ── */
 
-export function ChatWindow({ conversation, onSend }: ChatWindowProps) {
+export function ChatWindow({
+  conversation,
+  provider = 'whatsapp',
+  onSend,
+  onUploadAndSend,
+  onRetry,
+}: ChatWindowProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const search = useSearch({ strict: false }) as { conv?: string; ticket?: string }
+  const [replyTo, setReplyTo] = useState<Message | null>(null)
+
+  // Clear reply when conversation changes
+  useEffect(() => {
+    setReplyTo(null)
+  }, [conversation.id])
+
+  const tickets = conversation.tickets ?? []
 
   const drawerTicket = useMemo(
-    () => conversation.tickets.find((t) => t.id === search.ticket) || null,
-    [conversation.tickets, search.ticket],
+    () => tickets.find((t) => t.id === search.ticket) || null,
+    [tickets, search.ticket],
   )
 
   const openTicket = useCallback(
@@ -362,11 +560,16 @@ export function ChatWindow({ conversation, onSend }: ChatWindowProps) {
 
   const groups = useMemo(() => groupMessagesByDate(conversation.messages), [conversation.messages])
 
+  // Scroll to bottom on conversation change or new messages
+  const messageCount = conversation.messages.length
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [conversation.id])
+    // Use requestAnimationFrame to ensure DOM is rendered before scrolling
+    requestAnimationFrame(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      }
+    })
+  }, [conversation.id, messageCount])
 
   const scrollToMessage = useCallback((messageId: string) => {
     const el = document.getElementById(`msg-${messageId}`)
@@ -399,11 +602,9 @@ export function ChatWindow({ conversation, onSend }: ChatWindowProps) {
 
   // Show the most recent active (non-resolved, non-cancelled) ticket pinned
   const activeTicket = useMemo(() => {
-    const active = conversation.tickets.filter(
-      (t) => t.status !== 'resolved' && t.status !== 'cancelled',
-    )
+    const active = tickets.filter((t) => t.status !== 'resolved' && t.status !== 'cancelled')
     return active.length > 0 ? active[active.length - 1] : null
-  }, [conversation.tickets])
+  }, [tickets])
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -417,7 +618,7 @@ export function ChatWindow({ conversation, onSend }: ChatWindowProps) {
       )}
 
       {/* Messages area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto py-2">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto pt-2 pb-10">
         {groups.map((group) => (
           <div key={group.date}>
             <div className="flex items-center justify-center py-3">
@@ -433,6 +634,8 @@ export function ChatWindow({ conversation, onSend }: ChatWindowProps) {
                   message={msg}
                   position={getPosition(globalIndex, allMessages)}
                   onScrollToMessage={scrollToMessage}
+                  onRetry={onRetry}
+                  onReply={provider !== 'instagram-dm' ? setReplyTo : undefined}
                 />
               )
             })}
@@ -441,12 +644,34 @@ export function ChatWindow({ conversation, onSend }: ChatWindowProps) {
       </div>
 
       {/* Input area */}
-      <ChatInput onSend={onSend} />
+      <ChatInput
+        onSend={
+          onSend
+            ? (msg) => {
+                const rid = replyTo?.id
+                setReplyTo(null)
+                return onSend(msg, undefined, rid)
+              }
+            : undefined
+        }
+        onUploadAndSend={
+          onUploadAndSend
+            ? (file, type) => {
+                const rid = replyTo?.id
+                setReplyTo(null)
+                return onUploadAndSend(file, type as 'image' | 'video' | 'audio' | 'file', rid)
+              }
+            : undefined
+        }
+        provider={provider}
+        replyTo={replyTo}
+        onCancelReply={() => setReplyTo(null)}
+      />
 
       {/* Ticket drawer */}
       <TicketDrawer
         ticket={drawerTicket}
-        allTickets={conversation.tickets}
+        allTickets={tickets}
         open={!!drawerTicket}
         onClose={closeTicket}
         onSwitchTicket={openTicket}

@@ -93,16 +93,35 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    const handleMessageReaction = (data: {
+      conversationId: string
+      messageId: string
+      reactions: { senderId: string; emoji: string }[]
+    }) => {
+      // Update the message reactions in cache directly
+      queryClient.setQueriesData<{ id: string; reactions?: unknown }[]>(
+        { queryKey: ['get', '/messaging/conversations/{conversationId}/messages'] },
+        (old) => {
+          if (!old) return old
+          return old.map((msg) =>
+            msg.id === data.messageId ? { ...msg, reactions: data.reactions } : msg,
+          )
+        },
+      )
+    }
+
     socket.on('comment:new', handleCommentNew)
     socket.on('comment:updated', handleCommentUpdated)
     socket.on('comment:removed', handleCommentRemoved)
     socket.on('message:new', handleMessageNew)
+    socket.on('message:reaction', handleMessageReaction)
 
     return () => {
       socket.off('comment:new', handleCommentNew)
       socket.off('comment:updated', handleCommentUpdated)
       socket.off('comment:removed', handleCommentRemoved)
       socket.off('message:new', handleMessageNew)
+      socket.off('message:reaction', handleMessageReaction)
       disconnectSocket()
     }
   }, [orgSlug, queryClient])

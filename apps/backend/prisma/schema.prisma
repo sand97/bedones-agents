@@ -28,6 +28,16 @@ enum OrgRole {
   MEMBER
 }
 
+enum UserStatus {
+  PENDING
+  VERIFIED
+}
+
+enum MemberStatus {
+  ACTIVE
+  INVITED
+}
+
 enum CommentAction {
   NONE
   HIDE
@@ -44,15 +54,17 @@ enum CommentStatus {
 // ─── Models ───
 
 model User {
-  id             String   @id @default(uuid())
-  email          String   @unique
+  id             String     @id @default(uuid())
+  email          String?    @unique
+  phone          String?    @unique
   name           String
   avatar         String?
   passwordHash   String?
   authType       AuthType
   providerUserId String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  status         UserStatus @default(VERIFIED)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
   memberships              OrganisationMember[]
   sessions                 Session[]
@@ -83,7 +95,8 @@ model OrganisationMember {
   id             String       @id @default(uuid())
   userId         String
   organisationId String
-  role           OrgRole      @default(OWNER)
+  role           OrgRole      @default(MEMBER)
+  status         MemberStatus @default(INVITED)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
@@ -211,7 +224,13 @@ model DirectMessage {
   senderName     String
   isFromPage     Boolean      @default(false)
   mediaUrl       String?
-  mediaType      String?      // text, image, video, audio, sticker
+  mediaType      String?      // text, image, video, audio, file, sticker
+  fileName       String?      // Original file name for file attachments
+  fileSize       Int?         // File size in bytes
+  replyToId      String?      // ID of the message being replied to
+  replyTo        DirectMessage?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies        DirectMessage[] @relation("MessageReplies")
+  reactions      Json?        // Array of { senderId, emoji } reactions on this message
   createdTime    DateTime
   isRead         Boolean      @default(false)
   createdAt      DateTime     @default(now())

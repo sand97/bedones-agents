@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { MulterModule } from '@nestjs/platform-express'
 import { UploadController } from './upload.controller'
 import { UploadService } from './upload.service'
+import { MediaConverterService } from './media-converter.service'
 import { AuthModule } from '../auth/auth.module'
 
 @Module({
@@ -12,7 +13,7 @@ import { AuthModule } from '../auth/auth.module'
     }),
   ],
   controllers: [UploadController],
-  providers: [UploadService],
-  exports: [UploadService],
+  providers: [UploadService, MediaConverterService],
+  exports: [UploadService, MediaConverterService],
 })
 export class UploadModule {}

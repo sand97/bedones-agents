@@ -1,22 +1,68 @@
+import type { ReactNode } from 'react'
 import { useState, useMemo } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Button, Popover, Checkbox } from 'antd'
+import { MessageCircle } from 'lucide-react'
 import { ConversationList } from './conversation-list'
 import { ChatWindow } from './chat-window'
 import { SocialSetup } from '@app/components/social/social-setup'
-import { WhatsAppIcon } from '@app/components/icons/social-icons'
+import {
+  WhatsAppIcon,
+  InstagramIcon,
+  MessengerIcon,
+  LabelBadgeIcon,
+} from '@app/components/icons/social-icons'
 import { ConversationListSkeleton, ChatWindowSkeleton } from './chat-skeleton'
 import type { Conversation } from './mock-data'
 import { AVAILABLE_LABELS } from './mock-data'
-import { LabelBadgeIcon } from '@app/components/icons/social-icons'
+
+type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger'
+
+const PROVIDER_EMPTY_STATE: Record<
+  ChatProvider,
+  { icon: ReactNode; color: string; noConvTitle: string; selectTitle: string; selectDesc: string }
+> = {
+  whatsapp: {
+    icon: <WhatsAppIcon width={40} height={40} />,
+    color: 'var(--color-brand-whatsapp)',
+    noConvTitle: 'Aucune conversation',
+    selectTitle: 'Sélectionnez une conversation',
+    selectDesc: 'Choisissez un contact dans la liste pour voir ses messages WhatsApp',
+  },
+  'instagram-dm': {
+    icon: <InstagramIcon width={40} height={40} />,
+    color: 'var(--color-brand-instagram)',
+    noConvTitle: 'Aucun message reçu',
+    selectTitle: 'Sélectionnez une conversation',
+    selectDesc: 'Choisissez un contact dans la liste pour voir ses messages Instagram',
+  },
+  messenger: {
+    icon: <MessengerIcon width={40} height={40} />,
+    color: 'var(--color-brand-messenger)',
+    noConvTitle: 'Aucun message reçu',
+    selectTitle: 'Sélectionnez une conversation',
+    selectDesc: 'Choisissez un contact dans la liste pour voir ses messages Messenger',
+  },
+}
 
 interface ChatLayoutProps {
   conversations: Conversation[]
   loading?: boolean
-  onSend?: (message: string) => Promise<void>
+  provider?: ChatProvider
+  onSend?: (
+    message: string,
+    media?: { url: string; type: 'image' | 'video' | 'audio' | 'file' },
+    replyToId?: string,
+  ) => Promise<void>
+  onUploadAndSend?: (
+    file: File,
+    type: 'image' | 'video' | 'audio' | 'file',
+    replyToId?: string,
+  ) => Promise<void>
   onSelectConversation?: (convId: string) => void
   onSync?: () => void
   syncing?: boolean
+  onRetry?: (messageId: string) => void
 }
 
 /* ── Labels filter popover ── */
@@ -72,13 +118,17 @@ function LabelsFilterPopover({
 export function ChatLayout({
   conversations,
   loading = false,
+  provider = 'whatsapp',
   onSend,
+  onUploadAndSend,
   onSelectConversation,
   onSync: _onSync,
   syncing: _syncing,
+  onRetry,
 }: ChatLayoutProps) {
   const navigate = useNavigate()
   const search = useSearch({ strict: false }) as { conv?: string }
+  const providerConfig = PROVIDER_EMPTY_STATE[provider]
   const selectedConvId = search.conv
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
@@ -172,13 +222,26 @@ export function ChatLayout({
         className={`chat-split__right ${selectedConversation ? 'chat-split__right--visible' : ''}`}
       >
         {selectedConversation ? (
-          <ChatWindow conversation={selectedConversation} onSend={onSend} />
+          <ChatWindow
+            conversation={selectedConversation}
+            provider={provider}
+            onSend={onSend}
+            onUploadAndSend={onUploadAndSend}
+            onRetry={onRetry}
+          />
+        ) : conversations.length === 0 ? (
+          <SocialSetup
+            icon={<MessageCircle size={40} strokeWidth={1.5} />}
+            color={providerConfig.color}
+            title={providerConfig.noConvTitle}
+            description="Les conversations apparaîtront ici dès qu'un message sera reçu"
+          />
         ) : (
           <SocialSetup
-            icon={<WhatsAppIcon width={40} height={40} />}
-            color="var(--color-brand-whatsapp)"
-            title="Sélectionnez une conversation"
-            description="Choisissez un contact dans la liste pour voir ses messages"
+            icon={providerConfig.icon}
+            color={providerConfig.color}
+            title={providerConfig.selectTitle}
+            description={providerConfig.selectDesc}
           />
         )}
       </div>

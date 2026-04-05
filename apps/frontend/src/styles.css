@@ -29,6 +29,7 @@
   --color-brand-messenger: #0084ff;
 
   --radius-card: 16px;
+  --radius-card-inner: 12px;
   --radius-panel: 20px;
   --radius-control: 10px;
   --radius-pill: 9999px;
@@ -102,6 +103,10 @@ body {
   @apply md:-top-4 md:-left-4 -top-2 -left-2;
   border-top-width: 2px;
   border-left-width: 2px;
+}
+
+.ant-btn:not(:disabled):focus-visible {
+  outline-width: 1px;
 }
 
 .onboarding-corner--tr {
@@ -384,6 +389,7 @@ a {
   justify-content: flex-start;
   height: auto;
   text-align: left;
+  border-radius: var(--radius-card-inner) !important;
 }
 
 /* Mobile sidebar overlay — transparent, used only to detect outside clicks */
@@ -710,16 +716,71 @@ a {
   100% { background: transparent; }
 }
 
+/* Reply context inside bubble */
+.chat-reply-context {
+  width: 100%;
+  border-left: 2px solid rgba(17, 27, 33, 0.3);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.chat-bubble--outgoing .chat-reply-context {
+  background: rgba(17, 27, 33, 0.06);
+}
+
+.chat-bubble--outgoing .chat-reply-context:hover {
+  background: rgba(17, 27, 33, 0.1);
+}
+
+.chat-bubble--incoming .chat-reply-context {
+  background: var(--color-bg-subtle);
+}
+
+.chat-bubble--incoming .chat-reply-context:hover {
+  background: var(--color-bg-muted);
+}
+
+/* Reactions — floating below the bubble */
+.chat-reactions {
+  position: absolute;
+  bottom: -10px;
+  left: 8px;
+  display: flex;
+  gap: 2px;
+  background: var(--color-bg-elevated);
+  border-radius: 999px;
+  padding: 1px 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  z-index: 1;
+}
+
+.chat-reaction {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.chat-bubble:has(.chat-reactions) {
+  margin-bottom: 12px;
+}
+
 /* Message bubbles */
 .chat-bubble {
+  position: relative;
   max-width: 75%;
   padding: 8px 12px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* Media messages need equal padding all around for coherent border radius */
 .chat-bubble--media {
   padding: 6px;
+}
+
+.chat-bubble--video {
+  max-width: 40%;
 }
 
 .chat-bubble--media > p,
@@ -779,13 +840,19 @@ a {
   min-width: 260px;
 }
 
-/* Media container: minimum height with placeholder bg */
+/* Media container: placeholder bg matches content aspect ratio */
 .chat-media-container {
   position: relative;
-  min-height: 160px;
+  aspect-ratio: 4 / 3;
   background: var(--color-bg-muted);
   border-radius: var(--radius-control);
   overflow: hidden;
+}
+
+/* Once the image loads, let it determine the container size */
+.chat-media-container:has(img[src]),
+.chat-media-container:has(video[src]) {
+  aspect-ratio: auto;
 }
 
 .chat-media-container img,
@@ -1978,5 +2045,11 @@ a {
     margin-top: -1px;
     border-radius: 0 0 var(--radius-control) var(--radius-control) !important;
   }
+}
+
+/* ─── OTP Input ─── */
+.ant-otp-input {
+  width: 40px !important;
+  height: 40px !important;
 }
 

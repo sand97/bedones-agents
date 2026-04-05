@@ -297,6 +297,46 @@
         ]
       }
     },
+    "/upload/chat-media": {
+      "post": {
+        "operationId": "UploadController_uploadChatMedia",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Upload"
+        ]
+      }
+    },
     "/social/connect/facebook": {
       "post": {
         "operationId": "SocialController_connectFacebook",
@@ -956,6 +996,253 @@
           "Messaging"
         ]
       }
+    },
+    "/organisations/{orgId}/members": {
+      "get": {
+        "operationId": "MemberController_list",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Members"
+        ]
+      }
+    },
+    "/organisations/{orgId}/members/invite": {
+      "post": {
+        "operationId": "MemberController_invite",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteMemberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Members"
+        ]
+      }
+    },
+    "/organisations/{orgId}/members/{memberId}": {
+      "delete": {
+        "operationId": "MemberController_remove",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "memberId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Membre supprimé"
+          }
+        },
+        "tags": [
+          "Members"
+        ]
+      }
+    },
+    "/invitations": {
+      "get": {
+        "operationId": "InvitationController_getInvitation",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invitation details"
+          }
+        },
+        "tags": [
+          "Invitations"
+        ]
+      }
+    },
+    "/invitations/send-otp": {
+      "post": {
+        "operationId": "InvitationController_sendOtp",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accept-language",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OTP sent"
+          }
+        },
+        "tags": [
+          "Invitations"
+        ]
+      }
+    },
+    "/invitations/verify-otp": {
+      "post": {
+        "operationId": "InvitationController_verifyOtp",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyInviteOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP verified, user authenticated"
+          }
+        },
+        "tags": [
+          "Invitations"
+        ]
+      }
+    },
+    "/invitations/accept": {
+      "post": {
+        "operationId": "InvitationController_accept",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInvitationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Invitation accepted"
+          }
+        },
+        "tags": [
+          "Invitations"
+        ]
+      }
+    },
+    "/invitations/reject": {
+      "post": {
+        "operationId": "InvitationController_reject",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invitation rejected"
+          }
+        },
+        "tags": [
+          "Invitations"
+        ]
+      }
     }
   },
   "info": {
@@ -1011,7 +1298,12 @@
             "type": "string"
           },
           "email": {
-            "type": "string"
+            "type": "object",
+            "nullable": true
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
           },
           "name": {
             "type": "string"
@@ -1027,14 +1319,21 @@
               "FACEBOOK",
               "INSTAGRAM"
             ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "VERIFIED"
+            ]
           }
         },
         "required": [
           "id",
-          "email",
           "name",
           "avatar",
-          "authType"
+          "authType",
+          "status"
         ]
       },
       "SocialAccountDto": {
@@ -1103,6 +1402,38 @@
           "socialAccounts"
         ]
       },
+      "PendingInvitationDto": {
+        "type": "object",
+        "properties": {
+          "organisationId": {
+            "type": "string"
+          },
+          "organisationName": {
+            "type": "string"
+          },
+          "organisationLogo": {
+            "type": "object",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "MEMBER"
+            ]
+          },
+          "invitedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "organisationId",
+          "organisationName",
+          "role",
+          "invitedAt"
+        ]
+      },
       "MeResponseDto": {
         "type": "object",
         "properties": {
@@ -1114,11 +1445,18 @@
             "items": {
               "$ref": "#/components/schemas/OrganisationSummaryDto"
             }
+          },
+          "pendingInvitations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingInvitationDto"
+            }
           }
         },
         "required": [
           "user",
-          "organisations"
+          "organisations",
+          "pendingInvitations"
         ]
       },
       "CreateOrganisationDto": {
@@ -1688,6 +2026,40 @@
           "unreadCount"
         ]
       },
+      "ReplyToDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "from"
+        ]
+      },
+      "ReactionDto": {
+        "type": "object",
+        "properties": {
+          "senderId": {
+            "type": "string"
+          },
+          "emoji": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "senderId",
+          "emoji"
+        ]
+      },
       "DirectMessageResponseDto": {
         "type": "object",
         "properties": {
@@ -1718,6 +2090,27 @@
           "mediaType": {
             "type": "string"
           },
+          "fileName": {
+            "type": "string"
+          },
+          "fileSize": {
+            "type": "number"
+          },
+          "replyTo": {
+            "description": "Reply context",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReplyToDto"
+              }
+            ]
+          },
+          "reactions": {
+            "description": "Reactions on this message",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReactionDto"
+            }
+          },
           "createdTime": {
             "format": "date-time",
             "type": "string"
@@ -1745,11 +2138,35 @@
           },
           "message": {
             "type": "string"
+          },
+          "mediaUrl": {
+            "type": "string",
+            "description": "Public URL of the media file to send"
+          },
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video",
+              "audio",
+              "file"
+            ]
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Original file name"
+          },
+          "fileSize": {
+            "type": "number",
+            "description": "File size in bytes"
+          },
+          "replyToId": {
+            "type": "string",
+            "description": "ID of the message to reply to"
           }
         },
         "required": [
-          "conversationId",
-          "message"
+          "conversationId"
         ]
       },
       "MarkConversationReadDto": {
@@ -1762,6 +2179,142 @@
         "required": [
           "conversationId"
         ]
+      },
+      "MemberUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "object",
+            "nullable": true
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "avatar": {
+            "type": "object",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "VERIFIED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status"
+        ]
+      },
+      "MemberResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "organisationId": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "OWNER",
+              "ADMIN",
+              "MEMBER"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INVITED"
+            ]
+          },
+          "user": {
+            "$ref": "#/components/schemas/MemberUserDto"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "organisationId",
+          "role",
+          "status",
+          "user",
+          "createdAt"
+        ]
+      },
+      "InviteMemberDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "example": "Aminata"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Diallo"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+2250701020304"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "MEMBER"
+            ],
+            "example": "MEMBER"
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName",
+          "phone",
+          "role"
+        ]
+      },
+      "VerifyInviteOtpDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "AcceptInvitationDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "example": "Aminata"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Diallo"
+          }
+        }
       }
     }
   }

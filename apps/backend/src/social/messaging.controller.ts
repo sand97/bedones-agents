@@ -44,7 +44,16 @@ export class MessagingController {
   @ApiBody({ type: SendMessageDto })
   @ApiCreatedResponse({ type: DirectMessageResponseDto })
   async sendMessage(@CurrentUser() user: { id: string }, @Body() body: SendMessageDto) {
-    return this.messagingService.sendMessage(user.id, body.conversationId, body.message)
+    return this.messagingService.sendMessage(
+      user.id,
+      body.conversationId,
+      body.message,
+      body.mediaUrl,
+      body.mediaType,
+      body.fileName,
+      body.fileSize,
+      body.replyToId,
+    )
   }
 
   // ─── Mark conversation as read ───

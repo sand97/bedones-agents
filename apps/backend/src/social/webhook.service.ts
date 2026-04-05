@@ -438,6 +438,12 @@ export class WebhookService {
     const recipientId = messaging.recipient?.id
     if (!senderId || !recipientId) return
 
+    // Handle reactions
+    if (messaging.reaction) {
+      await this.handleReaction(messaging.reaction, senderId, orgId, 'FACEBOOK')
+      return
+    }
+
     const message = messaging.message
     if (!message) return
 
@@ -445,12 +451,28 @@ export class WebhookService {
 
     // Echo = message sent by the page
     if (message.is_echo) {
+      let echoMediaUrl: string | null = null
+      let echoMediaType: string | null = null
+      let echoFileName: string | null = null
+      let echoFileSize: number | null = null
+      if (message.attachments?.length) {
+        const att = message.attachments[0]
+        echoMediaType = att.type || null
+        echoMediaUrl = att.payload?.url || null
+        echoFileName = att.name || null
+        echoFileSize = att.size || null
+      }
+
       await this.messagingService.handleEchoMessage(
         socialAccountId,
         recipientId === pageId ? senderId : recipientId,
         message.text || '',
         message.mid || null,
         timestamp,
+        echoMediaUrl,
+        echoMediaType,
+        echoFileName,
+        echoFileSize,
       )
       return
     }
@@ -459,8 +481,9 @@ export class WebhookService {
     const isFromPage = senderId === pageId
     if (isFromPage) return
 
-    // Get sender name from Graph API
+    // Get sender name and avatar from Graph API
     let senderName = 'Utilisateur'
+    let senderAvatar: string | null = null
     try {
       const accessToken = await this.encryptionService.decrypt(
         (
@@ -476,6 +499,7 @@ export class WebhookService {
       if (profileRes.ok) {
         const profile = (await profileRes.json()) as { name?: string; profile_pic?: string }
         senderName = profile.name || senderName
+        senderAvatar = profile.profile_pic || null
       }
     } catch {
       // fallback to default name
@@ -483,11 +507,15 @@ export class WebhookService {
 
     let mediaUrl: string | null = null
     let mediaType: string | null = null
+    let fileName: string | null = null
+    let fileSize: number | null = null
 
     if (message.attachments?.length) {
       const attachment = message.attachments[0]
       mediaType = attachment.type || null
       mediaUrl = attachment.payload?.url || null
+      fileName = attachment.name || null
+      fileSize = attachment.size || null
     }
 
     const conversation = await this.messagingService.handleIncomingMessage(
@@ -500,6 +528,10 @@ export class WebhookService {
       mediaType,
       timestamp,
       orgId,
+      senderAvatar,
+      fileName,
+      fileSize,
+      message.reply_to?.mid || null,
     )
 
     this.logger.log(
@@ -525,6 +557,12 @@ export class WebhookService {
     const recipientId = messaging.recipient?.id
     if (!senderId || !recipientId) return
 
+    // Handle reactions
+    if (messaging.reaction) {
+      await this.handleReaction(messaging.reaction, senderId, orgId, 'INSTAGRAM')
+      return
+    }
+
     const message = messaging.message
     if (!message) return
 
@@ -532,12 +570,28 @@ export class WebhookService {
 
     // Echo = message sent by the page
     if (message.is_echo) {
+      let echoMediaUrl: string | null = null
+      let echoMediaType: string | null = null
+      let echoFileName: string | null = null
+      let echoFileSize: number | null = null
+      if (message.attachments?.length) {
+        const att = message.attachments[0]
+        echoMediaType = att.type || null
+        echoMediaUrl = att.payload?.url || null
+        echoFileName = att.name || null
+        echoFileSize = att.size || null
+      }
+
       await this.messagingService.handleEchoMessage(
         socialAccountId,
         recipientId === igAccountId ? senderId : recipientId,
         message.text || '',
         message.mid || null,
         timestamp,
+        echoMediaUrl,
+        echoMediaType,
+        echoFileName,
+        echoFileSize,
       )
       return
     }
@@ -546,17 +600,45 @@ export class WebhookService {
     const isFromPage = senderId === igAccountId
     if (isFromPage) return
 
-    // For Instagram DMs, sender name is not in the webhook — use sender ID
-    // The sync will fetch proper names from the conversations API
-    const senderName = `instagram_user_${senderId}`
+    // Fetch sender profile from Instagram API
+    let senderName = senderId
+    let senderAvatar: string | null = null
+    try {
+      const accessToken = await this.encryptionService.decrypt(
+        (
+          await this.prisma.socialAccount.findUniqueOrThrow({
+            where: { id: socialAccountId },
+            select: { accessToken: true },
+          })
+        ).accessToken,
+      )
+      const profileRes = await fetch(
+        `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/${senderId}?fields=name,username,profile_pic&access_token=${accessToken}`,
+      )
+      if (profileRes.ok) {
+        const profile = (await profileRes.json()) as {
+          name?: string
+          username?: string
+          profile_pic?: string
+        }
+        senderName = profile.username || profile.name || senderName
+        senderAvatar = profile.profile_pic || null
+      }
+    } catch {
+      this.logger.warn(`[Instagram DM] Failed to fetch profile for ${senderId}`)
+    }
 
     let mediaUrl: string | null = null
     let mediaType: string | null = null
+    let fileName: string | null = null
+    let fileSize: number | null = null
 
     if (message.attachments?.length) {
       const attachment = message.attachments[0]
       mediaType = attachment.type || null
       mediaUrl = attachment.payload?.url || null
+      fileName = attachment.name || null
+      fileSize = attachment.size || null
     }
 
     const conversation = await this.messagingService.handleIncomingMessage(
@@ -569,16 +651,73 @@ export class WebhookService {
       mediaType,
       timestamp,
       orgId,
+      senderAvatar,
+      fileName,
+      fileSize,
+      message.reply_to?.mid || null,
     )
 
     this.logger.log(
-      `[Instagram DM] New message from ${senderId}: "${message.text?.substring(0, 50) || '[media]'}"`,
+      `[Instagram DM] New message from ${senderName} (${senderId}): "${message.text?.substring(0, 50) || '[media]'}"`,
     )
 
     this.eventsGateway.emitToOrg(orgId, 'message:new', {
       conversationId: conversation.id,
       socialAccountId,
       provider: 'INSTAGRAM',
+    })
+  }
+
+  // ─── Reaction handling ───
+
+  private async handleReaction(
+    reaction: NonNullable<MessagingEvent['reaction']>,
+    senderId: string,
+    orgId: string,
+    provider: 'FACEBOOK' | 'INSTAGRAM',
+  ) {
+    const targetMsgId = reaction.mid
+    if (!targetMsgId) return
+
+    const targetMessage = await this.prisma.directMessage.findUnique({
+      where: { platformMsgId: targetMsgId },
+      select: { id: true, conversationId: true, reactions: true },
+    })
+
+    if (!targetMessage) {
+      this.logger.warn(
+        `[${provider} Reaction] Message ${targetMsgId} not found in DB, skipping reaction`,
+      )
+      return
+    }
+
+    const existing = (targetMessage.reactions as { senderId: string; emoji: string }[]) || []
+
+    let updated: { senderId: string; emoji: string }[]
+
+    if (reaction.action === 'unreact') {
+      updated = existing.filter((r) => r.senderId !== senderId)
+    } else {
+      // Remove any previous reaction from same sender, then add new one
+      updated = existing.filter((r) => r.senderId !== senderId)
+      if (reaction.emoji) {
+        updated.push({ senderId, emoji: reaction.emoji })
+      }
+    }
+
+    await this.prisma.directMessage.update({
+      where: { id: targetMessage.id },
+      data: { reactions: updated },
+    })
+
+    this.logger.log(
+      `[${provider} Reaction] ${reaction.action} "${reaction.emoji || ''}" on message ${targetMsgId} by ${senderId}`,
+    )
+
+    this.eventsGateway.emitToOrg(orgId, 'message:reaction', {
+      conversationId: targetMessage.conversationId,
+      messageId: targetMessage.id,
+      reactions: updated,
     })
   }
 
@@ -848,6 +987,17 @@ interface MessagingEvent {
       payload?: {
         url?: string
       }
+      name?: string
+      size?: number
     }>
+    reply_to?: {
+      mid?: string
+    }
+  }
+  reaction?: {
+    mid: string
+    action: 'react' | 'unreact'
+    reaction?: string
+    emoji?: string
   }
 }
