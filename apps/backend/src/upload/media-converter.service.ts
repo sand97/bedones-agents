@@ -86,6 +86,59 @@ export class MediaConverterService {
   }
 
   /**
+   * Convert audio to OGG (Opus) for WhatsApp compatibility.
+   * WhatsApp only accepts: audio/ogg; codecs=opus, audio/mpeg, audio/amr, audio/mp4, audio/aac.
+   */
+  async convertAudioToOgg(
+    inputBuffer: Buffer,
+    originalMimetype: string,
+  ): Promise<{ buffer: Buffer; mimetype: string; extension: string }> {
+    const tmpDir = os.tmpdir()
+    const id = crypto.randomUUID()
+    const extMap: Record<string, string> = {
+      'audio/webm': '.webm',
+      'audio/ogg': '.ogg',
+      'audio/mpeg': '.mp3',
+      'audio/wav': '.wav',
+      'audio/mp4': '.mp4',
+      'audio/m4a': '.m4a',
+      'video/mp4': '.mp4',
+    }
+    const inputExt = extMap[originalMimetype] || '.bin'
+    const inputPath = path.join(tmpDir, `${id}-input${inputExt}`)
+    const outputPath = path.join(tmpDir, `${id}-output.ogg`)
+
+    try {
+      fs.writeFileSync(inputPath, inputBuffer)
+
+      this.logger.log(
+        `[MediaConverter] Converting audio to OGG/Opus (${originalMimetype}, ${inputBuffer.length} bytes)`,
+      )
+
+      await this.runFfmpeg(inputPath, outputPath, [
+        '-c:a',
+        'libopus',
+        '-ar',
+        '48000',
+        '-ac',
+        '1',
+        '-b:a',
+        '64k',
+      ])
+
+      const outputBuffer = fs.readFileSync(outputPath)
+
+      this.logger.log(
+        `[MediaConverter] Audio → OGG/Opus (${inputBuffer.length} → ${outputBuffer.length} bytes)`,
+      )
+
+      return { buffer: outputBuffer, mimetype: 'audio/ogg', extension: 'ogg' }
+    } finally {
+      this.cleanup(inputPath, outputPath)
+    }
+  }
+
+  /**
    * Convert video to MP4 (H.264/AAC) for Instagram mobile compatibility.
    * Returns converted buffer + new mimetype, or throws if duration > 3min.
    */

@@ -20,6 +20,7 @@ export class WebhookController {
   private readonly logger = new Logger(WebhookController.name)
   private readonly fbVerifyToken: string
   private readonly igVerifyToken: string
+  private readonly waVerifyToken: string
 
   constructor(
     private webhookService: WebhookService,
@@ -27,6 +28,7 @@ export class WebhookController {
   ) {
     this.fbVerifyToken = this.configService.getOrThrow<string>('FACEBOOK_WEBHOOK_VERIFY_TOKEN')
     this.igVerifyToken = this.configService.getOrThrow<string>('INSTAGRAM_WEBHOOK_VERIFY_TOKEN')
+    this.waVerifyToken = this.configService.get<string>('WHATSAPP_WEBHOOK_VERIFY_TOKEN', '')
   }
 
   // ─── Facebook webhook verification ───
@@ -114,6 +116,50 @@ export class WebhookController {
       await this.webhookService.processInstagramWebhook(req.body)
     } catch (error) {
       this.logger.error('[Instagram Webhook] Processing error:', error)
+    }
+  }
+
+  // ─── WhatsApp webhook verification ───
+
+  @Get('whatsapp')
+  whatsappVerify(
+    @Query('hub.mode') mode: string,
+    @Query('hub.verify_token') token: string,
+    @Query('hub.challenge') challenge: string,
+    @Res() res: Response,
+  ) {
+    if (mode === 'subscribe' && token === this.waVerifyToken) {
+      this.logger.log('[WhatsApp Webhook] Verification successful')
+      return res.status(200).send(challenge)
+    }
+
+    this.logger.error('[WhatsApp Webhook] Verification failed — invalid token')
+    throw new ForbiddenException('Invalid verify token')
+  }
+
+  // ─── WhatsApp webhook events ───
+
+  @Post('whatsapp')
+  async whatsappEvent(@Req() req: Request, @RawBody() rawBody: Buffer, @Res() res: Response) {
+    // Respond immediately to avoid timeout
+    res.status(200).send('EVENT_RECEIVED')
+
+    // Verify signature
+    const signature = req.headers['x-hub-signature-256'] as string
+    if (signature) {
+      const valid = await this.webhookService.verifyWhatsAppSignature(rawBody, signature)
+      if (!valid) {
+        this.logger.error('[WhatsApp Webhook] Invalid signature')
+        return
+      }
+    }
+
+    // Process asynchronously
+    try {
+      this.logger.log(`[WhatsApp Webhook] Payload: ${JSON.stringify(req.body, null, 2)}`)
+      await this.webhookService.processWhatsAppWebhook(req.body)
+    } catch (error) {
+      this.logger.error('[WhatsApp Webhook] Processing error:', error)
     }
   }
 }

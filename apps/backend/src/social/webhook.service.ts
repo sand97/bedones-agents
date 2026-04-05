@@ -13,6 +13,7 @@ export class WebhookService {
   private readonly logger = new Logger(WebhookService.name)
   private readonly facebookAppSecret: string
   private readonly instagramAppSecret: string
+  private readonly whatsappAppSecret: string
 
   constructor(
     private prisma: PrismaService,
@@ -25,6 +26,7 @@ export class WebhookService {
   ) {
     this.facebookAppSecret = this.configService.getOrThrow<string>('FACEBOOK_APP_SECRET')
     this.instagramAppSecret = this.configService.getOrThrow<string>('INSTAGRAM_APP_SECRET')
+    this.whatsappAppSecret = this.configService.getOrThrow<string>('FACEBOOK_APP_SECRET')
   }
 
   // ─── Signature verification ───
@@ -35,6 +37,10 @@ export class WebhookService {
 
   async verifyInstagramSignature(rawBody: Buffer, signature: string): Promise<boolean> {
     return this.verifySignature(rawBody, signature, this.instagramAppSecret)
+  }
+
+  async verifyWhatsAppSignature(rawBody: Buffer, signature: string): Promise<boolean> {
+    return this.verifySignature(rawBody, signature, this.whatsappAppSecret)
   }
 
   private async verifySignature(
@@ -721,6 +727,214 @@ export class WebhookService {
     })
   }
 
+  // ─── Process WhatsApp webhook ───
+
+  async processWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
+    for (const entry of payload.entry || []) {
+      for (const change of entry.changes || []) {
+        if (change.field !== 'messages') continue
+
+        const value = change.value
+        if (!value?.metadata?.phone_number_id) continue
+
+        const phoneNumberId = value.metadata.phone_number_id
+
+        // Find the social account for this phone number
+        const socialAccount = await this.prisma.socialAccount.findFirst({
+          where: { provider: 'WHATSAPP', providerAccountId: phoneNumberId },
+          select: { id: true, organisationId: true },
+        })
+
+        if (!socialAccount) {
+          this.logger.warn(`[WhatsApp Webhook] No account found for phone ${phoneNumberId}`)
+          continue
+        }
+
+        const orgId = socialAccount.organisationId
+
+        // Handle status updates (sent, delivered, read)
+        for (const status of value.statuses || []) {
+          await this.handleWhatsAppStatus(status, orgId)
+        }
+
+        // Handle incoming messages
+        for (const msg of value.messages || []) {
+          await this.handleWhatsAppMessage(
+            socialAccount.id,
+            phoneNumberId,
+            msg,
+            value.contacts,
+            orgId,
+          )
+        }
+      }
+    }
+  }
+
+  private async handleWhatsAppMessage(
+    socialAccountId: string,
+    phoneNumberId: string,
+    msg: WhatsAppMessage,
+    contacts: WhatsAppContact[] | undefined,
+    orgId: string,
+  ) {
+    const senderId = msg.from // phone number of the sender
+    const timestamp = new Date(parseInt(msg.timestamp) * 1000)
+    const platformMsgId = msg.id
+
+    // Get sender name from contacts array
+    const contact = contacts?.find((c) => c.wa_id === senderId)
+    const senderName = contact?.profile?.name || senderId
+
+    // Extract message content
+    let messageText = ''
+    let mediaUrl: string | null = null
+    let mediaType: string | null = null
+    let fileName: string | null = null
+    let replyToMid: string | null = null
+
+    if (msg.context?.id) {
+      replyToMid = msg.context.id
+    }
+
+    switch (msg.type) {
+      case 'text':
+        messageText = msg.text?.body || ''
+        break
+      case 'image':
+        mediaType = 'image'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.image?.id)
+        messageText = msg.image?.caption || ''
+        break
+      case 'video':
+        mediaType = 'video'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.video?.id)
+        messageText = msg.video?.caption || ''
+        break
+      case 'audio':
+        mediaType = 'audio'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.audio?.id)
+        break
+      case 'document':
+        mediaType = 'file'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.document?.id)
+        fileName = msg.document?.filename || null
+        break
+      case 'sticker':
+        mediaType = 'image'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.sticker?.id)
+        break
+      default:
+        messageText = `[${msg.type}]`
+    }
+
+    const conversation = await this.messagingService.handleIncomingMessage(
+      socialAccountId,
+      senderId,
+      senderName,
+      messageText,
+      platformMsgId,
+      mediaUrl,
+      mediaType,
+      timestamp,
+      orgId,
+      null,
+      fileName,
+      null,
+      replyToMid,
+    )
+
+    this.logger.log(
+      `[WhatsApp] New message from ${senderName} (${senderId}): "${messageText?.substring(0, 50) || '[media]'}"`,
+    )
+
+    this.eventsGateway.emitToOrg(orgId, 'message:new', {
+      conversationId: conversation.id,
+      socialAccountId,
+      provider: 'WHATSAPP',
+    })
+  }
+
+  private async handleWhatsAppStatus(
+    status: { id: string; status: string; timestamp: string; recipient_id: string },
+    orgId: string,
+  ) {
+    const validStatuses = ['sent', 'delivered', 'read']
+    if (!validStatuses.includes(status.status)) return
+
+    this.logger.log(`[WhatsApp] Status: ${status.status} for ${status.id}`)
+
+    // Find the message by platformMsgId
+    const message = await this.prisma.directMessage.findUnique({
+      where: { platformMsgId: status.id },
+      select: { id: true, conversationId: true, deliveryStatus: true },
+    })
+
+    if (!message) return
+
+    // Only upgrade status: sent → delivered → read (never downgrade)
+    const statusOrder = { sent: 1, delivered: 2, read: 3 }
+    const currentOrder =
+      statusOrder[(message.deliveryStatus as keyof typeof statusOrder) || 'sent'] || 0
+    const newOrder = statusOrder[status.status as keyof typeof statusOrder] || 0
+    if (newOrder <= currentOrder) return
+
+    await this.prisma.directMessage.update({
+      where: { id: message.id },
+      data: { deliveryStatus: status.status },
+    })
+
+    this.eventsGateway.emitToOrg(orgId, 'message:status', {
+      conversationId: message.conversationId,
+      messageId: message.id,
+      platformMsgId: status.id,
+      deliveryStatus: status.status,
+    })
+  }
+
+  private async downloadWhatsAppMedia(
+    socialAccountId: string,
+    mediaId?: string,
+  ): Promise<string | null> {
+    if (!mediaId) return null
+
+    try {
+      const account = await this.prisma.socialAccount.findUniqueOrThrow({
+        where: { id: socialAccountId },
+        select: { accessToken: true },
+      })
+      const accessToken = await this.encryptionService.decrypt(account.accessToken)
+
+      // 1. Get media URL from WhatsApp
+      const metaRes = await fetch(
+        `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${mediaId}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      )
+      if (!metaRes.ok) return null
+
+      const metaData = (await metaRes.json()) as { url?: string }
+      if (!metaData.url) return null
+
+      // 2. Download the media and upload to our storage
+      const downloadRes = await fetch(metaData.url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!downloadRes.ok) return null
+
+      const buffer = Buffer.from(await downloadRes.arrayBuffer())
+      const uploaded = await this.uploadService.uploadBuffer(
+        buffer,
+        `whatsapp-${mediaId}`,
+        downloadRes.headers.get('content-type') || 'application/octet-stream',
+        'chat-media',
+      )
+      return uploaded || null
+    } catch (error) {
+      this.logger.error(`[WhatsApp] Failed to download media ${mediaId}: ${error}`)
+      return null
+    }
+  }
+
   // ─── AI analysis + auto-action ───
 
   private async analyzeAndAct(
@@ -1000,4 +1214,52 @@ interface MessagingEvent {
     reaction?: string
     emoji?: string
   }
+}
+
+// ─── WhatsApp webhook payload types ───
+
+interface WhatsAppWebhookPayload {
+  object: string
+  entry: Array<{
+    id: string
+    changes: Array<{
+      field: string
+      value: WhatsAppWebhookValue
+    }>
+  }>
+}
+
+interface WhatsAppWebhookValue {
+  messaging_product: string
+  metadata: {
+    display_phone_number: string
+    phone_number_id: string
+  }
+  contacts?: WhatsAppContact[]
+  messages?: WhatsAppMessage[]
+  statuses?: Array<{
+    id: string
+    status: string
+    timestamp: string
+    recipient_id: string
+  }>
+}
+
+interface WhatsAppContact {
+  wa_id: string
+  profile?: { name?: string }
+}
+
+interface WhatsAppMessage {
+  id: string
+  from: string
+  timestamp: string
+  type: string
+  text?: { body: string }
+  image?: { id: string; caption?: string; mime_type?: string }
+  video?: { id: string; caption?: string; mime_type?: string }
+  audio?: { id: string; mime_type?: string }
+  document?: { id: string; filename?: string; mime_type?: string }
+  sticker?: { id: string; mime_type?: string }
+  context?: { id?: string; from?: string }
 }

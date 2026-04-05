@@ -208,3 +208,17 @@ export class CommentActionDto {
   @ApiProperty()
   commentId: string
 }
+
+export class ConnectWhatsAppDto {
+  @ApiProperty()
+  organisationId: string
+
+  @ApiProperty()
+  code: string
+
+  @ApiPropertyOptional({ description: 'WABA ID from Embedded Signup session info' })
+  wabaId?: string
+
+  @ApiPropertyOptional({ description: 'Phone Number ID from Embedded Signup session info' })
+  phoneNumberId?: string
+}

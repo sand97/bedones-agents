@@ -434,6 +434,163 @@ export class SocialService {
     return socialAccount
   }
 
+  // ─── Connect WhatsApp Account (Embedded Signup) ───
+
+  async connectWhatsAppAccount(
+    userId: string,
+    organisationId: string,
+    code: string,
+    clientWabaId?: string,
+    clientPhoneId?: string,
+  ) {
+    this.logger.log(
+      `[WhatsApp] connectWhatsAppAccount called — userId=${userId}, orgId=${organisationId}`,
+    )
+    await this.assertMembership(userId, organisationId)
+
+    const appId = this.configService.getOrThrow<string>('FACEBOOK_APP_ID')
+    const appSecret = this.configService.getOrThrow<string>('FACEBOOK_APP_SECRET')
+
+    // 1. Exchange the code for a user access token
+    this.logger.log(`[WhatsApp] Exchanging code for access token...`)
+    const tokenResponse = await fetch(
+      `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/oauth/access_token`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: appId,
+          client_secret: appSecret,
+          grant_type: 'authorization_code',
+          code,
+        }),
+      },
+    )
+
+    const tokenBody = await tokenResponse.text()
+    if (!tokenResponse.ok) {
+      this.logger.error(
+        `[WhatsApp] Token exchange failed (HTTP ${tokenResponse.status}): ${tokenBody}`,
+      )
+      throw new BadRequestException('whatsapp_token_exchange_failed')
+    }
+
+    const { access_token: accessToken } = JSON.parse(tokenBody) as { access_token: string }
+    this.logger.log(`[WhatsApp] Token exchange OK`)
+
+    // 2. Resolve WABA ID and Phone Number ID
+    let wabaId = clientWabaId
+    let phoneId = clientPhoneId
+
+    if (!wabaId) {
+      const debugResponse = await fetch(
+        `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/debug_token?` +
+          new URLSearchParams({
+            input_token: accessToken,
+            access_token: `${appId}|${appSecret}`,
+          }),
+      )
+      if (debugResponse.ok) {
+        const debugData = (await debugResponse.json()) as {
+          data?: {
+            granular_scopes?: Array<{ scope: string; target_ids?: string[] }>
+          }
+        }
+        const mgmtScope = debugData.data?.granular_scopes?.find(
+          (s) => s.scope === 'whatsapp_business_management',
+        )
+        if (mgmtScope?.target_ids?.length) {
+          wabaId = mgmtScope.target_ids[0]
+        }
+        if (!phoneId) {
+          const msgScope = debugData.data?.granular_scopes?.find(
+            (s) => s.scope === 'whatsapp_business_messaging',
+          )
+          if (msgScope?.target_ids?.length) {
+            phoneId = msgScope.target_ids[0]
+          }
+        }
+      }
+    }
+
+    // 3. Fetch phone numbers from WABA if still missing
+    if (wabaId && !phoneId) {
+      const phonesResponse = await fetch(
+        `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${wabaId}/phone_numbers`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      )
+      if (phonesResponse.ok) {
+        const phonesData = (await phonesResponse.json()) as {
+          data?: Array<{ id: string; display_phone_number?: string; verified_name?: string }>
+        }
+        if (phonesData.data?.length) {
+          phoneId = phonesData.data[0].id
+        }
+      }
+    }
+
+    if (!phoneId) {
+      throw new BadRequestException('Could not resolve WhatsApp phone number ID. Please try again.')
+    }
+
+    // 4. Get phone number display info
+    let displayName = phoneId
+    let displayPhone = ''
+    const phoneInfoRes = await fetch(
+      `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${phoneId}?fields=display_phone_number,verified_name`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    )
+    if (phoneInfoRes.ok) {
+      const phoneInfo = (await phoneInfoRes.json()) as {
+        display_phone_number?: string
+        verified_name?: string
+      }
+      displayName = phoneInfo.verified_name || phoneInfo.display_phone_number || phoneId
+      displayPhone = phoneInfo.display_phone_number || ''
+    }
+
+    // 5. Webhook subscription is configured at app level in the Meta Dashboard
+    // (same as Instagram — no per-account subscription needed)
+
+    // 6. Save the account
+    const encryptedToken = await this.encryptionService.encrypt(accessToken)
+
+    const socialAccount = await this.prisma.socialAccount.upsert({
+      where: {
+        provider_providerAccountId: {
+          provider: 'WHATSAPP',
+          providerAccountId: phoneId,
+        },
+      },
+      create: {
+        organisationId,
+        provider: 'WHATSAPP',
+        providerAccountId: phoneId,
+        pageName: displayName,
+        username: displayPhone || null,
+        accessToken: encryptedToken,
+        scopes: ['whatsapp_business_management', 'whatsapp_business_messaging'],
+      },
+      update: {
+        pageName: displayName,
+        username: displayPhone || null,
+        accessToken: encryptedToken,
+      },
+    })
+
+    // Create default settings
+    await this.prisma.pageSettings.upsert({
+      where: { socialAccountId: socialAccount.id },
+      create: { socialAccountId: socialAccount.id },
+      update: {},
+    })
+
+    this.logger.log(
+      `[WhatsApp] ✅ Connected "${displayName}" (phone=${phoneId}, waba=${wabaId}) for org ${organisationId}`,
+    )
+    return socialAccount
+  }
+
   // ─── TikTok: Refresh token ───
 
   private async refreshTikTokToken(socialAccountId: string): Promise<string> {
@@ -1141,12 +1298,21 @@ export class SocialService {
       counts[account.provider] = (counts[account.provider] || 0) + unreadComments
 
       // Messaging unread counts (keyed by messaging type)
-      if (account.scopes.includes('messages')) {
+      const hasMessaging =
+        account.scopes.includes('messages') ||
+        account.scopes.includes('whatsapp_business_messaging') ||
+        account.scopes.includes('whatsapp_business_management')
+      if (hasMessaging) {
         const unreadMessages = account.conversations.reduce(
           (sum, conv) => sum + conv.unreadCount,
           0,
         )
-        const msgProvider = account.provider === 'INSTAGRAM' ? 'INSTAGRAM_DM' : 'MESSENGER'
+        const msgProvider =
+          account.provider === 'INSTAGRAM'
+            ? 'INSTAGRAM_DM'
+            : account.provider === 'WHATSAPP'
+              ? 'WHATSAPP'
+              : 'MESSENGER'
         counts[msgProvider] = (counts[msgProvider] || 0) + unreadMessages
       }
     }

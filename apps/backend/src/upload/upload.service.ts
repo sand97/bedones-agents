@@ -86,6 +86,48 @@ export class UploadService {
     }
   }
 
+  /**
+   * Upload a raw buffer to Minio.
+   * Returns the public URL of the uploaded file, or null on failure.
+   */
+  async uploadBuffer(
+    buffer: Buffer,
+    name: string,
+    contentType: string,
+    folder: string,
+  ): Promise<string | null> {
+    try {
+      await this.ensureBucket()
+
+      const ext = contentType.includes('png')
+        ? 'png'
+        : contentType.includes('webp')
+          ? 'webp'
+          : contentType.includes('mp4')
+            ? 'mp4'
+            : contentType.includes('ogg') || contentType.includes('opus')
+              ? 'ogg'
+              : contentType.includes('pdf')
+                ? 'pdf'
+                : contentType.includes('jpeg') || contentType.includes('jpg')
+                  ? 'jpg'
+                  : 'bin'
+      const safeName = name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const filename = `${folder}/${crypto.randomUUID()}/${safeName}.${ext}`
+
+      await this.client.putObject(this.bucket, filename, buffer, buffer.length, {
+        'Content-Type': contentType,
+      })
+
+      const url = `${this.publicBaseUrl}/${this.bucket}/${filename}`
+      this.logger.log(`[Upload] Uploaded buffer "${name}" → ${url}`)
+      return url
+    } catch (error) {
+      this.logger.error(`[Upload] Failed to upload buffer "${name}":`, error)
+      return null
+    }
+  }
+
   private async ensureBucket() {
     const exists = await this.client.bucketExists(this.bucket)
     if (!exists) {

@@ -39,6 +39,9 @@ export interface Message {
   localId?: string
   status?: MessageStatus
 
+  // WhatsApp delivery status
+  deliveryStatus?: 'sent' | 'delivered' | 'read'
+
   // Context reply
   replyTo?: ReplyContext
 

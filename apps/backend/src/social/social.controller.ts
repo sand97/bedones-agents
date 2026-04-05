@@ -5,6 +5,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { SocialService } from './social.service'
 import {
   ConnectPagesDto,
+  ConnectWhatsAppDto,
   UpdatePageSettingsDto,
   SocialAccountResponseDto,
   PostResponseDto,
@@ -148,6 +149,21 @@ export class SocialController {
   @ApiOkResponse({ type: CommentResponseDto })
   async delete(@CurrentUser() user: { id: string }, @Body() body: CommentActionDto) {
     return this.socialService.deleteComment(user.id, body.commentId)
+  }
+
+  // ─── Connect WhatsApp (Embedded Signup) ───
+
+  @Post('connect/whatsapp')
+  @ApiBody({ type: ConnectWhatsAppDto })
+  @ApiCreatedResponse({ type: SocialAccountResponseDto })
+  async connectWhatsApp(@CurrentUser() user: { id: string }, @Body() body: ConnectWhatsAppDto) {
+    return this.socialService.connectWhatsAppAccount(
+      user.id,
+      body.organisationId,
+      body.code,
+      body.wabaId,
+      body.phoneNumberId,
+    )
   }
 
   // ─── Connect TikTok ───

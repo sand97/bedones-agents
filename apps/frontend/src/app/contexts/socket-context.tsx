@@ -132,11 +132,30 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       )
     }
 
+    const handleMessageStatus = (data: {
+      conversationId: string
+      messageId: string
+      platformMsgId: string
+      deliveryStatus: 'sent' | 'delivered' | 'read'
+    }) => {
+      // Update the message deliveryStatus in cache directly
+      queryClient.setQueriesData<{ id: string; deliveryStatus?: string }[]>(
+        { queryKey: ['get', '/messaging/conversations/{conversationId}/messages'] },
+        (old) => {
+          if (!old) return old
+          return old.map((msg) =>
+            msg.id === data.messageId ? { ...msg, deliveryStatus: data.deliveryStatus } : msg,
+          )
+        },
+      )
+    }
+
     socket.on('comment:new', handleCommentNew)
     socket.on('comment:updated', handleCommentUpdated)
     socket.on('comment:removed', handleCommentRemoved)
     socket.on('message:new', handleMessageNew)
     socket.on('message:reaction', handleMessageReaction)
+    socket.on('message:status', handleMessageStatus)
 
     return () => {
       socket.off('comment:new', handleCommentNew)
@@ -144,6 +163,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socket.off('comment:removed', handleCommentRemoved)
       socket.off('message:new', handleMessageNew)
       socket.off('message:reaction', handleMessageReaction)
+      socket.off('message:status', handleMessageStatus)
       disconnectSocket()
     }
   }, [orgSlug, queryClient])

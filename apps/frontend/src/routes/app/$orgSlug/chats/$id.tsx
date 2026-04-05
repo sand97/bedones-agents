@@ -8,7 +8,6 @@ import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { AccountSwitcher, type SocialAccount } from '@app/components/social/account-switcher'
 import { ChatLayout } from '@app/components/whatsapp/chat-layout'
-import { MOCK_CONVERSATIONS } from '@app/components/whatsapp/mock-data'
 import { uploadChatMedia } from '@app/lib/api'
 import { WhatsAppIcon, InstagramIcon, MessengerIcon } from '@app/components/icons/social-icons'
 import { useLayout } from '@app/contexts/layout-context'
@@ -18,6 +17,7 @@ import {
   buildFacebookOAuthUrl,
   buildInstagramOAuthUrl,
 } from '@app/lib/auth-redirect'
+import { launchWhatsAppSignup } from '@app/lib/facebook-sdk'
 import type { Conversation, Message } from '@app/components/whatsapp/mock-data'
 
 export const Route = createFileRoute('/app/$orgSlug/chats/$id')({
@@ -41,7 +41,7 @@ const CHAT_CONFIG: Record<
     description: string
     button: string
     connectLabel: string
-    provider: 'FACEBOOK' | 'INSTAGRAM'
+    provider: 'FACEBOOK' | 'INSTAGRAM' | 'WHATSAPP'
   }
 > = {
   whatsapp: {
@@ -54,7 +54,7 @@ const CHAT_CONFIG: Record<
       'Associez votre compte WhatsApp Business via Facebook Cloud API pour centraliser vos conversations et répondre à vos clients directement depuis Bedones.',
     button: 'Connecter un numéro WhatsApp',
     connectLabel: 'Connecter un numéro',
-    provider: 'FACEBOOK',
+    provider: 'WHATSAPP',
   },
   'instagram-dm': {
     label: 'Messages Instagram',
@@ -81,11 +81,6 @@ const CHAT_CONFIG: Record<
     provider: 'FACEBOOK',
   },
 }
-
-const MOCK_WA_ACCOUNTS: SocialAccount[] = [
-  { id: '1', name: '+237 691 000 001' },
-  { id: '2', name: '+237 655 000 002' },
-]
 
 /* ── Mobile back button ── */
 
@@ -143,6 +138,7 @@ function mapApiConversation(
       const raw = m as Record<string, unknown>
       const status = raw._status as 'sending' | 'sent' | 'error' | undefined
       const localId = raw._localId as string | undefined
+      const deliveryStatus = raw.deliveryStatus as 'sent' | 'delivered' | 'read' | undefined
       return {
         id: m.id,
         type: (m.mediaType as 'text' | 'image' | 'video' | 'audio' | 'file') || 'text',
@@ -150,6 +146,7 @@ function mapApiConversation(
         text: m.message,
         timestamp: m.createdTime,
         isRead: m.isRead,
+        deliveryStatus,
         localId,
         status,
         imageUrl: m.mediaType === 'image' ? (m.mediaUrl ?? undefined) : undefined,
@@ -191,19 +188,19 @@ function ChatsPage() {
 
   const [connecting, setConnecting] = useState(false)
 
-  // ─── Accounts query (for Messenger & Instagram DM) ───
-  const accountsQuery = $api.useQuery(
-    'get',
-    '/social/accounts/{organisationId}',
-    { params: { path: { organisationId: orgSlug } } },
-    { enabled: id !== 'whatsapp' },
-  )
+  // ─── Accounts query ───
+  const accountsQuery = $api.useQuery('get', '/social/accounts/{organisationId}', {
+    params: { path: { organisationId: orgSlug } },
+  })
 
   const accounts = useMemo(
     () =>
-      (accountsQuery.data ?? []).filter(
-        (a) => a.provider === config?.provider && a.scopes?.includes('messages'),
-      ),
+      (accountsQuery.data ?? []).filter((a) => {
+        if (a.provider !== config?.provider) return false
+        // WhatsApp accounts are always messaging accounts — no scope check needed
+        if (a.provider === 'WHATSAPP') return true
+        return a.scopes?.includes('messages')
+      }),
     [accountsQuery.data, config?.provider],
   )
 
@@ -221,7 +218,7 @@ function ChatsPage() {
     [navigate],
   )
 
-  if (id !== 'whatsapp' && accounts.length > 0 && !currentAccountId) {
+  if (accounts.length > 0 && !currentAccountId) {
     setAccountInUrl(accounts[0].id)
   }
 
@@ -230,7 +227,7 @@ function ChatsPage() {
     'get',
     '/messaging/conversations/{accountId}',
     { params: { path: { accountId: currentAccountId! } } },
-    { enabled: id !== 'whatsapp' && !!currentAccountId },
+    { enabled: !!currentAccountId },
   )
 
   // ─── Messages query for selected conversation ───
@@ -238,7 +235,7 @@ function ChatsPage() {
     'get',
     '/messaging/conversations/{conversationId}/messages',
     { params: { path: { conversationId: search.conv! } } },
-    { enabled: id !== 'whatsapp' && !!search.conv },
+    { enabled: !!search.conv },
   )
 
   // ─── Send mutation ───
@@ -248,7 +245,7 @@ function ChatsPage() {
 
   // ─── Map conversations to ChatLayout format ───
   const apiConversations: Conversation[] = useMemo(() => {
-    if (id === 'whatsapp' || !conversationsQuery.data) return []
+    if (!conversationsQuery.data) return []
 
     return conversationsQuery.data.map((conv) => {
       const isSelected = search.conv === conv.id
@@ -478,7 +475,8 @@ function ChatsPage() {
   )
 
   // Map route id to sidebar unread provider key
-  const unreadProviderKey = id === 'instagram-dm' ? 'INSTAGRAM_DM' : 'MESSENGER'
+  const unreadProviderKey =
+    id === 'instagram-dm' ? 'INSTAGRAM_DM' : id === 'whatsapp' ? 'WHATSAPP' : 'MESSENGER'
   const unreadCountsKey = [
     'get',
     '/social/unread-counts/{organisationId}',
@@ -564,8 +562,47 @@ function ChatsPage() {
     )
   }
 
-  const handleConnect = () => {
+  // ─── WhatsApp connect mutation ───
+  const connectWhatsAppMutation = $api.useMutation('post', '/social/connect/whatsapp')
+
+  const handleConnect = async () => {
     setConnecting(true)
+
+    if (id === 'whatsapp') {
+      try {
+        const appId = import.meta.env.VITE_FACEBOOK_APP_ID
+        const waConfigId = import.meta.env.VITE_WHATSAPP_CONFIGGURATION_ID
+        if (!appId || !waConfigId) {
+          setConnecting(false)
+          return
+        }
+
+        const { loginResponse, sessionInfo } = await launchWhatsAppSignup(appId, waConfigId)
+        if (!loginResponse.authResponse?.code) {
+          setConnecting(false)
+          return
+        }
+
+        await connectWhatsAppMutation.mutateAsync({
+          body: {
+            organisationId: orgSlug,
+            code: loginResponse.authResponse.code,
+            wabaId: sessionInfo.waba_id,
+            phoneNumberId: sessionInfo.phone_number_id,
+          },
+        })
+
+        // Refresh accounts list
+        queryClient.invalidateQueries({
+          queryKey: ['get', '/social/accounts/{organisationId}'],
+        })
+      } catch (err) {
+        console.error('[WhatsApp] Connect failed:', err)
+      } finally {
+        setConnecting(false)
+      }
+      return
+    }
 
     if (id === 'messenger') {
       setAuthRedirect({
@@ -602,28 +639,6 @@ function ChatsPage() {
         <div className="flex flex-1 items-center justify-center text-text-muted">
           Page introuvable
         </div>
-      </div>
-    )
-  }
-
-  // ─── WhatsApp: full chat UI with mock data ───
-  if (id === 'whatsapp') {
-    return (
-      <div className="flex h-screen flex-col overflow-hidden">
-        <DashboardHeader
-          title={config.label}
-          mobileTitle={config.mobileLabel}
-          action={
-            <AccountSwitcher
-              accounts={MOCK_WA_ACCOUNTS}
-              currentAccount={MOCK_WA_ACCOUNTS[0]}
-              connectLabel={config.connectLabel}
-              icon={<WhatsAppIcon width={18} height={18} className="text-brand-whatsapp" />}
-            />
-          }
-          mobileLeft={hasSelectedConv && !isDesktop ? <MobileBackButton /> : undefined}
-        />
-        <ChatLayout conversations={MOCK_CONVERSATIONS} provider="whatsapp" />
       </div>
     )
   }

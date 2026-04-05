@@ -231,6 +231,7 @@ model DirectMessage {
   replyTo        DirectMessage?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
   replies        DirectMessage[] @relation("MessageReplies")
   reactions      Json?        // Array of { senderId, emoji } reactions on this message
+  deliveryStatus String?      // WhatsApp delivery: 'sent' | 'delivered' | 'read'
   createdTime    DateTime
   isRead         Boolean      @default(false)
   createdAt      DateTime     @default(now())

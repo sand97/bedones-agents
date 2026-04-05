@@ -1,6 +1,8 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
+import { MediaConverterService } from '../upload/media-converter.service'
+import { UploadService } from '../upload/upload.service'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
 
 @Injectable()
@@ -10,6 +12,8 @@ export class MessagingService {
   constructor(
     private prisma: PrismaService,
     private encryptionService: EncryptionService,
+    private mediaConverter: MediaConverterService,
+    private uploadService: UploadService,
   ) {}
 
   // ─── Get conversations for a social account ───
@@ -98,7 +102,7 @@ export class MessagingService {
     // Resolve the platform message ID of the replied message (for API reply_to)
     // Instagram API with Instagram Login does not support reply_to — only Facebook does
     let replyToPlatformMid: string | null = null
-    if (replyToId && provider === 'FACEBOOK') {
+    if (replyToId && (provider === 'FACEBOOK' || provider === 'WHATSAPP')) {
       const repliedMsg = await this.prisma.directMessage.findUnique({
         where: { id: replyToId },
         select: { platformMsgId: true },
@@ -132,6 +136,16 @@ export class MessagingService {
           mediaUrl,
           mediaType,
         )
+      } else if (provider === 'WHATSAPP') {
+        platformMsgId = await this.sendWhatsAppMessage(
+          conversation.socialAccount.providerAccountId,
+          conversation.participantId,
+          accessToken,
+          message,
+          mediaUrl,
+          mediaType,
+          replyToPlatformMid,
+        )
       }
     } catch (error) {
       this.logger.error(
@@ -157,6 +171,7 @@ export class MessagingService {
         fileName: fileName || null,
         fileSize: fileSize || null,
         replyToId: replyToId || null,
+        deliveryStatus: provider === 'WHATSAPP' ? 'sent' : null,
         createdTime: new Date(),
       },
       include: {
@@ -233,6 +248,9 @@ export class MessagingService {
       await this.syncFacebookConversations(accountId, account.providerAccountId, accessToken)
     } else if (account.provider === 'INSTAGRAM') {
       await this.syncInstagramConversations(accountId, account.providerAccountId, accessToken)
+    } else if (account.provider === 'WHATSAPP') {
+      // WhatsApp is webhook-driven — no sync API. Just return existing conversations.
+      this.logger.log(`[WhatsApp] Sync skipped — WhatsApp uses webhooks for real-time messages`)
     }
 
     return this.getConversations(userId, accountId)
@@ -580,6 +598,90 @@ export class MessagingService {
     )
   }
 
+  // ─── WhatsApp Cloud API ───
+
+  private async sendWhatsAppMessage(
+    phoneNumberId: string,
+    recipientPhone: string,
+    accessToken: string,
+    message?: string,
+    mediaUrl?: string,
+    mediaType?: string,
+    replyToMid?: string | null,
+  ): Promise<string | null> {
+    const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${phoneNumberId}/messages`
+
+    let body: Record<string, unknown>
+
+    if (mediaUrl && mediaType) {
+      let finalMediaUrl = mediaUrl
+
+      // WhatsApp rejects video/mp4 for audio — convert to OGG/Opus
+      if (mediaType === 'audio') {
+        finalMediaUrl = await this.convertAudioForWhatsApp(mediaUrl)
+      }
+
+      const waType =
+        mediaType === 'file'
+          ? 'document'
+          : mediaType === 'audio'
+            ? 'audio'
+            : mediaType === 'video'
+              ? 'video'
+              : 'image'
+
+      body = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: recipientPhone,
+        type: waType,
+        [waType]: {
+          link: finalMediaUrl,
+          ...(message && (waType === 'image' || waType === 'video') ? { caption: message } : {}),
+        },
+      }
+    } else {
+      body = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: recipientPhone,
+        type: 'text',
+        text: { body: message || '' },
+      }
+    }
+
+    if (replyToMid) {
+      body.context = { message_id: replyToMid }
+    }
+
+    this.logger.log(`[WhatsApp] Sending to ${recipientPhone}`)
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      this.logger.error(
+        `[WhatsApp] Send failed (${response.status})\n` +
+          `  Payload: ${JSON.stringify(body)}\n` +
+          `  Response: ${JSON.stringify(data)}`,
+      )
+      throw new BadRequestException(
+        `Failed to send WhatsApp message: ${JSON.stringify(data?.error?.message || data)}`,
+      )
+    }
+
+    const messages = (data as { messages?: Array<{ id: string }> }).messages
+    return messages?.[0]?.id || null
+  }
+
   // ─── Handle incoming webhook message ───
 
   async handleIncomingMessage(
@@ -721,6 +823,42 @@ export class MessagingService {
     })
   }
 
+  // ─── WhatsApp audio conversion ───
+
+  /**
+   * Download audio from our storage, convert to OGG/Opus (WhatsApp-compatible),
+   * re-upload, and return the new URL.
+   */
+  private async convertAudioForWhatsApp(mediaUrl: string): Promise<string> {
+    try {
+      const res = await fetch(mediaUrl)
+      if (!res.ok) {
+        this.logger.warn(`[WhatsApp] Failed to download audio for conversion: ${res.status}`)
+        return mediaUrl
+      }
+
+      const buffer = Buffer.from(await res.arrayBuffer())
+      const contentType = res.headers.get('content-type') || 'audio/mp4'
+
+      const converted = await this.mediaConverter.convertAudioToOgg(buffer, contentType)
+      const uploadedUrl = await this.uploadService.uploadBuffer(
+        converted.buffer,
+        'whatsapp-audio',
+        converted.mimetype,
+        'chat-media',
+      )
+
+      if (uploadedUrl) {
+        this.logger.log(`[WhatsApp] Audio converted to OGG/Opus: ${uploadedUrl}`)
+        return uploadedUrl
+      }
+    } catch (error) {
+      this.logger.error(`[WhatsApp] Audio conversion failed: ${error}`)
+    }
+
+    return mediaUrl
+  }
+
   // ─── Helpers ───
 
   private async getDecryptedToken(socialAccountId: string): Promise<string> {
@@ -732,7 +870,13 @@ export class MessagingService {
   }
 
   private assertScope(scopes: string[], required: string) {
-    if (!scopes.includes(required)) {
+    // WhatsApp uses platform-specific scopes instead of generic 'messages'
+    const hasScope =
+      scopes.includes(required) ||
+      (required === 'messages' &&
+        (scopes.includes('whatsapp_business_messaging') ||
+          scopes.includes('whatsapp_business_management')))
+    if (!hasScope) {
       throw new BadRequestException(
         `This account does not have the "${required}" scope. Please reconnect with the required permissions.`,
       )

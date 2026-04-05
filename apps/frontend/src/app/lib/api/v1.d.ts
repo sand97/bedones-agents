@@ -373,6 +373,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/social/connect/whatsapp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SocialController_connectWhatsApp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/social/connect/tiktok": {
         parameters: {
             query?: never;
@@ -839,6 +855,14 @@ export interface components {
         };
         CommentActionDto: {
             commentId: string;
+        };
+        ConnectWhatsAppDto: {
+            organisationId: string;
+            code: string;
+            /** @description WABA ID from Embedded Signup session info */
+            wabaId?: string;
+            /** @description Phone Number ID from Embedded Signup session info */
+            phoneNumberId?: string;
         };
         ConversationResponseDto: {
             id: string;
@@ -1472,6 +1496,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommentResponseDto"];
+                };
+            };
+        };
+    };
+    SocialController_connectWhatsApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectWhatsAppDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountResponseDto"];
                 };
             };
         };

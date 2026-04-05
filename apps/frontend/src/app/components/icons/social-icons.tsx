@@ -120,6 +120,19 @@ export function LabelBadgeIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function SingleCheckIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" {...props}>
+      <path
+        d="M5 12L9.57574 16.5757C9.81005 16.8101 10.1899 16.8101 10.4243 16.5757L20 7"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 export function DoubleCheckIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...props}>

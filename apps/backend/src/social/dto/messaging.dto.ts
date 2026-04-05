@@ -88,6 +88,12 @@ export class DirectMessageResponseDto {
   @ApiPropertyOptional({ description: 'Reactions on this message', type: [ReactionDto] })
   reactions?: ReactionDto[]
 
+  @ApiPropertyOptional({
+    description: 'WhatsApp delivery status',
+    enum: ['sent', 'delivered', 'read'],
+  })
+  deliveryStatus?: string
+
   @ApiProperty()
   createdTime: Date
 

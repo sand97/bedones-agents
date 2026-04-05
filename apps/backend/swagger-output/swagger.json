@@ -727,6 +727,37 @@
         ]
       }
     },
+    "/social/connect/whatsapp": {
+      "post": {
+        "operationId": "SocialController_connectWhatsApp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectWhatsAppDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialAccountResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
     "/social/connect/tiktok": {
       "post": {
         "operationId": "SocialController_connectTikTok",
@@ -1986,6 +2017,29 @@
           "commentId"
         ]
       },
+      "ConnectWhatsAppDto": {
+        "type": "object",
+        "properties": {
+          "organisationId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "wabaId": {
+            "type": "string",
+            "description": "WABA ID from Embedded Signup session info"
+          },
+          "phoneNumberId": {
+            "type": "string",
+            "description": "Phone Number ID from Embedded Signup session info"
+          }
+        },
+        "required": [
+          "organisationId",
+          "code"
+        ]
+      },
       "ConversationResponseDto": {
         "type": "object",
         "properties": {
@@ -2110,6 +2164,15 @@
             "items": {
               "$ref": "#/components/schemas/ReactionDto"
             }
+          },
+          "deliveryStatus": {
+            "type": "string",
+            "description": "WhatsApp delivery status",
+            "enum": [
+              "sent",
+              "delivered",
+              "read"
+            ]
           },
           "createdTime": {
             "format": "date-time",

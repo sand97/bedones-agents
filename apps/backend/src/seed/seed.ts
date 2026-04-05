@@ -3,6 +3,31 @@ import { PrismaClient } from '../../generated/prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import * as bcrypt from 'bcrypt'
 
+const IV_LENGTH = 12
+
+async function encryptToken(text: string): Promise<string> {
+  const secret = process.env.SESSION_SECRET
+  if (!secret) throw new Error('SESSION_SECRET is required for encryption')
+
+  const encoder = new TextEncoder()
+  const keyMaterial = encoder.encode(secret.padEnd(32, '0').slice(0, 32))
+  const key = await crypto.subtle.importKey('raw', keyMaterial, { name: 'AES-GCM' }, false, [
+    'encrypt',
+  ])
+
+  const data = encoder.encode(text)
+  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH))
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data)
+
+  const combined = new Uint8Array(iv.length + encrypted.byteLength)
+  combined.set(iv, 0)
+  combined.set(new Uint8Array(encrypted), iv.length)
+
+  return Array.from(combined)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
 /**
  * Seed script — creates:
  * - A test user with email/password (for Meta reviewers)
@@ -61,6 +86,8 @@ async function main() {
     const whatsappToken = process.env.SEED_WHATSAPP_TOKEN
 
     if (whatsappPhoneId && whatsappToken) {
+      const encryptedToken = await encryptToken(whatsappToken)
+
       await prisma.socialAccount.upsert({
         where: {
           provider_providerAccountId: {
@@ -69,15 +96,15 @@ async function main() {
           },
         },
         update: {
-          accessToken: whatsappToken,
+          accessToken: encryptedToken,
         },
         create: {
           organisationId: org.id,
           provider: 'WHATSAPP',
           providerAccountId: whatsappPhoneId,
           pageName: 'WhatsApp Test',
-          accessToken: whatsappToken,
-          scopes: ['whatsapp_business_messaging'],
+          accessToken: encryptedToken,
+          scopes: ['whatsapp_business_management', 'whatsapp_business_messaging'],
         },
       })
       console.log(`✓ WhatsApp SocialAccount: ${whatsappPhoneId}`)

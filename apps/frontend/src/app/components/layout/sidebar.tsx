@@ -78,6 +78,7 @@ const mainGroups: NavGroup[] = [
           />
         ),
         path: 'chats/whatsapp',
+        unreadProvider: 'WHATSAPP',
       },
       {
         key: 'instagram-dm',

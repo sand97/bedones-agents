@@ -1,5 +1,5 @@
 import { useMemo, useRef, useEffect, useCallback, useState } from 'react'
-import { Avatar, Popover, Button, Spin } from 'antd'
+import { Avatar, Popover, Button, Spin, Tooltip } from 'antd'
 import {
   Play,
   Pause,
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import dayjs from 'dayjs'
-import { DoubleCheckIcon, OptionsIcon } from '@app/components/icons/social-icons'
+import { DoubleCheckIcon, SingleCheckIcon, OptionsIcon } from '@app/components/icons/social-icons'
 import type { Conversation, Message, Ticket } from './mock-data'
 import { TicketCard } from './ticket-card'
 import { TicketDrawer } from './ticket-drawer'
@@ -76,6 +76,8 @@ function AudioPlayer({
   isSending,
   isError,
   isRead,
+  deliveryStatus,
+  provider,
   onRetry,
 }: {
   audioUrl?: string
@@ -84,6 +86,8 @@ function AudioPlayer({
   isSending?: boolean
   isError?: boolean
   isRead?: boolean
+  deliveryStatus?: 'sent' | 'delivered' | 'read'
+  provider?: ChatProvider
   onRetry?: () => void
 }) {
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -166,8 +170,12 @@ function AudioPlayer({
           <span className="flex items-center gap-1">
             {timestamp}
             {isOutgoing && isSending && <Spin size="small" />}
-            {isOutgoing && !isSending && isRead && (
-              <DoubleCheckIcon width={14} height={14} className="text-text-muted" />
+            {isOutgoing && !isSending && (
+              <DeliveryCheck
+                deliveryStatus={deliveryStatus}
+                provider={provider}
+                isRead={!!isRead}
+              />
             )}
           </span>
         )}
@@ -212,9 +220,44 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
 }
 
+/** Delivery status check marks for WhatsApp outgoing messages */
+function DeliveryCheck({
+  deliveryStatus,
+  provider,
+  isRead,
+}: {
+  deliveryStatus?: 'sent' | 'delivered' | 'read'
+  provider?: ChatProvider
+  isRead: boolean
+}) {
+  // WhatsApp: use deliveryStatus for granular check marks
+  if (provider === 'whatsapp' && deliveryStatus) {
+    if (deliveryStatus === 'read') {
+      return (
+        <Tooltip title="Lu">
+          <DoubleCheckIcon width={14} height={14} className="text-text-muted" />
+        </Tooltip>
+      )
+    }
+    const label = deliveryStatus === 'delivered' ? 'Distribué' : 'Envoyé'
+    return (
+      <Tooltip title={label}>
+        <SingleCheckIcon width={14} height={14} className="text-text-muted" />
+      </Tooltip>
+    )
+  }
+
+  // Default: double check when read (Messenger/Instagram behavior)
+  if (isRead) {
+    return <DoubleCheckIcon width={14} height={14} className="text-text-muted" />
+  }
+  return null
+}
+
 function MessageBubble({
   message,
   position,
+  provider,
   onScrollToMessage,
   onRetry,
   onReply,
@@ -222,6 +265,7 @@ function MessageBubble({
 }: {
   message: Message
   position: 'first' | 'middle' | 'last' | 'single'
+  provider?: ChatProvider
   onScrollToMessage?: (id: string) => void
   onRetry?: (messageId: string) => void
   onReply?: (message: Message) => void
@@ -263,6 +307,8 @@ function MessageBubble({
             isSending={isSending}
             isError={isError}
             isRead={message.isRead}
+            deliveryStatus={message.deliveryStatus}
+            provider={provider}
             onRetry={() => onRetry?.(message.localId || message.id)}
           />
         )
@@ -304,8 +350,12 @@ function MessageBubble({
                 <span className="flex items-center gap-1">
                   {formatTime(message.timestamp)}
                   {isOutgoing && isSending && <Spin size="small" />}
-                  {isOutgoing && !isSending && message.isRead && (
-                    <DoubleCheckIcon width={14} height={14} className="text-text-muted" />
+                  {isOutgoing && !isSending && (
+                    <DeliveryCheck
+                      deliveryStatus={message.deliveryStatus}
+                      provider={provider}
+                      isRead={message.isRead}
+                    />
                   )}
                 </span>
               )}
@@ -445,8 +495,12 @@ function MessageBubble({
               <span className="flex items-center gap-1">
                 {formatTime(message.timestamp)}
                 {isOutgoing && isSending && <Spin size="small" className="ml-0.5" />}
-                {isOutgoing && !isSending && message.isRead && (
-                  <DoubleCheckIcon width={14} height={14} className="text-text-muted" />
+                {isOutgoing && !isSending && (
+                  <DeliveryCheck
+                    deliveryStatus={message.deliveryStatus}
+                    provider={provider}
+                    isRead={message.isRead}
+                  />
                 )}
               </span>
             )}
@@ -640,6 +694,7 @@ export function ChatWindow({
                   key={msg.id}
                   message={msg}
                   position={getPosition(globalIndex, allMessages)}
+                  provider={provider}
                   onScrollToMessage={scrollToMessage}
                   onRetry={onRetry}
                   onReply={provider !== 'instagram-dm' ? setReplyTo : undefined}
