@@ -279,7 +279,26 @@ function CommentsPage() {
   const handleMarkRead = async (postId: string) => {
     try {
       await markReadMutation.mutateAsync({ body: { postId } })
-      invalidatePosts()
+      // Update cache directly — set unreadComments to 0 and all comments to isRead: true
+      const postsKey = [
+        'get',
+        '/social/accounts/{accountId}/posts',
+        { params: { path: { accountId: currentAccountId! } } },
+      ]
+      queryClient.setQueryData(postsKey, (old: unknown[] | undefined) =>
+        (old ?? []).map((p: Record<string, unknown>) =>
+          p.id === postId
+            ? {
+                ...p,
+                unreadComments: 0,
+                comments: ((p.comments as Record<string, unknown>[]) ?? []).map((c) => ({
+                  ...c,
+                  isRead: true,
+                })),
+              }
+            : p,
+        ),
+      )
       refreshUnread()
     } catch {
       // silent

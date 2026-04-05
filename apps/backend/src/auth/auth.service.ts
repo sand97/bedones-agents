@@ -199,12 +199,16 @@ export class AuthService {
       select: {
         id: true,
         email: true,
+        phone: true,
         name: true,
         avatar: true,
         authType: true,
+        status: true,
         memberships: {
           select: {
             role: true,
+            status: true,
+            createdAt: true,
             organisation: {
               select: {
                 id: true,
@@ -225,20 +229,32 @@ export class AuthService {
       },
     })
 
+    const active = user.memberships.filter((m) => m.status === 'ACTIVE')
+    const invited = user.memberships.filter((m) => m.status === 'INVITED')
+
     return {
       user: {
         id: user.id,
         email: user.email,
+        phone: user.phone,
         name: user.name,
         avatar: user.avatar,
         authType: user.authType,
+        status: user.status,
       },
-      organisations: user.memberships.map((m) => ({
+      organisations: active.map((m) => ({
         id: m.organisation.id,
         name: m.organisation.name,
         logoUrl: m.organisation.logoUrl,
         role: m.role,
         socialAccounts: m.organisation.socialAccounts,
+      })),
+      pendingInvitations: invited.map((m) => ({
+        organisationId: m.organisation.id,
+        organisationName: m.organisation.name,
+        organisationLogo: m.organisation.logoUrl,
+        role: m.role,
+        invitedAt: m.createdAt,
       })),
     }
   }
@@ -252,6 +268,12 @@ export class AuthService {
     } catch {
       // Session already expired or invalid, that's fine
     }
+  }
+
+  // ─── Public helpers ───
+
+  async createSession(userId: string) {
+    return this.createSessionForUser(userId)
   }
 
   // ─── Private helpers ───

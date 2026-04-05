@@ -93,6 +93,23 @@ export async function uploadLogo(file: File): Promise<string> {
   return data.url
 }
 
+export async function uploadChatMedia(file: File): Promise<string> {
+  const { data, error } = await apiClient.POST('/upload/chat-media', {
+    body: { file } as unknown as { file: string },
+    bodySerializer: () => {
+      const formData = new FormData()
+      formData.append('file', file)
+      return formData
+    },
+  })
+
+  if (error) {
+    throw new Error(getErrorMessage(error, "Erreur lors de l'upload du média"))
+  }
+
+  return data.url
+}
+
 // ─── Social / Comments ───
 
 export async function connectFacebook(

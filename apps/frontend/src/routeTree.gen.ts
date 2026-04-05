@@ -9,6 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as OrganisationsRouteImport } from './routes/organisations'
+import { Route as InvitationRouteImport } from './routes/invitation'
 import { Route as CreateOrganisationRouteImport } from './routes/create-organisation'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BlogIndexRouteImport } from './routes/blog/index'
@@ -34,6 +36,16 @@ import { Route as AppOrgSlugAgentRouteImport } from './routes/app/$orgSlug/agent
 import { Route as AppOrgSlugCommentsIdRouteImport } from './routes/app/$orgSlug/comments/$id'
 import { Route as AppOrgSlugChatsIdRouteImport } from './routes/app/$orgSlug/chats/$id'
 
+const OrganisationsRoute = OrganisationsRouteImport.update({
+  id: '/organisations',
+  path: '/organisations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvitationRoute = InvitationRouteImport.update({
+  id: '/invitation',
+  path: '/invitation',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CreateOrganisationRoute = CreateOrganisationRouteImport.update({
   id: '/create-organisation',
   path: '/create-organisation',
@@ -158,6 +170,8 @@ const AppOrgSlugChatsIdRoute = AppOrgSlugChatsIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/create-organisation': typeof CreateOrganisationRoute
+  '/invitation': typeof InvitationRoute
+  '/organisations': typeof OrganisationsRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
@@ -184,6 +198,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/create-organisation': typeof CreateOrganisationRoute
+  '/invitation': typeof InvitationRoute
+  '/organisations': typeof OrganisationsRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
@@ -211,6 +227,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/create-organisation': typeof CreateOrganisationRoute
+  '/invitation': typeof InvitationRoute
+  '/organisations': typeof OrganisationsRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
@@ -239,6 +257,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/create-organisation'
+    | '/invitation'
+    | '/organisations'
     | '/app/$orgSlug'
     | '/auth/callback'
     | '/auth/login'
@@ -265,6 +285,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/create-organisation'
+    | '/invitation'
+    | '/organisations'
     | '/app/$orgSlug'
     | '/auth/callback'
     | '/auth/login'
@@ -291,6 +313,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/create-organisation'
+    | '/invitation'
+    | '/organisations'
     | '/app/$orgSlug'
     | '/auth/callback'
     | '/auth/login'
@@ -318,6 +342,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CreateOrganisationRoute: typeof CreateOrganisationRoute
+  InvitationRoute: typeof InvitationRoute
+  OrganisationsRoute: typeof OrganisationsRoute
   AppOrgSlugRouteRoute: typeof AppOrgSlugRouteRouteWithChildren
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthLoginRoute: typeof AuthLoginRoute
@@ -330,6 +356,20 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/organisations': {
+      id: '/organisations'
+      path: '/organisations'
+      fullPath: '/organisations'
+      preLoaderRoute: typeof OrganisationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invitation': {
+      id: '/invitation'
+      path: '/invitation'
+      fullPath: '/invitation'
+      preLoaderRoute: typeof InvitationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/create-organisation': {
       id: '/create-organisation'
       path: '/create-organisation'
@@ -542,6 +582,8 @@ const AppOrgSlugRouteRouteWithChildren = AppOrgSlugRouteRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CreateOrganisationRoute: CreateOrganisationRoute,
+  InvitationRoute: InvitationRoute,
+  OrganisationsRoute: OrganisationsRoute,
   AppOrgSlugRouteRoute: AppOrgSlugRouteRouteWithChildren,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthLoginRoute: AuthLoginRoute,

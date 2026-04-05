@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class StatusResponseDto {
   @ApiProperty({ example: 'success' })
@@ -36,12 +36,32 @@ export class OrganisationSummaryDto {
   socialAccounts: SocialAccountDto[]
 }
 
+export class PendingInvitationDto {
+  @ApiProperty()
+  organisationId: string
+
+  @ApiProperty()
+  organisationName: string
+
+  @ApiPropertyOptional({ nullable: true })
+  organisationLogo: string | null
+
+  @ApiProperty({ enum: ['ADMIN', 'MEMBER'] })
+  role: string
+
+  @ApiProperty()
+  invitedAt: Date
+}
+
 export class UserDto {
   @ApiProperty()
   id: string
 
-  @ApiProperty()
-  email: string
+  @ApiPropertyOptional({ nullable: true })
+  email: string | null
+
+  @ApiPropertyOptional({ nullable: true })
+  phone: string | null
 
   @ApiProperty()
   name: string
@@ -51,6 +71,9 @@ export class UserDto {
 
   @ApiProperty({ enum: ['PASSWORD', 'FACEBOOK', 'INSTAGRAM'] })
   authType: string
+
+  @ApiProperty({ enum: ['PENDING', 'VERIFIED'] })
+  status: string
 }
 
 export class MeResponseDto {
@@ -59,4 +82,7 @@ export class MeResponseDto {
 
   @ApiProperty({ type: [OrganisationSummaryDto] })
   organisations: OrganisationSummaryDto[]
+
+  @ApiProperty({ type: [PendingInvitationDto] })
+  pendingInvitations: PendingInvitationDto[]
 }
