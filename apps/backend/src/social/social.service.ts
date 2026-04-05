@@ -1110,7 +1110,7 @@ export class SocialService {
     }
   }
 
-  // ─── Unread comment counts per provider ───
+  // ─── Unread counts per provider (comments + messaging) ───
 
   async getUnreadCounts(userId: string, organisationId: string) {
     await this.assertMembership(userId, organisationId)
@@ -1119,6 +1119,7 @@ export class SocialService {
       where: { organisationId },
       select: {
         provider: true,
+        scopes: true,
         posts: {
           select: {
             comments: {
@@ -1127,13 +1128,27 @@ export class SocialService {
             },
           },
         },
+        conversations: {
+          select: { unreadCount: true },
+        },
       },
     })
 
     const counts: Record<string, number> = {}
     for (const account of accounts) {
-      const unread = account.posts.reduce((sum, post) => sum + post.comments.length, 0)
-      counts[account.provider] = (counts[account.provider] || 0) + unread
+      // Comment unread counts (keyed by provider: FACEBOOK, INSTAGRAM, TIKTOK)
+      const unreadComments = account.posts.reduce((sum, post) => sum + post.comments.length, 0)
+      counts[account.provider] = (counts[account.provider] || 0) + unreadComments
+
+      // Messaging unread counts (keyed by messaging type)
+      if (account.scopes.includes('messages')) {
+        const unreadMessages = account.conversations.reduce(
+          (sum, conv) => sum + conv.unreadCount,
+          0,
+        )
+        const msgProvider = account.provider === 'INSTAGRAM' ? 'INSTAGRAM_DM' : 'MESSENGER'
+        counts[msgProvider] = (counts[msgProvider] || 0) + unreadMessages
+      }
     }
 
     return Object.entries(counts).map(([provider, count]) => ({ provider, count }))

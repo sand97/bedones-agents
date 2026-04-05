@@ -63,6 +63,8 @@ interface ChatLayoutProps {
   onSync?: () => void
   syncing?: boolean
   onRetry?: (messageId: string) => void
+  /** Called when user clicks anywhere in the chat window area */
+  onChatClick?: () => void
 }
 
 /* ── Labels filter popover ── */
@@ -125,6 +127,7 @@ export function ChatLayout({
   onSync: _onSync,
   syncing: _syncing,
   onRetry,
+  onChatClick,
 }: ChatLayoutProps) {
   const navigate = useNavigate()
   const search = useSearch({ strict: false }) as { conv?: string }
@@ -217,9 +220,10 @@ export function ChatLayout({
         </div>
       </div>
 
-      {/* Right: chat window */}
+      {/* Right: chat window — click to mark as read */}
       <div
         className={`chat-split__right ${selectedConversation ? 'chat-split__right--visible' : ''}`}
+        onClick={onChatClick}
       >
         {selectedConversation ? (
           <ChatWindow

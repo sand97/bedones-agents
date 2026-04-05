@@ -218,12 +218,14 @@ function MessageBubble({
   onScrollToMessage,
   onRetry,
   onReply,
+  onMediaLoad,
 }: {
   message: Message
   position: 'first' | 'middle' | 'last' | 'single'
   onScrollToMessage?: (id: string) => void
   onRetry?: (messageId: string) => void
   onReply?: (message: Message) => void
+  onMediaLoad?: () => void
 }) {
   const isOutgoing = message.from === 'business'
   const isSending = message.status === 'sending'
@@ -322,6 +324,7 @@ function MessageBubble({
                 src={message.imageUrl}
                 alt=""
                 className="relative z-1 max-h-64 w-full rounded-control object-cover"
+                onLoad={onMediaLoad}
               />
             </div>
             {message.imageCaption && (
@@ -338,6 +341,7 @@ function MessageBubble({
               controls
               preload="metadata"
               className="w-full rounded-control aspect-video bg-bg-muted"
+              onLoadedMetadata={onMediaLoad}
             />
             {message.text && <p className="m-0 mt-2 text-sm text-text-primary">{message.text}</p>}
           </div>
@@ -396,7 +400,7 @@ function MessageBubble({
       data-from={message.from}
     >
       {/* Reply button — left of outgoing messages */}
-      {isOutgoing && onReply && (
+      {isOutgoing && onReply && !isSending && !isError && (
         <Button
           variant="text"
           size="small"
@@ -450,7 +454,7 @@ function MessageBubble({
         )}
       </div>
       {/* Reply button — right of incoming messages */}
-      {!isOutgoing && onReply && (
+      {!isOutgoing && onReply && !isSending && !isError && (
         <Button
           variant="text"
           size="small"
@@ -560,16 +564,19 @@ export function ChatWindow({
 
   const groups = useMemo(() => groupMessagesByDate(conversation.messages), [conversation.messages])
 
-  // Scroll to bottom on conversation change or new messages
-  const messageCount = conversation.messages.length
-  useEffect(() => {
-    // Use requestAnimationFrame to ensure DOM is rendered before scrolling
+  const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
       if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight
       }
     })
-  }, [conversation.id, messageCount])
+  }, [])
+
+  // Scroll to bottom on conversation change or new messages
+  const messageCount = conversation.messages.length
+  useEffect(() => {
+    scrollToBottom()
+  }, [conversation.id, messageCount, scrollToBottom])
 
   const scrollToMessage = useCallback((messageId: string) => {
     const el = document.getElementById(`msg-${messageId}`)
@@ -636,6 +643,7 @@ export function ChatWindow({
                   onScrollToMessage={scrollToMessage}
                   onRetry={onRetry}
                   onReply={provider !== 'instagram-dm' ? setReplyTo : undefined}
+                  onMediaLoad={scrollToBottom}
                 />
               )
             })}

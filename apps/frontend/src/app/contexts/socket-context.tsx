@@ -16,7 +16,7 @@ interface SocketContextType {
 
 const SocketContext = createContext<SocketContextType>({ connected: false })
 
-/** Plays a short notification sound when a new comment arrives while the tab is not visible */
+/** Plays a short notification sound when a new event arrives */
 function playNotificationSound() {
   try {
     const ctx = new AudioContext()
@@ -35,6 +35,23 @@ function playNotificationSound() {
   }
 }
 
+/**
+ * Check if the user is currently viewing a specific conversation.
+ * Returns true if the URL matches /chats/<provider>?conv=<conversationId>
+ */
+function isViewingConversation(conversationId: string): boolean {
+  if (document.hidden) return false
+  const url = new URL(window.location.href)
+  return url.searchParams.get('conv') === conversationId
+}
+
+/** Check if the user is currently on a comments page for a provider. */
+function isViewingComments(provider: string): boolean {
+  if (document.hidden) return false
+  const providerPath = provider === 'FACEBOOK' ? 'comments/facebook' : 'comments/instagram'
+  return window.location.pathname.includes(providerPath)
+}
+
 export function SocketProvider({ children }: { children: ReactNode }) {
   const { orgSlug } = useParams({ strict: false }) as { orgSlug?: string }
   const queryClient = useQueryClient()
@@ -46,7 +63,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     const socket = getSocket(orgSlug)
     socketRef.current = socket
 
-    const handleCommentNew = (_data: CommentEvent) => {
+    const handleCommentNew = (data: CommentEvent) => {
       // Invalidate posts cache for the relevant account
       queryClient.invalidateQueries({
         queryKey: ['get', '/social/accounts/{accountId}/posts'],
@@ -56,8 +73,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         queryKey: ['get', '/social/unread-counts/{organisationId}'],
       })
 
-      // Play notification sound if tab is not visible
-      if (document.hidden) {
+      // Play sound if user is NOT currently viewing comments for this provider
+      if (!isViewingComments(data.provider)) {
         playNotificationSound()
       }
     }
@@ -80,15 +97,20 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       })
     }
 
-    const handleMessageNew = () => {
+    const handleMessageNew = (data: { conversationId: string }) => {
       queryClient.invalidateQueries({
         queryKey: ['get', '/messaging/conversations/{accountId}'],
       })
       queryClient.invalidateQueries({
         queryKey: ['get', '/messaging/conversations/{conversationId}/messages'],
       })
+      // Invalidate unread counts for sidebar badges
+      queryClient.invalidateQueries({
+        queryKey: ['get', '/social/unread-counts/{organisationId}'],
+      })
 
-      if (document.hidden) {
+      // Play sound if user is NOT currently viewing this conversation
+      if (!isViewingConversation(data.conversationId)) {
         playNotificationSound()
       }
     }

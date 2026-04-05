@@ -89,6 +89,7 @@ const mainGroups: NavGroup[] = [
           />
         ),
         path: 'chats/instagram-dm',
+        unreadProvider: 'INSTAGRAM_DM',
       },
       {
         key: 'messenger',
@@ -100,6 +101,7 @@ const mainGroups: NavGroup[] = [
           />
         ),
         path: 'chats/messenger',
+        unreadProvider: 'MESSENGER',
       },
     ],
   },

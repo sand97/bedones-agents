@@ -119,9 +119,9 @@ export class MediaConverterService {
         `[MediaConverter] Converting video (${originalMimetype}, ${inputBuffer.length} bytes)`,
       )
 
-      // Always transcode to ensure Instagram mobile compatibility:
+      // Always transcode for Instagram/Messenger mobile compatibility:
       // - H.264 Main profile (High not supported on all mobile)
-      // - Max 720p resolution
+      // - Max 720p, min bitrate 1Mbps (mobile players choke on very low bitrate)
       // - Stereo AAC audio
       await this.runFfmpeg(inputPath, outputPath, [
         '-c:v',

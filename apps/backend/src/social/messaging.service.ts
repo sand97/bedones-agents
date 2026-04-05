@@ -264,7 +264,7 @@ export class MessagingService {
       messagePayload = {
         attachment: {
           type: fbType,
-          payload: { url: mediaUrl, is_reusable: true },
+          payload: { url: mediaUrl },
         },
       }
     } else {

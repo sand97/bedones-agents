@@ -30,9 +30,11 @@ function getMediaDuration(file: File): Promise<number> {
 function AttachmentPopover({
   children,
   onSelectFiles,
+  provider,
 }: {
   children: React.ReactNode
   onSelectFiles: (files: FileList, type: MediaType) => void
+  provider?: string
 }) {
   const [open, setOpen] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -50,16 +52,20 @@ function AttachmentPopover({
         photoInputRef.current?.click()
       },
     },
-    {
-      icon: <Video size={18} />,
-      label: 'Vidéo',
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-50',
-      onClick: () => {
-        setOpen(false)
-        videoInputRef.current?.click()
-      },
-    },
+    ...(provider !== 'messenger'
+      ? [
+          {
+            icon: <Video size={18} />,
+            label: 'Vidéo',
+            color: 'text-purple-500',
+            bgColor: 'bg-purple-50',
+            onClick: () => {
+              setOpen(false)
+              videoInputRef.current?.click()
+            },
+          },
+        ]
+      : []),
     {
       icon: <FileText size={18} />,
       label: 'Document',
@@ -137,6 +143,7 @@ function AttachmentPopover({
 export function ChatInput({
   onSend,
   onUploadAndSend,
+  provider,
   replyTo,
   onCancelReply,
 }: {
@@ -226,7 +233,7 @@ export function ChatInput({
         </div>
       )}
       <div className="chat-input-row">
-        <AttachmentPopover onSelectFiles={handleFileSelect}>
+        <AttachmentPopover onSelectFiles={handleFileSelect} provider={provider}>
           <Button
             type="text"
             shape="circle"

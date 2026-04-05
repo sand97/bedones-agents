@@ -477,12 +477,22 @@ function ChatsPage() {
     [search.conv, queryClient],
   )
 
-  // ─── Mark as read when conv is opened or tab becomes visible ───
+  // Map route id to sidebar unread provider key
+  const unreadProviderKey = id === 'instagram-dm' ? 'INSTAGRAM_DM' : 'MESSENGER'
+  const unreadCountsKey = [
+    'get',
+    '/social/unread-counts/{organisationId}',
+    { params: { path: { organisationId: orgSlug } } },
+  ]
+
+  // ─── Mark as read when conv is opened, clicked, or tab becomes visible ───
   const markAsRead = useCallback(
     (convId: string) => {
       const convs = conversationsQuery.data as Record<string, unknown>[] | undefined
       const conv = convs?.find((c) => c.id === convId)
       if (!conv || (conv.unreadCount as number) === 0) return
+
+      const convUnread = conv.unreadCount as number
 
       markReadMutation.mutate({ body: { conversationId: convId } })
       queryClient.setQueryData(conversationsKey, (old: unknown[] | undefined) =>
@@ -490,9 +500,30 @@ function ChatsPage() {
           c.id === convId ? { ...c, unreadCount: 0 } : c,
         ),
       )
+      // Optimistically subtract from sidebar badge count
+      queryClient.setQueryData(
+        unreadCountsKey,
+        (old: { provider: string; count: number }[] | undefined) =>
+          (old ?? []).map((item) =>
+            item.provider === unreadProviderKey
+              ? { ...item, count: Math.max(0, item.count - convUnread) }
+              : item,
+          ),
+      )
     },
-    [conversationsQuery.data, markReadMutation, queryClient, conversationsKey],
+    [
+      conversationsQuery.data,
+      markReadMutation,
+      queryClient,
+      conversationsKey,
+      unreadCountsKey,
+      unreadProviderKey,
+    ],
   )
+
+  const handleChatClick = useCallback(() => {
+    if (search.conv) markAsRead(search.conv)
+  }, [search.conv, markAsRead])
 
   const markReadConvRef = useRef(search.conv)
   markReadConvRef.current = search.conv
@@ -666,6 +697,7 @@ function ChatsPage() {
         onSync={handleSync}
         syncing={syncMutation.isPending}
         onRetry={handleRetry}
+        onChatClick={handleChatClick}
       />
     </div>
   )
