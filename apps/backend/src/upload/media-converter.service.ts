@@ -115,24 +115,33 @@ export class MediaConverterService {
         )
       }
 
-      // Already MP4 with H.264 — check if conversion is needed
-      if (originalMimetype === 'video/mp4') {
-        const needsConversion = await this.videoNeedsConversion(inputPath)
-        if (!needsConversion) {
-          this.logger.log('[MediaConverter] Video already H.264/MP4, skipping conversion')
-          return { buffer: inputBuffer, mimetype: 'video/mp4', extension: 'mp4' }
-        }
-      }
+      this.logger.log(
+        `[MediaConverter] Converting video (${originalMimetype}, ${inputBuffer.length} bytes)`,
+      )
 
+      // Always transcode to ensure Instagram mobile compatibility:
+      // - H.264 Main profile (High not supported on all mobile)
+      // - Max 720p resolution
+      // - Stereo AAC audio
       await this.runFfmpeg(inputPath, outputPath, [
         '-c:v',
         'libx264',
+        '-profile:v',
+        'main',
+        '-level',
+        '3.1',
         '-preset',
         'fast',
         '-crf',
         '23',
+        '-vf',
+        "scale='min(720,iw)':'-2'",
         '-c:a',
         'aac',
+        '-ar',
+        '44100',
+        '-ac',
+        '2',
         '-b:a',
         '128k',
         '-movflags',
@@ -144,8 +153,11 @@ export class MediaConverterService {
       ])
 
       const outputBuffer = fs.readFileSync(outputPath)
+
+      // Verify conversion result
+      const info = await this.probeFile(outputPath)
       this.logger.log(
-        `[MediaConverter] Video converted to MP4 (${inputBuffer.length} → ${outputBuffer.length} bytes)`,
+        `[MediaConverter] Video converted: ${originalMimetype} → ${info} (${inputBuffer.length} → ${outputBuffer.length} bytes)`,
       )
 
       return { buffer: outputBuffer, mimetype: 'video/mp4', extension: 'mp4' }
@@ -165,39 +177,6 @@ export class MediaConverterService {
           return
         }
         resolve(metadata.format.duration || 0)
-      })
-    })
-  }
-
-  private async validateDuration(buffer: Buffer, _mimetype: string): Promise<void> {
-    const tmpPath = path.join(os.tmpdir(), `${crypto.randomUUID()}-probe`)
-    try {
-      fs.writeFileSync(tmpPath, buffer)
-      const duration = await this.getDuration(tmpPath)
-      if (duration > MAX_DURATION_SECONDS) {
-        throw new BadRequestException(
-          `La durée dépasse la limite de ${MAX_DURATION_SECONDS / 60} minutes`,
-        )
-      }
-    } finally {
-      try {
-        fs.unlinkSync(tmpPath)
-      } catch {
-        // Cleanup errors are non-critical
-      }
-    }
-  }
-
-  private videoNeedsConversion(filePath: string): Promise<boolean> {
-    return new Promise((resolve) => {
-      ffmpeg.ffprobe(filePath, (err, metadata) => {
-        if (err) {
-          resolve(true) // Can't determine — convert to be safe
-          return
-        }
-        const videoStream = metadata.streams.find((s) => s.codec_type === 'video')
-        const isH264 = videoStream?.codec_name === 'h264'
-        resolve(!isH264)
       })
     })
   }
