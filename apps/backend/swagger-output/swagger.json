@@ -603,6 +603,37 @@
         ]
       }
     },
+    "/social/comments/post": {
+      "post": {
+        "operationId": "SocialController_commentOnPost",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentOnPostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
     "/social/comments/reply": {
       "post": {
         "operationId": "SocialController_reply",
@@ -871,6 +902,78 @@
         },
         "tags": [
           "Social"
+        ]
+      }
+    },
+    "/webhooks/tiktok/setup": {
+      "post": {
+        "operationId": "TikTokWebhookController_setup",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "query",
+            "description": "Admin token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Register the COMMENT webhook on TikTok Business API"
+          }
+        },
+        "tags": [
+          "TikTok Webhooks"
+        ]
+      }
+    },
+    "/webhooks/tiktok/list": {
+      "get": {
+        "operationId": "TikTokWebhookController_list",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "query",
+            "description": "Admin token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List registered TikTok webhooks"
+          }
+        },
+        "tags": [
+          "TikTok Webhooks"
+        ]
+      }
+    },
+    "/webhooks/tiktok/delete": {
+      "delete": {
+        "operationId": "TikTokWebhookController_delete",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "query",
+            "description": "Admin token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete the COMMENT webhook from TikTok Business API"
+          }
+        },
+        "tags": [
+          "TikTok Webhooks"
         ]
       }
     },
@@ -1989,6 +2092,21 @@
         },
         "required": [
           "postId"
+        ]
+      },
+      "CommentOnPostDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "postId",
+          "message"
         ]
       },
       "ReplyToCommentDto": {

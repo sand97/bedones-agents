@@ -4,10 +4,12 @@ import * as cookieParser from 'cookie-parser'
 import { join } from 'path'
 import { mkdirSync, writeFileSync } from 'fs'
 import { AppModule } from './app.module'
+import { PrismaNotFoundFilter } from './common/filters/prisma-not-found.filter'
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true })
 
+  app.useGlobalFilters(new PrismaNotFoundFilter())
   app.use(cookieParser())
 
   app.enableCors({

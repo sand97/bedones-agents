@@ -204,6 +204,14 @@ export class ReplyToCommentDto {
   message: string
 }
 
+export class CommentOnPostDto {
+  @ApiProperty()
+  postId: string
+
+  @ApiProperty()
+  message: string
+}
+
 export class CommentActionDto {
   @ApiProperty()
   commentId: string

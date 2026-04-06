@@ -245,6 +245,7 @@ function CommentsPage() {
 
   // ─── Mutations ───
   const replyMutation = $api.useMutation('post', '/social/comments/reply')
+  const commentMutation = $api.useMutation('post', '/social/comments/post')
   const tiktokReplyMutation = $api.useMutation('post', '/social/tiktok/comments/reply')
   const hideMutation = $api.useMutation('post', '/social/comments/hide')
   const unhideMutation = $api.useMutation('post', '/social/comments/unhide')
@@ -258,6 +259,16 @@ function CommentsPage() {
     } else {
       await replyMutation.mutateAsync({ body: { commentId, message } })
     }
+    invalidatePosts()
+  }
+
+  const handleComment = async (postId: string, message: string) => {
+    if (id === 'tiktok') {
+      // TikTok doesn't support top-level comments via API
+      messageApi.warning('TikTok ne supporte pas les commentaires directs sur un post')
+      return
+    }
+    await commentMutation.mutateAsync({ body: { postId, message } })
     invalidatePosts()
   }
 
@@ -497,6 +508,7 @@ function CommentsPage() {
         accountId={currentAccountId || undefined}
         isConfigured={isConfigured}
         onReply={handleReply}
+        onComment={handleComment}
         onHide={handleHide}
         onUnhide={handleUnhide}
         onDelete={handleDelete}

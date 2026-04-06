@@ -15,6 +15,7 @@ import {
   UserStatsResponseDto,
   MarkReadDto,
   ReplyToCommentDto,
+  CommentOnPostDto,
   CommentActionDto,
 } from './dto/social.dto'
 
@@ -113,6 +114,15 @@ export class SocialController {
   async markRead(@CurrentUser() user: { id: string }, @Body() body: MarkReadDto) {
     await this.socialService.markCommentsAsRead(user.id, body.postId)
     return { status: 'success' }
+  }
+
+  // ─── Comment on a post (top-level) ───
+
+  @Post('comments/post')
+  @ApiBody({ type: CommentOnPostDto })
+  @ApiCreatedResponse({ type: CommentResponseDto })
+  async commentOnPost(@CurrentUser() user: { id: string }, @Body() body: CommentOnPostDto) {
+    return this.socialService.commentOnPost(user.id, body.postId, body.message)
   }
 
   // ─── Reply to a comment ───

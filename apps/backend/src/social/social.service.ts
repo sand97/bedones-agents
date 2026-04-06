@@ -368,9 +368,13 @@ export class SocialService {
           }
         }
       }
+      this.logger.log(`[TikTok] User info response: ${JSON.stringify(userData)}`)
       displayName = userData.data.user.display_name || displayName
       username = userData.data.user.username
       avatarUrl = userData.data.user.avatar_url || null
+    } else {
+      const errorBody = await userRes.text()
+      this.logger.error(`[TikTok] User info fetch failed (HTTP ${userRes.status}): ${errorBody}`)
     }
 
     const encryptedToken = await this.encryptionService.encrypt(tokenData.access_token)
@@ -815,29 +819,50 @@ export class SocialService {
     await this.assertMembership(userId, comment.post.socialAccount.organisationId)
     const accessToken = await this.refreshTikTokToken(comment.post.socialAccount.id)
 
-    const response = await fetch('https://open.tiktokapis.com/v2/comment/reply/', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        video_id: comment.postId,
-        comment_id: commentId,
-        text: message,
-      }),
+    // Get the open_id (business_id) for the Business API
+    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+      where: { id: comment.post.socialAccount.id },
+      select: { providerAccountId: true },
     })
 
-    if (!response.ok) {
-      const error = await response.text()
-      this.logger.error(`[TikTok] Reply failed: ${error}`)
-      throw new BadRequestException('Failed to reply to TikTok comment')
+    const response = await fetch(
+      'https://business-api.tiktok.com/open_api/v1.3/business/comment/reply/create/',
+      {
+        method: 'POST',
+        headers: {
+          'Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          business_id: account.providerAccountId,
+          video_id: comment.postId,
+          comment_id: commentId,
+          text: message,
+        }),
+      },
+    )
+
+    const replyText = await response.text()
+    this.logger.log(`[TikTok] Reply response: ${replyText}`)
+
+    // Extract comment_id from raw text to avoid BigInt precision loss
+    const replyIdMatch = replyText.match(/"comment_id"\s*:\s*"?(\d+)"?/)
+    const replyBody = JSON.parse(replyText) as {
+      code: number
+      message: string
     }
 
-    // Save the reply locally
-    const replyId = `tiktok_reply_${Date.now()}_${commentId}`
-    return this.prisma.comment.create({
-      data: {
+    if (replyBody.code !== 0) {
+      this.logger.error(`[TikTok] Reply failed: ${replyBody.code} — ${replyBody.message}`)
+      throw new BadRequestException(`Failed to reply to TikTok comment: ${replyBody.message}`)
+    }
+
+    // Use the real TikTok comment ID to avoid duplicates from webhooks
+    const replyId = replyIdMatch?.[1] || `tiktok_reply_${Date.now()}_${commentId}`
+
+    return this.prisma.comment.upsert({
+      where: { id: replyId },
+      create: {
         id: replyId,
         postId: comment.postId,
         parentId: commentId,
@@ -848,7 +873,94 @@ export class SocialService {
         isRead: true,
         isPageReply: true,
       },
+      update: {},
     })
+  }
+
+  // ─── TikTok: Setup webhook (COMMENT) ───
+
+  async setupTikTokWebhook() {
+    const appId = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
+    const secret = this.configService.getOrThrow<string>('TIKTOK_CLIENT_SECRET')
+    const appUrl = this.configService.getOrThrow<string>('APP_URL')
+    const callbackUrl = `${appUrl}/webhooks/tiktok`
+
+    const response = await fetch(
+      'https://business-api.tiktok.com/open_api/v1.3/business/webhook/update/',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          app_id: appId,
+          secret,
+          event_type: 'COMMENT',
+          callback_url: callbackUrl,
+        }),
+      },
+    )
+
+    const body = await response.json()
+    this.logger.log(`[TikTok Webhook] Setup response: ${JSON.stringify(body)}`)
+
+    if ((body as { code?: number }).code !== 0) {
+      throw new BadRequestException(
+        `TikTok webhook setup failed: ${(body as { message?: string }).message}`,
+      )
+    }
+
+    return body
+  }
+
+  // ─── TikTok: List webhooks ───
+
+  async listTikTokWebhooks() {
+    const appId = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
+    const secret = this.configService.getOrThrow<string>('TIKTOK_CLIENT_SECRET')
+
+    const params = new URLSearchParams({
+      app_id: appId,
+      secret,
+      event_type: 'COMMENT',
+    })
+
+    const response = await fetch(
+      `https://business-api.tiktok.com/open_api/v1.3/business/webhook/list/?${params}`,
+    )
+
+    const body = await response.json()
+    this.logger.log(`[TikTok Webhook] List response: ${JSON.stringify(body)}`)
+    return body
+  }
+
+  // ─── TikTok: Delete webhook (COMMENT) ───
+
+  async deleteTikTokWebhook() {
+    const appId = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
+    const secret = this.configService.getOrThrow<string>('TIKTOK_CLIENT_SECRET')
+
+    const response = await fetch(
+      'https://business-api.tiktok.com/open_api/v1.3/business/webhook/delete/',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          app_id: appId,
+          secret,
+          event_type: 'COMMENT',
+        }),
+      },
+    )
+
+    const body = await response.json()
+    this.logger.log(`[TikTok Webhook] Delete response: ${JSON.stringify(body)}`)
+
+    if ((body as { code?: number }).code !== 0) {
+      throw new BadRequestException(
+        `TikTok webhook delete failed: ${(body as { message?: string }).message}`,
+      )
+    }
+
+    return body
   }
 
   // ─── Webhook subscriptions ───
@@ -1015,6 +1127,58 @@ export class SocialService {
     await this.prisma.comment.updateMany({
       where: { postId, isRead: false },
       data: { isRead: true },
+    })
+  }
+
+  // ─── Comment on a post (top-level) ───
+
+  async commentOnPost(userId: string, postId: string, message: string) {
+    const post = await this.prisma.post.findUniqueOrThrow({
+      where: { id: postId },
+      include: {
+        socialAccount: { select: { id: true, provider: true, organisationId: true } },
+      },
+    })
+
+    await this.assertMembership(userId, post.socialAccount.organisationId)
+    const provider = post.socialAccount.provider
+
+    if (provider === 'TIKTOK') {
+      throw new BadRequestException('TikTok does not support top-level comments via API')
+    }
+
+    const accessToken = await this.getDecryptedToken(post.socialAccount.id)
+
+    if (provider === 'FACEBOOK') {
+      await this.facebookReplyToComment(postId, message, accessToken)
+    } else if (provider === 'INSTAGRAM') {
+      // Instagram: POST /{media-id}/comments
+      const response = await fetch(
+        `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/${postId}/comments?access_token=${accessToken}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message }),
+        },
+      )
+      if (!response.ok) {
+        this.logger.error(`[Instagram] Comment on post failed: ${await response.text()}`)
+        throw new BadRequestException('Failed to comment on Instagram post')
+      }
+    }
+
+    const commentId = `comment_${Date.now()}_${postId}`
+    return this.prisma.comment.create({
+      data: {
+        id: commentId,
+        postId,
+        message,
+        fromId: post.socialAccount.id,
+        fromName: 'Page',
+        createdTime: new Date(),
+        isRead: true,
+        isPageReply: true,
+      },
     })
   }
 

@@ -162,4 +162,20 @@ export class WebhookController {
       this.logger.error('[WhatsApp Webhook] Processing error:', error)
     }
   }
+
+  // ─── TikTok webhook events ───
+
+  @Post('tiktok')
+  async tiktokEvent(@Req() req: Request, @Res() res: Response) {
+    // Respond immediately to avoid timeout
+    res.status(200).send('EVENT_RECEIVED')
+
+    // Process asynchronously
+    try {
+      this.logger.log(`[TikTok Webhook] Payload: ${JSON.stringify(req.body, null, 2)}`)
+      await this.webhookService.processTikTokWebhook(req.body)
+    } catch (error) {
+      this.logger.error('[TikTok Webhook] Processing error:', error)
+    }
+  }
 }

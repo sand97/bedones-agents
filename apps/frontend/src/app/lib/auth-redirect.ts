@@ -95,7 +95,10 @@ export function buildTikTokOAuthUrl(): string {
   url.searchParams.set('client_key', clientKey)
   url.searchParams.set('redirect_uri', redirectUri)
   url.searchParams.set('response_type', 'code')
-  url.searchParams.set('scope', 'user.info.basic,video.list,comment.list,comment.list.manage')
+  url.searchParams.set(
+    'scope',
+    'user.info.basic,user.info.username,video.list,user.account.type,comment.list,comment.list.manage',
+  )
 
   return url.toString()
 }

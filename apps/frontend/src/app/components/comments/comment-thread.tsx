@@ -119,6 +119,7 @@ interface CommentThreadProps {
   accountId: string
   isConfigured?: boolean
   onReply?: (commentId: string, message: string) => Promise<void>
+  onComment?: (postId: string, message: string) => Promise<void>
   onHide?: (commentId: string) => Promise<void>
   onUnhide?: (commentId: string) => Promise<void>
   onDelete?: (commentId: string) => Promise<void>
@@ -389,7 +390,7 @@ function CommentBubble({
           <span className="whitespace-nowrap text-xs text-text-muted">
             {' '}
             · {formatTime(comment.createdTime)}
-            {isPage && ' (by IA)'}
+            {isPage && comment.fromId === 'ai' && ' (by IA)'}
           </span>
         </div>
         {(isHidden || isDeleted) && (
@@ -516,6 +517,7 @@ export function CommentThread({
   accountId,
   isConfigured = true,
   onReply,
+  onComment,
   onHide,
   onUnhide,
   onDelete,
@@ -544,14 +546,17 @@ export function CommentThread({
   }
 
   const handleSend = async () => {
-    if (!inputValue.trim() || !onReply) return
-
-    const commentId = replyTo?.id
-    if (!commentId) return
+    if (!inputValue.trim()) return
 
     setSending(true)
     try {
-      await onReply(commentId, inputValue.trim())
+      if (replyTo && onReply) {
+        await onReply(replyTo.id, inputValue.trim())
+      } else if (onComment) {
+        await onComment(post.id, inputValue.trim())
+      } else {
+        return
+      }
       setInputValue('')
       setReplyTo(null)
     } catch (err) {
@@ -562,7 +567,7 @@ export function CommentThread({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
     }
@@ -570,7 +575,7 @@ export function CommentThread({
 
   const placeholder = replyTo
     ? `Répondre à ${replyTo.fromName || 'ce commentaire'}…`
-    : 'Sélectionnez un commentaire pour répondre…'
+    : 'Écrire un commentaire…'
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -635,13 +640,12 @@ export function CommentThread({
                 onKeyDown={handleKeyDown}
                 autoSize={{ minRows: 1, maxRows: 3 }}
                 className="rounded-2xl!"
-                disabled={!replyTo}
               />
               <Button
                 type="text"
                 shape="circle"
                 onClick={handleSend}
-                disabled={!inputValue.trim() || !replyTo}
+                disabled={!inputValue.trim()}
                 loading={sending}
                 icon={<Send strokeWidth={1.5} size={18} />}
                 className="flex-shrink-0"

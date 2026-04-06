@@ -21,6 +21,7 @@ interface CommentsLayoutProps {
   /** Whether the page settings have been configured by the user */
   isConfigured?: boolean
   onReply?: (commentId: string, message: string) => Promise<void>
+  onComment?: (postId: string, message: string) => Promise<void>
   onHide?: (commentId: string) => Promise<void>
   onUnhide?: (commentId: string) => Promise<void>
   onDelete?: (commentId: string) => Promise<void>
@@ -36,6 +37,7 @@ export function CommentsLayout({
   accountId,
   isConfigured = false,
   onReply,
+  onComment,
   onHide,
   onUnhide,
   onDelete,
@@ -126,6 +128,7 @@ export function CommentsLayout({
             accountId={accountId || ''}
             isConfigured={isConfigured}
             onReply={isConfigured ? onReply : undefined}
+            onComment={isConfigured ? onComment : undefined}
             onHide={onHide}
             onUnhide={onUnhide}
             onDelete={onDelete}

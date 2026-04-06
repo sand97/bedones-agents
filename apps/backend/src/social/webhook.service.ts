@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { Prisma } from 'generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
 import { UploadService } from '../upload/upload.service'
@@ -935,12 +936,414 @@ export class WebhookService {
     }
   }
 
+  // ─── Process TikTok webhook ───
+
+  async processTikTokWebhook(payload: TikTokWebhookPayload) {
+    const { event } = payload
+
+    if (event !== 'comment.update') {
+      this.logger.log(`[TikTok Webhook] Ignoring event type: ${event}`)
+      return
+    }
+
+    const rawContent =
+      typeof payload.content === 'string' ? payload.content : JSON.stringify(payload.content)
+
+    // Extract IDs from raw string to avoid JSON.parse losing precision on big integers
+    const commentIdMatch = rawContent.match(/"comment_id"\s*:\s*(\d+)/)
+    const videoIdMatch = rawContent.match(/"video_id"\s*:\s*(\d+)/)
+    const parentIdMatch = rawContent.match(/"parent_comment_id"\s*:\s*(\d+)/)
+    const actionMatch = rawContent.match(/"comment_action"\s*:\s*"([^"]+)"/)
+    const timestampMatch = rawContent.match(/"timestamp"\s*:\s*(\d+)/)
+
+    const commentAction = actionMatch?.[1] || ''
+
+    // Only process new comments becoming public
+    if (commentAction !== 'set_to_public') {
+      this.logger.log(`[TikTok Webhook] Ignoring comment action: ${commentAction}`)
+      return
+    }
+
+    const openId = payload.user_openid
+    if (!openId) {
+      this.logger.warn('[TikTok Webhook] No user_openid in payload')
+      return
+    }
+
+    // Find the TikTok social account by open_id
+    const socialAccount = await this.prisma.socialAccount.findFirst({
+      where: { provider: 'TIKTOK', providerAccountId: openId },
+      select: {
+        id: true,
+        organisationId: true,
+        accessToken: true,
+        refreshToken: true,
+        tokenExpiresAt: true,
+      },
+    })
+
+    if (!socialAccount) {
+      this.logger.warn(`[TikTok Webhook] No social account found for open_id ${openId}`)
+      return
+    }
+
+    const orgId = socialAccount.organisationId
+    const videoId = videoIdMatch?.[1] || ''
+    const commentId = commentIdMatch?.[1] || ''
+    const parentCommentId = parentIdMatch?.[1] && parentIdMatch[1] !== '0' ? parentIdMatch[1] : null
+    const timestamp = timestampMatch?.[1] ? parseInt(timestampMatch[1]) : Date.now()
+
+    if (!videoId || !commentId) {
+      this.logger.warn('[TikTok Webhook] Missing video_id or comment_id')
+      return
+    }
+
+    // Fetch comment details from TikTok API (text, author info)
+    const accessToken = await this.getTikTokAccessToken(socialAccount)
+
+    const commentData = await this.fetchTikTokComment(accessToken, openId, videoId, commentId)
+
+    // Fetch video details if we don't have them yet
+    const existingPost = await this.prisma.post.findUnique({ where: { id: videoId } })
+    const needsVideoFetch = !existingPost || !existingPost.imageUrl
+
+    let postMessage = existingPost?.message || null
+    let postImageUrl = existingPost?.imageUrl || null
+    let postPermalinkUrl = existingPost?.permalinkUrl || null
+
+    if (needsVideoFetch) {
+      const videoData = await this.fetchTikTokVideo(accessToken, openId, videoId)
+      if (videoData) {
+        postMessage = videoData.title || postMessage
+        postImageUrl = videoData.cover_image_url || postImageUrl
+        postPermalinkUrl = videoData.share_url || postPermalinkUrl
+
+        // Upload cover image to our storage
+        if (videoData.cover_image_url && !existingPost?.imageUrl) {
+          const uploaded = await this.uploadService.uploadFromUrl(
+            videoData.cover_image_url,
+            'posts',
+          )
+          if (uploaded) postImageUrl = uploaded
+        }
+      }
+    }
+
+    // Upsert the post (video)
+    await this.prisma.post.upsert({
+      where: { id: videoId },
+      create: {
+        id: videoId,
+        socialAccountId: socialAccount.id,
+        message: postMessage,
+        imageUrl: postImageUrl,
+        permalinkUrl: postPermalinkUrl,
+      },
+      update: {
+        message: postMessage || undefined,
+        imageUrl: postImageUrl || undefined,
+        permalinkUrl: postPermalinkUrl || undefined,
+      },
+    })
+
+    const commentText = commentData?.text || ''
+
+    // Skip empty comments — don't save, don't run AI
+    if (!commentText.trim()) {
+      this.logger.log(`[TikTok Webhook] Empty comment ${commentId}, skipping`)
+      return
+    }
+
+    const fromId = commentData?.user?.open_id || 'unknown'
+    const isOwnComment = commentData?.owner === true
+    const fromName = commentData?.user?.display_name || 'Utilisateur TikTok'
+    const fromAvatar = commentData?.user?.avatar_url || null
+
+    // Own comment — already saved locally when we replied
+    if (isOwnComment) {
+      this.logger.log(`[TikTok Webhook] Own comment ${commentId}, merging with local entry`)
+
+      // Try to create with real ID — if it already exists, just ignore
+      try {
+        await this.prisma.comment.create({
+          data: {
+            id: commentId,
+            postId: videoId,
+            parentId: parentCommentId,
+            message: commentText,
+            fromId: socialAccount.id,
+            fromName: 'Page',
+            fromAvatar,
+            createdTime: new Date(timestamp),
+            isRead: true,
+            isPageReply: true,
+          },
+        })
+
+        // Created successfully — delete any leftover fake-ID entry
+        await this.prisma.comment
+          .deleteMany({
+            where: {
+              postId: videoId,
+              parentId: parentCommentId,
+              isPageReply: true,
+              id: { startsWith: 'tiktok_' },
+            },
+          })
+          .then((r) => {
+            if (r.count > 0) this.logger.log(`[TikTok Webhook] Cleaned ${r.count} fake entries`)
+          })
+      } catch (e) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+          // Already exists with real ID — nothing to do
+          this.logger.log(`[TikTok Webhook] Own comment ${commentId} already exists, skipping`)
+        } else {
+          throw e
+        }
+      }
+      return
+    }
+
+    // External comment — upsert and run AI moderation
+    await this.prisma.comment.upsert({
+      where: { id: commentId },
+      create: {
+        id: commentId,
+        postId: videoId,
+        parentId: parentCommentId,
+        message: commentText,
+        fromId,
+        fromName,
+        fromAvatar,
+        createdTime: new Date(timestamp),
+        isRead: false,
+        isPageReply: false,
+      },
+      update: {
+        message: commentText,
+        fromName,
+        fromAvatar,
+      },
+    })
+
+    this.logger.log(`[TikTok Webhook] Comment ${commentId} on video ${videoId} from ${fromName}`)
+
+    // Emit real-time event
+    this.eventsGateway.emitToOrg(orgId, 'comment:new', {
+      commentId,
+      postId: videoId,
+      socialAccountId: socialAccount.id,
+      provider: 'TIKTOK',
+    })
+
+    await this.analyzeAndAct(socialAccount.id, commentId, 'TIKTOK', orgId, {
+      id: commentId,
+      message: commentText,
+      fromName,
+      fromId,
+    })
+  }
+
+  private async getTikTokAccessToken(account: {
+    id: string
+    accessToken: string
+    refreshToken: string | null
+    tokenExpiresAt: Date | null
+  }): Promise<string> {
+    // Check if token is still valid
+    if (account.tokenExpiresAt && account.tokenExpiresAt > new Date()) {
+      return this.encryptionService.decrypt(account.accessToken)
+    }
+
+    if (!account.refreshToken) {
+      return this.encryptionService.decrypt(account.accessToken)
+    }
+
+    const clientKey = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
+    const clientSecret = this.configService.getOrThrow<string>('TIKTOK_CLIENT_SECRET')
+    const refreshToken = await this.encryptionService.decrypt(account.refreshToken)
+
+    const response = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_key: clientKey,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    })
+
+    if (!response.ok) {
+      this.logger.error(`[TikTok Webhook] Token refresh failed: ${await response.text()}`)
+      return this.encryptionService.decrypt(account.accessToken)
+    }
+
+    const data = (await response.json()) as {
+      access_token: string
+      refresh_token?: string
+      expires_in: number
+    }
+
+    const encryptedToken = await this.encryptionService.encrypt(data.access_token)
+    const encryptedRefresh = data.refresh_token
+      ? await this.encryptionService.encrypt(data.refresh_token)
+      : account.refreshToken
+
+    await this.prisma.socialAccount.update({
+      where: { id: account.id },
+      data: {
+        accessToken: encryptedToken,
+        refreshToken: encryptedRefresh,
+        tokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
+      },
+    })
+
+    return data.access_token
+  }
+
+  private async fetchTikTokComment(
+    accessToken: string,
+    openId: string,
+    videoId: string,
+    commentId: string,
+  ): Promise<{
+    text: string
+    owner: boolean
+    user?: { open_id: string; display_name: string; avatar_url?: string }
+  } | null> {
+    try {
+      const params = new URLSearchParams({
+        business_id: openId,
+        video_id: videoId,
+      })
+      params.append('comment_ids', JSON.stringify([commentId]))
+      const url = `https://business-api.tiktok.com/open_api/v1.3/business/comment/list/?${params}`
+
+      this.logger.log(`[TikTok Webhook] Fetching comments: ${url}`)
+
+      const response = await fetch(url, {
+        headers: { 'Access-Token': accessToken },
+      })
+
+      const body = (await response.json()) as {
+        code: number
+        message: string
+        data?: {
+          comments?: Array<{
+            comment_id: string
+            text: string
+            owner?: boolean
+            user_id?: string
+            username?: string
+            display_name?: string
+            profile_image?: string
+            create_time?: number
+          }>
+        }
+      }
+
+      if (body.code !== 0) {
+        this.logger.error(`[TikTok Webhook] Fetch comments failed: ${body.code} — ${body.message}`)
+        return null
+      }
+
+      const found = body.data?.comments?.[0]
+      if (!found) {
+        this.logger.warn(`[TikTok Webhook] Comment ${commentId} not found in video ${videoId}`)
+        return null
+      }
+
+      this.logger.log(`[TikTok Webhook] Fetched comment: ${JSON.stringify(found)}`)
+
+      return {
+        text: found.text,
+        owner: found.owner === true,
+        user: {
+          open_id: found.user_id || 'unknown',
+          display_name: found.display_name || found.username || 'Utilisateur TikTok',
+          avatar_url: found.profile_image,
+        },
+      }
+    } catch (error) {
+      this.logger.error(`[TikTok Webhook] Error fetching comment: ${error}`)
+      return null
+    }
+  }
+
+  private async fetchTikTokVideo(
+    accessToken: string,
+    _openId: string,
+    videoId: string,
+  ): Promise<{
+    title?: string
+    cover_image_url?: string
+    share_url?: string
+  } | null> {
+    try {
+      const url =
+        'https://open.tiktokapis.com/v2/video/query/?fields=id,title,cover_image_url,share_url,video_description'
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filters: { video_ids: [videoId] },
+        }),
+      })
+
+      if (!response.ok) {
+        this.logger.error(`[TikTok Webhook] Fetch video failed: ${await response.text()}`)
+        return null
+      }
+
+      const body = (await response.json()) as {
+        data: {
+          videos: Array<{
+            id: string
+            title?: string
+            video_description?: string
+            cover_image_url?: string
+            share_url?: string
+          }>
+        }
+        error: { code: string; message: string }
+      }
+
+      if (body.error?.code !== 'ok') {
+        this.logger.error(
+          `[TikTok Webhook] Fetch video error: ${body.error?.code} — ${body.error?.message}`,
+        )
+        return null
+      }
+
+      const found = body.data?.videos?.[0]
+      if (!found) {
+        this.logger.warn(`[TikTok Webhook] Video ${videoId} not found`)
+        return null
+      }
+
+      this.logger.log(`[TikTok Webhook] Fetched video: ${JSON.stringify(found)}`)
+      return {
+        title: found.title || found.video_description,
+        cover_image_url: found.cover_image_url,
+        share_url: found.share_url,
+      }
+    } catch (error) {
+      this.logger.error(`[TikTok Webhook] Error fetching video: ${error}`)
+      return null
+    }
+  }
+
   // ─── AI analysis + auto-action ───
 
   private async analyzeAndAct(
     socialAccountId: string,
     commentId: string,
-    provider: 'FACEBOOK' | 'INSTAGRAM',
+    provider: 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK',
     orgId: string,
     comment: { id: string; message: string; fromName: string; fromId: string },
   ) {
@@ -996,13 +1399,18 @@ export class WebhookService {
 
   private async executeAIAction(
     commentId: string,
-    provider: 'FACEBOOK' | 'INSTAGRAM',
+    provider: 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK',
     result: AIAnalysisResult,
     accessToken: string,
     orgId: string,
     socialAccountId: string,
     comment: { fromName: string; fromId: string },
   ) {
+    if (provider === 'TIKTOK') {
+      await this.executeTikTokAIAction(commentId, result, accessToken, orgId, socialAccountId)
+      return
+    }
+
     const baseUrl =
       provider === 'INSTAGRAM'
         ? `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}`
@@ -1123,6 +1531,127 @@ export class WebhookService {
         })
       } else {
         this.logger.error(`[AI] Failed to reply to comment: ${await response.text()}`)
+      }
+    }
+  }
+
+  private async executeTikTokAIAction(
+    commentId: string,
+    result: AIAnalysisResult,
+    accessToken: string,
+    orgId: string,
+    socialAccountId: string,
+  ) {
+    const provider = 'TIKTOK' as const
+
+    // TikTok: hide is not supported via API, mark locally only
+    if (result.action === 'hide') {
+      await this.prisma.comment.update({
+        where: { id: commentId },
+        data: { status: 'HIDDEN', action: 'HIDE', actionReason: result.reason, isRead: true },
+      })
+      this.logger.log(`[AI] Marked TikTok comment ${commentId} as hidden (local only)`)
+      this.eventsGateway.emitToOrg(orgId, 'comment:updated', {
+        commentId,
+        socialAccountId,
+        provider,
+        action: 'hide',
+      })
+    }
+
+    // TikTok: delete is not supported for comments via API, mark locally only
+    if (result.action === 'delete') {
+      await this.prisma.comment.update({
+        where: { id: commentId },
+        data: { status: 'DELETED', action: 'DELETE', actionReason: result.reason, isRead: true },
+      })
+      this.logger.log(`[AI] Marked TikTok comment ${commentId} as deleted (local only)`)
+      this.eventsGateway.emitToOrg(orgId, 'comment:updated', {
+        commentId,
+        socialAccountId,
+        provider,
+        action: 'delete',
+      })
+    }
+
+    if (result.action === 'reply' && result.replyMessage) {
+      const replyComment = await this.prisma.comment.findUnique({
+        where: { id: commentId },
+        select: { postId: true },
+      })
+      if (!replyComment) return
+
+      // Get the open_id (business_id) for the Business API
+      const account = await this.prisma.socialAccount.findUniqueOrThrow({
+        where: { id: socialAccountId },
+        select: { providerAccountId: true },
+      })
+
+      const response = await fetch(
+        'https://business-api.tiktok.com/open_api/v1.3/business/comment/reply/create/',
+        {
+          method: 'POST',
+          headers: {
+            'Access-Token': accessToken,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            business_id: account.providerAccountId,
+            video_id: replyComment.postId,
+            comment_id: commentId,
+            text: result.replyMessage,
+          }),
+        },
+      )
+
+      const replyText = await response.text()
+      this.logger.log(`[AI] TikTok reply response: ${replyText}`)
+
+      // Extract comment_id from raw text to avoid BigInt precision loss
+      const replyIdMatch = replyText.match(/"comment_id"\s*:\s*"?(\d+)"?/)
+      const replyBody = JSON.parse(replyText) as {
+        code: number
+        message: string
+      }
+
+      if (replyBody.code === 0) {
+        const replyId = replyIdMatch?.[1] || `tiktok_ai_reply_${Date.now()}_${commentId}`
+
+        await this.prisma.comment.upsert({
+          where: { id: replyId },
+          create: {
+            id: replyId,
+            postId: replyComment.postId,
+            parentId: commentId,
+            message: result.replyMessage,
+            fromId: 'ai',
+            fromName: 'Page (IA)',
+            createdTime: new Date(),
+            isRead: true,
+            isPageReply: true,
+            action: 'REPLY',
+            actionReason: result.reason,
+            replyMessage: result.replyMessage,
+          },
+          update: {},
+        })
+
+        await this.prisma.comment.update({
+          where: { id: commentId },
+          data: { action: 'REPLY', actionReason: result.reason, isRead: true },
+        })
+
+        this.logger.log(`[AI] Replied to TikTok comment ${commentId}`)
+        this.eventsGateway.emitToOrg(orgId, 'comment:updated', {
+          commentId,
+          socialAccountId,
+          provider,
+          action: 'reply',
+        })
+      } else {
+        this.logger.error(
+          `[AI] Failed to reply to TikTok comment: ${replyBody.code} — ${replyBody.message}`,
+        )
       }
     }
   }
@@ -1262,4 +1791,24 @@ interface WhatsAppMessage {
   document?: { id: string; filename?: string; mime_type?: string }
   sticker?: { id: string; mime_type?: string }
   context?: { id?: string; from?: string }
+}
+
+// ─── TikTok webhook payload types ───
+
+interface TikTokWebhookPayload {
+  client_key: string
+  event: string
+  create_time: number
+  user_openid: string
+  content: string | TikTokCommentContent
+}
+
+interface TikTokCommentContent {
+  comment_id: number | string
+  video_id: number | string
+  parent_comment_id: number | string
+  comment_type: string
+  comment_action: string // 'insert' | 'set_to_public' | 'delete' | etc.
+  timestamp: number
+  unique_identifier: string
 }
