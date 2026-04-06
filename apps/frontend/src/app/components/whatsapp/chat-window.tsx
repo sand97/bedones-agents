@@ -378,7 +378,7 @@ function MessageBubble({
               <img
                 src={message.imageUrl}
                 alt=""
-                className="relative z-1 max-h-64 w-full rounded-control object-cover"
+                className="relative z-1 max-h-64 w-full rounded-xl object-cover"
                 onLoad={onMediaLoad}
               />
             </div>

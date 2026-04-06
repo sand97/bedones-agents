@@ -720,7 +720,7 @@ a {
 .chat-reply-context {
   width: 100%;
   border-left: 2px solid rgba(17, 27, 33, 0.3);
-  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-sm);
+  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-sm) var(--radius-sm);
   padding: 6px 10px;
   font-size: 12px;
   text-align: left;
