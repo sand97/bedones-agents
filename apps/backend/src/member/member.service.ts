@@ -1,4 +1,5 @@
 import { Injectable, ForbiddenException, ConflictException } from '@nestjs/common'
+import { I18nContext } from 'nestjs-i18n'
 import { PrismaService } from '../prisma/prisma.service'
 import type { InviteMemberDto } from './dto/member.dto'
 
@@ -58,7 +59,10 @@ export class MemberService {
     })
 
     if (existing) {
-      throw new ConflictException('Ce numéro est déjà associé à un membre de cette organisation')
+      throw new ConflictException(
+        I18nContext.current()?.t('errors.member.phone_already_exists') ??
+          'Ce numéro est déjà associé à un membre de cette organisation',
+      )
     }
 
     return this.prisma.organisationMember.create({
@@ -91,7 +95,10 @@ export class MemberService {
     })
 
     if (member.role === 'OWNER') {
-      throw new ForbiddenException("Impossible de supprimer le propriétaire de l'organisation")
+      throw new ForbiddenException(
+        I18nContext.current()?.t('errors.member.cannot_delete_owner') ??
+          "Impossible de supprimer le propriétaire de l'organisation",
+      )
     }
 
     return this.prisma.organisationMember.delete({
@@ -110,7 +117,10 @@ export class MemberService {
     })
 
     if (!membership) {
-      throw new ForbiddenException("Vous n'êtes pas membre de cette organisation")
+      throw new ForbiddenException(
+        I18nContext.current()?.t('errors.member.not_member') ??
+          "Vous n'êtes pas membre de cette organisation",
+      )
     }
 
     return membership
@@ -120,7 +130,10 @@ export class MemberService {
     const membership = await this.assertMembership(userId, orgId)
 
     if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
-      throw new ForbiddenException("Vous n'avez pas les droits pour cette action")
+      throw new ForbiddenException(
+        I18nContext.current()?.t('errors.member.insufficient_permissions') ??
+          "Vous n'avez pas les droits pour cette action",
+      )
     }
 
     return membership

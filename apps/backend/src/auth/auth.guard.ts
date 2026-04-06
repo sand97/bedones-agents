@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
+import { I18nContext } from 'nestjs-i18n'
 import { PrismaService } from '../prisma/prisma.service'
 
 @Injectable()
@@ -13,8 +14,10 @@ export class AuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest()
     const token = request.cookies?.session
 
+    const i18n = I18nContext.current()
+
     if (!token) {
-      throw new UnauthorizedException('Session manquante')
+      throw new UnauthorizedException(i18n?.t('errors.auth.session_missing') ?? 'Session manquante')
     }
 
     try {
@@ -31,14 +34,14 @@ export class AuthGuard implements CanActivate {
         if (session) {
           await this.prisma.session.delete({ where: { id: session.id } })
         }
-        throw new UnauthorizedException('Session expirée')
+        throw new UnauthorizedException(i18n?.t('errors.auth.session_expired') ?? 'Session expirée')
       }
 
       request.user = session.user
       return true
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error
-      throw new UnauthorizedException('Session invalide')
+      throw new UnauthorizedException(i18n?.t('errors.auth.session_invalid') ?? 'Session invalide')
     }
   }
 }

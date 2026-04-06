@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { Table, Input } from 'antd'
 import { Search, ChevronDown } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
@@ -8,7 +9,7 @@ import { TablePagination } from '@app/components/shared/table-pagination'
 import { FilterPopover } from '@app/components/shared/filter-popover'
 import { useLayout } from '@app/contexts/layout-context'
 import { ArticleDescriptionCard } from '@app/components/catalog/article-description-card'
-import { catalogColumns } from '@app/components/catalog/catalog-columns'
+import { useCatalogColumns } from '@app/components/catalog/catalog-columns'
 import {
   MOCK_CATALOG_ARTICLES,
   CATALOG_STATUS_CONFIG,
@@ -30,7 +31,9 @@ const STATUS_FILTER_OPTIONS = ALL_STATUSES.map((status) => ({
 }))
 
 function CatalogPage() {
+  const { t } = useTranslation()
   const { isDesktop } = useLayout()
+  const catalogColumns = useCatalogColumns()
   const [connected, setConnected] = useState(true)
   const [searchText, setSearchText] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<CatalogArticleStatus[]>([])
@@ -97,12 +100,14 @@ function CatalogPage() {
     selectedStatuses.length > 0 ? `Status (${selectedStatuses.length})` : 'Status'
 
   const categoryButtonLabel =
-    selectedCategories.length > 0 ? `Catégorie (${selectedCategories.length})` : 'Catégorie'
+    selectedCategories.length > 0
+      ? t('catalog.category_with_count', { count: selectedCategories.length })
+      : t('catalog.category')
 
   if (!connected) {
     return (
       <div className="flex min-h-screen flex-col">
-        <DashboardHeader title="Catalogue" />
+        <DashboardHeader title={t('catalog.title')} />
         <CatalogEmpty onConnect={() => setConnected(true)} />
       </div>
     )
@@ -110,12 +115,12 @@ function CatalogPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <DashboardHeader title="Catalogue" />
+      <DashboardHeader title={t('catalog.title')} />
 
       <div className="flex-1 p-4 pb-16 lg:p-6 lg:pb-16">
         <div className="tickets-filters">
           <Input
-            placeholder="Rechercher un article..."
+            placeholder={t('catalog.search_placeholder')}
             prefix={<Search size={16} className="text-text-muted" />}
             value={searchText}
             onChange={(e) => {
@@ -126,7 +131,7 @@ function CatalogPage() {
             className="tickets-filter-input"
           />
           <FilterPopover
-            title="Filtrer par status"
+            title={t('catalog.filter_status')}
             options={STATUS_FILTER_OPTIONS}
             selected={selectedStatuses}
             onToggle={toggleStatus}
@@ -137,7 +142,7 @@ function CatalogPage() {
             </button>
           </FilterPopover>
           <FilterPopover
-            title="Filtrer par catégorie"
+            title={t('catalog.filter_category')}
             options={categoryFilterOptions}
             selected={selectedCategories}
             onToggle={toggleCategory}
@@ -163,7 +168,7 @@ function CatalogPage() {
           <div className="flex flex-col gap-3">
             {paginatedArticles.length === 0 ? (
               <div className="flex items-center justify-center py-12 text-sm text-text-muted">
-                Aucun article trouvé
+                {t('catalog.no_articles')}
               </div>
             ) : (
               paginatedArticles.map((article) => (

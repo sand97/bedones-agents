@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { Typography, Collapse, Form, Input, Select, Button, Modal, message } from 'antd'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
+import { useLocale } from '@app/contexts/locale-context'
 import {
   FileText,
   Shield,
@@ -23,95 +25,88 @@ export const Route = createFileRoute('/app/$orgSlug/legal')({
   component: HelpPage,
 })
 
-/* ───────── FAQ ───────── */
-const faqItems = [
-  {
-    key: '1',
-    label: 'Comment connecter mon compte WhatsApp Business ?',
-    children:
-      'Rendez-vous dans la section Messageries > WhatsApp, puis cliquez sur "Connecter". Vous serez guidé à travers le processus de vérification Meta Business et la connexion de votre numéro WhatsApp Business.',
-  },
-  {
-    key: '2',
-    label: "Comment fonctionne l'agent IA ?",
-    children:
-      "L'agent IA analyse automatiquement les messages entrants et propose des réponses pertinentes basées sur votre catalogue produit, votre historique de conversations et les règles que vous avez configurées. Vous pouvez l'activer ou le désactiver à tout moment.",
-  },
-  {
-    key: '3',
-    label: 'Puis-je gérer plusieurs comptes sociaux ?',
-    children:
-      'Oui, Bedones vous permet de connecter et gérer simultanément vos comptes WhatsApp, Instagram, Facebook et TikTok depuis une seule interface. Chaque plateforme dispose de sa propre section de messagerie et de commentaires.',
-  },
-  {
-    key: '4',
-    label: 'Comment ajouter des membres à mon équipe ?',
-    children:
-      'Depuis la page Membres, cliquez sur "Ajouter" pour inviter un collaborateur par email. Vous pouvez attribuer différents rôles (Propriétaire, Administrateur, Membre) avec des niveaux d\'accès distincts.',
-  },
-  {
-    key: '5',
-    label: 'Comment modifier ou annuler mon abonnement ?',
-    children:
-      "Rendez-vous dans la section Souscription pour voir votre plan actuel, changer de formule ou gérer vos moyens de paiement. L'annulation prend effet à la fin de la période de facturation en cours.",
-  },
-  {
-    key: '6',
-    label: 'Mes données sont-elles sécurisées ?',
-    children:
-      'Absolument. Toutes les données sont chiffrées en transit et au repos. Nous sommes conformes au RGPD et ne partageons jamais vos données avec des tiers sans votre consentement. Consultez notre politique de confidentialité pour plus de détails.',
-  },
-]
-
-/* ───────── Legal cards ───────── */
-const legalCards = [
-  {
-    icon: <FileText size={24} strokeWidth={1} />,
-    title: 'Mentions légales',
-    description:
-      'Informations sur l\u2019éditeur, l\u2019hébergement et la propriété intellectuelle de la plateforme Bedones.',
-    href: '/legal/mentions',
-  },
-  {
-    icon: <Shield size={24} strokeWidth={1} />,
-    title: 'Politique de confidentialité',
-    description:
-      'Comment nous collectons, utilisons et protégeons vos données personnelles et celles de vos clients.',
-    href: '/legal/privacy',
-  },
-  {
-    icon: <ShoppingCart size={24} strokeWidth={1} />,
-    title: 'Conditions générales de vente',
-    description:
-      'Modalités d\u2019abonnement, tarification, engagements et responsabilités liés à l\u2019utilisation du service.',
-    href: '/legal/conditions',
-  },
-]
-
-/* ───────── Support form options ───────── */
-const motifOptions = [
-  { value: 'bug', label: 'Signaler un bug' },
-  { value: 'feature', label: 'Suggestion de fonctionnalité' },
-  { value: 'billing', label: 'Facturation / Paiement' },
-  { value: 'account', label: 'Mon compte' },
-  { value: 'integration', label: 'Intégration / Connexion' },
-  { value: 'other', label: 'Autre' },
-]
-
-const platformOptions = [
-  { value: 'whatsapp', label: 'WhatsApp' },
-  { value: 'instagram', label: 'Instagram' },
-  { value: 'facebook', label: 'Facebook' },
-  { value: 'tiktok', label: 'TikTok' },
-  { value: 'messenger', label: 'Messenger' },
-  { value: 'general', label: 'Général / Toutes' },
-]
-
 /* ───────── Page ───────── */
 function HelpPage() {
+  const { t } = useTranslation()
+  const { locale } = useLocale()
   const [form] = Form.useForm()
   const [contactOpen, setContactOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  /* ───────── FAQ ───────── */
+  const faqItems = [
+    {
+      key: '1',
+      label: t('help.faq_1_q'),
+      children: t('help.faq_1_a'),
+    },
+    {
+      key: '2',
+      label: t('help.faq_2_q'),
+      children: t('help.faq_2_a'),
+    },
+    {
+      key: '3',
+      label: t('help.faq_3_q'),
+      children: t('help.faq_3_a'),
+    },
+    {
+      key: '4',
+      label: t('help.faq_4_q'),
+      children: t('help.faq_4_a'),
+    },
+    {
+      key: '5',
+      label: t('help.faq_5_q'),
+      children: t('help.faq_5_a'),
+    },
+    {
+      key: '6',
+      label: t('help.faq_6_q'),
+      children: t('help.faq_6_a'),
+    },
+  ]
+
+  /* ───────── Legal cards ───────── */
+  const legalCards = [
+    {
+      icon: <FileText size={24} strokeWidth={1} />,
+      title: t('help.legal_mentions_title'),
+      description: t('help.legal_mentions_desc'),
+      href: `/legal/${locale}/mentions`,
+    },
+    {
+      icon: <Shield size={24} strokeWidth={1} />,
+      title: t('help.legal_privacy_title'),
+      description: t('help.legal_privacy_desc'),
+      href: `/legal/${locale}/privacy`,
+    },
+    {
+      icon: <ShoppingCart size={24} strokeWidth={1} />,
+      title: t('help.legal_conditions_title'),
+      description: t('help.legal_conditions_desc'),
+      href: `/legal/${locale}/conditions`,
+    },
+  ]
+
+  /* ───────── Support form options ───────── */
+  const motifOptions = [
+    { value: 'bug', label: t('help.motif_bug') },
+    { value: 'feature', label: t('help.motif_feature') },
+    { value: 'billing', label: t('help.motif_billing') },
+    { value: 'account', label: t('help.motif_account') },
+    { value: 'integration', label: t('help.motif_integration') },
+    { value: 'other', label: t('help.motif_other') },
+  ]
+
+  const platformOptions = [
+    { value: 'whatsapp', label: 'WhatsApp' },
+    { value: 'instagram', label: 'Instagram' },
+    { value: 'facebook', label: 'Facebook' },
+    { value: 'tiktok', label: 'TikTok' },
+    { value: 'messenger', label: 'Messenger' },
+    { value: 'general', label: t('help.platform_general') },
+  ]
 
   const handleSubmit = async (values: Record<string, string>) => {
     setSubmitting(true)
@@ -120,13 +115,13 @@ function HelpPage() {
     setSubmitting(false)
     form.resetFields()
     setContactOpen(false)
-    message.success('Votre message a bien été envoyé. Nous reviendrons vers vous rapidement.')
+    message.success(t('help.success_message'))
     console.log('Support form submitted:', values)
   }
 
   return (
     <div>
-      <DashboardHeader title="Aides et ressources" />
+      <DashboardHeader title={t('help.page_title')} />
 
       <div className="p-4 pb-16 lg:p-6 lg:pb-16">
         {/* ── FAQ ── */}
@@ -137,10 +132,10 @@ function HelpPage() {
             </div>
             <div>
               <Title level={5} style={{ margin: 0 }}>
-                Questions fréquentes
+                {t('help.faq_section_title')}
               </Title>
               <Text type="secondary" className="text-xs">
-                Trouvez rapidement des réponses à vos questions
+                {t('help.faq_section_subtitle')}
               </Text>
             </div>
           </div>
@@ -171,19 +166,17 @@ function HelpPage() {
               <Headphones size={24} strokeWidth={1} className="text-text-secondary" />
             </div>
             <Title level={5} style={{ margin: '12px 0 4px' }}>
-              Vous souhaitez discuter avec nous ?
+              {t('help.support_title')}
             </Title>
             <Text type="secondary" className="mb-5 block text-sm leading-relaxed">
-              Si vous n&apos;avez pas trouvé la réponse à votre question dans notre FAQ, notre
-              équipe est là pour vous aider. Envoyez-nous un message et nous vous répondrons dans
-              les plus brefs délais.
+              {t('help.support_desc')}
             </Text>
             <Button
               type="primary"
               icon={<MessageSquare size={14} strokeWidth={1.5} />}
               onClick={() => setContactOpen(true)}
             >
-              Nous contacter
+              {t('help.support_btn')}
             </Button>
           </div>
         </section>
@@ -192,44 +185,41 @@ function HelpPage() {
         <Modal
           open={contactOpen}
           onCancel={() => setContactOpen(false)}
-          title="Contacter le support"
+          title={t('help.contact_modal_title')}
           footer={null}
           destroyOnClose
         >
           <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
             <Form.Item
               name="contact"
-              label="Email ou numéro de téléphone"
-              rules={[{ required: true, message: 'Ce champ est requis' }]}
+              label={t('help.form_contact_label')}
+              rules={[{ required: true, message: t('help.form_required') }]}
             >
-              <Input placeholder="votre@email.com ou +225 07 00 00 00" />
+              <Input placeholder={t('help.form_contact_placeholder')} />
             </Form.Item>
 
             <Form.Item
               name="motif"
-              label="Motif"
-              rules={[{ required: true, message: 'Veuillez sélectionner un motif' }]}
+              label={t('help.form_motif_label')}
+              rules={[{ required: true, message: t('help.form_motif_required') }]}
             >
-              <Select placeholder="Sélectionner un motif" options={motifOptions} />
+              <Select placeholder={t('help.form_motif_placeholder')} options={motifOptions} />
             </Form.Item>
 
             <Form.Item
               name="platform"
-              label="Plateforme concernée"
-              rules={[{ required: true, message: 'Veuillez sélectionner une plateforme' }]}
+              label={t('help.form_platform_label')}
+              rules={[{ required: true, message: t('help.form_platform_required') }]}
             >
-              <Select placeholder="Sélectionner une plateforme" options={platformOptions} />
+              <Select placeholder={t('help.form_platform_placeholder')} options={platformOptions} />
             </Form.Item>
 
             <Form.Item
               name="description"
-              label="Description"
-              rules={[{ required: true, message: 'Veuillez décrire votre problème' }]}
+              label={t('help.form_description_label')}
+              rules={[{ required: true, message: t('help.form_description_required') }]}
             >
-              <TextArea
-                rows={4}
-                placeholder="Décrivez votre problème ou votre demande en détail..."
-              />
+              <TextArea rows={4} placeholder={t('help.form_description_placeholder')} />
             </Form.Item>
 
             <div className="flex justify-end">
@@ -239,7 +229,7 @@ function HelpPage() {
                 loading={submitting}
                 icon={<Send size={14} strokeWidth={1.5} />}
               >
-                Envoyer
+                {t('help.form_submit')}
               </Button>
             </div>
           </Form>
@@ -252,11 +242,10 @@ function HelpPage() {
               <BookOpen size={24} strokeWidth={1} className="text-text-secondary" />
             </div>
             <Title level={5} style={{ margin: '12px 0 4px' }}>
-              Conseils pour votre business
+              {t('help.blog_title')}
             </Title>
             <Text type="secondary" className="mb-5 block text-sm leading-relaxed">
-              Découvrez nos articles pratiques sur l&apos;automatisation, la gestion des commandes
-              et les meilleures stratégies pour développer votre activité en ligne en Afrique.
+              {t('help.blog_desc')}
             </Text>
             <Button
               type="primary"
@@ -264,7 +253,7 @@ function HelpPage() {
               href="/blog"
               target="_blank"
             >
-              Lire le blog
+              {t('help.blog_btn')}
             </Button>
           </div>
         </section>
@@ -277,10 +266,10 @@ function HelpPage() {
             </div>
             <div>
               <Title level={5} style={{ margin: 0 }}>
-                Informations légales
+                {t('help.legal_section_title')}
               </Title>
               <Text type="secondary" className="text-xs">
-                Consultez les documents juridiques relatifs à l&apos;utilisation de Bedones
+                {t('help.legal_section_subtitle')}
               </Text>
             </div>
           </div>

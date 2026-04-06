@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common'
+import { I18nContext } from 'nestjs-i18n'
 import * as ffmpeg from 'fluent-ffmpeg'
 import * as ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
 import * as ffprobeInstaller from '@ffprobe-installer/ffprobe'
@@ -47,7 +48,10 @@ export class MediaConverterService {
       const duration = await this.getDuration(inputPath)
       if (duration > MAX_DURATION_SECONDS) {
         throw new BadRequestException(
-          `La durée du fichier audio dépasse la limite de ${MAX_DURATION_SECONDS / 60} minutes`,
+          I18nContext.current()?.t('errors.upload.audio_too_long', {
+            args: { minutes: MAX_DURATION_SECONDS / 60 },
+          }) ??
+            `La durée du fichier audio dépasse la limite de ${MAX_DURATION_SECONDS / 60} minutes`,
         )
       }
 
@@ -164,7 +168,9 @@ export class MediaConverterService {
       const duration = await this.getDuration(inputPath)
       if (duration > MAX_DURATION_SECONDS) {
         throw new BadRequestException(
-          `La durée de la vidéo dépasse la limite de ${MAX_DURATION_SECONDS / 60} minutes`,
+          I18nContext.current()?.t('errors.upload.video_too_long', {
+            args: { minutes: MAX_DURATION_SECONDS / 60 },
+          }) ?? `La durée de la vidéo dépasse la limite de ${MAX_DURATION_SECONDS / 60} minutes`,
         )
       }
 
@@ -257,7 +263,12 @@ export class MediaConverterService {
         .on('end', () => resolve())
         .on('error', (err) => {
           this.logger.error(`[MediaConverter] FFmpeg error: ${err.message}`)
-          reject(new BadRequestException('Erreur lors de la conversion du fichier média'))
+          reject(
+            new BadRequestException(
+              I18nContext.current()?.t('errors.upload.conversion_error') ??
+                'Erreur lors de la conversion du fichier média',
+            ),
+          )
         })
         .run()
     })

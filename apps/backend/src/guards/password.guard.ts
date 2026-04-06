@@ -5,6 +5,7 @@ import {
   Injectable,
   mixin,
 } from '@nestjs/common'
+import { I18nContext } from 'nestjs-i18n'
 
 export default function PasswordGuard(passwordEnvKey = 'MIGRATION_TOKEN') {
   @Injectable()
@@ -15,7 +16,8 @@ export default function PasswordGuard(passwordEnvKey = 'MIGRATION_TOKEN') {
       if (password && password === process.env[passwordEnvKey]) {
         return true
       }
-      throw new ForbiddenException('Invalid token')
+      const i18n = I18nContext.current()
+      throw new ForbiddenException(i18n?.t('errors.auth.invalid_token') ?? 'Invalid token')
     }
   }
   return mixin(PasswordGuardClass)

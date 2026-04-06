@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Button, Popover, Checkbox } from 'antd'
 import { MessageCircle } from 'lucide-react'
@@ -20,28 +21,34 @@ type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger'
 
 const PROVIDER_EMPTY_STATE: Record<
   ChatProvider,
-  { icon: ReactNode; color: string; noConvTitle: string; selectTitle: string; selectDesc: string }
+  {
+    icon: ReactNode
+    color: string
+    noConvTitleKey: string
+    selectTitleKey: string
+    selectDescKey: string
+  }
 > = {
   whatsapp: {
     icon: <WhatsAppIcon width={40} height={40} />,
     color: 'var(--color-brand-whatsapp)',
-    noConvTitle: 'Aucune conversation',
-    selectTitle: 'Sélectionnez une conversation',
-    selectDesc: 'Choisissez un contact dans la liste pour voir ses messages WhatsApp',
+    noConvTitleKey: 'chat.no_conversations',
+    selectTitleKey: 'chat.select_conversation',
+    selectDescKey: 'chat.whatsapp_select_desc',
   },
   'instagram-dm': {
     icon: <InstagramIcon width={40} height={40} />,
     color: 'var(--color-brand-instagram)',
-    noConvTitle: 'Aucun message reçu',
-    selectTitle: 'Sélectionnez une conversation',
-    selectDesc: 'Choisissez un contact dans la liste pour voir ses messages Instagram',
+    noConvTitleKey: 'chat.no_messages',
+    selectTitleKey: 'chat.select_conversation',
+    selectDescKey: 'chat.instagram_select_desc',
   },
   messenger: {
     icon: <MessengerIcon width={40} height={40} />,
     color: 'var(--color-brand-messenger)',
-    noConvTitle: 'Aucun message reçu',
-    selectTitle: 'Sélectionnez une conversation',
-    selectDesc: 'Choisissez un contact dans la liste pour voir ses messages Messenger',
+    noConvTitleKey: 'chat.no_messages',
+    selectTitleKey: 'chat.select_conversation',
+    selectDescKey: 'chat.messenger_select_desc',
   },
 }
 
@@ -79,12 +86,15 @@ function LabelsFilterPopover({
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
+  const { t } = useTranslation()
 
   return (
     <Popover
       content={
         <div className="flex w-48 flex-col gap-0.5">
-          <div className="px-3 py-2 text-xs font-semibold text-text-muted">Filtrer par label</div>
+          <div className="px-3 py-2 text-xs font-semibold text-text-muted">
+            {t('chat.filter_by_label')}
+          </div>
           {AVAILABLE_LABELS.map((label) => (
             <Button
               key={label.id}
@@ -129,6 +139,7 @@ export function ChatLayout({
   onRetry,
   onChatClick,
 }: ChatLayoutProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const search = useSearch({ strict: false }) as { conv?: string }
   const providerConfig = PROVIDER_EMPTY_STATE[provider]
@@ -190,7 +201,7 @@ export function ChatLayout({
             onClick={() => setFilter('all')}
             className="comments-filter-btn"
           >
-            Tout
+            {t('comments.all')}
           </Button>
           <Button
             type={filter === 'unread' ? 'primary' : 'default'}
@@ -198,7 +209,7 @@ export function ChatLayout({
             onClick={() => setFilter('unread')}
             className="comments-filter-btn"
           >
-            Non lus
+            {t('comments.unread')}
           </Button>
           <LabelsFilterPopover selectedLabelIds={selectedLabelIds} onToggle={toggleLabel}>
             <Button
@@ -237,15 +248,15 @@ export function ChatLayout({
           <SocialSetup
             icon={<MessageCircle size={40} strokeWidth={1.5} />}
             color={providerConfig.color}
-            title={providerConfig.noConvTitle}
-            description="Les conversations apparaîtront ici dès qu'un message sera reçu"
+            title={t(providerConfig.noConvTitleKey)}
+            description={t('chat.conversations_will_appear')}
           />
         ) : (
           <SocialSetup
             icon={providerConfig.icon}
             color={providerConfig.color}
-            title={providerConfig.selectTitle}
-            description={providerConfig.selectDesc}
+            title={t(providerConfig.selectTitleKey)}
+            description={t(providerConfig.selectDescKey)}
           />
         )}
       </div>

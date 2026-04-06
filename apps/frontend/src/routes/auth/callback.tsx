@@ -1,8 +1,10 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Spin, Typography, Button, Result } from 'antd'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { fetchMe, connectFacebook, connectInstagram, connectTikTok } from '@app/lib/api'
 import { getAuthRedirect, clearAuthRedirect } from '@app/lib/auth-redirect'
+import i18n from '@app/i18n'
 
 const { Text } = Typography
 
@@ -16,10 +18,11 @@ export const Route = createFileRoute('/auth/callback')({
 })
 
 function AuthCallbackPage() {
+  const { t } = useTranslation()
   const { status, error, code } = Route.useSearch()
   const navigate = useNavigate()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [loadingMessage, setLoadingMessage] = useState('Connexion en cours...')
+  const [loadingMessage, setLoadingMessage] = useState(i18n.t('auth.connecting'))
   const handledRef = useRef(false)
 
   useEffect(() => {
@@ -36,7 +39,7 @@ function AuthCallbackPage() {
 
     // ─── OAuth code received — connect pages flow ───
     if (code && redirect?.intent === 'connect_pages' && redirect.orgId) {
-      setLoadingMessage('Nous finalisons la connexion...')
+      setLoadingMessage(i18n.t('auth.finalizing_connection'))
 
       const provider = redirect.provider || 'facebook'
       const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
@@ -65,7 +68,7 @@ function AuthCallbackPage() {
         })
         .catch((err) => {
           clearAuthRedirect()
-          setErrorMessage(err instanceof Error ? err.message : 'Erreur de connexion de la page')
+          setErrorMessage(err instanceof Error ? err.message : i18n.t('auth.page_connect_error'))
         })
       return
     }
@@ -107,14 +110,14 @@ function AuthCallbackPage() {
           }
         })
         .catch(() => {
-          setErrorMessage('Impossible de récupérer vos informations. Veuillez réessayer.')
+          setErrorMessage(i18n.t('auth.fetch_user_error'))
         })
       return
     }
 
     // Fallback — code present but no matching intent
     clearAuthRedirect()
-    setErrorMessage("Code OAuth reçu mais aucune action n'est configurée. Veuillez réessayer.")
+    setErrorMessage(i18n.t('auth.oauth_no_action'))
   }, [status, error, code, navigate])
 
   if (errorMessage) {
@@ -122,11 +125,11 @@ function AuthCallbackPage() {
       <div className="flex min-h-screen items-center justify-center p-4">
         <Result
           status="error"
-          title="Erreur de connexion"
+          title={t('auth.connection_error')}
           subTitle={errorMessage}
           extra={
             <Button type="primary" onClick={() => navigate({ to: '/auth/login' })}>
-              Retour à la connexion
+              {t('auth.back_to_login')}
             </Button>
           }
         />
@@ -145,14 +148,14 @@ function AuthCallbackPage() {
 function getErrorText(error?: string): string {
   switch (error) {
     case 'missing_code':
-      return "Le code d'autorisation est manquant. Veuillez réessayer."
+      return i18n.t('auth.missing_auth_code')
     case 'token_exchange_failed':
-      return "Erreur lors de l'échange du token. Veuillez réessayer."
+      return i18n.t('auth.token_exchange_error')
     case 'user_info_failed':
-      return 'Impossible de récupérer vos informations depuis le réseau social.'
+      return i18n.t('auth.user_info_error')
     case 'no_email':
-      return "Votre compte ne fournit pas d'adresse email. Veuillez en ajouter une et réessayer."
+      return i18n.t('auth.no_email')
     default:
-      return error || 'Une erreur inattendue est survenue. Veuillez réessayer.'
+      return error || i18n.t('auth.unexpected_error')
   }
 }

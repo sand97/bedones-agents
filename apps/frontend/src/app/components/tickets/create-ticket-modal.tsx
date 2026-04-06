@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Modal, Form, Select, AutoComplete, InputNumber, Space } from 'antd'
 import { Input } from 'antd'
 import { Plus, Trash2, ShoppingBag } from 'lucide-react'
@@ -68,6 +69,7 @@ export function CreateTicketModal({
   selectedArticles,
   setSelectedArticles,
 }: CreateTicketModalProps) {
+  const { t } = useTranslation()
   const [form] = Form.useForm()
   const [charges, setCharges] = useState<ChargeLine[]>([
     { id: 'charge-default', reason: 'Frais de transport', amount: 0, isDefault: true },
@@ -165,7 +167,7 @@ export function CreateTicketModal({
 
   return (
     <Modal
-      title="Créer un ticket"
+      title={t('tickets.create')}
       open={open}
       onCancel={handleClose}
       width={640}

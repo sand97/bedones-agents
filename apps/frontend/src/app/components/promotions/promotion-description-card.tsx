@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Button, Descriptions, Tag, Tooltip } from 'antd'
 import { Pencil, Trash2 } from 'lucide-react'
 import { StatusTag } from '@app/components/shared/status-tag'
@@ -19,12 +20,13 @@ export function PromotionDescriptionCard({
   onEdit,
   onDelete,
 }: PromotionDescriptionCardProps) {
+  const { t } = useTranslation()
   const statusConfig = PROMOTION_STATUS_CONFIG[promo.status]
 
   const eligibilityLabel =
     promo.eligibility === 'all'
-      ? 'Tous les produits'
-      : `${promo.eligibleProductIds.length} produit${promo.eligibleProductIds.length > 1 ? 's' : ''}`
+      ? t('promotions.eligibility_all')
+      : t('promotions.product_count', { count: promo.eligibleProductIds.length })
 
   const eligibleNames =
     promo.eligibility === 'specific'
@@ -48,17 +50,17 @@ export function PromotionDescriptionCard({
         size="small"
         className="ticket-list-card-bordered catalog-card__details"
       >
-        <Descriptions.Item label="Status">
+        <Descriptions.Item label={t('promotions.status')}>
           <StatusTag label={statusConfig.label} color={statusConfig.color} />
         </Descriptions.Item>
-        <Descriptions.Item label="Réduction">
+        <Descriptions.Item label={t('promotions.discount')}>
           <span className="font-medium">
             {promo.type === 'percent'
               ? `-${promo.value}%`
               : `-${formatPrice(promo.value, promo.currency)}`}
           </span>
         </Descriptions.Item>
-        <Descriptions.Item label="Produits">
+        <Descriptions.Item label={t('promotions.products')}>
           {eligibleNames ? (
             <Tooltip title={eligibleNames}>
               <span>{eligibilityLabel}</span>
@@ -67,23 +69,23 @@ export function PromotionDescriptionCard({
             <span>{eligibilityLabel}</span>
           )}
         </Descriptions.Item>
-        <Descriptions.Item label="Cumulable">
+        <Descriptions.Item label={t('promotions.stackable')}>
           <Tag bordered={false} color={promo.stackable ? 'green' : 'default'}>
-            {promo.stackable ? 'Oui' : 'Non'}
+            {promo.stackable ? t('promotions.yes') : t('promotions.no')}
           </Tag>
         </Descriptions.Item>
-        <Descriptions.Item label="Période">
+        <Descriptions.Item label={t('promotions.period')}>
           <span className="text-text-secondary">
             {formatDate(promo.startDate)} — {formatDate(promo.endDate)}
           </span>
         </Descriptions.Item>
-        <Descriptions.Item label="Actions">
+        <Descriptions.Item label={t('promotions.actions')}>
           <div className="flex items-center gap-2">
             <Button type="default" size="small" icon={<Pencil size={14} />} onClick={onEdit}>
-              Modifier
+              {t('promotions.edit')}
             </Button>
             <Button size="small" danger icon={<Trash2 size={14} />} onClick={onDelete}>
-              Supprimer
+              {t('promotions.delete')}
             </Button>
           </div>
         </Descriptions.Item>

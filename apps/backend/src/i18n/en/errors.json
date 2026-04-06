@@ -1,0 +1,37 @@
+{
+  "auth": {
+    "invalid_credentials": "Invalid email or password",
+    "session_missing": "Session missing",
+    "session_expired": "Session expired",
+    "session_invalid": "Invalid session",
+    "invalid_token": "Invalid token"
+  },
+  "member": {
+    "phone_already_exists": "This number is already associated with a member of this organization",
+    "cannot_delete_owner": "Cannot delete the organization owner",
+    "not_member": "You are not a member of this organization",
+    "insufficient_permissions": "You do not have permission for this action"
+  },
+  "invitation": {
+    "not_found_or_accepted": "Invitation not found or already accepted",
+    "otp_sent": "OTP sent successfully",
+    "no_pending_otp": "No pending OTP for this number",
+    "otp_expired": "OTP expired, please request a new one",
+    "otp_invalid": "Invalid OTP code",
+    "invalid_token": "Invalid token",
+    "invalid_or_expired_link": "Invalid or expired invitation link",
+    "not_found": "Invitation not found"
+  },
+  "upload": {
+    "unsupported_image_format": "Unsupported format. Use PNG, JPG, SVG, or WEBP.",
+    "no_file": "No file provided",
+    "unsupported_format": "Unsupported file format.",
+    "audio_too_long": "Audio file duration exceeds the {minutes}-minute limit",
+    "video_too_long": "Video duration exceeds the {minutes}-minute limit",
+    "conversion_error": "Error converting media file"
+  },
+  "common": {
+    "not_found": "Resource not found",
+    "internal_error": "Internal server error"
+  }
+}

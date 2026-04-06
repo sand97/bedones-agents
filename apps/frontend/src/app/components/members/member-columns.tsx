@@ -1,20 +1,23 @@
 import type { ColumnsType } from 'antd/es/table'
+import { useTranslation } from 'react-i18next'
 import { StatusTag } from '@app/components/shared/status-tag'
 import { formatDate } from '@app/lib/format'
 import { MemberCell } from './member-cell'
 import { MemberActions } from './member-actions'
 import { MEMBER_ROLE_CONFIG, type Member, type MemberRole } from './mock-data'
 
-export function getMemberColumns(onDelete: (memberId: string) => void): ColumnsType<Member> {
+export function useMemberColumns(onDelete: (memberId: string) => void): ColumnsType<Member> {
+  const { t } = useTranslation()
+
   return [
     {
-      title: 'Membre',
+      title: t('members.member'),
       key: 'member',
       ellipsis: true,
       render: (_: unknown, record: Member) => <MemberCell member={record} />,
     },
     {
-      title: 'Rôle',
+      title: t('members.role'),
       dataIndex: 'role',
       key: 'role',
       width: 140,
@@ -24,7 +27,7 @@ export function getMemberColumns(onDelete: (memberId: string) => void): ColumnsT
       },
     },
     {
-      title: 'Statut',
+      title: t('members.status'),
       dataIndex: 'status',
       key: 'status',
       width: 120,
@@ -32,14 +35,14 @@ export function getMemberColumns(onDelete: (memberId: string) => void): ColumnsT
         const isInvited = status === 'invited'
         return (
           <StatusTag
-            label={isInvited ? 'Invité' : 'Actif'}
+            label={isInvited ? t('members.invited') : t('members.active')}
             color={isInvited ? '#f59e0b' : '#10b981'}
           />
         )
       },
     },
     {
-      title: 'Ajouté le',
+      title: t('members.added_at'),
       dataIndex: 'joinedAt',
       key: 'joinedAt',
       width: 200,

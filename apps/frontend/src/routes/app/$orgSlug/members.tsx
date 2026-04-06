@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { Table, Input, Button, Modal, message } from 'antd'
 import { Search, ChevronDown, UserPlus, Copy, Check } from 'lucide-react'
@@ -10,7 +11,7 @@ import { FilterPopover } from '@app/components/shared/filter-popover'
 import { useLayout } from '@app/contexts/layout-context'
 import { MemberDescriptionCard } from '@app/components/members/member-description-card'
 import { InviteMemberModal } from '@app/components/members/invite-member-modal'
-import { getMemberColumns } from '@app/components/members/member-columns'
+import { useMemberColumns } from '@app/components/members/member-columns'
 import {
   mapApiMember,
   MEMBER_ROLE_CONFIG,
@@ -31,6 +32,7 @@ const ROLE_FILTER_OPTIONS = ALL_ROLES.map((role) => ({
 }))
 
 function MembersPage() {
+  const { t } = useTranslation()
   const { orgSlug } = Route.useParams()
   const { isDesktop } = useLayout()
   const queryClient = useQueryClient()
@@ -97,11 +99,10 @@ function MembersPage() {
         })
         setCopied(false)
       } else {
-        message.success('Invitation créée')
+        message.success(t('members.invitation_created'))
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Erreur lors de la création de l'invitation"
+      const errorMessage = err instanceof Error ? err.message : t('members.create_invitation_error')
       message.error(errorMessage)
     }
   }
@@ -109,7 +110,7 @@ function MembersPage() {
   const handleCopyLink = () => {
     navigator.clipboard.writeText(inviteLinkModal.link)
     setCopied(true)
-    message.success('Lien copié')
+    message.success(t('members.link_copied'))
   }
 
   const handleDelete = async (memberId: string) => {
@@ -117,15 +118,15 @@ function MembersPage() {
       await deleteMutation.mutateAsync({
         params: { path: { orgId: orgSlug, memberId } },
       })
-      message.success('Membre supprimé')
+      message.success(t('members.member_deleted'))
       invalidateMembers()
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la suppression'
+      const errorMessage = err instanceof Error ? err.message : t('social.delete_error')
       message.error(errorMessage)
     }
   }
 
-  const columns = useMemo(() => getMemberColumns(handleDelete), [orgSlug])
+  const columns = useMemberColumns(handleDelete)
 
   const toggleRole = (role: string) => {
     setSelectedRoles((prev) =>
@@ -158,18 +159,21 @@ function MembersPage() {
     return filteredMembers.slice(start, start + pageSize)
   }, [filteredMembers, currentPage, pageSize])
 
-  const roleButtonLabel = selectedRoles.length > 0 ? `Rôle (${selectedRoles.length})` : 'Rôle'
+  const roleButtonLabel =
+    selectedRoles.length > 0
+      ? t('members.role_with_count', { count: selectedRoles.length })
+      : t('members.role')
 
   return (
     <div className="flex min-h-screen flex-col">
       <DashboardHeader
-        title="Membres"
+        title={t('members.title')}
         action={
           <Button
             onClick={() => setInviteOpen(true)}
             icon={<UserPlus size={16} strokeWidth={1.5} />}
           >
-            Ajouter
+            {t('common.add')}
           </Button>
         }
       />
@@ -177,7 +181,7 @@ function MembersPage() {
       <div className="flex-1 p-4 pb-16 lg:p-6 lg:pb-16">
         <div className="tickets-filters">
           <Input
-            placeholder="Rechercher par nom ou téléphone..."
+            placeholder={t('members.search_placeholder')}
             prefix={<Search size={16} className="text-text-muted" />}
             value={searchText}
             onChange={(e) => {
@@ -188,7 +192,7 @@ function MembersPage() {
             className="tickets-filter-input"
           />
           <FilterPopover
-            title="Filtrer par rôle"
+            title={t('members.filter_role')}
             options={ROLE_FILTER_OPTIONS}
             selected={selectedRoles}
             onToggle={toggleRole}
@@ -215,7 +219,7 @@ function MembersPage() {
           <div className="flex flex-col gap-3">
             {paginatedMembers.length === 0 ? (
               <div className="flex items-center justify-center py-12 text-sm text-text-muted">
-                Aucun membre trouvé
+                {t('members.no_members')}
               </div>
             ) : (
               paginatedMembers.map((member) => (
@@ -245,7 +249,7 @@ function MembersPage() {
 
       {/* Invite link modal */}
       <Modal
-        title="Invitation créée"
+        title={t('members.invitation_created')}
         open={inviteLinkModal.open}
         onCancel={() => setInviteLinkModal((prev) => ({ ...prev, open: false }))}
         footer={[
@@ -255,15 +259,14 @@ function MembersPage() {
             icon={copied ? <Check size={16} /> : <Copy size={16} />}
             onClick={handleCopyLink}
           >
-            {copied ? 'Copié' : 'Copier le lien'}
+            {copied ? t('common.copied') : t('members.copy_link')}
           </Button>,
         ]}
         width={520}
       >
         <div className="flex flex-col gap-3 py-2">
           <p className="text-sm text-text-secondary">
-            L&apos;invitation pour <strong>{inviteLinkModal.name}</strong> a été créée. Partagez ce
-            lien pour qu&apos;il puisse rejoindre l&apos;organisation.
+            {t('members.invitation_share_message', { name: inviteLinkModal.name })}
           </p>
           <Input.TextArea
             value={inviteLinkModal.link}

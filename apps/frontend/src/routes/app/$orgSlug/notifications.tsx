@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { Switch, Typography, Modal, Button } from 'antd'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { MessageCircle, Eye } from 'lucide-react'
@@ -38,38 +39,14 @@ interface NotifSetting {
 //   },
 // ]
 
-const whatsappSettings: NotifSetting[] = [
-  {
-    key: 'wa_new_message',
-    title: 'Nouveaux messages',
-    description: 'Recevoir une notification WhatsApp pour chaque nouveau message client',
-  },
-  {
-    key: 'wa_new_comment',
-    title: 'Nouveaux commentaires',
-    description: 'Recevoir une notification WhatsApp pour les commentaires sur vos publications',
-  },
-  {
-    key: 'wa_ticket_assigned',
-    title: 'Tickets assignés',
-    description: 'Être notifié sur WhatsApp lorsqu\u2019un ticket vous est assigné',
-  },
-  {
-    key: 'wa_ticket_urgent',
-    title: 'Tickets urgents',
-    description: 'Recevoir une alerte WhatsApp pour les tickets marqués comme urgents',
-  },
-  {
-    key: 'wa_agent_alert',
-    title: 'Alertes de l\u2019agent IA',
-    description: 'Être notifié lorsque l\u2019agent IA nécessite une intervention manuelle',
-  },
-  {
-    key: 'wa_daily_summary',
-    title: 'Résumé quotidien',
-    description: 'Recevoir un résumé de l\u2019activité du jour chaque soir',
-  },
-]
+const WHATSAPP_SETTING_KEYS = [
+  'wa_new_message',
+  'wa_new_comment',
+  'wa_ticket_assigned',
+  'wa_ticket_urgent',
+  'wa_agent_alert',
+  'wa_daily_summary',
+] as const
 
 /* ─── Email templates ─── */
 
@@ -185,6 +162,14 @@ const emailTemplates: EmailTemplate[] = [
 ]
 
 function NotificationsPage() {
+  const { t } = useTranslation()
+
+  const whatsappSettings: NotifSetting[] = WHATSAPP_SETTING_KEYS.map((key) => ({
+    key,
+    title: t(`notifications.wa.${key}_title`),
+    description: t(`notifications.wa.${key}_desc`),
+  }))
+
   const [values, setValues] = useState<Record<string, boolean>>({
     // Email (marketing) — commenté pour le moment
     // email_new_features: true,
@@ -244,7 +229,7 @@ function NotificationsPage() {
 
   return (
     <div>
-      <DashboardHeader title="Préférences de notification" />
+      <DashboardHeader title={t('notifications.title')} />
 
       <div className="p-4 pb-16 lg:p-6 lg:pb-16">
         {/* ─── Notifications par email ───
@@ -264,8 +249,8 @@ function NotificationsPage() {
 
         {renderSection(
           <MessageCircle size={20} strokeWidth={1} className="text-text-secondary" />,
-          'Notifications WhatsApp',
-          'Choisissez les notifications que vous souhaitez recevoir sur WhatsApp',
+          t('notifications.wa_title'),
+          t('notifications.wa_subtitle'),
           whatsappSettings,
         )}
 
@@ -278,10 +263,10 @@ function NotificationsPage() {
               </div>
               <div>
                 <Title level={5} style={{ margin: 0 }}>
-                  Templates d'emails
+                  {t('notifications.email_templates')}
                 </Title>
                 <Text type="secondary" className="text-xs">
-                  Prévisualisez les emails qui seront envoyés à vos utilisateurs
+                  {t('notifications.email_templates_desc')}
                 </Text>
               </div>
             </div>
@@ -297,7 +282,7 @@ function NotificationsPage() {
                       </span>
                     </div>
                     <Button size="small" onClick={() => setPreviewTemplate(tpl)}>
-                      Prévisualiser
+                      {t('notifications.preview')}
                     </Button>
                   </div>
                   {i < emailTemplates.length - 1 && <div className="notif-divider" />}
@@ -322,7 +307,7 @@ function NotificationsPage() {
             <div className="mt-4">
               <div className="mb-3 flex items-center gap-2">
                 <Text type="secondary" className="text-xs">
-                  Sujet :
+                  {t('notifications.subject')} :
                 </Text>
                 <Text className="text-sm">{previewTemplate.subject}</Text>
               </div>

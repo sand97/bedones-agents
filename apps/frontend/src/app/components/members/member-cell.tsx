@@ -1,13 +1,15 @@
 import { Avatar, Button, message } from 'antd'
+import { useTranslation } from 'react-i18next'
 import { User, Copy } from 'lucide-react'
 import type { Member } from './mock-data'
 
 export function MemberCell({ member }: { member: Member }) {
+  const { t } = useTranslation()
   const copyInviteLink = () => {
     if (!member.inviteToken) return
     const link = `${window.location.origin}/invitation?token=${encodeURIComponent(member.inviteToken)}`
     navigator.clipboard.writeText(link)
-    message.success("Lien d'invitation copié")
+    message.success(t('members.invite_link_copied'))
   }
 
   return (
@@ -31,7 +33,7 @@ export function MemberCell({ member }: { member: Member }) {
               }}
               className="!p-0 !h-auto"
             >
-              Copier l&apos;invitation
+              {t('members.copy_invite')}
             </Button>
           )}
         </div>

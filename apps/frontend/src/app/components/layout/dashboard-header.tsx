@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { PanelLeftOpen, PanelLeftClose } from 'lucide-react'
 import { Button } from 'antd'
+import { useTranslation } from 'react-i18next'
 import { useLayout } from '@app/contexts/layout-context'
 
 interface DashboardHeaderProps {
@@ -13,6 +14,7 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ title, mobileTitle, action, mobileLeft }: DashboardHeaderProps) {
+  const { t } = useTranslation()
   const { isDesktop, collapsed, mobileMenuOpen, toggleCollapsed } = useLayout()
 
   const sidebarOpen = isDesktop ? !collapsed : mobileMenuOpen
@@ -34,7 +36,7 @@ export function DashboardHeader({ title, mobileTitle, action, mobileLeft }: Dash
                 <PanelLeftOpen size={20} strokeWidth={1} />
               )
             }
-            aria-label={sidebarOpen ? 'Réduire la sidebar' : 'Ouvrir la sidebar'}
+            aria-label={sidebarOpen ? t('sidebar.collapse_sidebar') : t('sidebar.expand_sidebar')}
           />
           <h1 className="m-0 flex-1 truncate pr-20 text-base font-medium text-text-primary">
             {!isDesktop && mobileTitle ? mobileTitle : title}

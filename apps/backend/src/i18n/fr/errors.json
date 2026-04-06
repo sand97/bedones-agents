@@ -1,0 +1,37 @@
+{
+  "auth": {
+    "invalid_credentials": "Email ou mot de passe incorrect",
+    "session_missing": "Session manquante",
+    "session_expired": "Session expirée",
+    "session_invalid": "Session invalide",
+    "invalid_token": "Token invalide"
+  },
+  "member": {
+    "phone_already_exists": "Ce numéro est déjà associé à un membre de cette organisation",
+    "cannot_delete_owner": "Impossible de supprimer le propriétaire de l'organisation",
+    "not_member": "Vous n'êtes pas membre de cette organisation",
+    "insufficient_permissions": "Vous n'avez pas les droits pour cette action"
+  },
+  "invitation": {
+    "not_found_or_accepted": "Invitation introuvable ou déjà acceptée",
+    "otp_sent": "OTP envoyé avec succès",
+    "no_pending_otp": "Aucun OTP en attente pour ce numéro",
+    "otp_expired": "OTP expiré, veuillez en demander un nouveau",
+    "otp_invalid": "Code OTP invalide",
+    "invalid_token": "Token invalide",
+    "invalid_or_expired_link": "Lien d'invitation invalide ou expiré",
+    "not_found": "Invitation introuvable"
+  },
+  "upload": {
+    "unsupported_image_format": "Format non supporté. Utilisez PNG, JPG, SVG ou WEBP.",
+    "no_file": "Aucun fichier fourni",
+    "unsupported_format": "Format de fichier non supporté.",
+    "audio_too_long": "La durée du fichier audio dépasse la limite de {minutes} minutes",
+    "video_too_long": "La durée de la vidéo dépasse la limite de {minutes} minutes",
+    "conversion_error": "Erreur lors de la conversion du fichier média"
+  },
+  "common": {
+    "not_found": "Ressource introuvable",
+    "internal_error": "Erreur interne du serveur"
+  }
+}

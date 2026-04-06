@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common'
 import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiTags } from '@nestjs/swagger'
 import { FileInterceptor } from '@nestjs/platform-express'
+import { I18nContext } from 'nestjs-i18n'
 import { UploadService } from './upload.service'
 import { MediaConverterService } from './media-converter.service'
 import { AuthGuard } from '../auth/auth.guard'
@@ -43,7 +44,13 @@ export class UploadController {
       fileFilter: (_req, file, cb) => {
         const allowed = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp']
         if (!allowed.includes(file.mimetype)) {
-          cb(new BadRequestException('Format non supporté. Utilisez PNG, JPG, SVG ou WEBP.'), false)
+          cb(
+            new BadRequestException(
+              I18nContext.current()?.t('errors.upload.unsupported_image_format') ??
+                'Format non supporté. Utilisez PNG, JPG, SVG ou WEBP.',
+            ),
+            false,
+          )
           return
         }
         cb(null, true)
@@ -52,7 +59,9 @@ export class UploadController {
   )
   async uploadLogo(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
-      throw new BadRequestException('Aucun fichier fourni')
+      throw new BadRequestException(
+        I18nContext.current()?.t('errors.upload.no_file') ?? 'Aucun fichier fourni',
+      )
     }
 
     const url = await this.uploadService.uploadFile(file, 'logos')
@@ -100,7 +109,13 @@ export class UploadController {
           'application/x-rar-compressed',
         ]
         if (!allowed.includes(file.mimetype)) {
-          cb(new BadRequestException('Format de fichier non supporté.'), false)
+          cb(
+            new BadRequestException(
+              I18nContext.current()?.t('errors.upload.unsupported_format') ??
+                'Format de fichier non supporté.',
+            ),
+            false,
+          )
           return
         }
         cb(null, true)
@@ -109,7 +124,9 @@ export class UploadController {
   )
   async uploadChatMedia(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
-      throw new BadRequestException('Aucun fichier fourni')
+      throw new BadRequestException(
+        I18nContext.current()?.t('errors.upload.no_file') ?? 'Aucun fichier fourni',
+      )
     }
 
     // Convert audio to M4A (AAC) for Instagram/Messenger compatibility

@@ -21,6 +21,10 @@ import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AppOrgSlugRouteRouteImport } from './routes/app/$orgSlug/route'
+import { Route as LegalFrPrivacyRouteImport } from './routes/legal/fr/privacy'
+import { Route as LegalFrConditionsRouteImport } from './routes/legal/fr/conditions'
+import { Route as LegalEnPrivacyRouteImport } from './routes/legal/en/privacy'
+import { Route as LegalEnConditionsRouteImport } from './routes/legal/en/conditions'
 import { Route as AppOrgSlugWebsiteRouteImport } from './routes/app/$orgSlug/website'
 import { Route as AppOrgSlugTicketsRouteImport } from './routes/app/$orgSlug/tickets'
 import { Route as AppOrgSlugStatsRouteImport } from './routes/app/$orgSlug/stats'
@@ -94,6 +98,26 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
 const AppOrgSlugRouteRoute = AppOrgSlugRouteRouteImport.update({
   id: '/app/$orgSlug',
   path: '/app/$orgSlug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalFrPrivacyRoute = LegalFrPrivacyRouteImport.update({
+  id: '/legal/fr/privacy',
+  path: '/legal/fr/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalFrConditionsRoute = LegalFrConditionsRouteImport.update({
+  id: '/legal/fr/conditions',
+  path: '/legal/fr/conditions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalEnPrivacyRoute = LegalEnPrivacyRouteImport.update({
+  id: '/legal/en/privacy',
+  path: '/legal/en/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalEnConditionsRoute = LegalEnConditionsRouteImport.update({
+  id: '/legal/en/conditions',
+  path: '/legal/en/conditions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppOrgSlugWebsiteRoute = AppOrgSlugWebsiteRouteImport.update({
@@ -192,6 +216,10 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/stats': typeof AppOrgSlugStatsRoute
   '/app/$orgSlug/tickets': typeof AppOrgSlugTicketsRoute
   '/app/$orgSlug/website': typeof AppOrgSlugWebsiteRoute
+  '/legal/en/conditions': typeof LegalEnConditionsRoute
+  '/legal/en/privacy': typeof LegalEnPrivacyRoute
+  '/legal/fr/conditions': typeof LegalFrConditionsRoute
+  '/legal/fr/privacy': typeof LegalFrPrivacyRoute
   '/app/$orgSlug/chats/$id': typeof AppOrgSlugChatsIdRoute
   '/app/$orgSlug/comments/$id': typeof AppOrgSlugCommentsIdRoute
 }
@@ -220,6 +248,10 @@ export interface FileRoutesByTo {
   '/app/$orgSlug/stats': typeof AppOrgSlugStatsRoute
   '/app/$orgSlug/tickets': typeof AppOrgSlugTicketsRoute
   '/app/$orgSlug/website': typeof AppOrgSlugWebsiteRoute
+  '/legal/en/conditions': typeof LegalEnConditionsRoute
+  '/legal/en/privacy': typeof LegalEnPrivacyRoute
+  '/legal/fr/conditions': typeof LegalFrConditionsRoute
+  '/legal/fr/privacy': typeof LegalFrPrivacyRoute
   '/app/$orgSlug/chats/$id': typeof AppOrgSlugChatsIdRoute
   '/app/$orgSlug/comments/$id': typeof AppOrgSlugCommentsIdRoute
 }
@@ -249,6 +281,10 @@ export interface FileRoutesById {
   '/app/$orgSlug/stats': typeof AppOrgSlugStatsRoute
   '/app/$orgSlug/tickets': typeof AppOrgSlugTicketsRoute
   '/app/$orgSlug/website': typeof AppOrgSlugWebsiteRoute
+  '/legal/en/conditions': typeof LegalEnConditionsRoute
+  '/legal/en/privacy': typeof LegalEnPrivacyRoute
+  '/legal/fr/conditions': typeof LegalFrConditionsRoute
+  '/legal/fr/privacy': typeof LegalFrPrivacyRoute
   '/app/$orgSlug/chats/$id': typeof AppOrgSlugChatsIdRoute
   '/app/$orgSlug/comments/$id': typeof AppOrgSlugCommentsIdRoute
 }
@@ -279,6 +315,10 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/stats'
     | '/app/$orgSlug/tickets'
     | '/app/$orgSlug/website'
+    | '/legal/en/conditions'
+    | '/legal/en/privacy'
+    | '/legal/fr/conditions'
+    | '/legal/fr/privacy'
     | '/app/$orgSlug/chats/$id'
     | '/app/$orgSlug/comments/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -307,6 +347,10 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/stats'
     | '/app/$orgSlug/tickets'
     | '/app/$orgSlug/website'
+    | '/legal/en/conditions'
+    | '/legal/en/privacy'
+    | '/legal/fr/conditions'
+    | '/legal/fr/privacy'
     | '/app/$orgSlug/chats/$id'
     | '/app/$orgSlug/comments/$id'
   id:
@@ -335,6 +379,10 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/stats'
     | '/app/$orgSlug/tickets'
     | '/app/$orgSlug/website'
+    | '/legal/en/conditions'
+    | '/legal/en/privacy'
+    | '/legal/fr/conditions'
+    | '/legal/fr/privacy'
     | '/app/$orgSlug/chats/$id'
     | '/app/$orgSlug/comments/$id'
   fileRoutesById: FileRoutesById
@@ -352,6 +400,10 @@ export interface RootRouteChildren {
   LegalMentionsRoute: typeof LegalMentionsRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   BlogIndexRoute: typeof BlogIndexRoute
+  LegalEnConditionsRoute: typeof LegalEnConditionsRoute
+  LegalEnPrivacyRoute: typeof LegalEnPrivacyRoute
+  LegalFrConditionsRoute: typeof LegalFrConditionsRoute
+  LegalFrPrivacyRoute: typeof LegalFrPrivacyRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -438,6 +490,34 @@ declare module '@tanstack/react-router' {
       path: '/app/$orgSlug'
       fullPath: '/app/$orgSlug'
       preLoaderRoute: typeof AppOrgSlugRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/fr/privacy': {
+      id: '/legal/fr/privacy'
+      path: '/legal/fr/privacy'
+      fullPath: '/legal/fr/privacy'
+      preLoaderRoute: typeof LegalFrPrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/fr/conditions': {
+      id: '/legal/fr/conditions'
+      path: '/legal/fr/conditions'
+      fullPath: '/legal/fr/conditions'
+      preLoaderRoute: typeof LegalFrConditionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/en/privacy': {
+      id: '/legal/en/privacy'
+      path: '/legal/en/privacy'
+      fullPath: '/legal/en/privacy'
+      preLoaderRoute: typeof LegalEnPrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/en/conditions': {
+      id: '/legal/en/conditions'
+      path: '/legal/en/conditions'
+      fullPath: '/legal/en/conditions'
+      preLoaderRoute: typeof LegalEnConditionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/$orgSlug/website': {
@@ -592,6 +672,10 @@ const rootRouteChildren: RootRouteChildren = {
   LegalMentionsRoute: LegalMentionsRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
   BlogIndexRoute: BlogIndexRoute,
+  LegalEnConditionsRoute: LegalEnConditionsRoute,
+  LegalEnPrivacyRoute: LegalEnPrivacyRoute,
+  LegalFrConditionsRoute: LegalFrConditionsRoute,
+  LegalFrPrivacyRoute: LegalFrPrivacyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

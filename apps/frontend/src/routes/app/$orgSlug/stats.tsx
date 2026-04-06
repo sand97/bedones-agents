@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { DatePicker } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import isoWeek from 'dayjs/plugin/isoWeek'
@@ -42,6 +43,7 @@ export const Route = createFileRoute('/app/$orgSlug/stats')({
 })
 
 function StatsPage() {
+  const { t } = useTranslation()
   const { isDesktop } = useLayout()
   const [period, setPeriod] = useState<Period>('week')
   const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs())
@@ -66,7 +68,7 @@ function StatsPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <DashboardHeader title="Statistiques et usages" />
+      <DashboardHeader title={t('stats.title')} />
 
       <div className="flex-1 p-4 lg:p-6">
         <div className="mb-4">
@@ -116,8 +118,8 @@ function StatsPage() {
         </div>
 
         <div className={`grid gap-4 lg:gap-6 ${isDesktop ? 'grid-cols-2' : 'grid-cols-1'}`}>
-          <NetworkPieChart title="Messages par réseau" data={MESSAGES_BY_NETWORK} />
-          <NetworkPieChart title="Commentaires par réseau" data={COMMENTS_BY_NETWORK} />
+          <NetworkPieChart title={t('stats.messages_by_network')} data={MESSAGES_BY_NETWORK} />
+          <NetworkPieChart title={t('stats.comments_by_network')} data={COMMENTS_BY_NETWORK} />
         </div>
       </div>
     </div>

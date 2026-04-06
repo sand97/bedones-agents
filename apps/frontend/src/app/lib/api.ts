@@ -1,3 +1,4 @@
+import i18n from '@app/i18n'
 import { apiClient } from './api/client'
 import type { components } from './api/v1'
 
@@ -40,7 +41,7 @@ export async function login(email: string, password: string): Promise<void> {
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, 'Erreur de connexion'))
+    throw new Error(getErrorMessage(error, i18n.t('auth.login_error')))
   }
 }
 
@@ -54,7 +55,7 @@ export async function createOrganisation(name: string): Promise<OrganisationResp
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, 'Erreur lors de la création'))
+    throw new Error(getErrorMessage(error, i18n.t('org.create_error')))
   }
 
   return data
@@ -70,7 +71,7 @@ export async function updateOrganisation(
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, 'Erreur lors de la mise à jour'))
+    throw new Error(getErrorMessage(error, i18n.t('org.update_error')))
   }
 
   return data
@@ -87,7 +88,7 @@ export async function uploadLogo(file: File): Promise<string> {
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, "Erreur lors de l'upload"))
+    throw new Error(getErrorMessage(error, i18n.t('upload.error')))
   }
 
   return data.url
@@ -104,7 +105,7 @@ export async function uploadChatMedia(file: File): Promise<string> {
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, "Erreur lors de l'upload du média"))
+    throw new Error(getErrorMessage(error, i18n.t('upload.media_error')))
   }
 
   return data.url
@@ -123,7 +124,7 @@ export async function connectFacebook(
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, 'Erreur de connexion Facebook'))
+    throw new Error(getErrorMessage(error, i18n.t('social.facebook_connect_error')))
   }
 
   return data
@@ -140,7 +141,7 @@ export async function connectInstagram(
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, 'Erreur de connexion Instagram'))
+    throw new Error(getErrorMessage(error, i18n.t('social.instagram_connect_error')))
   }
 
   return data
@@ -157,7 +158,7 @@ export async function connectTikTok(
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, 'Erreur de connexion TikTok'))
+    throw new Error(getErrorMessage(error, i18n.t('social.tiktok_connect_error')))
   }
 
   return data
@@ -169,7 +170,7 @@ export async function getSocialAccounts(organisationId: string): Promise<SocialA
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, 'Erreur lors du chargement des comptes'))
+    throw new Error(getErrorMessage(error, i18n.t('social.load_accounts_error')))
   }
 
   return data
@@ -181,7 +182,7 @@ export async function getPostsForAccount(accountId: string): Promise<PostRespons
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, 'Erreur lors du chargement des posts'))
+    throw new Error(getErrorMessage(error, i18n.t('social.load_posts_error')))
   }
 
   return data
@@ -202,7 +203,7 @@ export async function updatePageSettings(
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, 'Erreur lors de la mise à jour'))
+    throw new Error(getErrorMessage(error, i18n.t('social.update_error')))
   }
 
   return data
@@ -214,7 +215,7 @@ export async function markPostAsRead(postId: string): Promise<void> {
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, 'Erreur lors du marquage'))
+    throw new Error(getErrorMessage(error, i18n.t('social.mark_error')))
   }
 }
 
@@ -224,7 +225,7 @@ export async function replyToComment(commentId: string, message: string): Promis
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, 'Erreur lors de la réponse'))
+    throw new Error(getErrorMessage(error, i18n.t('social.reply_error')))
   }
 
   return data
@@ -236,7 +237,7 @@ export async function hideComment(commentId: string): Promise<CommentResponse> {
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, 'Erreur lors du masquage'))
+    throw new Error(getErrorMessage(error, i18n.t('social.hide_error')))
   }
 
   return data
@@ -248,7 +249,7 @@ export async function deleteComment(commentId: string): Promise<CommentResponse>
   })
 
   if (error) {
-    throw new Error(getErrorMessage(error, 'Erreur lors de la suppression'))
+    throw new Error(getErrorMessage(error, i18n.t('social.delete_error')))
   }
 
   return data

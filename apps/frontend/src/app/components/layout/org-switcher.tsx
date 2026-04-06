@@ -1,5 +1,6 @@
 import { Avatar } from 'antd'
 import { Building2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ChevronUpDownIcon } from '@app/components/icons/social-icons'
 import { SwitcherPopover } from '@app/components/shared/switcher-popover'
 
@@ -21,6 +22,7 @@ interface OrgSwitcherProps {
 }
 
 export function OrgSwitcher({ collapsed }: OrgSwitcherProps) {
+  const { t } = useTranslation()
   const currentOrg = MOCK_ORGS[0]
 
   const options = MOCK_ORGS.map((org) => ({
@@ -45,7 +47,7 @@ export function OrgSwitcher({ collapsed }: OrgSwitcherProps) {
     <SwitcherPopover
       title="Organisations"
       options={options}
-      addLabel="Créer une organisation"
+      addLabel={t('org.create')}
       placement="bottomLeft"
     >
       <button

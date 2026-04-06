@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { ShoppingBag } from 'lucide-react'
 
@@ -6,13 +7,15 @@ interface CatalogEmptyProps {
 }
 
 export function CatalogEmpty({ onConnect }: CatalogEmptyProps) {
+  const { t } = useTranslation()
+
   return (
     <SocialSetup
       icon={<ShoppingBag size={36} strokeWidth={1.5} />}
       color="#111b21"
-      title="Connectez votre catalogue"
-      description="Importez vos articles depuis votre boutique en ligne ou ajoutez-les manuellement pour que votre agent IA puisse les proposer à vos clients."
-      buttonLabel="Connecter un catalogue"
+      title={t('catalog.connect_title')}
+      description={t('catalog.connect_desc')}
+      buttonLabel={t('catalog.connect_button')}
       onAction={onConnect}
     />
   )

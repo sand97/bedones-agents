@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { Button, Card, Form, Typography, Input, message, Result, Avatar } from 'antd'
+import { useTranslation } from 'react-i18next'
+import { Button, Card, Typography, Input, message, Result, Avatar } from 'antd'
 import { Shield, Send, Building2 } from 'lucide-react'
 import { $api } from '@app/lib/api/$api'
 
@@ -27,6 +28,7 @@ interface InvitationInfo {
 }
 
 function InvitationPage() {
+  const { t } = useTranslation()
   const { token } = Route.useSearch()
   const [step, setStep] = useState<Step>('welcome')
   const [otpCode, setOtpCode] = useState('')
@@ -52,11 +54,11 @@ function InvitationPage() {
       await sendOtpMutation.mutateAsync({
         params: { query: { token } },
       })
-      message.success('Code OTP envoyé sur WhatsApp')
+      message.success(t('invitation.otp_sent'))
       setOtpCode('')
       setStep('otp')
     } catch {
-      message.error("Impossible d'envoyer le code OTP")
+      message.error(t('invitation.otp_send_error'))
     }
   }
 
@@ -74,7 +76,7 @@ function InvitationPage() {
       setStep('accept')
     } catch (err) {
       const apiMessage = (err as { message?: string })?.message
-      message.error(apiMessage || 'Code invalide')
+      message.error(apiMessage || t('invitation.invalid_code'))
     }
   }
 
@@ -87,7 +89,7 @@ function InvitationPage() {
       })
       setStep('done')
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Erreur')
+      message.error(err instanceof Error ? err.message : t('common.error'))
     }
   }
 
@@ -98,9 +100,9 @@ function InvitationPage() {
         params: { query: { orgId: info.organisationId } },
       })
       setStep('done')
-      message.info('Invitation refusée')
+      message.info(t('invitation.rejected'))
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Erreur')
+      message.error(err instanceof Error ? err.message : t('common.error'))
     }
   }
 
@@ -109,8 +111,8 @@ function InvitationPage() {
       <div className="flex min-h-screen items-center justify-center p-4">
         <Result
           status="error"
-          title="Invitation introuvable"
-          subTitle="Ce lien d'invitation est invalide, expiré ou a déjà été utilisé."
+          title={t('invitation.not_found')}
+          subTitle={t('invitation.invalid_link')}
         />
       </div>
     )
@@ -119,7 +121,7 @@ function InvitationPage() {
   if (invitationQuery.isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-text-muted">Chargement...</div>
+        <div className="text-text-muted">{t('common.loading')}</div>
       </div>
     )
   }
@@ -129,11 +131,11 @@ function InvitationPage() {
       <div className="flex min-h-screen items-center justify-center p-4">
         <Result
           status="success"
-          title="Terminé"
-          subTitle="Vous pouvez maintenant vous connecter."
+          title={t('common.done')}
+          subTitle={t('invitation.can_login_now')}
           extra={
             <Button type="primary" href="/auth/login">
-              Se connecter
+              {t('auth.submit')}
             </Button>
           }
         />
@@ -157,10 +159,7 @@ function InvitationPage() {
 
           {step === 'welcome' && (
             <>
-              <Text type="secondary">
-                Vous avez été invité à rejoindre cette organisation. Vérifiez votre numéro WhatsApp
-                pour continuer.
-              </Text>
+              <Text type="secondary">{t('invitation.welcome_message')}</Text>
               <div className="flex w-full flex-col gap-3">
                 <Input value={info?.phone || ''} disabled addonBefore={<Shield size={16} />} />
                 <Button
@@ -170,7 +169,7 @@ function InvitationPage() {
                   loading={sendOtpMutation.isPending}
                   block
                 >
-                  Vérifier mon numéro
+                  {t('invitation.verify_number')}
                 </Button>
               </div>
             </>
@@ -178,7 +177,7 @@ function InvitationPage() {
 
           {step === 'otp' && (
             <>
-              <Text type="secondary">Entrez le code à 6 chiffres envoyé au {info?.phone}.</Text>
+              <Text type="secondary">{t('invitation.enter_otp', { phone: info?.phone })}</Text>
               <div className="flex w-full flex-col items-center gap-3">
                 <Input.OTP length={6} value={otpCode} onChange={setOtpCode} />
                 <Button
@@ -188,10 +187,10 @@ function InvitationPage() {
                   disabled={otpCode.length < 6}
                   block
                 >
-                  Vérifier
+                  {t('invitation.verify')}
                 </Button>
                 <Button type="link" onClick={handleSendOtp} loading={sendOtpMutation.isPending}>
-                  Renvoyer le code
+                  {t('invitation.resend_code')}
                 </Button>
               </div>
             </>
@@ -199,26 +198,24 @@ function InvitationPage() {
 
           {step === 'accept' && (
             <>
-              <Text type="secondary">
-                Confirmez vos informations pour rejoindre l&apos;organisation.
-              </Text>
+              <Text type="secondary">{t('invitation.confirm_info')}</Text>
               <div className="flex w-full flex-col gap-3">
-                <Input value={info?.phone || ''} disabled addonBefore="Téléphone" />
+                <Input value={info?.phone || ''} disabled addonBefore={t('invitation.phone')} />
                 <div className="flex gap-3">
                   <Input
-                    placeholder="Prénom"
+                    placeholder={t('invitation.first_name')}
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                   />
                   <Input
-                    placeholder="Nom"
+                    placeholder={t('invitation.last_name')}
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                   />
                 </div>
                 <div className="flex gap-3">
                   <Button onClick={handleReject} loading={rejectMutation.isPending} block>
-                    Refuser
+                    {t('invitation.reject')}
                   </Button>
                   <Button
                     type="primary"
@@ -226,7 +223,7 @@ function InvitationPage() {
                     loading={acceptMutation.isPending}
                     block
                   >
-                    Accepter l&apos;invitation
+                    {t('invitation.accept')}
                   </Button>
                 </div>
               </div>

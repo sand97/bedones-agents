@@ -1,4 +1,5 @@
 import { Select } from 'antd'
+import { useTranslation } from 'react-i18next'
 
 const PAGE_SIZE_OPTIONS = [8, 16, 32]
 
@@ -15,10 +16,12 @@ export function TablePagination({
   pageSize,
   total,
   onChange,
-  itemLabel = 'élément',
+  itemLabel,
 }: TablePaginationProps) {
+  const { t } = useTranslation()
+  const resolvedLabel = itemLabel ?? t('pagination.item')
   const totalPages = Math.ceil(total / pageSize)
-  const pluralLabel = total > 1 ? `${itemLabel}s` : itemLabel
+  const pluralLabel = total > 1 ? `${resolvedLabel}s` : resolvedLabel
 
   return (
     <div className="table-pagination">
@@ -47,7 +50,7 @@ export function TablePagination({
               onClick={() => onChange(current - 1, pageSize)}
               className="tickets-pagination-btn"
             >
-              Précédent
+              {t('pagination.previous')}
             </button>
             <span className="tickets-pagination-indicator">
               {current} / {totalPages}
@@ -58,7 +61,7 @@ export function TablePagination({
               onClick={() => onChange(current + 1, pageSize)}
               className="tickets-pagination-btn"
             >
-              Suivant
+              {t('pagination.next')}
             </button>
           </div>
         )}

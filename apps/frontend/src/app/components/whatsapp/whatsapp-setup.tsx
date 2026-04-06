@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Alert } from 'antd'
 import { WhatsAppIcon } from '@app/components/icons/social-icons'
 import { launchWhatsAppSignup } from '@app/lib/facebook-sdk'
@@ -15,6 +16,8 @@ export function WhatsAppSetup() {
     phoneId?: string
     error?: string
   } | null>(null)
+
+  const { t } = useTranslation()
 
   const handleConnect = useCallback(async () => {
     setLoading(true)
@@ -44,7 +47,7 @@ export function WhatsAppSetup() {
         } else {
           setResult({
             success: false,
-            error: exchangeResult.error || 'Erreur lors de la connexion',
+            error: exchangeResult.error || t('social.connection_error'),
           })
         }
       }
@@ -56,7 +59,7 @@ export function WhatsAppSetup() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-24">

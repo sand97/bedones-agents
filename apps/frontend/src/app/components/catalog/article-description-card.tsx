@@ -1,9 +1,11 @@
+import { useTranslation } from 'react-i18next'
 import { Descriptions } from 'antd'
 import { StatusTag } from '@app/components/shared/status-tag'
 import { formatPrice } from '@app/lib/format'
 import { CATALOG_STATUS_CONFIG, type CatalogArticle } from '@app/components/whatsapp/mock-data'
 
 export function ArticleDescriptionCard({ article }: { article: CatalogArticle }) {
+  const { t } = useTranslation()
   const statusConfig = CATALOG_STATUS_CONFIG[article.status]
   return (
     <div className="catalog-card">
@@ -20,18 +22,18 @@ export function ArticleDescriptionCard({ article }: { article: CatalogArticle })
         size="small"
         className="ticket-list-card-bordered catalog-card__details"
       >
-        <Descriptions.Item label="Status">
+        <Descriptions.Item label={t('catalog.status')}>
           <StatusTag label={statusConfig.label} color={statusConfig.color} />
         </Descriptions.Item>
-        <Descriptions.Item label="Catégorie">
+        <Descriptions.Item label={t('catalog.category')}>
           <span className="text-text-secondary">{article.category}</span>
         </Descriptions.Item>
-        <Descriptions.Item label="Prix">
+        <Descriptions.Item label={t('catalog.price')}>
           <span className="font-medium">{formatPrice(article.price, article.currency)}</span>
         </Descriptions.Item>
-        <Descriptions.Item label="Stock">
+        <Descriptions.Item label={t('catalog.stock')}>
           <span className="text-text-secondary">
-            {article.stock} unité{article.stock > 1 ? 's' : ''}
+            {t('catalog.unit_count', { count: article.stock })}
           </span>
         </Descriptions.Item>
       </Descriptions>

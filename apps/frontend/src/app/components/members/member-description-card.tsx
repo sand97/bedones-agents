@@ -1,4 +1,5 @@
 import { Descriptions } from 'antd'
+import { useTranslation } from 'react-i18next'
 import { StatusTag } from '@app/components/shared/status-tag'
 import { formatDate } from '@app/lib/format'
 import { MemberCell } from './member-cell'
@@ -11,6 +12,7 @@ interface MemberDescriptionCardProps {
 }
 
 export function MemberDescriptionCard({ member, onDelete }: MemberDescriptionCardProps) {
+  const { t } = useTranslation()
   const roleConfig = MEMBER_ROLE_CONFIG[member.role]
   const isInvited = member.status === 'invited'
 
@@ -25,16 +27,16 @@ export function MemberDescriptionCard({ member, onDelete }: MemberDescriptionCar
       <Descriptions.Item label="Infos membre" span={2}>
         <MemberCell member={member} />
       </Descriptions.Item>
-      <Descriptions.Item label="Rôle">
+      <Descriptions.Item label={t('members.role')}>
         <StatusTag label={roleConfig.label} color={roleConfig.color} />
       </Descriptions.Item>
-      <Descriptions.Item label="Statut">
+      <Descriptions.Item label={t('members.status')}>
         <StatusTag
-          label={isInvited ? 'Invité' : 'Actif'}
+          label={isInvited ? t('members.invited') : t('members.active')}
           color={isInvited ? '#f59e0b' : '#10b981'}
         />
       </Descriptions.Item>
-      <Descriptions.Item label="Ajouté le">
+      <Descriptions.Item label={t('members.added_at')}>
         <span className="text-text-secondary">{formatDate(member.joinedAt)}</span>
       </Descriptions.Item>
       {member.role !== 'owner' && (

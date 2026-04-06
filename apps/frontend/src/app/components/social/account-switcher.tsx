@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Avatar, Button } from 'antd'
 import { ChevronUpDownIcon } from '@app/components/icons/social-icons'
 import { SwitcherPopover } from '@app/components/shared/switcher-popover'
@@ -27,6 +28,7 @@ export function AccountSwitcher({
   onSwitch,
   onConnect,
 }: AccountSwitcherProps) {
+  const { t } = useTranslation()
   const options = accounts.map((account) => ({
     id: account.id,
     isCurrent: account.id === currentAccount.id,
@@ -53,7 +55,7 @@ export function AccountSwitcher({
 
   return (
     <SwitcherPopover
-      title="Comptes connectés"
+      title={t('social.connected_accounts')}
       options={options}
       addLabel={connectLabel}
       placement="bottomRight"

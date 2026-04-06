@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { Table, Input, Button, Modal } from 'antd'
 import { Search, ChevronDown, Plus } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
@@ -9,7 +10,7 @@ import { useLayout } from '@app/contexts/layout-context'
 import { PromotionDescriptionCard } from '@app/components/promotions/promotion-description-card'
 import { PromotionModal } from '@app/components/promotions/create-promotion-modal'
 import { ProductPickerModal } from '@app/components/promotions/product-picker-modal'
-import { getPromotionColumns } from '@app/components/promotions/promotion-columns'
+import { usePromotionColumns } from '@app/components/promotions/promotion-columns'
 import {
   MOCK_PROMOTIONS_FULL,
   PROMOTION_STATUS_CONFIG,
@@ -31,18 +32,20 @@ const STATUS_FILTER_OPTIONS = ALL_STATUSES.map((status) => ({
   color: PROMOTION_STATUS_CONFIG[status].color,
 }))
 
-const TYPE_FILTER_OPTIONS = [
-  { key: 'percent', label: 'Pourcentage' },
-  { key: 'fixed', label: 'Montant fixe' },
-]
-
-const STACKABLE_FILTER_OPTIONS = [
-  { key: 'true', label: 'Cumulable' },
-  { key: 'false', label: 'Non cumulable' },
-]
-
 function PromotionsPage() {
+  const { t } = useTranslation()
   const { isDesktop } = useLayout()
+
+  const TYPE_FILTER_OPTIONS = [
+    { key: 'percent', label: t('promotions.type_percent') },
+    { key: 'fixed', label: t('promotions.type_fixed') },
+  ]
+
+  const STACKABLE_FILTER_OPTIONS = [
+    { key: 'true', label: t('promotions.stackable') },
+    { key: 'false', label: t('promotions.not_stackable') },
+  ]
+
   const [searchText, setSearchText] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<PromotionStatus[]>([])
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
@@ -113,7 +116,9 @@ function PromotionsPage() {
   const typeButtonLabel = selectedTypes.length > 0 ? `Type (${selectedTypes.length})` : 'Type'
 
   const stackableButtonLabel =
-    selectedStackable.length > 0 ? `Cumulable (${selectedStackable.length})` : 'Cumulable'
+    selectedStackable.length > 0
+      ? t('promotions.stackable_with_count', { count: selectedStackable.length })
+      : t('promotions.stackable')
 
   const handleEdit = (promo: PromotionFull) => {
     setEditingPromo(promo)
@@ -133,29 +138,26 @@ function PromotionsPage() {
 
   const handleDelete = (promo: PromotionFull) => {
     Modal.confirm({
-      title: 'Supprimer la promotion',
-      content: `Êtes-vous sûr de vouloir supprimer la promotion "${promo.name}" ?`,
-      okText: 'Supprimer',
+      title: t('promotions.confirm_delete'),
+      content: t('promotions.confirm_delete_message', { name: promo.name }),
+      okText: t('common.delete'),
       okButtonProps: { danger: true },
-      cancelText: 'Annuler',
+      cancelText: t('common.cancel'),
       onOk: () => {
         // TODO: call API to delete
       },
     })
   }
 
-  const columns = useMemo(
-    () => getPromotionColumns({ onEdit: handleEdit, onDelete: handleDelete }),
-    [],
-  )
+  const columns = usePromotionColumns({ onEdit: handleEdit, onDelete: handleDelete })
 
   return (
     <div className="flex min-h-screen flex-col">
       <DashboardHeader
-        title="Promotions"
+        title={t('promotions.title')}
         action={
           <Button onClick={handleCreate} icon={<Plus size={16} strokeWidth={1.5} />}>
-            Ajouter
+            {t('common.add')}
           </Button>
         }
       />
@@ -163,7 +165,7 @@ function PromotionsPage() {
       <div className="flex-1 p-4 pb-16 lg:p-6 lg:pb-16">
         <div className="tickets-filters">
           <Input
-            placeholder="Rechercher une promotion..."
+            placeholder={t('promotions.search_placeholder')}
             prefix={<Search size={16} className="text-text-muted" />}
             value={searchText}
             onChange={(e) => {
@@ -174,7 +176,7 @@ function PromotionsPage() {
             className="tickets-filter-input"
           />
           <FilterPopover
-            title="Filtrer par status"
+            title={t('promotions.filter_status')}
             options={STATUS_FILTER_OPTIONS}
             selected={selectedStatuses}
             onToggle={toggleStatus}
@@ -185,7 +187,7 @@ function PromotionsPage() {
             </button>
           </FilterPopover>
           <FilterPopover
-            title="Filtrer par type"
+            title={t('promotions.filter_type')}
             options={TYPE_FILTER_OPTIONS}
             selected={selectedTypes}
             onToggle={toggleType}
@@ -196,7 +198,7 @@ function PromotionsPage() {
             </button>
           </FilterPopover>
           <FilterPopover
-            title="Filtrer par cumulabilité"
+            title={t('promotions.filter_stackable')}
             options={STACKABLE_FILTER_OPTIONS}
             selected={selectedStackable}
             onToggle={toggleStackable}
@@ -222,7 +224,7 @@ function PromotionsPage() {
           <div className="flex flex-col gap-3">
             {paginatedPromotions.length === 0 ? (
               <div className="flex items-center justify-center py-12 text-sm text-text-muted">
-                Aucune promotion trouvée
+                {t('promotions.no_promotions')}
               </div>
             ) : (
               paginatedPromotions.map((promo) => (

@@ -22,11 +22,13 @@
     "@tanstack/router-plugin": "^1.132.0",
     "antd": "^5.29.3",
     "dayjs": "^1.11.19",
+    "i18next": "^26.0.3",
     "lucide-react": "^0.545.0",
     "openapi-fetch": "^0.17.0",
     "openapi-react-query": "^0.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-i18next": "^17.0.2",
     "recharts": "^3.8.1",
     "socket.io-client": "^4.8.3"
   },

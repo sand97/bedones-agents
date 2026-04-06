@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Modal, Form, Input, InputNumber, Select, DatePicker, Switch, Popover } from 'antd'
 import { ShoppingBag, Plus, Trash2 } from 'lucide-react'
 import dayjs from 'dayjs'
@@ -23,16 +24,6 @@ interface PromotionModalProps {
   setSelectedProductIds: React.Dispatch<React.SetStateAction<string[]>>
 }
 
-const TYPE_OPTIONS = [
-  { value: 'percent', label: 'Pourcentage (%)' },
-  { value: 'fixed', label: 'Montant fixe (FCFA)' },
-]
-
-const ELIGIBILITY_OPTIONS = [
-  { value: 'all', label: 'Tous les produits' },
-  { value: 'specific', label: 'Produits spécifiques' },
-]
-
 export function PromotionModal({
   open,
   onClose,
@@ -41,8 +32,19 @@ export function PromotionModal({
   selectedProductIds,
   setSelectedProductIds,
 }: PromotionModalProps) {
+  const { t } = useTranslation()
   const [form] = Form.useForm()
   const [eligibility, setEligibility] = useState<PromotionEligibility>('all')
+
+  const TYPE_OPTIONS = [
+    { value: 'percent', label: t('promotions.type_percent') },
+    { value: 'fixed', label: t('promotions.type_fixed') },
+  ]
+
+  const ELIGIBILITY_OPTIONS = [
+    { value: 'all', label: t('promotions.eligibility_all') },
+    { value: 'specific', label: t('promotions.eligibility_specific') },
+  ]
 
   const isEditing = !!editingPromo
   const promoType = Form.useWatch('type', form)
@@ -89,16 +91,16 @@ export function PromotionModal({
 
   return (
     <Modal
-      title={isEditing ? 'Modifier la promotion' : 'Créer une promotion'}
+      title={isEditing ? t('promotions.edit_title') : t('promotions.create_title')}
       open={open}
       onCancel={handleClose}
       width={640}
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       footer={
         <div className="flex items-center justify-end gap-2">
-          <Button onClick={handleClose}>Annuler</Button>
+          <Button onClick={handleClose}>{t('promotions.cancel')}</Button>
           <Button type="primary" onClick={handleSubmit}>
-            {isEditing ? 'Enregistrer' : 'Créer la promotion'}
+            {isEditing ? t('promotions.save') : t('promotions.create_button')}
           </Button>
         </div>
       }
@@ -111,19 +113,19 @@ export function PromotionModal({
         initialValues={{ type: 'percent', eligibility: 'all', stackable: false }}
       >
         <Form.Item
-          label="Nom"
+          label={t('promotions.name')}
           name="name"
-          rules={[{ required: true, message: 'Le nom est requis' }]}
+          rules={[{ required: true, message: t('promotions.name_required') }]}
         >
-          <Input placeholder="Ex: Soldes d'été -20%" />
+          <Input placeholder={t('promotions.name_placeholder')} />
         </Form.Item>
 
         <Form.Item
-          label="Code promo"
+          label={t('promotions.code')}
           name="code"
           rules={[
-            { required: true, message: 'Le code est requis' },
-            { pattern: /^\S+$/, message: 'Pas d\u2019espaces' },
+            { required: true, message: t('promotions.code_required') },
+            { pattern: /^\S+$/, message: t('promotions.no_spaces') },
           ]}
         >
           <Input
@@ -136,17 +138,21 @@ export function PromotionModal({
           />
         </Form.Item>
 
-        <Form.Item label="Réduction" required className="mb-4">
+        <Form.Item label={t('promotions.discount')} required className="mb-4">
           <div className="promo-modal-reduction-row">
-            <Form.Item name="type" noStyle rules={[{ required: true, message: 'Requis' }]}>
+            <Form.Item
+              name="type"
+              noStyle
+              rules={[{ required: true, message: t('promotions.required') }]}
+            >
               <Select options={TYPE_OPTIONS} className="promo-modal-type-select" />
             </Form.Item>
             <Form.Item
               name="value"
               noStyle
               rules={[
-                { required: true, message: 'Requis' },
-                { type: 'number', min: 1, message: 'Min 1' },
+                { required: true, message: t('promotions.required') },
+                { type: 'number', min: 1, message: t('promotions.min_1') },
               ]}
             >
               <InputNumber
@@ -161,21 +167,21 @@ export function PromotionModal({
         </Form.Item>
 
         <Form.Item
-          label="Période de validité"
+          label={t('promotions.validity_period')}
           name="period"
-          rules={[{ required: true, message: 'La période est requise' }]}
+          rules={[{ required: true, message: t('promotions.period_required') }]}
         >
           <RangePicker
-            placeholder={['Date début', 'Date fin']}
+            placeholder={[t('promotions.start_date'), t('promotions.end_date')]}
             format="DD/MM/YYYY"
             className="w-full"
           />
         </Form.Item>
 
         <Form.Item
-          label="Produits éligibles"
+          label={t('promotions.eligible_products')}
           name="eligibility"
-          rules={[{ required: true, message: 'Requis' }]}
+          rules={[{ required: true, message: t('promotions.required') }]}
         >
           <Select
             options={ELIGIBILITY_OPTIONS}
@@ -191,12 +197,14 @@ export function PromotionModal({
             {selectedArticles.length === 0 ? (
               <div className="create-ticket-empty-section">
                 <ShoppingBag size={32} strokeWidth={1.5} className="text-text-muted opacity-50" />
-                <div className="text-sm font-medium text-text-primary">Aucun produit</div>
+                <div className="text-sm font-medium text-text-primary">
+                  {t('promotions.no_products')}
+                </div>
                 <div className="text-xs text-text-muted">
-                  Sélectionnez les produits éligibles à cette promotion
+                  {t('promotions.select_products_hint')}
                 </div>
                 <Button onClick={onOpenProductPicker} icon={<Plus size={16} />} className="mt-2">
-                  Sélectionner des produits
+                  {t('promotions.select_products')}
                 </Button>
               </div>
             ) : (
@@ -251,18 +259,14 @@ export function PromotionModal({
                   onClick={onOpenProductPicker}
                   icon={<Plus size={14} />}
                 >
-                  Modifier la sélection
+                  {t('promotions.edit_selection')}
                 </Button>
               </div>
             )}
           </div>
         )}
 
-        <Form.Item
-          label="Cumulable avec d'autres promotions"
-          name="stackable"
-          valuePropName="checked"
-        >
+        <Form.Item label={t('promotions.stackable_label')} name="stackable" valuePropName="checked">
           <Switch />
         </Form.Item>
       </Form>

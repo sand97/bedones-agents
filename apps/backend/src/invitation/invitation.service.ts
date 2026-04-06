@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
+import { I18nContext } from 'nestjs-i18n'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuthService } from '../auth/auth.service'
 
@@ -42,7 +43,10 @@ export class InvitationService {
     })
 
     if (!member) {
-      throw new NotFoundException('Invitation introuvable ou déjà acceptée')
+      throw new NotFoundException(
+        I18nContext.current()?.t('errors.invitation.not_found_or_accepted') ??
+          'Invitation introuvable ou déjà acceptée',
+      )
     }
 
     return {
@@ -74,7 +78,9 @@ export class InvitationService {
     const templateLang = lang === 'en' ? 'en' : 'fr'
     await this.sendWhatsAppOtp(payload.phone, code, templateLang)
 
-    return { message: 'OTP envoyé avec succès' }
+    return {
+      message: I18nContext.current()?.t('errors.invitation.otp_sent') ?? 'OTP envoyé avec succès',
+    }
   }
 
   /**
@@ -86,16 +92,24 @@ export class InvitationService {
     const stored = this.otpStore.get(key)
 
     if (!stored) {
-      throw new BadRequestException('Aucun OTP en attente pour ce numéro')
+      throw new BadRequestException(
+        I18nContext.current()?.t('errors.invitation.no_pending_otp') ??
+          'Aucun OTP en attente pour ce numéro',
+      )
     }
 
     if (Date.now() > stored.expiresAt) {
       this.otpStore.delete(key)
-      throw new BadRequestException('OTP expiré, veuillez en demander un nouveau')
+      throw new BadRequestException(
+        I18nContext.current()?.t('errors.invitation.otp_expired') ??
+          'OTP expiré, veuillez en demander un nouveau',
+      )
     }
 
     if (stored.code !== code) {
-      throw new BadRequestException('Code OTP invalide')
+      throw new BadRequestException(
+        I18nContext.current()?.t('errors.invitation.otp_invalid') ?? 'Code OTP invalide',
+      )
     }
 
     this.otpStore.delete(key)
@@ -130,7 +144,9 @@ export class InvitationService {
     })
 
     if (!member) {
-      throw new NotFoundException('Invitation introuvable')
+      throw new NotFoundException(
+        I18nContext.current()?.t('errors.invitation.not_found') ?? 'Invitation introuvable',
+      )
     }
 
     // Update name if provided
@@ -160,7 +176,9 @@ export class InvitationService {
     })
 
     if (!member) {
-      throw new NotFoundException('Invitation introuvable')
+      throw new NotFoundException(
+        I18nContext.current()?.t('errors.invitation.not_found') ?? 'Invitation introuvable',
+      )
     }
 
     return this.prisma.organisationMember.delete({
@@ -172,11 +190,16 @@ export class InvitationService {
     try {
       const payload = this.jwtService.verify(token)
       if (payload.type !== 'invitation') {
-        throw new BadRequestException('Token invalide')
+        throw new BadRequestException(
+          I18nContext.current()?.t('errors.invitation.invalid_token') ?? 'Token invalide',
+        )
       }
       return { orgId: payload.orgId, phone: payload.phone }
     } catch {
-      throw new BadRequestException("Lien d'invitation invalide ou expiré")
+      throw new BadRequestException(
+        I18nContext.current()?.t('errors.invitation.invalid_or_expired_link') ??
+          "Lien d'invitation invalide ou expiré",
+      )
     }
   }
 

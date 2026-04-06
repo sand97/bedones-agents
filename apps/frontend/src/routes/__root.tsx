@@ -2,6 +2,9 @@ import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-r
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ComponentType, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
+import '@app/i18n'
+import { getStoredLocale } from '@app/i18n'
+import { LocaleProvider } from '@app/contexts/locale-context'
 
 import appStyles from '../styles.css?url'
 
@@ -20,10 +23,6 @@ export const Route = createRootRoute({
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: 'Bedones — CRM Social' },
-      {
-        name: 'description',
-        content: 'Centralisez vos interactions sociales en opportunites commerciales.',
-      },
     ],
     links: [
       {
@@ -36,8 +35,9 @@ export const Route = createRootRoute({
 })
 
 function RootDocument({ children }: { children: ReactNode }) {
+  const initialLocale = typeof window !== 'undefined' ? getStoredLocale() : 'fr'
   return (
-    <html lang="fr">
+    <html lang={initialLocale}>
       <head>
         <HeadContent />
       </head>
@@ -63,13 +63,15 @@ function RootComponent() {
   return (
     <RootDocument>
       <QueryClientProvider client={queryClient}>
-        {AntdProviders ? (
-          <AntdProviders>
-            <Outlet />
-          </AntdProviders>
-        ) : (
-          <div />
-        )}
+        <LocaleProvider>
+          {AntdProviders ? (
+            <AntdProviders>
+              <Outlet />
+            </AntdProviders>
+          ) : (
+            <div />
+          )}
+        </LocaleProvider>
       </QueryClientProvider>
     </RootDocument>
   )

@@ -1,6 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
+import { I18nContext } from 'nestjs-i18n'
 import * as bcrypt from 'bcrypt'
 import * as crypto from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
@@ -31,12 +32,18 @@ export class AuthService {
     })
 
     if (!user || !user.passwordHash) {
-      throw new UnauthorizedException('Email ou mot de passe incorrect')
+      throw new UnauthorizedException(
+        I18nContext.current()?.t('errors.auth.invalid_credentials') ??
+          'Email ou mot de passe incorrect',
+      )
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) {
-      throw new UnauthorizedException('Email ou mot de passe incorrect')
+      throw new UnauthorizedException(
+        I18nContext.current()?.t('errors.auth.invalid_credentials') ??
+          'Email ou mot de passe incorrect',
+      )
     }
 
     return this.createSessionForUser(user.id)

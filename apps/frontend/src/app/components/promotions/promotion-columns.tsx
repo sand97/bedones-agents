@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Button, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { Pencil, Trash2 } from 'lucide-react'
@@ -15,13 +16,15 @@ interface PromotionColumnCallbacks {
   onDelete: (promo: PromotionFull) => void
 }
 
-export function getPromotionColumns({
+export function usePromotionColumns({
   onEdit,
   onDelete,
 }: PromotionColumnCallbacks): ColumnsType<PromotionFull> {
+  const { t } = useTranslation()
+
   return [
     {
-      title: 'Nom',
+      title: t('promotions.name'),
       key: 'name',
       ellipsis: true,
       minWidth: 200,
@@ -33,7 +36,7 @@ export function getPromotionColumns({
       ),
     },
     {
-      title: 'Réduction',
+      title: t('promotions.discount'),
       key: 'value',
       width: 140,
       render: (_: unknown, record: PromotionFull) => (
@@ -45,12 +48,14 @@ export function getPromotionColumns({
       ),
     },
     {
-      title: 'Produits',
+      title: t('promotions.products'),
       key: 'eligibility',
       width: 140,
       render: (_: unknown, record: PromotionFull) => {
         if (record.eligibility === 'all') {
-          return <span className="text-sm text-text-secondary">Tous les produits</span>
+          return (
+            <span className="text-sm text-text-secondary">{t('promotions.eligibility_all')}</span>
+          )
         }
         const names = record.eligibleProductIds
           .map((id) => MOCK_CATALOG_ARTICLES.find((a) => a.id === id)?.name)
@@ -58,25 +63,24 @@ export function getPromotionColumns({
         return (
           <Tooltip title={names.join(', ')}>
             <span className="text-sm text-text-secondary">
-              {record.eligibleProductIds.length} produit
-              {record.eligibleProductIds.length > 1 ? 's' : ''}
+              {t('promotions.product_count', { count: record.eligibleProductIds.length })}
             </span>
           </Tooltip>
         )
       },
     },
     {
-      title: 'Cumulable',
+      title: t('promotions.stackable'),
       key: 'stackable',
       width: 100,
       render: (_: unknown, record: PromotionFull) => (
         <Tag bordered={false} color={record.stackable ? 'green' : 'default'}>
-          {record.stackable ? 'Oui' : 'Non'}
+          {record.stackable ? t('promotions.yes') : t('promotions.no')}
         </Tag>
       ),
     },
     {
-      title: 'Status',
+      title: t('promotions.status'),
       dataIndex: 'status',
       key: 'status',
       width: 120,
@@ -86,7 +90,7 @@ export function getPromotionColumns({
       },
     },
     {
-      title: 'Période',
+      title: t('promotions.period'),
       key: 'period',
       minWidth: 260,
       render: (_: unknown, record: PromotionFull) => (
@@ -102,10 +106,10 @@ export function getPromotionColumns({
       render: (_: unknown, record: PromotionFull) => (
         <div className="flex items-center justify-end gap-2">
           <Button size="small" icon={<Pencil size={14} />} onClick={() => onEdit(record)}>
-            Modifier
+            {t('promotions.edit')}
           </Button>
           <Button size="small" danger icon={<Trash2 size={14} />} onClick={() => onDelete(record)}>
-            Supprimer
+            {t('promotions.delete')}
           </Button>
         </div>
       ),

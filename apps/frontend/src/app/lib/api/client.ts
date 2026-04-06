@@ -1,5 +1,6 @@
 import createClient, { type Middleware } from 'openapi-fetch'
 import type { paths } from './v1'
+import { getStoredLocale } from '@app/i18n'
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
 
@@ -9,13 +10,11 @@ const apiClient = createClient<paths>({
 })
 
 /**
- * Middleware to send browser language on every request via Accept-Language header.
+ * Middleware to send current language on every request via Accept-Language header.
  */
 const localeMiddleware: Middleware = {
   async onRequest({ request }) {
-    const browserLang = navigator.language?.split('-')[0] || 'fr'
-    const lang = browserLang === 'en' ? 'en' : 'fr'
-    request.headers.set('Accept-Language', lang)
+    request.headers.set('Accept-Language', getStoredLocale())
     return request
   },
 }

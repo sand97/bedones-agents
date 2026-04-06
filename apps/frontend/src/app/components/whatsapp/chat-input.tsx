@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Input, Popover, message } from 'antd'
 import { Send, Mic, Paperclip, FileText, Video, ImageIcon, X } from 'lucide-react'
 import { AudioRecorder } from './audio-recorder'
@@ -37,6 +38,7 @@ function AttachmentPopover({
   provider?: string
 }) {
   const [open, setOpen] = useState(false)
+  const { t } = useTranslation()
   const photoInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -44,7 +46,7 @@ function AttachmentPopover({
   const items = [
     {
       icon: <ImageIcon size={18} />,
-      label: 'Photos',
+      label: t('chat.image'),
       color: 'text-green-500',
       bgColor: 'bg-green-50',
       onClick: () => {
@@ -56,7 +58,7 @@ function AttachmentPopover({
       ? [
           {
             icon: <Video size={18} />,
-            label: 'Vidéo',
+            label: t('chat.video'),
             color: 'text-purple-500',
             bgColor: 'bg-purple-50',
             onClick: () => {
@@ -68,7 +70,7 @@ function AttachmentPopover({
       : []),
     {
       icon: <FileText size={18} />,
-      label: 'Document',
+      label: t('chat.document'),
       color: 'text-blue-500',
       bgColor: 'bg-blue-50',
       onClick: () => {
@@ -156,6 +158,7 @@ export function ChatInput({
   replyTo?: Message | null
   onCancelReply?: () => void
 }) {
+  const { t } = useTranslation()
   const [mode, setMode] = useState<InputMode>('text')
   const [inputValue, setInputValue] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -202,7 +205,7 @@ export function ChatInput({
     if (type === 'video' || type === 'audio') {
       const duration = await getMediaDuration(file)
       if (duration > MAX_MEDIA_DURATION) {
-        message.error('Les fichiers audio et vidéo ne doivent pas dépasser 3 minutes')
+        message.error(t('chat.media_duration_limit'))
         return
       }
     }
@@ -220,7 +223,8 @@ export function ChatInput({
       {replyTo && (
         <div className="mb-2 flex items-center gap-2 rounded-lg bg-bg-subtle px-3 py-2 text-xs text-text-secondary">
           <span className="min-w-0 flex-1 truncate">
-            Réponse à <strong>{replyTo.from === 'business' ? 'Vous' : 'Client'}</strong> :{' '}
+            {t('chat.reply_to')}{' '}
+            <strong>{replyTo.from === 'business' ? t('chat.you') : t('chat.client')}</strong> :{' '}
             {replyTo.text || (replyTo.type !== 'text' ? `[${replyTo.type}]` : '')}
           </span>
           <Button
@@ -246,7 +250,7 @@ export function ChatInput({
           <AudioRecorder onSend={handleAudioSend} onCancel={() => setMode('text')} />
         ) : (
           <Input.TextArea
-            placeholder="Écrire un message…"
+            placeholder={t('chat.type_message')}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}

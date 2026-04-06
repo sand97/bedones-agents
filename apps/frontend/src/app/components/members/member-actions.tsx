@@ -1,4 +1,5 @@
 import { Button, Modal } from 'antd'
+import { useTranslation } from 'react-i18next'
 import { Trash2 } from 'lucide-react'
 import type { Member } from './mock-data'
 
@@ -8,17 +9,19 @@ interface MemberActionsProps {
 }
 
 export function MemberActions({ member, onDelete }: MemberActionsProps) {
+  const { t } = useTranslation()
+
   if (member.role === 'owner') {
     return null
   }
 
   const handleDelete = () => {
     Modal.confirm({
-      title: 'Supprimer ce membre ?',
-      content: `${member.name} sera retiré de l'organisation. Cette action est irréversible.`,
-      okText: 'Supprimer',
+      title: t('members.confirm_delete'),
+      content: t('members.confirm_delete_message', { name: member.name }),
+      okText: t('common.delete'),
       okType: 'danger',
-      cancelText: 'Annuler',
+      cancelText: t('common.cancel'),
       onOk() {
         return onDelete?.(member.id)
       },
@@ -33,7 +36,7 @@ export function MemberActions({ member, onDelete }: MemberActionsProps) {
       icon={<Trash2 size={15} />}
       onClick={handleDelete}
     >
-      Supprimer
+      {t('common.delete')}
     </Button>
   )
 }

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useState, useCallback, useMemo } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { App, Button, Progress } from 'antd'
 import { ArrowLeft, CheckCircle, MessageSquareOff, Settings } from 'lucide-react'
@@ -32,54 +33,50 @@ export const Route = createFileRoute('/app/$orgSlug/comments/$id')({
 
 const ICON_SIZE = 40
 
-const COMMENT_CONFIG: Record<
-  string,
-  {
-    label: string
-    mobileLabel: string
-    icon: ReactNode
-    color: string
-    title: string
-    description: string
-    button: string
-    connectLabel: string
-    provider: 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK'
-  }
-> = {
+interface CommentConfigEntry {
+  labelKey: string
+  mobileLabel: string
+  icon: ReactNode
+  color: string
+  titleKey: string
+  descriptionKey: string
+  buttonKey: string
+  connectLabelKey: string
+  provider: 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK'
+}
+
+const COMMENT_CONFIG: Record<string, CommentConfigEntry> = {
   facebook: {
-    label: 'Commentaires Facebook',
+    labelKey: 'comments.facebook_label',
     mobileLabel: 'Facebook',
     icon: <FacebookIcon width={ICON_SIZE} height={ICON_SIZE} />,
     color: 'var(--color-brand-facebook)',
-    title: 'Connecter Facebook',
-    description:
-      'Reliez votre page Facebook pour suivre et répondre aux commentaires de vos publications directement depuis Bedones.',
-    button: 'Connecter une page Facebook',
-    connectLabel: 'Connecter une page',
+    titleKey: 'comments.connect_facebook_title',
+    descriptionKey: 'comments.connect_facebook_desc',
+    buttonKey: 'comments.connect_facebook_btn',
+    connectLabelKey: 'comments.connect_facebook_short',
     provider: 'FACEBOOK',
   },
   instagram: {
-    label: 'Commentaires Instagram',
+    labelKey: 'comments.instagram_label',
     mobileLabel: 'Instagram',
     icon: <InstagramIcon width={ICON_SIZE} height={ICON_SIZE} />,
     color: 'var(--color-brand-instagram)',
-    title: 'Connecter Instagram',
-    description:
-      'Reliez votre compte Instagram professionnel pour gérer les commentaires de vos publications directement depuis Bedones.',
-    button: 'Connecter un compte Instagram',
-    connectLabel: 'Connecter un compte',
+    titleKey: 'comments.connect_instagram_title',
+    descriptionKey: 'comments.connect_instagram_desc',
+    buttonKey: 'comments.connect_instagram_btn',
+    connectLabelKey: 'comments.connect_instagram_short',
     provider: 'INSTAGRAM',
   },
   tiktok: {
-    label: 'Commentaires TikTok',
+    labelKey: 'comments.tiktok_label',
     mobileLabel: 'TikTok',
     icon: <TikTokIcon width={ICON_SIZE} height={ICON_SIZE} />,
     color: 'var(--color-brand-tiktok)',
-    title: 'Connecter TikTok',
-    description:
-      'Reliez votre compte TikTok Business pour suivre et répondre aux commentaires de vos vidéos directement depuis Bedones.',
-    button: 'Connecter un compte TikTok',
-    connectLabel: 'Connecter un compte',
+    titleKey: 'comments.connect_tiktok_title',
+    descriptionKey: 'comments.connect_tiktok_desc',
+    buttonKey: 'comments.connect_tiktok_btn',
+    connectLabelKey: 'comments.connect_tiktok_short',
     provider: 'TIKTOK',
   },
 }
@@ -155,6 +152,7 @@ function MobileBackButton() {
 }
 
 function CommentsPage() {
+  const { t } = useTranslation()
   const { id, orgSlug } = useParams({ from: '/app/$orgSlug/comments/$id' })
   const search = useSearch({ from: '/app/$orgSlug/comments/$id' })
   const navigate = useNavigate()
@@ -162,7 +160,17 @@ function CommentsPage() {
   const { isDesktop } = useLayout()
   const { refresh: refreshUnread } = useUnreadCounts()
   const { message: messageApi } = App.useApp()
-  const config = COMMENT_CONFIG[id]
+  const rawConfig = COMMENT_CONFIG[id]
+  const config = rawConfig
+    ? {
+        ...rawConfig,
+        label: t(rawConfig.labelKey),
+        title: t(rawConfig.titleKey),
+        description: t(rawConfig.descriptionKey),
+        button: t(rawConfig.buttonKey),
+        connectLabel: t(rawConfig.connectLabelKey),
+      }
+    : null
   const title = config?.label || `Commentaires — ${id}`
 
   const hasSelectedPost = !!search.post
@@ -265,7 +273,7 @@ function CommentsPage() {
   const handleComment = async (postId: string, message: string) => {
     if (id === 'tiktok') {
       // TikTok doesn't support top-level comments via API
-      messageApi.warning('TikTok ne supporte pas les commentaires directs sur un post')
+      messageApi.warning(t('comments.tiktok_no_direct'))
       return
     }
     await commentMutation.mutateAsync({ body: { postId, message } })
@@ -329,7 +337,7 @@ function CommentsPage() {
     if (id === 'facebook') {
       const configId = import.meta.env.VITE_FB_COMMENTS_CONFIGGURATION_ID
       if (!configId) {
-        messageApi.error('Configuration Facebook manquante (VITE_FB_COMMENTS_CONFIGGURATION_ID)')
+        messageApi.error(t('comments.config_facebook_missing'))
         setConnecting(false)
         return
       }
@@ -339,7 +347,7 @@ function CommentsPage() {
     } else if (id === 'tiktok') {
       const clientKey = import.meta.env.VITE_TIKTOK_CLIENT_KEY
       if (!clientKey) {
-        messageApi.error('Configuration TikTok manquante (VITE_TIKTOK_CLIENT_KEY)')
+        messageApi.error(t('comments.config_tiktok_missing'))
         setConnecting(false)
         return
       }
@@ -357,7 +365,7 @@ function CommentsPage() {
       <div className="flex min-h-screen flex-col">
         <DashboardHeader title={title} />
         <div className="flex flex-1 items-center justify-center text-text-muted">
-          Page introuvable
+          {t('comments.page_not_found')}
         </div>
       </div>
     )
@@ -423,9 +431,9 @@ function CommentsPage() {
         <SocialSetup
           icon={<CheckCircle size={40} strokeWidth={1.5} />}
           color={config.color}
-          title="Page ajoutée avec succès"
-          description="Configurez maintenant comment l'IA doit répondre aux commentaires"
-          buttonLabel="Configurer les réponses"
+          title={t('comments.page_added')}
+          description={t('comments.setup_description')}
+          buttonLabel={t('comments.setup_button')}
           buttonIcon={<Settings size={18} />}
           onAction={() => setConfigOpen(true)}
         />
@@ -457,9 +465,9 @@ function CommentsPage() {
         <SocialSetup
           icon={<MessageSquareOff size={40} strokeWidth={1.5} />}
           color={config.color}
-          title="Aucun commentaire reçu"
-          description={`Les commentaires de vos publications ${config.mobileLabel} apparaîtront ici`}
-          buttonLabel="Modifier la configuration"
+          title={t('comments.no_comments')}
+          description={t('comments.no_comments_desc', { provider: config.mobileLabel })}
+          buttonLabel={t('comments.edit_config')}
           buttonType="default"
           buttonIcon={<Settings size={18} />}
           onAction={() => setConfigOpen(true)}

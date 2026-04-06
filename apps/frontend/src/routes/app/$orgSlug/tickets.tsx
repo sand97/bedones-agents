@@ -15,7 +15,7 @@ import {
   CreateTicketModal,
   type SelectedArticle,
 } from '@app/components/tickets/create-ticket-modal'
-import { getTicketColumns } from '@app/components/tickets/ticket-columns'
+import { useTicketColumns } from '@app/components/tickets/ticket-columns'
 import {
   MOCK_TICKET_LIST,
   TICKET_STATUS_CONFIG,
@@ -104,7 +104,7 @@ function TicketsPage() {
     setDrawerTicket(getTicketDetail(entry))
   }
 
-  const columns = useMemo(() => getTicketColumns(openDrawer), [])
+  const columns = useTicketColumns(openDrawer)
 
   return (
     <div className="flex min-h-screen flex-col">

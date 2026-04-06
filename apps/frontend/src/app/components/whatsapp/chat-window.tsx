@@ -1,4 +1,5 @@
 import { useMemo, useRef, useEffect, useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Avatar, Popover, Button, Spin, Tooltip } from 'antd'
 import {
   Play,
@@ -41,20 +42,23 @@ function formatTime(timestamp: string): string {
   return dayjs(timestamp).format('HH:mm')
 }
 
-function formatDateLabel(timestamp: string): string {
+function formatDateLabel(timestamp: string, t: (key: string) => string): string {
   const date = dayjs(timestamp)
   const now = dayjs()
 
-  if (date.isSame(now, 'day')) return "Aujourd'hui"
-  if (date.isSame(now.subtract(1, 'day'), 'day')) return 'Hier'
+  if (date.isSame(now, 'day')) return t('date.today')
+  if (date.isSame(now.subtract(1, 'day'), 'day')) return t('date.yesterday')
   return date.format('D MMMM')
 }
 
-function groupMessagesByDate(messages: Message[]): { date: string; messages: Message[] }[] {
+function groupMessagesByDate(
+  messages: Message[],
+  t: (key: string) => string,
+): { date: string; messages: Message[] }[] {
   const groups: { date: string; messages: Message[] }[] = []
 
   for (const msg of messages) {
-    const label = formatDateLabel(msg.timestamp)
+    const label = formatDateLabel(msg.timestamp, t)
     const last = groups[groups.length - 1]
 
     if (last && last.date === label) {
@@ -239,7 +243,8 @@ function DeliveryCheck({
         </Tooltip>
       )
     }
-    const label = deliveryStatus === 'delivered' ? 'Distribué' : 'Envoyé'
+    const { t } = useTranslation()
+    const label = deliveryStatus === 'delivered' ? t('chat.delivered') : t('chat.sent')
     return (
       <Tooltip title={label}>
         <SingleCheckIcon width={14} height={14} className="text-text-muted" />
@@ -525,6 +530,7 @@ function MessageBubble({
 /* ── Chat header with copy-phone option ── */
 
 function ChatHeader({ conversation }: { conversation: Conversation }) {
+  const { t } = useTranslation()
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -558,7 +564,9 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
               icon={copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
               className="py-2.5!"
             >
-              {copied ? 'Copié !' : `Copier ${conversation.contact.phone}`}
+              {copied
+                ? t('common.copied')
+                : t('chat.copy_phone', { phone: conversation.contact.phone })}
             </Button>
           </div>
         }
@@ -588,6 +596,7 @@ export function ChatWindow({
   onUploadAndSend,
   onRetry,
 }: ChatWindowProps) {
+  const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const search = useSearch({ strict: false }) as { conv?: string; ticket?: string }
@@ -616,7 +625,10 @@ export function ChatWindow({
     navigate({ search: { conv: search.conv } as never })
   }, [navigate, search.conv])
 
-  const groups = useMemo(() => groupMessagesByDate(conversation.messages), [conversation.messages])
+  const groups = useMemo(
+    () => groupMessagesByDate(conversation.messages, t),
+    [conversation.messages, t],
+  )
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {

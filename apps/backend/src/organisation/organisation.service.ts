@@ -1,4 +1,5 @@
 import { Injectable, ForbiddenException } from '@nestjs/common'
+import { I18nContext } from 'nestjs-i18n'
 import { PrismaService } from '../prisma/prisma.service'
 
 @Injectable()
@@ -77,7 +78,10 @@ export class OrganisationService {
     })
 
     if (!membership) {
-      throw new ForbiddenException("Vous n'êtes pas membre de cette organisation")
+      throw new ForbiddenException(
+        I18nContext.current()?.t('errors.member.not_member') ??
+          "Vous n'êtes pas membre de cette organisation",
+      )
     }
 
     return membership

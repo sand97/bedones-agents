@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from 'antd'
 import { ArrowLeft } from 'lucide-react'
@@ -30,30 +31,28 @@ export const Route = createFileRoute('/app/$orgSlug/chats/$id')({
 
 const ICON_SIZE = 40
 
-const CHAT_CONFIG: Record<
-  string,
-  {
-    label: string
-    mobileLabel: string
-    icon: ReactNode
-    color: string
-    title: string
-    description: string
-    button: string
-    connectLabel: string
-    provider: 'FACEBOOK' | 'INSTAGRAM' | 'WHATSAPP'
-  }
-> = {
+interface ChatConfigEntry {
+  label: string
+  mobileLabel: string
+  icon: ReactNode
+  color: string
+  titleKey: string
+  descriptionKey: string
+  buttonKey: string
+  connectLabelKey: string
+  provider: 'FACEBOOK' | 'INSTAGRAM' | 'WHATSAPP'
+}
+
+const CHAT_CONFIG: Record<string, ChatConfigEntry> = {
   whatsapp: {
     label: 'WhatsApp',
     mobileLabel: 'WhatsApp',
     icon: <WhatsAppIcon width={ICON_SIZE} height={ICON_SIZE} />,
     color: 'var(--color-brand-whatsapp)',
-    title: 'Connecter un numéro Whatsapp',
-    description:
-      'Associez votre compte WhatsApp Business via Facebook Cloud API pour centraliser vos conversations et répondre à vos clients directement depuis Bedones.',
-    button: 'Connecter un numéro WhatsApp',
-    connectLabel: 'Connecter un numéro',
+    titleKey: 'chat.whatsapp_setup_title',
+    descriptionKey: 'chat.whatsapp_setup_desc',
+    buttonKey: 'chat.whatsapp_setup_btn',
+    connectLabelKey: 'chat.whatsapp_connect_label',
     provider: 'WHATSAPP',
   },
   'instagram-dm': {
@@ -61,11 +60,10 @@ const CHAT_CONFIG: Record<
     mobileLabel: 'Instagram DM',
     icon: <InstagramIcon width={ICON_SIZE} height={ICON_SIZE} />,
     color: 'var(--color-brand-instagram)',
-    title: 'Connecter Instagram Direct',
-    description:
-      'Reliez votre compte Instagram professionnel pour recevoir et répondre aux messages directs de vos clients depuis Bedones.',
-    button: 'Connecter un compte Instagram',
-    connectLabel: 'Connecter un compte',
+    titleKey: 'chat.instagram_setup_title',
+    descriptionKey: 'chat.instagram_setup_desc',
+    buttonKey: 'chat.instagram_setup_btn',
+    connectLabelKey: 'chat.instagram_connect_label',
     provider: 'INSTAGRAM',
   },
   messenger: {
@@ -73,11 +71,10 @@ const CHAT_CONFIG: Record<
     mobileLabel: 'Messenger',
     icon: <MessengerIcon width={ICON_SIZE} height={ICON_SIZE} />,
     color: 'var(--color-brand-messenger)',
-    title: 'Connecter Messenger',
-    description:
-      'Reliez votre page Facebook pour gérer les conversations Messenger de vos clients directement depuis Bedones.',
-    button: 'Connecter une page Facebook',
-    connectLabel: 'Connecter une page',
+    titleKey: 'chat.messenger_setup_title',
+    descriptionKey: 'chat.messenger_setup_desc',
+    buttonKey: 'chat.messenger_setup_btn',
+    connectLabelKey: 'chat.messenger_connect_label',
     provider: 'FACEBOOK',
   },
 }
@@ -176,12 +173,22 @@ function mapApiConversation(
 }
 
 function ChatsPage() {
+  const { t } = useTranslation()
   const { id, orgSlug } = useParams({ from: '/app/$orgSlug/chats/$id' })
   const search = useSearch({ from: '/app/$orgSlug/chats/$id' })
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { isDesktop } = useLayout()
-  const config = CHAT_CONFIG[id]
+  const rawConfig = CHAT_CONFIG[id]
+  const config = rawConfig
+    ? {
+        ...rawConfig,
+        title: t(rawConfig.titleKey),
+        description: t(rawConfig.descriptionKey),
+        button: t(rawConfig.buttonKey),
+        connectLabel: t(rawConfig.connectLabelKey),
+      }
+    : null
   const title = config?.label || `Messagerie — ${id}`
 
   const hasSelectedConv = !!search.conv
@@ -637,7 +644,7 @@ function ChatsPage() {
       <div className="flex min-h-screen flex-col">
         <DashboardHeader title={title} />
         <div className="flex flex-1 items-center justify-center text-text-muted">
-          Page introuvable
+          {t('comments.page_not_found')}
         </div>
       </div>
     )

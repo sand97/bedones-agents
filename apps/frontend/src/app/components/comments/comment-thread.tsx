@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Avatar, Button, Input, Popover, Spin, Tooltip, App } from 'antd'
 import { MessageSquare, Send, Eye, EyeOff, Trash2, ExternalLink, Settings } from 'lucide-react'
 import dayjs from 'dayjs'
@@ -37,6 +38,7 @@ function UserProfilePopover({
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
+  const { t } = useTranslation()
 
   const { data } = $api.useQuery(
     'get',
@@ -63,18 +65,18 @@ function UserProfilePopover({
       </div>
       <div className="flex flex-col gap-1 text-xs text-text-secondary">
         <div className="flex items-center justify-between">
-          <span>Commentaires</span>
+          <span>{t('comments.total_comments')}</span>
           <span className="font-semibold">{data.totalComments}</span>
         </div>
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-1">
-            <EyeOff size={11} /> Masqués
+            <EyeOff size={11} /> {t('comments.hidden_label')}
           </span>
           <span className="font-semibold">{data.hiddenComments}</span>
         </div>
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-1">
-            <Trash2 size={11} /> Supprimés
+            <Trash2 size={11} /> {t('comments.deleted_label')}
           </span>
           <span className="font-semibold">{data.deletedComments}</span>
         </div>
@@ -134,12 +136,12 @@ function formatTime(timestamp: string): string {
   return dayjs(timestamp).format('HH[h]mm')
 }
 
-function formatDateLabel(timestamp: string): string {
+function formatDateLabel(timestamp: string, t: (key: string) => string): string {
   const date = dayjs(timestamp)
   const now = dayjs()
 
-  if (date.isSame(now, 'day')) return "Aujourd'hui"
-  if (date.isSame(now.subtract(1, 'day'), 'day')) return 'Hier'
+  if (date.isSame(now, 'day')) return t('date.today')
+  if (date.isSame(now.subtract(1, 'day'), 'day')) return t('date.yesterday')
   return date.format('D MMMM')
 }
 
@@ -161,11 +163,14 @@ function buildThreads(comments: Comment[]): Thread[] {
   }))
 }
 
-function groupThreadsByDate(threads: Thread[]): { date: string; threads: Thread[] }[] {
+function groupThreadsByDate(
+  threads: Thread[],
+  t: (key: string) => string,
+): { date: string; threads: Thread[] }[] {
   const groups: { date: string; threads: Thread[] }[] = []
 
   for (const thread of threads) {
-    const label = formatDateLabel(thread.root.createdTime)
+    const label = formatDateLabel(thread.root.createdTime, t)
     const last = groups[groups.length - 1]
 
     if (last && last.date === label) {
@@ -182,6 +187,7 @@ function groupThreadsByDate(threads: Thread[]): { date: string; threads: Thread[
 
 function PostOptionsMenu({ permalinkUrl }: { permalinkUrl?: string }) {
   const [open, setOpen] = useState(false)
+  const { t } = useTranslation()
 
   if (!permalinkUrl) return null
 
@@ -199,7 +205,7 @@ function PostOptionsMenu({ permalinkUrl }: { permalinkUrl?: string }) {
             icon={<ExternalLink size={14} />}
             className="py-2.5! whitespace-nowrap"
           >
-            Voir le post original
+            {t('comments.view_original_post')}
           </Button>
         </div>
       }
@@ -231,6 +237,7 @@ function CommentOptionsMenu({
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState<'hide' | 'unhide' | 'delete' | null>(null)
   const { message: messageApi } = App.useApp()
+  const { t } = useTranslation()
   const isHidden = comment.status === 'HIDDEN'
   const isDeleted = comment.status === 'DELETED'
 
@@ -239,9 +246,9 @@ function CommentOptionsMenu({
     setLoading('hide')
     try {
       await onHide(comment.id)
-      messageApi.success('Commentaire masqué')
+      messageApi.success(t('comments.hidden'))
     } catch (err) {
-      messageApi.error(err instanceof Error ? err.message : 'Erreur')
+      messageApi.error(err instanceof Error ? err.message : t('common.error'))
     } finally {
       setLoading(null)
       setOpen(false)
@@ -253,9 +260,9 @@ function CommentOptionsMenu({
     setLoading('unhide')
     try {
       await onUnhide(comment.id)
-      messageApi.success('Commentaire démasqué')
+      messageApi.success(t('comments.unhidden'))
     } catch (err) {
-      messageApi.error(err instanceof Error ? err.message : 'Erreur')
+      messageApi.error(err instanceof Error ? err.message : t('common.error'))
     } finally {
       setLoading(null)
       setOpen(false)
@@ -267,9 +274,9 @@ function CommentOptionsMenu({
     setLoading('delete')
     try {
       await onDelete(comment.id)
-      messageApi.success('Commentaire supprimé')
+      messageApi.success(t('comments.deleted'))
     } catch (err) {
-      messageApi.error(err instanceof Error ? err.message : 'Erreur')
+      messageApi.error(err instanceof Error ? err.message : t('common.error'))
     } finally {
       setLoading(null)
       setOpen(false)
@@ -289,7 +296,7 @@ function CommentOptionsMenu({
               icon={<EyeOff size={14} />}
               className="py-2.5!"
             >
-              Masquer
+              {t('comments.hide')}
             </Button>
           )}
           {isHidden && (
@@ -301,7 +308,7 @@ function CommentOptionsMenu({
               icon={<Eye size={14} />}
               className="py-2.5!"
             >
-              Démasquer
+              {t('comments.unhide')}
             </Button>
           )}
           {!isDeleted && (
@@ -314,7 +321,7 @@ function CommentOptionsMenu({
               icon={<Trash2 size={14} />}
               className="py-2.5!"
             >
-              Supprimer
+              {t('common.delete')}
             </Button>
           )}
         </div>
@@ -327,7 +334,7 @@ function CommentOptionsMenu({
       arrow={false}
     >
       <Button type="text" size="small" icon={<OptionsIcon width={14} height={14} />}>
-        Options
+        {t('comments.options')}
       </Button>
     </Popover>
   )
@@ -346,6 +353,7 @@ function CommentBubble({
   accountId: string
   isReply?: boolean
 }) {
+  const { t } = useTranslation()
   const isPage = comment.isPageReply
   const status = comment.status
   const isHidden = status === 'HIDDEN'
@@ -390,7 +398,7 @@ function CommentBubble({
           <span className="whitespace-nowrap text-xs text-text-muted">
             {' '}
             · {formatTime(comment.createdTime)}
-            {isPage && comment.fromId === 'ai' && ' (by IA)'}
+            {isPage && comment.fromId === 'ai' && ` (${t('comments.by_ai')})`}
           </span>
         </div>
         {(isHidden || isDeleted) && (
@@ -402,7 +410,7 @@ function CommentBubble({
                 <Trash2 size={12} className="flex-shrink-0" />
               )}
               <span className="font-semibold flex-shrink-0">
-                {isHidden ? 'Masqué' : 'Supprimé'}
+                {isHidden ? t('comments.hidden_status') : t('comments.deleted_status')}
               </span>
               {comment.actionReason && (
                 <span className="truncate font-normal text-text-muted">
@@ -438,6 +446,7 @@ function ThreadBlock({
   onUnhide?: (commentId: string) => Promise<void>
   onDelete?: (commentId: string) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const isRootDeleted = thread.root.status === 'DELETED'
   const hasReplies = thread.replies.length > 0
 
@@ -467,7 +476,7 @@ function ThreadBlock({
               onClick={() => onReplyClick(thread.root)}
               icon={<MessageSquare size={12} />}
             >
-              Répondre
+              {t('comments.reply')}
             </Button>
           )}
           <CommentOptionsMenu
@@ -485,7 +494,8 @@ function ThreadBlock({
 /* ── Post preview header ── */
 
 function PostPreviewHeader({ post }: { post: Post }) {
-  const displayText = post.message || 'Post sans message'
+  const { t } = useTranslation()
+  const displayText = post.message || t('comments.post_no_message')
 
   return (
     <div className="flex items-center gap-2 border-b border-border-subtle px-2 py-2">
@@ -527,9 +537,10 @@ export function CommentThread({
   const [sending, setSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const { message: messageApi } = App.useApp()
+  const { t } = useTranslation()
 
   const threads = useMemo(() => buildThreads(post.comments), [post.comments])
-  const groups = useMemo(() => groupThreadsByDate(threads), [threads])
+  const groups = useMemo(() => groupThreadsByDate(threads, t), [threads, t])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -560,7 +571,7 @@ export function CommentThread({
       setInputValue('')
       setReplyTo(null)
     } catch (err) {
-      messageApi.error(err instanceof Error ? err.message : 'Erreur lors de la réponse')
+      messageApi.error(err instanceof Error ? err.message : t('social.reply_error'))
     } finally {
       setSending(false)
     }
@@ -574,8 +585,10 @@ export function CommentThread({
   }
 
   const placeholder = replyTo
-    ? `Répondre à ${replyTo.fromName || 'ce commentaire'}…`
-    : 'Écrire un commentaire…'
+    ? replyTo.fromName
+      ? t('comments.reply_to_name', { name: replyTo.fromName })
+      : t('comments.reply_to_comment')
+    : t('comments.write_comment')
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -612,15 +625,15 @@ export function CommentThread({
         {!isConfigured ? (
           <div className="flex items-center gap-2 rounded-lg bg-bg-subtle px-3 py-2.5 text-sm text-text-muted">
             <Settings size={16} className="flex-shrink-0" />
-            <span>Configurez vos réponses pour pouvoir répondre aux commentaires</span>
+            <span>{t('comments.configure_replies')}</span>
           </div>
         ) : (
           <>
             {replyTo && (
               <div className="mb-2 flex items-center gap-2 rounded-lg bg-bg-subtle px-3 py-2 text-xs text-text-secondary">
                 <span className="min-w-0 flex-1 truncate">
-                  Réponse à <strong>{replyTo.fromName || 'un commentaire'}</strong> :{' '}
-                  {replyTo.message}
+                  {t('comments.reply_to')}{' '}
+                  <strong>{replyTo.fromName || t('comments.a_comment')}</strong> : {replyTo.message}
                 </span>
                 <Button
                   type="text"

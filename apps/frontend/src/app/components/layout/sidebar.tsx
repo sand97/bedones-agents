@@ -12,10 +12,14 @@ import {
   User,
   LogOut,
   Bell,
+  Languages,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { logout } from '@app/lib/api'
 import { useLayout } from '@app/contexts/layout-context'
+import { useLocale } from '@app/contexts/locale-context'
 import { useUnreadCounts } from '@app/contexts/unread-context'
+import { syncDayjsLocale } from '@app/lib/format'
 import { OrgSwitcher } from './org-switcher'
 
 const ICON_SIZE = 18
@@ -23,7 +27,7 @@ const STROKE = 1
 
 interface NavItem {
   key: string
-  label: string
+  labelKey: string
   icon: React.ReactNode
   path: string
   badge?: number
@@ -32,7 +36,7 @@ interface NavItem {
 }
 
 interface NavGroup {
-  title?: string
+  titleKey?: string
   items: NavItem[]
 }
 
@@ -41,36 +45,36 @@ const mainGroups: NavGroup[] = [
     items: [
       {
         key: 'agent',
-        label: 'Mon Agent',
+        labelKey: 'sidebar.agent',
         icon: <Sparkles size={ICON_SIZE} strokeWidth={STROKE} />,
         path: 'agent',
       },
       {
         key: 'tickets',
-        label: 'Tickets',
+        labelKey: 'sidebar.tickets',
         icon: <Ticket size={ICON_SIZE} strokeWidth={STROKE} />,
         path: 'tickets',
       },
       {
         key: 'catalog',
-        label: 'Catalogue',
+        labelKey: 'sidebar.catalog',
         icon: <ShoppingBag size={ICON_SIZE} strokeWidth={STROKE} />,
         path: 'catalog',
       },
       {
         key: 'promotions',
-        label: 'Promotions',
+        labelKey: 'sidebar.promotions',
         icon: <BadgePercent size={ICON_SIZE} strokeWidth={STROKE} />,
         path: 'promotions',
       },
     ],
   },
   {
-    title: 'Messageries',
+    titleKey: 'sidebar.messaging',
     items: [
       {
         key: 'whatsapp',
-        label: 'WhatsApp',
+        labelKey: 'sidebar.whatsapp',
         icon: (
           <span
             className="sidebar__social-dot"
@@ -82,7 +86,7 @@ const mainGroups: NavGroup[] = [
       },
       {
         key: 'instagram-dm',
-        label: 'Instagram DM',
+        labelKey: 'sidebar.instagram_dm',
         icon: (
           <span
             className="sidebar__social-dot"
@@ -94,7 +98,7 @@ const mainGroups: NavGroup[] = [
       },
       {
         key: 'messenger',
-        label: 'Messenger',
+        labelKey: 'sidebar.messenger',
         icon: (
           <span
             className="sidebar__social-dot"
@@ -107,11 +111,11 @@ const mainGroups: NavGroup[] = [
     ],
   },
   {
-    title: 'Commentaires',
+    titleKey: 'sidebar.comments_section',
     items: [
       {
         key: 'facebook',
-        label: 'Facebook',
+        labelKey: 'sidebar.facebook',
         icon: (
           <span
             className="sidebar__social-dot"
@@ -123,7 +127,7 @@ const mainGroups: NavGroup[] = [
       },
       {
         key: 'instagram',
-        label: 'Instagram',
+        labelKey: 'sidebar.instagram',
         icon: (
           <span
             className="sidebar__social-dot"
@@ -135,7 +139,7 @@ const mainGroups: NavGroup[] = [
       },
       {
         key: 'tiktok',
-        label: 'TikTok',
+        labelKey: 'sidebar.tiktok',
         icon: (
           <span
             className="sidebar__social-dot"
@@ -152,25 +156,25 @@ const mainGroups: NavGroup[] = [
 const bottomItems: NavItem[] = [
   {
     key: 'members',
-    label: 'Membres',
+    labelKey: 'sidebar.members',
     icon: <Users size={ICON_SIZE} strokeWidth={STROKE} />,
     path: 'members',
   },
   {
     key: 'stats',
-    label: 'Statistiques et usages',
+    labelKey: 'sidebar.stats',
     icon: <BarChart3 size={ICON_SIZE} strokeWidth={STROKE} />,
     path: 'stats',
   },
   {
     key: 'plan',
-    label: 'Souscription',
+    labelKey: 'sidebar.plan',
     icon: <CreditCard size={ICON_SIZE} strokeWidth={STROKE} />,
     path: 'plan',
   },
   {
     key: 'legal',
-    label: 'Aides et ressources',
+    labelKey: 'sidebar.legal',
     icon: <LifeBuoy size={ICON_SIZE} strokeWidth={STROKE} />,
     path: 'legal',
   },
@@ -179,6 +183,8 @@ const bottomItems: NavItem[] = [
 export function Sidebar() {
   const { collapsed, isDesktop, mobileMenuOpen, setMobileMenuOpen } = useLayout()
   const { counts: unreadCounts } = useUnreadCounts()
+  const { locale, toggleLocale } = useLocale()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
   const location = useLocation()
@@ -189,6 +195,12 @@ export function Sidebar() {
     await logout()
     await router.invalidate()
     navigate({ to: '/auth/login' })
+  }
+
+  const handleToggleLocale = () => {
+    const newLocale = locale === 'fr' ? 'en' : 'fr'
+    toggleLocale()
+    syncDayjsLocale(newLocale)
   }
 
   const isActive = (path: string) => {
@@ -214,7 +226,7 @@ export function Sidebar() {
       {!isDesktop && (
         <button
           type="button"
-          aria-label="Fermer le menu"
+          aria-label={t('sidebar.close_menu')}
           onClick={() => setMobileMenuOpen(false)}
           className={`sidebar-overlay ${!mobileMenuOpen ? 'sidebar-overlay--hidden' : ''}`}
         />
@@ -230,10 +242,10 @@ export function Sidebar() {
         <nav className="flex flex-1 flex-col overflow-y-auto px-1 py-2">
           {mainGroups.map((group, gi) => (
             <div key={gi}>
-              {group.title && !(collapsed && isDesktop) && (
-                <div className="sidebar__nav-group-title">{group.title}</div>
+              {group.titleKey && !(collapsed && isDesktop) && (
+                <div className="sidebar__nav-group-title">{t(group.titleKey)}</div>
               )}
-              {collapsed && isDesktop && group.title && (
+              {collapsed && isDesktop && group.titleKey && (
                 <div className="mx-4 my-2 h-px bg-border-subtle" />
               )}
               {group.items.map((item) => {
@@ -242,6 +254,7 @@ export function Sidebar() {
                 const badge = item.unreadProvider
                   ? unreadCounts[item.unreadProvider] || undefined
                   : item.badge
+                const label = t(item.labelKey)
                 const btn = (
                   <button
                     key={item.key}
@@ -256,14 +269,14 @@ export function Sidebar() {
                         <span className="absolute -top-1 -right-1 h-1.5 w-1.5 rounded-full bg-text-primary" />
                       ) : null}
                     </span>
-                    {!isCollapsed && <span className="flex-1 truncate">{item.label}</span>}
+                    {!isCollapsed && <span className="flex-1 truncate">{label}</span>}
                     {!isCollapsed && badge ? (
                       <span className="sidebar__nav-badge">{badge > 99 ? '99+' : badge}</span>
                     ) : null}
                   </button>
                 )
                 return collapsed && isDesktop ? (
-                  <Tooltip key={item.key} title={item.label} placement="right">
+                  <Tooltip key={item.key} title={label} placement="right">
                     {btn}
                   </Tooltip>
                 ) : (
@@ -278,6 +291,7 @@ export function Sidebar() {
         <div className="flex flex-shrink-0 flex-col border-t border-border-subtle px-1 py-2">
           {bottomItems.map((item) => {
             const active = isActive(item.path)
+            const label = t(item.labelKey)
             const btn = (
               <button
                 key={item.key}
@@ -289,11 +303,11 @@ export function Sidebar() {
                 }
               >
                 <span className="flex-shrink-0">{item.icon}</span>
-                {!(collapsed && isDesktop) && <span>{item.label}</span>}
+                {!(collapsed && isDesktop) && <span>{label}</span>}
               </button>
             )
             return collapsed && isDesktop ? (
-              <Tooltip key={item.key} title={item.label} placement="right">
+              <Tooltip key={item.key} title={label} placement="right">
                 {btn}
               </Tooltip>
             ) : (
@@ -319,7 +333,14 @@ export function Sidebar() {
                     }}
                     icon={<Bell size={16} strokeWidth={1} />}
                   >
-                    Préférences de notification
+                    {t('sidebar.notification_prefs')}
+                  </Button>
+                  <Button
+                    type={'text'}
+                    onClick={handleToggleLocale}
+                    icon={<Languages size={16} strokeWidth={1} />}
+                  >
+                    {locale === 'fr' ? t('sidebar.use_english') : t('sidebar.use_french')}
                   </Button>
                   <Divider className={'my-1!'} />
                   <Button
@@ -328,7 +349,7 @@ export function Sidebar() {
                     icon={<LogOut size={16} strokeWidth={1} />}
                     onClick={handleLogout}
                   >
-                    Déconnexion
+                    {t('sidebar.logout')}
                   </Button>
                 </div>
               }

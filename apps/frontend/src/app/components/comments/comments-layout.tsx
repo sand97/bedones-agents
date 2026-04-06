@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Button } from 'antd'
 import { Settings } from 'lucide-react'
@@ -45,6 +46,7 @@ export function CommentsLayout({
   onSettingsSaved,
 }: CommentsLayoutProps) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const search = useSearch({ strict: false }) as { post?: string }
   const [configOpen, setConfigOpen] = useState(false)
   const selectedPostId = search.post
@@ -101,7 +103,7 @@ export function CommentsLayout({
             onClick={() => setFilter('all')}
             className="comments-filter-btn"
           >
-            Tout
+            {t('comments.all')}
           </Button>
           <Button
             type={filter === 'unread' ? 'primary' : 'default'}
@@ -109,7 +111,7 @@ export function CommentsLayout({
             onClick={() => setFilter('unread')}
             className="comments-filter-btn"
           >
-            Non lus
+            {t('comments.unread')}
           </Button>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -137,9 +139,9 @@ export function CommentsLayout({
           <SocialSetup
             icon={<CommentsIcon width={EMPTY_ICON_SIZE} height={EMPTY_ICON_SIZE} />}
             color="var(--color-text-muted)"
-            title="Sélectionnez un post"
-            description="Choisissez un post dans la liste pour voir ses commentaires"
-            buttonLabel={pageName ? 'Modifier la configuration' : undefined}
+            title={t('comments.select_post')}
+            description={t('comments.select_post_desc')}
+            buttonLabel={pageName ? t('comments.edit_config') : undefined}
             buttonType="default"
             buttonIcon={<Settings size={18} />}
             onAction={() => setConfigOpen(true)}
