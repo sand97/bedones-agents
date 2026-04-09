@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Modal, Input, Button, Checkbox } from 'antd'
 import { Search, ShoppingBag } from 'lucide-react'
+// TODO(mock): Remplacer MOCK_CATALOG_ARTICLES par un appel API réel (catalogApi.getProducts)
 import { MOCK_CATALOG_ARTICLES } from '@app/components/whatsapp/mock-data'
 
 interface ProductPickerModalProps {

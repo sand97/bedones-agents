@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Modal, Input, Button } from 'antd'
 import { Search, Plus, Minus, ShoppingBag } from 'lucide-react'
+// TODO(mock): Remplacer MOCK_CATALOG_ARTICLES par un appel API réel (catalogApi.getProducts)
 import { MOCK_CATALOG_ARTICLES, type CatalogArticle } from '@app/components/whatsapp/mock-data'
 
 interface SelectedEntry {
@@ -36,7 +37,7 @@ export function ArticlePickerModal({
   })
 
   const activeArticles = useMemo(
-    () => MOCK_CATALOG_ARTICLES.filter((a) => a.status === 'active'),
+    () => MOCK_CATALOG_ARTICLES.filter((a) => a.status === 'active' || a.status === 'published'),
     [],
   )
 

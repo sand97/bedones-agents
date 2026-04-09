@@ -10,6 +10,13 @@
 - Tailwind CSS est réservé au **positionnement** (flex, grid, gap, margin, padding) et à la **typographie** (text-sm, font-semibold). Le style visuel des composants (background, border, hover, colors) doit venir d'Antd et de son thème.
 - Les seules exceptions acceptées sont les éléments interactifs complexes avec des classes CSS centralisées (ex: `sidebar__nav-item`, `chat-conv-item`, `ticket-card`).
 
+## Fichiers protégés (ne pas modifier)
+
+- **Ne jamais modifier ni remplacer les données mock** dans les composants suivants. Ces composants utilisent volontairement des mocks en attendant d'être branchés sur l'API réelle. Ne pas les "corriger" en les connectant à l'API, ne pas supprimer les imports de `mock-data`, ne pas remplacer `MOCK_*` par des appels API :
+  - `apps/frontend/src/app/components/catalog/article-picker-modal.tsx`
+  - `apps/frontend/src/app/components/tickets/create-ticket-modal.tsx`
+  - `apps/frontend/src/app/components/whatsapp/mock-data.ts`
+
 ## Règles API / React Query
 
 - **Toujours utiliser `$api` (`openapi-react-query`)** pour les appels API côté frontend. Ne jamais utiliser `useQuery` / `useMutation` manuellement depuis `@tanstack/react-query`, ni `fetch` / `axios` directement.

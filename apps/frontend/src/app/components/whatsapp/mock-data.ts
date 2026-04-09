@@ -830,13 +830,13 @@ export function getTicketDetail(entry: TicketListEntry): Ticket {
 
 /* ── Catalog ── */
 
-export type CatalogArticleStatus = 'active' | 'draft' | 'out_of_stock'
+export type CatalogArticleStatus = 'published' | 'draft' | 'archived'
 
 export const CATALOG_STATUS_CONFIG: Record<CatalogArticleStatus, { label: string; color: string }> =
   {
-    active: { label: 'Actif', color: '#22c55e' },
+    published: { label: 'Actif', color: '#22c55e' },
     draft: { label: 'Brouillon', color: '#f59e0b' },
-    out_of_stock: { label: 'Rupture', color: '#ef4444' },
+    archived: { label: 'Rupture', color: '#ef4444' },
   }
 
 export interface CatalogArticle {
@@ -1058,7 +1058,7 @@ export const MOCK_CATALOG_ARTICLES: CatalogArticle[] = [
     price: 35000,
     currency: 'FCFA',
     category: 'Robes',
-    status: 'active',
+    status: 'published',
     stock: 12,
     createdAt: daysAgo(30, 10, 0),
   },
@@ -1070,7 +1070,7 @@ export const MOCK_CATALOG_ARTICLES: CatalogArticle[] = [
     price: 45000,
     currency: 'FCFA',
     category: 'Ensembles',
-    status: 'active',
+    status: 'published',
     stock: 8,
     createdAt: daysAgo(25, 14, 0),
   },
@@ -1082,7 +1082,7 @@ export const MOCK_CATALOG_ARTICLES: CatalogArticle[] = [
     price: 28000,
     currency: 'FCFA',
     category: 'Accessoires',
-    status: 'active',
+    status: 'published',
     stock: 5,
     createdAt: daysAgo(20, 9, 0),
   },
@@ -1094,7 +1094,7 @@ export const MOCK_CATALOG_ARTICLES: CatalogArticle[] = [
     price: 5000,
     currency: 'FCFA',
     category: 'Accessoires',
-    status: 'active',
+    status: 'published',
     stock: 20,
     createdAt: daysAgo(18, 11, 0),
   },
@@ -1106,7 +1106,7 @@ export const MOCK_CATALOG_ARTICLES: CatalogArticle[] = [
     price: 22000,
     currency: 'FCFA',
     category: 'Chemises',
-    status: 'out_of_stock',
+    status: 'archived',
     stock: 0,
     createdAt: daysAgo(15, 16, 0),
   },
@@ -1118,7 +1118,7 @@ export const MOCK_CATALOG_ARTICLES: CatalogArticle[] = [
     price: 26000,
     currency: 'FCFA',
     category: 'Chaussures',
-    status: 'active',
+    status: 'published',
     stock: 6,
     createdAt: daysAgo(12, 10, 0),
   },
@@ -1142,7 +1142,7 @@ export const MOCK_CATALOG_ARTICLES: CatalogArticle[] = [
     price: 15000,
     currency: 'FCFA',
     category: 'Bijoux',
-    status: 'active',
+    status: 'published',
     stock: 15,
     createdAt: daysAgo(8, 9, 30),
   },
@@ -1154,7 +1154,7 @@ export const MOCK_CATALOG_ARTICLES: CatalogArticle[] = [
     price: 75000,
     currency: 'FCFA',
     category: 'Ensembles',
-    status: 'active',
+    status: 'published',
     stock: 2,
     createdAt: daysAgo(5, 11, 0),
   },

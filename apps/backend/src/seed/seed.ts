@@ -33,6 +33,7 @@ async function encryptToken(text: string): Promise<string> {
  * - A test user with email/password (for Meta reviewers)
  * - An organisation linked to that user
  * - A WhatsApp SocialAccount with the seed token
+ * - A Catalog linked to the WhatsApp account (if SEED_WHATSAPP_CATALOG_ID is set)
  */
 async function main() {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
@@ -85,10 +86,12 @@ async function main() {
     const whatsappPhoneId = process.env.SEED_WHATSAPP_PHONE_NUMBER_ID
     const whatsappToken = process.env.SEED_WHATSAPP_TOKEN
 
+    let whatsappAccount: { id: string } | null = null
+
     if (whatsappPhoneId && whatsappToken) {
       const encryptedToken = await encryptToken(whatsappToken)
 
-      await prisma.socialAccount.upsert({
+      whatsappAccount = await prisma.socialAccount.upsert({
         where: {
           provider_providerAccountId: {
             provider: 'WHATSAPP',
@@ -110,6 +113,49 @@ async function main() {
       console.log(`✓ WhatsApp SocialAccount: ${whatsappPhoneId}`)
     } else {
       console.log('⚠ Skipping WhatsApp seed (missing SEED_WHATSAPP_* env vars)')
+    }
+
+    // Upsert Catalog linked to WhatsApp account
+    const catalogProviderId = process.env.SEED_WHATSAPP_CATALOG_ID
+
+    if (catalogProviderId && whatsappAccount) {
+      let catalog = await prisma.catalog.findFirst({
+        where: {
+          organisationId: org.id,
+          providerId: catalogProviderId,
+        },
+      })
+
+      if (!catalog) {
+        catalog = await prisma.catalog.create({
+          data: {
+            organisationId: org.id,
+            name: 'Catalogue WhatsApp',
+            providerId: catalogProviderId,
+          },
+        })
+        console.log(`✓ Catalog created: ${catalog.name} (${catalog.id})`)
+      } else {
+        console.log(`✓ Catalog already exists: ${catalog.name} (${catalog.id})`)
+      }
+
+      // Link catalog to WhatsApp account
+      await prisma.catalogSocialAccount.upsert({
+        where: {
+          catalogId_socialAccountId: {
+            catalogId: catalog.id,
+            socialAccountId: whatsappAccount.id,
+          },
+        },
+        update: {},
+        create: {
+          catalogId: catalog.id,
+          socialAccountId: whatsappAccount.id,
+        },
+      })
+      console.log(`✓ Catalog linked to WhatsApp account`)
+    } else {
+      console.log('⚠ Skipping Catalog seed (missing SEED_WHATSAPP_CATALOG_ID or WhatsApp account)')
     }
 
     console.log('\n✅ Seed completed!')

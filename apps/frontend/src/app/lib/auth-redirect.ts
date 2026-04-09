@@ -18,10 +18,15 @@ export interface AuthRedirectIntent {
   pageId?: string
   /** Feature scopes to store on the account (e.g. ['comments'], ['messages']) */
   scopes?: string[]
+  /** The pathname the user was on before OAuth redirect — used to return on success or error */
+  returnTo?: string
 }
 
 export function setAuthRedirect(data: AuthRedirectIntent) {
-  localStorage.setItem(AUTH_REDIRECT_KEY, JSON.stringify(data))
+  localStorage.setItem(
+    AUTH_REDIRECT_KEY,
+    JSON.stringify({ ...data, returnTo: data.returnTo ?? window.location.pathname }),
+  )
 }
 
 export function getAuthRedirect(): AuthRedirectIntent | null {

@@ -40,6 +40,21 @@ export class SocialController {
     )
   }
 
+  // ─── Connect Facebook Catalog ───
+
+  @Post('connect/facebook-catalog')
+  @ApiBody({ type: ConnectPagesDto })
+  @ApiCreatedResponse({ description: 'Catalogs connected' })
+  async connectFacebookCatalog(@CurrentUser() user: { id: string }, @Body() body: ConnectPagesDto) {
+    return this.socialService.connectFacebookCatalog(
+      user.id,
+      body.organisationId,
+      body.code,
+      body.redirectUri,
+      body.scopes,
+    )
+  }
+
   // ─── Connect Instagram account ───
 
   @Post('connect/instagram')

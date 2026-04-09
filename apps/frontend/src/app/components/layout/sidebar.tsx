@@ -44,10 +44,10 @@ const mainGroups: NavGroup[] = [
   {
     items: [
       {
-        key: 'agent',
-        labelKey: 'sidebar.agent',
+        key: 'agents',
+        labelKey: 'sidebar.agents',
         icon: <Sparkles size={ICON_SIZE} strokeWidth={STROKE} />,
-        path: 'agent',
+        path: 'agents',
       },
       {
         key: 'tickets',
@@ -57,7 +57,7 @@ const mainGroups: NavGroup[] = [
       },
       {
         key: 'catalog',
-        labelKey: 'sidebar.catalog',
+        labelKey: 'sidebar.catalogs',
         icon: <ShoppingBag size={ICON_SIZE} strokeWidth={STROKE} />,
         path: 'catalog',
       },

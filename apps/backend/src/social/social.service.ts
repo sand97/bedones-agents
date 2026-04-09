@@ -146,6 +146,146 @@ export class SocialService {
     return savedPages
   }
 
+  // ─── Connect Facebook Catalogs ───
+
+  async connectFacebookCatalog(
+    userId: string,
+    organisationId: string,
+    code: string,
+    redirectUri: string,
+    scopes?: string[],
+  ) {
+    this.logger.log(
+      `[Facebook] connectFacebookCatalog called — userId=${userId}, orgId=${organisationId}`,
+    )
+    await this.assertMembership(userId, organisationId)
+
+    const appId = this.configService.getOrThrow<string>('FACEBOOK_APP_ID')
+    const appSecret = this.configService.getOrThrow<string>('FACEBOOK_APP_SECRET')
+
+    // Exchange code for user access token
+    const tokenUrl = new URL(
+      `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/oauth/access_token`,
+    )
+    tokenUrl.searchParams.set('client_id', appId)
+    tokenUrl.searchParams.set('client_secret', appSecret)
+    tokenUrl.searchParams.set('redirect_uri', redirectUri)
+    tokenUrl.searchParams.set('code', code)
+
+    this.logger.log(`[Facebook Catalog] Exchanging code for access token...`)
+    const tokenResponse = await fetch(tokenUrl.toString())
+    const tokenBody = await tokenResponse.text()
+
+    if (!tokenResponse.ok) {
+      this.logger.error(
+        `[Facebook Catalog] Token exchange failed (HTTP ${tokenResponse.status}): ${tokenBody}`,
+      )
+      throw new BadRequestException('token_exchange_failed')
+    }
+
+    const { access_token: userAccessToken } = JSON.parse(tokenBody) as { access_token: string }
+    this.logger.log(`[Facebook Catalog] Token exchange OK — fetching assigned catalogs...`)
+
+    // Fetch catalogs assigned to the user (works with catalog_management scope, no business_management needed)
+    const catalogsUrl = new URL(
+      `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/me/assigned_product_catalogs`,
+    )
+    catalogsUrl.searchParams.set('access_token', userAccessToken)
+    catalogsUrl.searchParams.set('fields', 'id,name,product_count,vertical')
+
+    const catalogsResponse = await fetch(catalogsUrl.toString())
+    const catalogsBody = await catalogsResponse.text()
+
+    if (!catalogsResponse.ok) {
+      this.logger.error(
+        `[Facebook Catalog] /me/assigned_product_catalogs failed (${catalogsResponse.status}): ${catalogsBody}`,
+      )
+      throw new BadRequestException('Failed to fetch catalogs from Meta')
+    }
+
+    const { data: metaCatalogs } = JSON.parse(catalogsBody) as {
+      data: { id: string; name: string; product_count?: number; vertical?: string }[]
+    }
+    this.logger.log(`[Facebook Catalog] Found ${metaCatalogs?.length || 0} assigned catalogs`)
+
+    if (!metaCatalogs?.length) {
+      throw new BadRequestException('No product catalogs found for this account')
+    }
+
+    // Save a SocialAccount with the user token (needed for product listing proxy)
+    const encryptedToken = await this.encryptionService.encrypt(userAccessToken)
+    const socialAccount = await this.prisma.socialAccount.upsert({
+      where: {
+        provider_providerAccountId: {
+          provider: 'FACEBOOK_CATALOG',
+          providerAccountId: organisationId,
+        },
+      },
+      create: {
+        organisationId,
+        provider: 'FACEBOOK_CATALOG',
+        providerAccountId: organisationId,
+        pageName: 'Catalog',
+        accessToken: encryptedToken,
+        scopes: scopes ?? ['catalog_management'],
+      },
+      update: {
+        accessToken: encryptedToken,
+        pageName: 'Catalog',
+        scopes: scopes ?? ['catalog_management'],
+      },
+    })
+
+    // Save each catalog in our DB
+    const savedCatalogs = []
+    for (const metaCatalog of metaCatalogs) {
+      let catalog = await this.prisma.catalog.findFirst({
+        where: { organisationId, providerId: metaCatalog.id },
+      })
+
+      if (catalog) {
+        catalog = await this.prisma.catalog.update({
+          where: { id: catalog.id },
+          data: {
+            name: metaCatalog.name,
+            productCount: metaCatalog.product_count ?? 0,
+          },
+        })
+      } else {
+        catalog = await this.prisma.catalog.create({
+          data: {
+            organisationId,
+            name: metaCatalog.name,
+            providerId: metaCatalog.id,
+            productCount: metaCatalog.product_count ?? 0,
+          },
+        })
+      }
+
+      // Link catalog to social account
+      await this.prisma.catalogSocialAccount.upsert({
+        where: {
+          catalogId_socialAccountId: {
+            catalogId: catalog.id,
+            socialAccountId: socialAccount.id,
+          },
+        },
+        create: {
+          catalogId: catalog.id,
+          socialAccountId: socialAccount.id,
+        },
+        update: {},
+      })
+
+      savedCatalogs.push(catalog)
+    }
+
+    this.logger.log(
+      `[Facebook Catalog] ✅ Connected ${savedCatalogs.length} catalogs for org ${organisationId}`,
+    )
+    return savedCatalogs
+  }
+
   // ─── Connect Instagram Account ───
 
   async connectInstagramAccount(

@@ -25,9 +25,9 @@
   },
 
   "sidebar": {
-    "agent": "Mon Agent",
+    "agents": "Mes Agents",
     "tickets": "Tickets",
-    "catalog": "Catalogue",
+    "catalogs": "Catalogues",
     "promotions": "Promotions",
     "messaging": "Messageries",
     "whatsapp": "WhatsApp",
@@ -78,7 +78,8 @@
 
   "upload": {
     "error": "Erreur lors de l'upload",
-    "media_error": "Erreur lors de l'upload du média"
+    "media_error": "Erreur lors de l'upload du média",
+    "label": "Télécharger"
   },
 
   "social": {
@@ -227,7 +228,29 @@
     "photos": "Photos",
     "whatsapp_connect_label": "Connecter un numéro",
     "instagram_connect_label": "Connecter un compte",
-    "messenger_connect_label": "Connecter une page"
+    "messenger_connect_label": "Connecter une page",
+    "configure_agent_title": "Configurez un agent pour répondre aux messages",
+    "configure_agent_desc": "Aucun message n'a encore été reçu. En attendant, vous pouvez configurer un Agent IA pour répondre automatiquement aux futurs messages.",
+    "configure_agent_btn": "Configurer un agent",
+    "no_catalog_associated": "Aucun catalogue associé",
+    "catalog_association_desc": "Associez un catalogue à ce numéro WhatsApp pour permettre la navigation de produits.",
+    "associate": "Associer",
+    "ignore": "Ignorer"
+  },
+
+  "whatsapp_config": {
+    "title": "Configuration WhatsApp",
+    "phone_info": "Informations du numéro",
+    "phone_number": "ID du numéro",
+    "labels": "Étiquettes",
+    "add_label": "Ajouter une étiquette",
+    "label_name": "Nom de l'étiquette",
+    "catalog_section": "Catalogue",
+    "current_catalog": "Catalogue actuel",
+    "no_catalog": "Aucun catalogue associé",
+    "dissociate": "Dissocier",
+    "dissociate_confirm": "Êtes-vous sûr de vouloir dissocier ce catalogue ?",
+    "associate_catalog": "Associer un catalogue"
   },
 
   "members": {
@@ -312,7 +335,16 @@
     "status_changed": "a passé le status à",
     "description_changed": "a modifié la description",
     "before": "Avant",
-    "after": "Après"
+    "after": "Après",
+    "search_placeholder": "Rechercher par titre ou contact...",
+    "filter_status": "Filtrer par status",
+    "filter_priority": "Filtrer par priorité",
+    "priority": "Priorité",
+    "contact": "Contact",
+    "col_title": "Titre",
+    "no_contact": "Sans contact",
+    "date_start": "Date début",
+    "date_end": "Date fin"
   },
 
   "catalog": {
@@ -324,7 +356,46 @@
     "search_placeholder": "Rechercher un article...",
     "filter_status": "Filtrer par status",
     "filter_category": "Filtrer par catégorie",
-    "no_articles": "Aucun article trouvé"
+    "no_articles": "Aucun article trouvé",
+    "sync": "Synchroniser",
+    "configuration": "Configuration",
+    "add_article": "Ajouter un article",
+    "edit_article": "Modifier l'article",
+    "delete_article": "Supprimer l'article",
+    "delete_article_confirm": "Êtes-vous sûr de vouloir supprimer cet article ? Cette action est irréversible.",
+    "articles": "Articles",
+    "collections": "Collections",
+    "add_collection": "Ajouter une collection",
+    "edit_collection": "Modifier la collection",
+    "delete_collection": "Supprimer la collection",
+    "delete_collection_confirm": "Êtes-vous sûr de vouloir supprimer cette collection ?",
+    "collection_name": "Nom de la collection",
+    "product_name": "Nom du produit",
+    "product_description": "Description",
+    "product_image": "URL de l'image",
+    "product_price": "Prix",
+    "product_currency": "Devise",
+    "product_url": "URL",
+    "product_availability": "Disponibilité",
+    "product_brand": "Marque",
+    "product_condition": "État",
+    "product_condition_new": "Neuf",
+    "product_condition_refurbished": "Reconditionné",
+    "product_condition_used": "Occasion",
+    "in_stock": "En stock",
+    "out_of_stock": "Rupture de stock",
+    "product_count": "{{count}} produits",
+    "article": "Article",
+    "price": "Prix",
+    "stock": "Stock",
+    "status": "Statut",
+    "unit_count": "{{count}} unités",
+    "no_collections": "Aucune collection trouvée",
+    "uncategorized": "Non catégorisé",
+    "connect_button": "Connecter",
+    "status_published": "Publié",
+    "status_draft": "Brouillon",
+    "status_archived": "Archivé"
   },
 
   "promotions": {
@@ -350,7 +421,13 @@
     "search_placeholder": "Rechercher une promotion...",
     "filter_status": "Filtrer par status",
     "filter_type": "Filtrer par type",
-    "filter_stackable": "Filtrer par cumulabilité"
+    "filter_stackable": "Filtrer par cumulabilité",
+    "col_name": "Nom",
+    "col_code": "Code",
+    "col_value": "Valeur",
+    "col_products": "Produits",
+    "col_period": "Période",
+    "no_code": "Sans code"
   },
 
   "agent": {
@@ -361,7 +438,19 @@
     "load_context_error": "Impossible de récupérer le contexte de l'agent. Veuillez réessayer.",
     "recap": "Récapitulatif",
     "add_mcq": "+ Question choix multiples",
-    "add_scq": "+ Question choix unique"
+    "add_scq": "+ Question choix unique",
+    "create_modal_title": "Créer un agent",
+    "create_modal_desc": "Choisissez les numéros WhatsApp que cet agent va gérer.",
+    "create_modal_ok": "Créer",
+    "create_modal_cancel": "Annuler",
+    "no_catalog": "Pas de catalogue",
+    "no_catalog_warning": "Certains numéros WhatsApp n'ont pas de catalogue associé. Allez dans WhatsApp → Configuration pour associer un catalogue.",
+    "no_social_accounts": "Aucun numéro WhatsApp connecté. Connectez un numéro WhatsApp depuis la page WhatsApp pour créer un agent.",
+    "already_linked": "Déjà associé à un agent",
+    "linked_to_agent": "Associé à l'agent : {{name}}",
+    "no_agent_configured": "Aucun agent configuré",
+    "setup_banner_desc": "Créez et configurez un agent IA pour répondre automatiquement aux messages {{provider}}.",
+    "configure": "Configurer"
   },
 
   "stats": {

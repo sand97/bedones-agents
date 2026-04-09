@@ -30,15 +30,12 @@ export function SocialSetup({
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-24">
       <div className="flex max-w-md flex-col items-center text-center">
-        <div
-          className="flex items-center justify-center rounded-3xl"
-          style={{ background: `${color}14`, color }}
-        >
+        <div className="flex items-center justify-center rounded-3xl" style={{ color }}>
           {icon}
         </div>
 
         <div className="mt-6 mb-6">
-          <h2 className="m-0 text-base font-bold text-text-primary">{title}</h2>
+          <h2 className="m-0 text-base font-semibold text-text-primary">{title}</h2>
           <p className="m-0 text-sm leading-relaxed text-text-secondary">{description}</p>
         </div>
 

@@ -4,6 +4,7 @@ import { Button, Modal, Form, Input, InputNumber, Select, DatePicker, Switch, Po
 import { ShoppingBag, Plus, Trash2 } from 'lucide-react'
 import dayjs from 'dayjs'
 import 'dayjs/locale/fr'
+// TODO(mock): Remplacer MOCK_CATALOG_ARTICLES par un appel API réel
 import {
   MOCK_CATALOG_ARTICLES,
   type PromotionEligibility,

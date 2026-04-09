@@ -51,6 +51,40 @@ enum CommentStatus {
   DELETED
 }
 
+enum AgentStatus {
+  DRAFT
+  CONFIGURING
+  READY
+  ACTIVE
+  PAUSED
+}
+
+enum CatalogAnalysisStatus {
+  PENDING
+  ANALYZING
+  COMPLETED
+  FAILED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum PromotionStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  EXPIRED
+}
+
+enum PromotionDiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
 // ─── Models ───
 
 model User {
@@ -89,6 +123,10 @@ model Organisation {
 
   members        OrganisationMember[]
   socialAccounts SocialAccount[]
+  catalogs       Catalog[]
+  agents         Agent[]
+  tickets        Ticket[]
+  promotions     Promotion[]
 }
 
 model OrganisationMember {
@@ -111,6 +149,7 @@ model SocialAccount {
   provider          SocialProvider
   providerAccountId String
   pageName          String?
+  pageAbout         String?
   username          String?
   profilePictureUrl String?
   accessToken       String
@@ -123,9 +162,194 @@ model SocialAccount {
   settings      PageSettings?
   posts         Post[]
   conversations Conversation[]
+  catalogs      CatalogSocialAccount[]
+  agentLink     AgentSocialAccount?
 
   @@unique([provider, providerAccountId])
 }
+
+// ─── Catalog & Products ───
+
+model Catalog {
+  id             String                @id @default(uuid())
+  organisationId String
+  organisation   Organisation          @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  name           String
+  providerId     String?               // External catalog ID (e.g. Facebook catalog ID)
+  description    String?               // AI-generated description of catalog contents
+  analysisStatus CatalogAnalysisStatus @default(PENDING)
+  productCount   Int                   @default(0)
+  indexedCount   Int                   @default(0)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  products      Product[]
+  socialAccounts CatalogSocialAccount[]
+
+  @@index([organisationId])
+}
+
+model Product {
+  id               String   @id @default(uuid())
+  catalogId        String
+  catalog          Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  providerProductId String? // External product ID
+  name             String
+  description      String?
+  imageUrl         String?
+  price            Float?
+  currency         String?  @default("XAF")
+  category         String?
+  status           String   @default("published") // published, draft, archived
+  needsIndexing    Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  promotionProducts PromotionProduct[]
+
+  @@unique([catalogId, providerProductId])
+  @@index([catalogId])
+}
+
+model CatalogSocialAccount {
+  id              String        @id @default(uuid())
+  catalogId       String
+  catalog         Catalog       @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  socialAccountId String
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@unique([catalogId, socialAccountId])
+  @@index([catalogId])
+  @@index([socialAccountId])
+}
+
+// ─── Agent ───
+
+model Agent {
+  id             String      @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  name           String?
+  status         AgentStatus @default(DRAFT)
+  score          Int         @default(0)
+  context        String?     // AI-generated business context (markdown)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  socialAccounts AgentSocialAccount[]
+  messages       AgentMessage[]
+  ticketStatuses TicketStatus[]
+  tickets        Ticket[]
+
+  @@index([organisationId])
+}
+
+model AgentSocialAccount {
+  id              String        @id @default(uuid())
+  agentId         String
+  agent           Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  socialAccountId String        @unique // A social account can only be in ONE agent
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@unique([agentId, socialAccountId])
+  @@index([agentId])
+}
+
+model AgentMessage {
+  id        String   @id @default(uuid())
+  agentId   String
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  role      String   // 'user' | 'agent' | 'system' | 'tool'
+  content   String
+  type      String   @default("text") // 'text' | 'mcq' | 'scq' | 'tool_status'
+  metadata  Json?    // Options for MCQ/SCQ, tool info, etc.
+  createdAt DateTime @default(now())
+
+  @@index([agentId])
+  @@index([createdAt])
+}
+
+// ─── Tickets ───
+
+model TicketStatus {
+  id        String  @id @default(uuid())
+  agentId   String
+  agent     Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  name      String
+  color     String  @default("#000000")
+  order     Int     @default(0)
+  isDefault Boolean @default(false)
+
+  tickets Ticket[]
+
+  @@index([agentId])
+}
+
+model Ticket {
+  id              String         @id @default(uuid())
+  organisationId  String
+  organisation    Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  agentId         String?
+  agent           Agent?         @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  statusId        String?
+  status          TicketStatus?  @relation(fields: [statusId], references: [id], onDelete: SetNull)
+  title           String
+  description     String?
+  priority        TicketPriority @default(MEDIUM)
+  contactName     String?
+  contactId       String?        // Platform user ID
+  provider        SocialProvider?
+  conversationId  String?        // Link to Conversation
+  assignedTo      String?        // OrganisationMember ID
+  metadata        Json?          // Extra data (order details, etc.)
+  resolvedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([organisationId])
+  @@index([agentId])
+  @@index([statusId])
+  @@index([createdAt])
+}
+
+// ─── Promotions ───
+
+model Promotion {
+  id             String                @id @default(uuid())
+  organisationId String
+  organisation   Organisation          @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  discountType   PromotionDiscountType @default(PERCENTAGE)
+  discountValue  Float                 @default(0)
+  code           String?               // Promo code
+  startDate      DateTime?
+  endDate        DateTime?
+  status         PromotionStatus       @default(DRAFT)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  products PromotionProduct[]
+
+  @@index([organisationId])
+  @@index([status])
+}
+
+model PromotionProduct {
+  id          String    @id @default(uuid())
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([promotionId, productId])
+  @@index([promotionId])
+  @@index([productId])
+}
+
+// ─── Page Settings & Comments ───
 
 model PageSettings {
   id                       String    @id @default(uuid())
@@ -192,7 +416,7 @@ model Comment {
   @@index([createdTime])
 }
 
-// ─── Messaging (Messenger, Instagram DM) ───
+// ─── Messaging (Messenger, Instagram DM, WhatsApp) ───
 
 model Conversation {
   id                String         @id @default(uuid())

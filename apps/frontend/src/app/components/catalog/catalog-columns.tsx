@@ -49,12 +49,12 @@ export function useCatalogColumns(): ColumnsType<CatalogArticle> {
       dataIndex: 'stock',
       key: 'stock',
       width: 100,
-      render: (stock: number) => (
+      render: (stock: number | null | undefined) => (
         <span className="text-sm text-text-secondary">
-          {t('catalog.unit_count', { count: stock })}
+          {stock != null ? t('catalog.unit_count', { count: stock }) : '—'}
         </span>
       ),
-      sorter: (a: CatalogArticle, b: CatalogArticle) => a.stock - b.stock,
+      sorter: (a: CatalogArticle, b: CatalogArticle) => (a.stock ?? 0) - (b.stock ?? 0),
     },
     {
       title: t('catalog.status'),
@@ -62,7 +62,7 @@ export function useCatalogColumns(): ColumnsType<CatalogArticle> {
       key: 'status',
       width: 120,
       render: (status: CatalogArticleStatus) => {
-        const config = CATALOG_STATUS_CONFIG[status]
+        const config = CATALOG_STATUS_CONFIG[status] ?? CATALOG_STATUS_CONFIG.draft
         return <StatusTag label={config.label} color={config.color} />
       },
     },

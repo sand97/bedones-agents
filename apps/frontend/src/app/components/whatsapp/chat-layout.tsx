@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Button, Popover, Checkbox } from 'antd'
-import { MessageCircle } from 'lucide-react'
+import { MessageCircle, Sparkles } from 'lucide-react'
 import { ConversationList } from './conversation-list'
 import { ChatWindow } from './chat-window'
 import { SocialSetup } from '@app/components/social/social-setup'
@@ -72,6 +72,10 @@ interface ChatLayoutProps {
   onRetry?: (messageId: string) => void
   /** Called when user clicks anywhere in the chat window area */
   onChatClick?: () => void
+  /** Whether a ready/active agent is configured for this provider */
+  hasReadyAgent?: boolean
+  /** Callback when user clicks the "configure agent" button */
+  onConfigureAgent?: () => void
 }
 
 /* ── Labels filter popover ── */
@@ -138,6 +142,8 @@ export function ChatLayout({
   syncing: _syncing,
   onRetry,
   onChatClick,
+  hasReadyAgent,
+  onConfigureAgent,
 }: ChatLayoutProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -243,6 +249,15 @@ export function ChatLayout({
             onSend={onSend}
             onUploadAndSend={onUploadAndSend}
             onRetry={onRetry}
+          />
+        ) : conversations.length === 0 && !hasReadyAgent ? (
+          <SocialSetup
+            icon={<Sparkles size={40} strokeWidth={1.5} />}
+            color={providerConfig.color}
+            title={t('chat.configure_agent_title')}
+            description={t('chat.configure_agent_desc')}
+            buttonLabel={t('chat.configure_agent_btn')}
+            onAction={onConfigureAgent}
           />
         ) : conversations.length === 0 ? (
           <SocialSetup

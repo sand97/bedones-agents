@@ -1,22 +1,15 @@
 import { useState, useMemo } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useParams } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { Table, Input, Button, Modal } from 'antd'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Table, Input, Button, Modal, Spin } from 'antd'
+import dayjs from 'dayjs'
 import { Search, ChevronDown, Plus } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { TablePagination } from '@app/components/shared/table-pagination'
 import { FilterPopover } from '@app/components/shared/filter-popover'
 import { useLayout } from '@app/contexts/layout-context'
-import { PromotionDescriptionCard } from '@app/components/promotions/promotion-description-card'
-import { PromotionModal } from '@app/components/promotions/create-promotion-modal'
-import { ProductPickerModal } from '@app/components/promotions/product-picker-modal'
-import { usePromotionColumns } from '@app/components/promotions/promotion-columns'
-import {
-  MOCK_PROMOTIONS_FULL,
-  PROMOTION_STATUS_CONFIG,
-  type PromotionFull,
-  type PromotionStatus,
-} from '@app/components/whatsapp/mock-data'
+import { promotionApi, type PromotionItem } from '@app/lib/api/agent-api'
 
 export const Route = createFileRoute('/app/$orgSlug/promotions')({
   component: PromotionsPage,
@@ -24,44 +17,83 @@ export const Route = createFileRoute('/app/$orgSlug/promotions')({
 
 const DEFAULT_PAGE_SIZE = 8
 
-const ALL_STATUSES = Object.keys(PROMOTION_STATUS_CONFIG) as PromotionStatus[]
+const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  DRAFT: { label: 'Brouillon', color: '#faad14' },
+  ACTIVE: { label: 'Active', color: '#52c41a' },
+  PAUSED: { label: 'En pause', color: '#1677ff' },
+  EXPIRED: { label: 'Expirée', color: '#ff4d4f' },
+}
 
-const STATUS_FILTER_OPTIONS = ALL_STATUSES.map((status) => ({
-  key: status,
-  label: PROMOTION_STATUS_CONFIG[status].label,
-  color: PROMOTION_STATUS_CONFIG[status].color,
+const TYPE_LABELS: Record<string, string> = {
+  PERCENTAGE: 'Pourcentage',
+  FIXED_AMOUNT: 'Montant fixe',
+}
+
+const STATUS_FILTER_OPTIONS = Object.entries(STATUS_CONFIG).map(([key, val]) => ({
+  key,
+  label: val.label,
+  color: val.color,
 }))
+
+const TYPE_FILTER_OPTIONS = [
+  { key: 'PERCENTAGE', label: 'Pourcentage' },
+  { key: 'FIXED_AMOUNT', label: 'Montant fixe' },
+]
 
 function PromotionsPage() {
   const { t } = useTranslation()
+  const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
   const { isDesktop } = useLayout()
-
-  const TYPE_FILTER_OPTIONS = [
-    { key: 'percent', label: t('promotions.type_percent') },
-    { key: 'fixed', label: t('promotions.type_fixed') },
-  ]
-
-  const STACKABLE_FILTER_OPTIONS = [
-    { key: 'true', label: t('promotions.stackable') },
-    { key: 'false', label: t('promotions.not_stackable') },
-  ]
+  const queryClient = useQueryClient()
 
   const [searchText, setSearchText] = useState('')
-  const [selectedStatuses, setSelectedStatuses] = useState<PromotionStatus[]>([])
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
-  const [selectedStackable, setSelectedStackable] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingPromo, setEditingPromo] = useState<PromotionFull | null>(null)
-  const [productPickerOpen, setProductPickerOpen] = useState(false)
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
+
+  // ─── Queries ───
+
+  const promotionsQuery = useQuery({
+    queryKey: ['promotions', orgSlug, searchText, selectedStatuses, currentPage, pageSize],
+    queryFn: () =>
+      promotionApi.list(orgSlug, {
+        status: selectedStatuses.length === 1 ? selectedStatuses[0] : undefined,
+        search: searchText || undefined,
+        page: currentPage,
+        pageSize,
+      }),
+    staleTime: 10_000,
+  })
+
+  const promotions = promotionsQuery.data?.promotions || []
+  const totalPromotions = promotionsQuery.data?.total || 0
+
+  // Client-side multi-filter
+  const filteredPromotions = useMemo(() => {
+    let result = promotions
+
+    if (selectedStatuses.length > 1) {
+      result = result.filter((p) => selectedStatuses.includes(p.status))
+    }
+
+    if (selectedTypes.length > 0) {
+      result = result.filter((p) => selectedTypes.includes(p.discountType))
+    }
+
+    return result
+  }, [promotions, selectedStatuses, selectedTypes])
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => promotionApi.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['promotions', orgSlug] })
+    },
+  })
 
   const toggleStatus = (status: string) => {
     setSelectedStatuses((prev) =>
-      prev.includes(status as PromotionStatus)
-        ? prev.filter((s) => s !== status)
-        : [...prev, status as PromotionStatus],
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status],
     )
     setCurrentPage(1)
   }
@@ -73,93 +105,107 @@ function PromotionsPage() {
     setCurrentPage(1)
   }
 
-  const toggleStackable = (val: string) => {
-    setSelectedStackable((prev) =>
-      prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val],
-    )
-    setCurrentPage(1)
-  }
-
-  const filteredPromotions = useMemo(() => {
-    let result = MOCK_PROMOTIONS_FULL
-
-    if (searchText) {
-      const q = searchText.toLowerCase()
-      result = result.filter(
-        (p) => p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q),
-      )
-    }
-
-    if (selectedStatuses.length > 0) {
-      result = result.filter((p) => selectedStatuses.includes(p.status))
-    }
-
-    if (selectedTypes.length > 0) {
-      result = result.filter((p) => selectedTypes.includes(p.type))
-    }
-
-    if (selectedStackable.length > 0) {
-      result = result.filter((p) => selectedStackable.includes(String(p.stackable)))
-    }
-
-    return result
-  }, [searchText, selectedStatuses, selectedTypes, selectedStackable])
-
-  const paginatedPromotions = useMemo(() => {
-    const start = (currentPage - 1) * pageSize
-    return filteredPromotions.slice(start, start + pageSize)
-  }, [filteredPromotions, currentPage, pageSize])
-
-  const statusButtonLabel =
-    selectedStatuses.length > 0 ? `Status (${selectedStatuses.length})` : 'Status'
-
-  const typeButtonLabel = selectedTypes.length > 0 ? `Type (${selectedTypes.length})` : 'Type'
-
-  const stackableButtonLabel =
-    selectedStackable.length > 0
-      ? t('promotions.stackable_with_count', { count: selectedStackable.length })
-      : t('promotions.stackable')
-
-  const handleEdit = (promo: PromotionFull) => {
-    setEditingPromo(promo)
-    setModalOpen(true)
-  }
-
-  const handleCreate = () => {
-    setEditingPromo(null)
-    setModalOpen(true)
-  }
-
-  const handleCloseModal = () => {
-    setModalOpen(false)
-    setEditingPromo(null)
-    setSelectedProductIds([])
-  }
-
-  const handleDelete = (promo: PromotionFull) => {
+  const handleDelete = (promo: PromotionItem) => {
     Modal.confirm({
       title: t('promotions.confirm_delete'),
       content: t('promotions.confirm_delete_message', { name: promo.name }),
       okText: t('common.delete'),
       okButtonProps: { danger: true },
       cancelText: t('common.cancel'),
-      onOk: () => {
-        // TODO: call API to delete
-      },
+      onOk: () => deleteMutation.mutate(promo.id),
     })
   }
 
-  const columns = usePromotionColumns({ onEdit: handleEdit, onDelete: handleDelete })
+  const statusButtonLabel =
+    selectedStatuses.length > 0 ? `Status (${selectedStatuses.length})` : 'Status'
+
+  const typeButtonLabel = selectedTypes.length > 0 ? `Type (${selectedTypes.length})` : 'Type'
+
+  // ─── Columns ───
+
+  const columns = useMemo(
+    () => [
+      {
+        title: t('promotions.col_name'),
+        dataIndex: 'name',
+        key: 'name',
+        ellipsis: true,
+      },
+      {
+        title: t('promotions.col_code'),
+        dataIndex: 'code',
+        key: 'code',
+        width: 120,
+        render: (code: string) => code || '-',
+      },
+      {
+        title: 'Type',
+        key: 'discountType',
+        width: 130,
+        render: (_: unknown, record: PromotionItem) =>
+          TYPE_LABELS[record.discountType] || record.discountType,
+      },
+      {
+        title: t('promotions.col_value'),
+        key: 'discountValue',
+        width: 100,
+        render: (_: unknown, record: PromotionItem) =>
+          record.discountType === 'PERCENTAGE'
+            ? `${record.discountValue}%`
+            : `${record.discountValue} XAF`,
+      },
+      {
+        title: 'Status',
+        key: 'status',
+        width: 110,
+        render: (_: unknown, record: PromotionItem) => {
+          const s = STATUS_CONFIG[record.status]
+          return (
+            <span
+              className="rounded-full px-2 py-0.5 text-xs font-medium"
+              style={{ background: `${s?.color}20`, color: s?.color }}
+            >
+              {s?.label || record.status}
+            </span>
+          )
+        },
+      },
+      {
+        title: t('promotions.col_products'),
+        key: 'products',
+        width: 80,
+        render: (_: unknown, record: PromotionItem) => record.products?.length || 0,
+      },
+      {
+        title: t('promotions.col_period'),
+        key: 'period',
+        width: 200,
+        render: (_: unknown, record: PromotionItem) => {
+          if (!record.startDate && !record.endDate) return '-'
+          const start = record.startDate ? dayjs(record.startDate).format('DD/MM/YYYY') : '...'
+          const end = record.endDate ? dayjs(record.endDate).format('DD/MM/YYYY') : '...'
+          return `${start} → ${end}`
+        },
+      },
+      {
+        title: '',
+        key: 'actions',
+        width: 80,
+        render: (_: unknown, record: PromotionItem) => (
+          <Button size="small" danger type="text" onClick={() => handleDelete(record)}>
+            {t('common.delete')}
+          </Button>
+        ),
+      },
+    ],
+    [t],
+  )
 
   return (
     <div className="flex min-h-screen flex-col">
       <DashboardHeader
         title={t('promotions.title')}
-        action={
-          <Button onClick={handleCreate} icon={<Plus size={16} strokeWidth={1.5} />}>
-            {t('common.add')}
-          </Button>
-        }
+        action={<Button icon={<Plus size={16} strokeWidth={1.5} />}>{t('common.add')}</Button>}
       />
 
       <div className="flex-1 p-4 pb-16 lg:p-6 lg:pb-16">
@@ -197,22 +243,15 @@ function PromotionsPage() {
               <ChevronDown size={14} className="text-text-muted" />
             </button>
           </FilterPopover>
-          <FilterPopover
-            title={t('promotions.filter_stackable')}
-            options={STACKABLE_FILTER_OPTIONS}
-            selected={selectedStackable}
-            onToggle={toggleStackable}
-          >
-            <button type="button" className="tickets-status-trigger">
-              <span>{stackableButtonLabel}</span>
-              <ChevronDown size={14} className="text-text-muted" />
-            </button>
-          </FilterPopover>
         </div>
 
-        {isDesktop ? (
+        {promotionsQuery.isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Spin />
+          </div>
+        ) : isDesktop ? (
           <Table
-            dataSource={paginatedPromotions}
+            dataSource={filteredPromotions}
             columns={columns}
             bordered
             rowKey="id"
@@ -222,18 +261,37 @@ function PromotionsPage() {
           />
         ) : (
           <div className="flex flex-col gap-3">
-            {paginatedPromotions.length === 0 ? (
+            {filteredPromotions.length === 0 ? (
               <div className="flex items-center justify-center py-12 text-sm text-text-muted">
                 {t('promotions.no_promotions')}
               </div>
             ) : (
-              paginatedPromotions.map((promo) => (
-                <PromotionDescriptionCard
+              filteredPromotions.map((promo) => (
+                <div
                   key={promo.id}
-                  promo={promo}
-                  onEdit={() => handleEdit(promo)}
-                  onDelete={() => handleDelete(promo)}
-                />
+                  className="rounded-lg border border-border-default bg-bg-surface p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-medium text-text-primary">{promo.name}</span>
+                      <span className="text-xs text-text-muted">
+                        {promo.code || t('promotions.no_code')} &middot;{' '}
+                        {promo.discountType === 'PERCENTAGE'
+                          ? `${promo.discountValue}%`
+                          : `${promo.discountValue} XAF`}
+                      </span>
+                    </div>
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{
+                        background: `${STATUS_CONFIG[promo.status]?.color}20`,
+                        color: STATUS_CONFIG[promo.status]?.color,
+                      }}
+                    >
+                      {STATUS_CONFIG[promo.status]?.label}
+                    </span>
+                  </div>
+                </div>
               ))
             )}
           </div>
@@ -242,7 +300,7 @@ function PromotionsPage() {
         <TablePagination
           current={currentPage}
           pageSize={pageSize}
-          total={filteredPromotions.length}
+          total={totalPromotions}
           onChange={(page, size) => {
             setCurrentPage(page)
             setPageSize(size)
@@ -250,21 +308,6 @@ function PromotionsPage() {
           itemLabel="promotion"
         />
       </div>
-
-      <PromotionModal
-        open={modalOpen}
-        onClose={handleCloseModal}
-        editingPromo={editingPromo}
-        onOpenProductPicker={() => setProductPickerOpen(true)}
-        selectedProductIds={selectedProductIds}
-        setSelectedProductIds={setSelectedProductIds}
-      />
-      <ProductPickerModal
-        open={productPickerOpen}
-        onClose={() => setProductPickerOpen(false)}
-        onSave={setSelectedProductIds}
-        initialSelection={selectedProductIds}
-      />
     </div>
   )
 }

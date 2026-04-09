@@ -4,9 +4,10 @@ import { ShoppingBag } from 'lucide-react'
 
 interface CatalogEmptyProps {
   onConnect: () => void
+  loading?: boolean
 }
 
-export function CatalogEmpty({ onConnect }: CatalogEmptyProps) {
+export function CatalogEmpty({ onConnect, loading }: CatalogEmptyProps) {
   const { t } = useTranslation()
 
   return (
@@ -17,6 +18,7 @@ export function CatalogEmpty({ onConnect }: CatalogEmptyProps) {
       description={t('catalog.connect_desc')}
       buttonLabel={t('catalog.connect_button')}
       onAction={onConnect}
+      loading={loading}
     />
   )
 }

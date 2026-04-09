@@ -1,7 +1,7 @@
 import { Select } from 'antd'
 import { useTranslation } from 'react-i18next'
 
-const PAGE_SIZE_OPTIONS = [8, 16, 32]
+const PAGE_SIZE_OPTIONS = [10, 20, 30]
 
 interface TablePaginationProps {
   current: number
@@ -9,6 +9,8 @@ interface TablePaginationProps {
   total: number
   onChange: (page: number, pageSize: number) => void
   itemLabel?: string
+  /** For cursor-based pagination: override "has next page" instead of computing from total */
+  hasMore?: boolean
 }
 
 export function TablePagination({
@@ -17,16 +19,23 @@ export function TablePagination({
   total,
   onChange,
   itemLabel,
+  hasMore,
 }: TablePaginationProps) {
   const { t } = useTranslation()
   const resolvedLabel = itemLabel ?? t('pagination.item')
-  const totalPages = Math.ceil(total / pageSize)
   const pluralLabel = total > 1 ? `${resolvedLabel}s` : resolvedLabel
+
+  const totalPages = total > 0 ? Math.ceil(total / pageSize) : undefined
+  const withinBounds = totalPages ? current < totalPages : true
+  const canGoNext =
+    hasMore !== undefined ? hasMore && withinBounds : totalPages ? current < totalPages : false
+  const canGoPrev = current > 1
+  const showNav = canGoNext || canGoPrev
 
   return (
     <div className="table-pagination">
       <span className="text-sm font-semibold text-text-muted">
-        {total} {pluralLabel}
+        {total > 0 ? `${total} ${pluralLabel}` : ''}
       </span>
 
       <div className="flex items-center gap-3">
@@ -42,22 +51,22 @@ export function TablePagination({
           />
         </div>
 
-        {totalPages > 1 && (
+        {showNav && (
           <div className="flex items-center gap-2">
             <button
               type="button"
-              disabled={current === 1}
+              disabled={!canGoPrev}
               onClick={() => onChange(current - 1, pageSize)}
               className="tickets-pagination-btn"
             >
               {t('pagination.previous')}
             </button>
             <span className="tickets-pagination-indicator">
-              {current} / {totalPages}
+              {totalPages ? `${current} / ${totalPages}` : `${current}`}
             </span>
             <button
               type="button"
-              disabled={current >= totalPages}
+              disabled={!canGoNext}
               onClick={() => onChange(current + 1, pageSize)}
               className="tickets-pagination-btn"
             >

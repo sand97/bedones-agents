@@ -6,6 +6,7 @@ import { Plus, Trash2, ShoppingBag } from 'lucide-react'
 import { ArticleListItem } from '@app/components/catalog/article-list-item'
 import { SocialIconInline } from '@app/components/shared/social-badge'
 import { formatPrice } from '@app/lib/format'
+// TODO(mock): Remplacer MOCK_CONVERSATIONS, MOCK_PROMOTIONS par des appels API réels
 import {
   MOCK_CONVERSATIONS,
   MOCK_PROMOTIONS,

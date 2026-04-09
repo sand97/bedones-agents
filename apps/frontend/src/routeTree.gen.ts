@@ -36,7 +36,7 @@ import { Route as AppOrgSlugMembersRouteImport } from './routes/app/$orgSlug/mem
 import { Route as AppOrgSlugLegalRouteImport } from './routes/app/$orgSlug/legal'
 import { Route as AppOrgSlugDashboardRouteImport } from './routes/app/$orgSlug/dashboard'
 import { Route as AppOrgSlugCatalogRouteImport } from './routes/app/$orgSlug/catalog'
-import { Route as AppOrgSlugAgentRouteImport } from './routes/app/$orgSlug/agent'
+import { Route as AppOrgSlugAgentsRouteImport } from './routes/app/$orgSlug/agents'
 import { Route as AppOrgSlugCommentsIdRouteImport } from './routes/app/$orgSlug/comments/$id'
 import { Route as AppOrgSlugChatsIdRouteImport } from './routes/app/$orgSlug/chats/$id'
 
@@ -175,9 +175,9 @@ const AppOrgSlugCatalogRoute = AppOrgSlugCatalogRouteImport.update({
   path: '/catalog',
   getParentRoute: () => AppOrgSlugRouteRoute,
 } as any)
-const AppOrgSlugAgentRoute = AppOrgSlugAgentRouteImport.update({
-  id: '/agent',
-  path: '/agent',
+const AppOrgSlugAgentsRoute = AppOrgSlugAgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
   getParentRoute: () => AppOrgSlugRouteRoute,
 } as any)
 const AppOrgSlugCommentsIdRoute = AppOrgSlugCommentsIdRouteImport.update({
@@ -204,7 +204,7 @@ export interface FileRoutesByFullPath {
   '/legal/mentions': typeof LegalMentionsRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/blog/': typeof BlogIndexRoute
-  '/app/$orgSlug/agent': typeof AppOrgSlugAgentRoute
+  '/app/$orgSlug/agents': typeof AppOrgSlugAgentsRoute
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
   '/app/$orgSlug/dashboard': typeof AppOrgSlugDashboardRoute
   '/app/$orgSlug/legal': typeof AppOrgSlugLegalRoute
@@ -236,7 +236,7 @@ export interface FileRoutesByTo {
   '/legal/mentions': typeof LegalMentionsRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/blog': typeof BlogIndexRoute
-  '/app/$orgSlug/agent': typeof AppOrgSlugAgentRoute
+  '/app/$orgSlug/agents': typeof AppOrgSlugAgentsRoute
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
   '/app/$orgSlug/dashboard': typeof AppOrgSlugDashboardRoute
   '/app/$orgSlug/legal': typeof AppOrgSlugLegalRoute
@@ -269,7 +269,7 @@ export interface FileRoutesById {
   '/legal/mentions': typeof LegalMentionsRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/blog/': typeof BlogIndexRoute
-  '/app/$orgSlug/agent': typeof AppOrgSlugAgentRoute
+  '/app/$orgSlug/agents': typeof AppOrgSlugAgentsRoute
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
   '/app/$orgSlug/dashboard': typeof AppOrgSlugDashboardRoute
   '/app/$orgSlug/legal': typeof AppOrgSlugLegalRoute
@@ -303,7 +303,7 @@ export interface FileRouteTypes {
     | '/legal/mentions'
     | '/legal/privacy'
     | '/blog/'
-    | '/app/$orgSlug/agent'
+    | '/app/$orgSlug/agents'
     | '/app/$orgSlug/catalog'
     | '/app/$orgSlug/dashboard'
     | '/app/$orgSlug/legal'
@@ -335,7 +335,7 @@ export interface FileRouteTypes {
     | '/legal/mentions'
     | '/legal/privacy'
     | '/blog'
-    | '/app/$orgSlug/agent'
+    | '/app/$orgSlug/agents'
     | '/app/$orgSlug/catalog'
     | '/app/$orgSlug/dashboard'
     | '/app/$orgSlug/legal'
@@ -367,7 +367,7 @@ export interface FileRouteTypes {
     | '/legal/mentions'
     | '/legal/privacy'
     | '/blog/'
-    | '/app/$orgSlug/agent'
+    | '/app/$orgSlug/agents'
     | '/app/$orgSlug/catalog'
     | '/app/$orgSlug/dashboard'
     | '/app/$orgSlug/legal'
@@ -597,11 +597,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugCatalogRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
-    '/app/$orgSlug/agent': {
-      id: '/app/$orgSlug/agent'
-      path: '/agent'
-      fullPath: '/app/$orgSlug/agent'
-      preLoaderRoute: typeof AppOrgSlugAgentRouteImport
+    '/app/$orgSlug/agents': {
+      id: '/app/$orgSlug/agents'
+      path: '/agents'
+      fullPath: '/app/$orgSlug/agents'
+      preLoaderRoute: typeof AppOrgSlugAgentsRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
     '/app/$orgSlug/comments/$id': {
@@ -622,7 +622,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppOrgSlugRouteRouteChildren {
-  AppOrgSlugAgentRoute: typeof AppOrgSlugAgentRoute
+  AppOrgSlugAgentsRoute: typeof AppOrgSlugAgentsRoute
   AppOrgSlugCatalogRoute: typeof AppOrgSlugCatalogRoute
   AppOrgSlugDashboardRoute: typeof AppOrgSlugDashboardRoute
   AppOrgSlugLegalRoute: typeof AppOrgSlugLegalRoute
@@ -639,7 +639,7 @@ interface AppOrgSlugRouteRouteChildren {
 }
 
 const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
-  AppOrgSlugAgentRoute: AppOrgSlugAgentRoute,
+  AppOrgSlugAgentsRoute: AppOrgSlugAgentsRoute,
   AppOrgSlugCatalogRoute: AppOrgSlugCatalogRoute,
   AppOrgSlugDashboardRoute: AppOrgSlugDashboardRoute,
   AppOrgSlugLegalRoute: AppOrgSlugLegalRoute,

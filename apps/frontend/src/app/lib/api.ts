@@ -130,6 +130,28 @@ export async function connectFacebook(
   return data
 }
 
+export async function connectFacebookCatalog(
+  organisationId: string,
+  code: string,
+  redirectUri: string,
+  scopes?: string[],
+): Promise<unknown> {
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+  const res = await fetch(`${API_URL}/social/connect/facebook-catalog`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ organisationId, code, redirectUri, scopes }),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(text || i18n.t('social.facebook_connect_error'))
+  }
+
+  return res.json()
+}
+
 export async function connectInstagram(
   organisationId: string,
   code: string,

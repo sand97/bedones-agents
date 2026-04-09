@@ -2,7 +2,13 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Spin, Typography, Button, Result } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { fetchMe, connectFacebook, connectInstagram, connectTikTok } from '@app/lib/api'
+import {
+  fetchMe,
+  connectFacebook,
+  connectFacebookCatalog,
+  connectInstagram,
+  connectTikTok,
+} from '@app/lib/api'
 import { getAuthRedirect, clearAuthRedirect } from '@app/lib/auth-redirect'
 import i18n from '@app/i18n'
 
@@ -23,6 +29,7 @@ function AuthCallbackPage() {
   const navigate = useNavigate()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [loadingMessage, setLoadingMessage] = useState(i18n.t('auth.connecting'))
+  const [returnTo, setReturnTo] = useState<string | null>(null)
   const handledRef = useRef(false)
 
   useEffect(() => {
@@ -31,6 +38,11 @@ function AuthCallbackPage() {
     handledRef.current = true
 
     if (status !== 'success') {
+      const savedRedirect = getAuthRedirect()
+      if (savedRedirect?.returnTo) {
+        setReturnTo(savedRedirect.returnTo)
+      }
+      clearAuthRedirect()
       setErrorMessage(getErrorText(error))
       return
     }
@@ -46,27 +58,30 @@ function AuthCallbackPage() {
       const redirectUri = `${apiUrl}/auth/callback/${provider}`
 
       const featureScopes = redirect.scopes
-      const connectPromise =
-        provider === 'tiktok'
+      const pageId = redirect.pageId || provider
+      const isCatalog = pageId === 'catalog'
+
+      const connectPromise = isCatalog
+        ? connectFacebookCatalog(redirect.orgId, code, redirectUri, featureScopes)
+        : provider === 'tiktok'
           ? connectTikTok(redirect.orgId, code, redirectUri, featureScopes)
           : provider === 'instagram'
             ? connectInstagram(redirect.orgId, code, redirectUri, featureScopes)
             : connectFacebook(redirect.orgId, code, redirectUri, featureScopes)
 
-      // Determine redirect destination after connect
-      const pageId = redirect.pageId || provider
-      const isChat = pageId === 'messenger' || pageId === 'instagram-dm'
-      const redirectPath = isChat ? '/app/$orgSlug/chats/$id' : '/app/$orgSlug/comments/$id'
+      const returnPath = redirect.returnTo
 
       connectPromise
         .then(() => {
           clearAuthRedirect()
-          navigate({
-            to: redirectPath,
-            params: { orgSlug: redirect.orgId!, id: pageId },
-          })
+          if (returnPath) {
+            navigate({ to: returnPath } as any)
+          } else {
+            navigate({ to: '/app/$orgSlug/dashboard', params: { orgSlug: redirect.orgId! } } as any)
+          }
         })
         .catch((err) => {
+          if (returnPath) setReturnTo(returnPath)
           clearAuthRedirect()
           setErrorMessage(err instanceof Error ? err.message : i18n.t('auth.page_connect_error'))
         })
@@ -128,8 +143,11 @@ function AuthCallbackPage() {
           title={t('auth.connection_error')}
           subTitle={errorMessage}
           extra={
-            <Button type="primary" onClick={() => navigate({ to: '/auth/login' })}>
-              {t('auth.back_to_login')}
+            <Button
+              type="primary"
+              onClick={() => navigate(returnTo ? ({ to: returnTo } as any) : { to: '/auth/login' })}
+            >
+              {returnTo ? t('common.go_back') : t('auth.back_to_login')}
             </Button>
           }
         />

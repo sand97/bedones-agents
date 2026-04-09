@@ -11,6 +11,10 @@ import { SocialModule } from './social/social.module'
 import { GatewayModule } from './gateway/gateway.module'
 import { MemberModule } from './member/member.module'
 import { InvitationModule } from './invitation/invitation.module'
+import { CatalogModule } from './catalog/catalog.module'
+import { AgentModule } from './agent/agent.module'
+import { TicketModule } from './ticket/ticket.module'
+import { PromotionModule } from './promotion/promotion.module'
 
 @Module({
   imports: [
@@ -31,6 +35,10 @@ import { InvitationModule } from './invitation/invitation.module'
     SocialModule,
     MemberModule,
     InvitationModule,
+    CatalogModule,
+    AgentModule,
+    TicketModule,
+    PromotionModule,
   ],
   controllers: [AppController],
 })

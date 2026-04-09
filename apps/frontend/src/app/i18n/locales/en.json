@@ -25,9 +25,9 @@
   },
 
   "sidebar": {
-    "agent": "My Agent",
+    "agents": "My Agents",
     "tickets": "Tickets",
-    "catalog": "Catalog",
+    "catalogs": "Catalogs",
     "promotions": "Promotions",
     "messaging": "Messaging",
     "whatsapp": "WhatsApp",
@@ -78,7 +78,8 @@
 
   "upload": {
     "error": "Upload error",
-    "media_error": "Media upload error"
+    "media_error": "Media upload error",
+    "label": "Upload"
   },
 
   "social": {
@@ -227,7 +228,29 @@
     "photos": "Photos",
     "whatsapp_connect_label": "Connect a number",
     "instagram_connect_label": "Connect an account",
-    "messenger_connect_label": "Connect a page"
+    "messenger_connect_label": "Connect a page",
+    "configure_agent_title": "Configure an agent to respond to messages",
+    "configure_agent_desc": "No messages received yet. In the meantime, you can set up an AI Agent to automatically respond to future messages.",
+    "configure_agent_btn": "Configure an agent",
+    "no_catalog_associated": "No catalog associated",
+    "catalog_association_desc": "Associate a catalog with this WhatsApp number to enable product browsing.",
+    "associate": "Associate",
+    "ignore": "Ignore"
+  },
+
+  "whatsapp_config": {
+    "title": "WhatsApp Configuration",
+    "phone_info": "Phone Information",
+    "phone_number": "Phone Number ID",
+    "labels": "Labels",
+    "add_label": "Add label",
+    "label_name": "Label name",
+    "catalog_section": "Catalog",
+    "current_catalog": "Current catalog",
+    "no_catalog": "No catalog associated",
+    "dissociate": "Dissociate",
+    "dissociate_confirm": "Are you sure you want to dissociate this catalog?",
+    "associate_catalog": "Associate catalog"
   },
 
   "members": {
@@ -312,7 +335,16 @@
     "status_changed": "changed status to",
     "description_changed": "modified the description",
     "before": "Before",
-    "after": "After"
+    "after": "After",
+    "search_placeholder": "Search by title or contact...",
+    "filter_status": "Filter by status",
+    "filter_priority": "Filter by priority",
+    "priority": "Priority",
+    "contact": "Contact",
+    "col_title": "Title",
+    "no_contact": "No contact",
+    "date_start": "Start date",
+    "date_end": "End date"
   },
 
   "catalog": {
@@ -324,7 +356,46 @@
     "search_placeholder": "Search an article...",
     "filter_status": "Filter by status",
     "filter_category": "Filter by category",
-    "no_articles": "No articles found"
+    "no_articles": "No articles found",
+    "sync": "Sync",
+    "configuration": "Configuration",
+    "add_article": "Add article",
+    "edit_article": "Edit article",
+    "delete_article": "Delete article",
+    "delete_article_confirm": "Are you sure you want to delete this article? This action cannot be undone.",
+    "articles": "Articles",
+    "collections": "Collections",
+    "add_collection": "Add collection",
+    "edit_collection": "Edit collection",
+    "delete_collection": "Delete collection",
+    "delete_collection_confirm": "Are you sure you want to delete this collection?",
+    "collection_name": "Collection name",
+    "product_name": "Product name",
+    "product_description": "Description",
+    "product_image": "Image URL",
+    "product_price": "Price",
+    "product_currency": "Currency",
+    "product_url": "URL",
+    "product_availability": "Availability",
+    "product_brand": "Brand",
+    "product_condition": "Condition",
+    "product_condition_new": "New",
+    "product_condition_refurbished": "Refurbished",
+    "product_condition_used": "Used",
+    "in_stock": "In stock",
+    "out_of_stock": "Out of stock",
+    "product_count": "{{count}} products",
+    "article": "Article",
+    "price": "Price",
+    "stock": "Stock",
+    "status": "Status",
+    "unit_count": "{{count}} units",
+    "no_collections": "No collections found",
+    "uncategorized": "Uncategorized",
+    "connect_button": "Connect",
+    "status_published": "Published",
+    "status_draft": "Draft",
+    "status_archived": "Archived"
   },
 
   "promotions": {
@@ -350,7 +421,13 @@
     "search_placeholder": "Search a promotion...",
     "filter_status": "Filter by status",
     "filter_type": "Filter by type",
-    "filter_stackable": "Filter by stackability"
+    "filter_stackable": "Filter by stackability",
+    "col_name": "Name",
+    "col_code": "Code",
+    "col_value": "Value",
+    "col_products": "Products",
+    "col_period": "Period",
+    "no_code": "No code"
   },
 
   "agent": {
@@ -361,7 +438,19 @@
     "load_context_error": "Unable to retrieve the agent context. Please try again.",
     "recap": "Summary",
     "add_mcq": "+ Multiple choice question",
-    "add_scq": "+ Single choice question"
+    "add_scq": "+ Single choice question",
+    "create_modal_title": "Create an agent",
+    "create_modal_desc": "Choose the WhatsApp numbers this agent will manage.",
+    "create_modal_ok": "Create",
+    "create_modal_cancel": "Cancel",
+    "no_catalog": "No catalog",
+    "no_catalog_warning": "Some WhatsApp numbers have no linked catalog. Go to WhatsApp → Configuration to associate a catalog.",
+    "no_social_accounts": "No WhatsApp number connected. Connect a WhatsApp number from the WhatsApp page to create an agent.",
+    "already_linked": "Already linked to an agent",
+    "linked_to_agent": "Linked to agent: {{name}}",
+    "no_agent_configured": "No agent configured",
+    "setup_banner_desc": "Create and configure an AI agent to automatically respond to {{provider}} messages.",
+    "configure": "Configure"
   },
 
   "stats": {
