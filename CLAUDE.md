@@ -17,6 +17,12 @@
   - `apps/frontend/src/app/components/tickets/create-ticket-modal.tsx`
   - `apps/frontend/src/app/components/whatsapp/mock-data.ts`
 
+- **⚠️ Modales protégées — Ne pas modifier sauf ordre explicite.** Les modales suivantes ont été restaurées après suppression accidentelle par un agent. **Ne JAMAIS les modifier** sauf si l'utilisateur donne un ordre explicite et précis. En cas de modification autorisée, ne JAMAIS supprimer ou altérer les champs, props, form items ou imports existants. Uniquement ajouter, jamais supprimer ni remplacer :
+  - `apps/frontend/src/app/components/promotions/create-promotion-modal.tsx` — Modal de création/édition de promotion
+  - `apps/frontend/src/app/components/promotions/product-picker-modal.tsx` — Modal de sélection de produits pour une promotion
+  - `apps/frontend/src/app/components/tickets/create-ticket-modal.tsx` — Modal de création de ticket avec articles, charges et promotions
+- **Ne pas réécrire les pages qui intègrent ces modales** (`promotions.tsx`, `tickets.tsx`) en supprimant les imports ou le rendu des modales. Les boutons "Ajouter"/"Créer" doivent toujours ouvrir la modale correspondante.
+
 ## Règles API / React Query
 
 - **Toujours utiliser `$api` (`openapi-react-query`)** pour les appels API côté frontend. Ne jamais utiliser `useQuery` / `useMutation` manuellement depuis `@tanstack/react-query`, ni `fetch` / `axios` directement.

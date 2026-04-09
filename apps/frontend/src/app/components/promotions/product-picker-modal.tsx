@@ -1,4 +1,11 @@
+/**
+ * ⚠️ PROTECTED FILE — DO NOT MODIFY unless you have received an EXPLICIT order to do so.
+ * If you do modify this file, you MUST NOT remove or alter any existing fields, props,
+ * or mock data imports. Only ADD to this file, never delete or replace.
+ * Any agent that removes functionality from this modal will break the product selection flow.
+ */
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Modal, Input, Button, Checkbox } from 'antd'
 import { Search, ShoppingBag } from 'lucide-react'
 // TODO(mock): Remplacer MOCK_CATALOG_ARTICLES par un appel API réel (catalogApi.getProducts)
@@ -21,11 +28,12 @@ export function ProductPickerModal({
   onSave,
   initialSelection = [],
 }: ProductPickerModalProps) {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initialSelection))
 
   const activeArticles = useMemo(
-    () => MOCK_CATALOG_ARTICLES.filter((a) => a.status === 'active'),
+    () => MOCK_CATALOG_ARTICLES.filter((a) => a.status === 'published'),
     [],
   )
 
@@ -70,7 +78,7 @@ export function ProductPickerModal({
     <Modal
       title={
         <Input
-          placeholder="Rechercher un article..."
+          placeholder={t('promotions.picker_search')}
           prefix={<Search size={16} className="text-text-muted" />}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -86,11 +94,10 @@ export function ProductPickerModal({
       closable={false}
       footer={[
         <Button key="cancel" onClick={handleClose}>
-          Annuler
+          {t('promotions.cancel')}
         </Button>,
         <Button key="save" type="primary" onClick={handleSave} disabled={selectedCount === 0}>
-          Sauvegarder{' '}
-          {selectedCount > 0 ? `${selectedCount} produit${selectedCount > 1 ? 's' : ''}` : ''}
+          {t('promotions.picker_save', { count: selectedCount })}
         </Button>,
       ]}
       width={540}
@@ -100,7 +107,7 @@ export function ProductPickerModal({
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-text-muted">
             <ShoppingBag size={32} strokeWidth={1.5} className="mb-2 opacity-40" />
-            <span className="text-sm">Aucun article trouvé</span>
+            <span className="text-sm">{t('promotions.picker_no_results')}</span>
           </div>
         ) : (
           filtered.map((article) => {

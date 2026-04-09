@@ -1,3 +1,9 @@
+/**
+ * ⚠️ PROTECTED FILE — DO NOT MODIFY unless you have received an EXPLICIT order to do so.
+ * If you do modify this file, you MUST NOT remove or alter any existing fields, props,
+ * form items, or mock data imports. Only ADD to this file, never delete or replace.
+ * Any agent that removes functionality from this modal will break the promotion creation flow.
+ */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Modal, Form, Input, InputNumber, Select, DatePicker, Switch, Popover } from 'antd'
