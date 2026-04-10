@@ -84,6 +84,11 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   condition?: string
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  collectionId?: string
 }
 
 export class UpdateProductDto {

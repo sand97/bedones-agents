@@ -1402,10 +1402,16 @@ a {
     flex-wrap: wrap;
   }
 
-  .tickets-filter-input {
+  .tickets-filters:not(.catalog-filters) .tickets-filter-input {
     flex: 0 0 100% !important;
     min-width: 0 !important;
     width: 100% !important;
+  }
+
+  .catalog-filters .tickets-filter-input {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    width: auto !important;
   }
 
   .tickets-status-trigger {
@@ -2045,6 +2051,27 @@ a {
     margin-top: -1px;
     border-radius: 0 0 var(--radius-control) var(--radius-control) !important;
   }
+}
+
+/* ─── Product Modal Image Remove ─── */
+.product-modal-img-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  background: rgba(0, 0, 0, 0.55) !important;
+  color: #fff !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.product-modal-img-remove:hover {
+  background: rgba(0, 0, 0, 0.8) !important;
 }
 
 /* ─── OTP Input ─── */

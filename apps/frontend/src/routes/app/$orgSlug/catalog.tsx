@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react'
-import { createFileRoute, useParams } from '@tanstack/react-router'
+import { useState, useMemo, useCallback } from 'react'
+import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Table, Input, Button, Spin, Dropdown, Modal } from 'antd'
+import { Table, Input, Button, Skeleton, Dropdown, Modal } from 'antd'
 import {
   Search,
   ChevronDown,
@@ -17,18 +17,23 @@ import { CatalogEmpty } from '@app/components/catalog/catalog-empty'
 import { TablePagination } from '@app/components/shared/table-pagination'
 import { FilterPopover } from '@app/components/shared/filter-popover'
 import { ProductModal } from '@app/components/catalog/product-modal'
-import { CollectionModal } from '@app/components/catalog/collection-modal'
-import { CollectionList } from '@app/components/catalog/collection-list'
+import { CollectionFilterSelect } from '@app/components/catalog/collection-filter-select'
 import { ArticleDescriptionCard } from '@app/components/catalog/article-description-card'
 import { useCatalogColumns } from '@app/components/catalog/catalog-columns'
 import { AccountSwitcher } from '@app/components/social/account-switcher'
 import { useLayout } from '@app/contexts/layout-context'
 import { catalogApi } from '@app/lib/api/agent-api'
 import { setAuthRedirect, buildFacebookOAuthUrl } from '@app/lib/auth-redirect'
-import type { Product, Collection } from '@app/lib/api/agent-api'
+import type { Product } from '@app/lib/api/agent-api'
 
 export const Route = createFileRoute('/app/$orgSlug/catalog')({
   component: CatalogPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    catalogId: (search.catalogId as string) || undefined,
+    status: (search.status as string) || undefined,
+    collection: (search.collection as string) || undefined,
+    page: Number(search.page) || undefined,
+  }),
 })
 
 const DEFAULT_LIMIT = 20
@@ -39,23 +44,22 @@ const STATUS_FILTER_OPTIONS = [
   { key: 'rejected', label: 'status_archived', color: '#ff4d4f' },
 ]
 
-type ViewTab = 'articles' | 'collections'
-
 function CatalogPage() {
   const { t } = useTranslation()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
+  const search = useSearch({ from: '/app/$orgSlug/catalog' })
+  const navigate = useNavigate()
   const { isDesktop } = useLayout()
   const catalogColumns = useCatalogColumns()
   const queryClient = useQueryClient()
 
-  const [selectedCatalogId, setSelectedCatalogId] = useState<string | null>(null)
   const [searchText, setSearchText] = useState('')
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(
+    search.status ? [search.status] : [],
+  )
   const [cursorStack, setCursorStack] = useState<string[]>([])
   const [afterCursor, setAfterCursor] = useState<string | undefined>(undefined)
   const [pageSize, setPageSize] = useState(DEFAULT_LIMIT)
-  const [activeTab, setActiveTab] = useState<ViewTab>('articles')
 
   const currentPage = cursorStack.length + 1
 
@@ -63,9 +67,22 @@ function CatalogPage() {
   const [createProductOpen, setCreateProductOpen] = useState(false)
   const [editProduct, setEditProduct] = useState<Product | undefined>(undefined)
 
-  // Collection CRUD state
-  const [collectionModalOpen, setCollectionModalOpen] = useState(false)
-  const [editCollection, setEditCollection] = useState<Collection | undefined>(undefined)
+  // URL params helpers
+  const updateSearch = useCallback(
+    (updates: Record<string, string | undefined>) => {
+      navigate({
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          ...updates,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const selectedCatalogId = search.catalogId || null
+  const selectedCollectionId = search.collection || undefined
 
   // ─── Queries ───
 
@@ -87,6 +104,7 @@ function CatalogPage() {
       selectedCatalog?.id,
       searchText,
       selectedStatuses,
+      selectedCollectionId,
       afterCursor,
       pageSize,
     ],
@@ -95,6 +113,7 @@ function CatalogPage() {
         ? catalogApi.getProducts(selectedCatalog.id, {
             search: searchText || undefined,
             status: selectedStatuses.length === 1 ? selectedStatuses[0] : undefined,
+            collectionId: selectedCollectionId,
             after: afterCursor,
             limit: pageSize,
           })
@@ -108,14 +127,16 @@ function CatalogPage() {
     queryKey: ['catalog-collections', selectedCatalog?.id],
     queryFn: () =>
       selectedCatalog ? catalogApi.listCollections(selectedCatalog.id) : Promise.resolve([]),
-    enabled: !!selectedCatalog && activeTab === 'collections',
-    staleTime: 5 * 60 * 1000,
+    enabled: !!selectedCatalog,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   })
 
   const products = productsQuery.data?.products || []
   const totalProducts = productsQuery.data?.total || 0
+  const collections = collectionsQuery.data || []
 
-  // Filter client-side for multi-status + categories
+  // Filter client-side for multi-status
   const filteredProducts = useMemo(() => {
     let result = products
 
@@ -123,22 +144,8 @@ function CatalogPage() {
       result = result.filter((p) => selectedStatuses.includes(p.status))
     }
 
-    if (selectedCategories.length > 0) {
-      result = result.filter((p) => p.category && selectedCategories.includes(p.category))
-    }
-
     return result
-  }, [products, selectedStatuses, selectedCategories])
-
-  const allCategories = useMemo(() => {
-    const cats = products.map((p) => p.category).filter((c): c is string => !!c && !/^\d+$/.test(c))
-    return [...new Set(cats)].sort()
-  }, [products])
-
-  const categoryFilterOptions = useMemo(
-    () => allCategories.map((cat) => ({ key: cat, label: cat })),
-    [allCategories],
-  )
+  }, [products, selectedStatuses])
 
   // ─── Mutations ───
 
@@ -183,7 +190,6 @@ function CatalogPage() {
       selectedCatalog ? catalogApi.createCollection(selectedCatalog.id, data) : Promise.reject(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['catalog-collections', selectedCatalog?.id] })
-      setCollectionModalOpen(false)
     },
   })
 
@@ -194,8 +200,6 @@ function CatalogPage() {
         : Promise.reject(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['catalog-collections', selectedCatalog?.id] })
-      setEditCollection(undefined)
-      setCollectionModalOpen(false)
     },
   })
 
@@ -214,19 +218,15 @@ function CatalogPage() {
   const resetPagination = () => {
     setCursorStack([])
     setAfterCursor(undefined)
+    updateSearch({ page: undefined })
   }
 
   const toggleStatus = (status: string) => {
-    setSelectedStatuses((prev) =>
-      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status],
-    )
-    resetPagination()
-  }
-
-  const toggleCategory = (cat: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
-    )
+    setSelectedStatuses((prev) => {
+      const next = prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+      updateSearch({ status: next.length === 1 ? next[0] : undefined })
+      return next
+    })
     resetPagination()
   }
 
@@ -257,11 +257,6 @@ function CatalogPage() {
 
   const statusButtonLabel =
     selectedStatuses.length > 0 ? `Status (${selectedStatuses.length})` : 'Status'
-
-  const categoryButtonLabel =
-    selectedCategories.length > 0
-      ? t('catalog.category_with_count', { count: selectedCategories.length })
-      : t('catalog.category')
 
   // Translate status filter labels
   const translatedStatusOptions = STATUS_FILTER_OPTIONS.map((o) => ({
@@ -325,13 +320,14 @@ function CatalogPage() {
     imageUrl: p.imageUrl || '',
     price: p.price ?? 0,
     currency: p.currency || 'XAF',
-    category: p.category && !/^\d+$/.test(p.category) ? p.category : t('catalog.uncategorized'),
+    category: p.category || t('catalog.uncategorized'),
     stock: typeof p.inventory === 'number' ? p.inventory : 0,
+    collection: p.collectionName,
     status: (p.status === 'approved'
-      ? 'active'
+      ? 'published'
       : p.status === 'pending'
         ? 'draft'
-        : 'out_of_stock') as 'active' | 'draft' | 'out_of_stock',
+        : 'archived') as 'published' | 'draft' | 'archived',
   }))
 
   // AccountSwitcher data
@@ -344,6 +340,7 @@ function CatalogPage() {
     <div className="flex min-h-screen flex-col">
       <DashboardHeader
         title={t('catalog.title')}
+        mobileTitle=" "
         action={
           currentSwitcherAccount && (
             <AccountSwitcher
@@ -352,7 +349,7 @@ function CatalogPage() {
               connectLabel={t('common.add')}
               icon={<ShoppingBag size={16} strokeWidth={1.5} />}
               onSwitch={(account) => {
-                setSelectedCatalogId(account.id)
+                updateSearch({ catalogId: account.id, collection: undefined })
                 resetPagination()
               }}
               onConnect={handleConnectCatalog}
@@ -362,173 +359,211 @@ function CatalogPage() {
       />
 
       <div className="flex-1 p-4 pb-16 lg:p-6 lg:pb-16">
-        {/* Tab filter buttons */}
-        <div className="mb-4 flex items-center gap-2">
-          <Button
-            type={activeTab === 'articles' ? 'primary' : 'default'}
-            size="small"
-            onClick={() => setActiveTab('articles')}
-            className="comments-filter-btn"
-          >
-            {t('catalog.articles')}
-          </Button>
-          <Button
-            type={activeTab === 'collections' ? 'primary' : 'default'}
-            size="small"
-            onClick={() => setActiveTab('collections')}
-            className="comments-filter-btn"
-          >
-            {t('catalog.collections')}
-          </Button>
-        </div>
-
-        {activeTab === 'articles' ? (
-          <>
-            <div className="tickets-filters">
-              <Input
-                placeholder={t('catalog.search_placeholder')}
-                prefix={<Search size={16} className="text-text-muted" />}
-                value={searchText}
-                onChange={(e) => {
-                  setSearchText(e.target.value)
+        <div className="tickets-filters catalog-filters">
+          <div className="flex flex-1 items-center gap-3 lg:contents">
+            <Input
+              placeholder={t('catalog.search_placeholder')}
+              prefix={<Search size={16} className="text-text-muted" />}
+              value={searchText}
+              onChange={(e) => {
+                setSearchText(e.target.value)
+                resetPagination()
+              }}
+              allowClear
+              className="tickets-filter-input"
+            />
+            <FilterPopover
+              title={t('catalog.filter_status')}
+              options={translatedStatusOptions}
+              selected={selectedStatuses}
+              onToggle={toggleStatus}
+            >
+              <button type="button" className="tickets-status-trigger">
+                <span>{statusButtonLabel}</span>
+                <ChevronDown size={14} className="text-text-muted" />
+              </button>
+            </FilterPopover>
+          </div>
+          <div className="flex flex-1 items-center gap-3 lg:contents">
+            <div className="flex-1 lg:flex-none">
+              <CollectionFilterSelect
+                collections={collections}
+                selected={selectedCollectionId}
+                onSelect={(id) => {
+                  updateSearch({ collection: id })
                   resetPagination()
                 }}
-                allowClear
-                className="tickets-filter-input"
-              />
-              <FilterPopover
-                title={t('catalog.filter_status')}
-                options={translatedStatusOptions}
-                selected={selectedStatuses}
-                onToggle={toggleStatus}
-              >
-                <button type="button" className="tickets-status-trigger">
-                  <span>{statusButtonLabel}</span>
-                  <ChevronDown size={14} className="text-text-muted" />
-                </button>
-              </FilterPopover>
-              <FilterPopover
-                title={t('catalog.filter_category')}
-                options={categoryFilterOptions}
-                selected={selectedCategories}
-                onToggle={toggleCategory}
-              >
-                <button type="button" className="tickets-status-trigger">
-                  <span>{categoryButtonLabel}</span>
-                  <ChevronDown size={14} className="text-text-muted" />
-                </button>
-              </FilterPopover>
-
-              <div className="ml-auto">
-                <Button onClick={() => setCreateProductOpen(true)} icon={<Plus size={14} />}>
-                  {t('catalog.add_article')}
-                </Button>
-              </div>
-            </div>
-
-            {productsQuery.isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Spin />
-              </div>
-            ) : isDesktop ? (
-              <Table
-                dataSource={tableData}
-                columns={columnsWithActions}
-                rowKey="id"
-                bordered
-                pagination={false}
-                className="tickets-table"
-                size="middle"
-              />
-            ) : (
-              <div className="flex flex-col gap-3">
-                {tableData.length === 0 ? (
-                  <div className="flex items-center justify-center py-12 text-sm text-text-muted">
-                    {t('catalog.no_articles')}
-                  </div>
-                ) : (
-                  tableData.map((article) => (
-                    <ArticleDescriptionCard key={article.id} article={article} />
-                  ))
-                )}
-              </div>
-            )}
-
-            <TablePagination
-              current={currentPage}
-              pageSize={pageSize}
-              total={totalProducts}
-              hasMore={productsQuery.data?.hasMore}
-              onChange={(page, newPageSize) => {
-                if (newPageSize !== pageSize) {
-                  setPageSize(newPageSize)
-                  resetPagination()
-                  return
-                }
-                if (page > currentPage && productsQuery.data?.cursors?.after) {
-                  setCursorStack((prev) => [...prev, afterCursor ?? ''])
-                  setAfterCursor(productsQuery.data.cursors.after)
-                } else if (page < currentPage) {
-                  setCursorStack((prev) => {
-                    const next = [...prev]
-                    const prevCursor = next.pop()
-                    setAfterCursor(prevCursor || undefined)
-                    return next
+                loading={collectionsQuery.isLoading}
+                onAdd={(name) => createCollectionMutation.mutate({ name })}
+                onEdit={(collection, name) =>
+                  updateCollectionMutation.mutate({
+                    collectionId: collection.id,
+                    data: { name },
                   })
                 }
-              }}
-              itemLabel="article"
+                onDelete={(collection) => deleteCollectionMutation.mutate(collection.id)}
+                mutating={createCollectionMutation.isPending || updateCollectionMutation.isPending}
+              />
+            </div>
+            <div className="flex-1 lg:ml-auto lg:flex-none">
+              <Button
+                onClick={() => setCreateProductOpen(true)}
+                icon={<Plus size={14} />}
+                block={!isDesktop}
+              >
+                {t('catalog.add_article')}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {isDesktop ? (
+          productsQuery.isLoading ? (
+            <Table
+              dataSource={[]}
+              columns={columnsWithActions}
+              rowKey="id"
+              bordered
+              pagination={false}
+              className="tickets-table"
+              size="middle"
+              locale={{ emptyText: ' ' }}
+              loading={{ spinning: true }}
             />
-          </>
+          ) : (
+            <Table
+              dataSource={tableData}
+              columns={columnsWithActions}
+              rowKey="id"
+              bordered
+              pagination={false}
+              className="tickets-table"
+              size="middle"
+              loading={productsQuery.isFetching}
+            />
+          )
+        ) : productsQuery.isLoading ? (
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="catalog-card">
+                <div className="catalog-card__header">
+                  <Skeleton.Avatar shape="square" size={44} active />
+                  <div className="min-w-0 flex-1">
+                    <Skeleton
+                      title={{ width: '60%' }}
+                      paragraph={{ rows: 1, width: '40%' }}
+                      active
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
-          <CollectionList
-            collections={collectionsQuery.data || []}
-            loading={collectionsQuery.isLoading}
-            onAdd={() => {
-              setEditCollection(undefined)
-              setCollectionModalOpen(true)
-            }}
-            onEdit={(collection) => {
-              setEditCollection(collection)
-              setCollectionModalOpen(true)
-            }}
-            onDelete={(collection) => deleteCollectionMutation.mutate(collection.id)}
-          />
+          <div
+            className="flex flex-col gap-3"
+            style={productsQuery.isFetching ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
+          >
+            {tableData.length === 0 ? (
+              <div className="flex items-center justify-center py-12 text-sm text-text-muted">
+                {t('catalog.no_articles')}
+              </div>
+            ) : (
+              tableData.map((article) => {
+                const product = products.find((p) => p.id === article.id)
+                return (
+                  <ArticleDescriptionCard
+                    key={article.id}
+                    article={article}
+                    actions={
+                      <Dropdown
+                        menu={{
+                          items: [
+                            {
+                              key: 'edit',
+                              label: t('catalog.edit_article'),
+                              icon: <Pencil size={14} />,
+                              onClick: () => product && setEditProduct(product),
+                            },
+                            {
+                              key: 'delete',
+                              label: t('catalog.delete_article'),
+                              icon: <Trash2 size={14} />,
+                              danger: true,
+                              onClick: () => handleDeleteProduct(article.id),
+                            },
+                          ],
+                        }}
+                        trigger={['click']}
+                      >
+                        <Button type="text" icon={<MoreHorizontal size={16} />} size="small" />
+                      </Dropdown>
+                    }
+                  />
+                )
+              })
+            )}
+          </div>
         )}
+
+        <TablePagination
+          current={currentPage}
+          pageSize={pageSize}
+          total={totalProducts}
+          hasMore={productsQuery.data?.hasMore}
+          onChange={(page, newPageSize) => {
+            if (newPageSize !== pageSize) {
+              setPageSize(newPageSize)
+              resetPagination()
+              return
+            }
+            if (page > currentPage && productsQuery.data?.cursors?.after) {
+              setCursorStack((prev) => [...prev, afterCursor ?? ''])
+              setAfterCursor(productsQuery.data.cursors.after)
+              updateSearch({ page: String(page) })
+            } else if (page < currentPage) {
+              setCursorStack((prev) => {
+                const next = [...prev]
+                const prevCursor = next.pop()
+                setAfterCursor(prevCursor || undefined)
+                return next
+              })
+              updateSearch({ page: page > 1 ? String(page) : undefined })
+            }
+          }}
+          itemLabel="article"
+        />
       </div>
 
       <ProductModal
+        collections={collections}
         open={createProductOpen || !!editProduct}
         onClose={() => {
           setCreateProductOpen(false)
           setEditProduct(undefined)
         }}
         onSubmit={(values) => {
+          const apiData = {
+            name: values.name,
+            description: values.description,
+            imageUrl: values.imageUrls?.[0],
+            price: values.price != null ? String(values.price) : undefined,
+            currency: values.currency,
+            category: values.category,
+            url: values.url,
+            availability: values.availability,
+            brand: values.brand,
+            condition: values.condition,
+            collectionId: values.collectionId,
+          }
           if (editProduct) {
-            updateProductMutation.mutate({ productId: editProduct.id, data: values })
+            updateProductMutation.mutate({ productId: editProduct.id, data: apiData })
           } else {
-            createProductMutation.mutate(values)
+            createProductMutation.mutate(apiData)
           }
         }}
         product={editProduct}
         loading={createProductMutation.isPending || updateProductMutation.isPending}
-      />
-
-      <CollectionModal
-        open={collectionModalOpen}
-        onClose={() => {
-          setCollectionModalOpen(false)
-          setEditCollection(undefined)
-        }}
-        onSubmit={(values) => {
-          if (editCollection) {
-            updateCollectionMutation.mutate({ collectionId: editCollection.id, data: values })
-          } else {
-            createCollectionMutation.mutate(values)
-          }
-        }}
-        collection={editCollection}
-        loading={createCollectionMutation.isPending || updateCollectionMutation.isPending}
       />
     </div>
   )

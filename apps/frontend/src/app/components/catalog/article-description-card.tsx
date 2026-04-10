@@ -1,10 +1,16 @@
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Descriptions } from 'antd'
 import { StatusTag } from '@app/components/shared/status-tag'
 import { formatPrice } from '@app/lib/format'
 import { CATALOG_STATUS_CONFIG, type CatalogArticle } from '@app/components/whatsapp/mock-data'
 
-export function ArticleDescriptionCard({ article }: { article: CatalogArticle }) {
+interface ArticleDescriptionCardProps {
+  article: CatalogArticle
+  actions?: ReactNode
+}
+
+export function ArticleDescriptionCard({ article, actions }: ArticleDescriptionCardProps) {
   const { t } = useTranslation()
   const statusConfig = CATALOG_STATUS_CONFIG[article.status]
   return (
@@ -15,6 +21,7 @@ export function ArticleDescriptionCard({ article }: { article: CatalogArticle })
           <div className="font-medium text-text-primary">{article.name}</div>
           <div className="truncate text-xs text-text-muted">{article.description}</div>
         </div>
+        {actions}
       </div>
       <Descriptions
         bordered
@@ -23,7 +30,7 @@ export function ArticleDescriptionCard({ article }: { article: CatalogArticle })
         className="ticket-list-card-bordered catalog-card__details"
       >
         <Descriptions.Item label={t('catalog.status')}>
-          <StatusTag label={statusConfig.label} color={statusConfig.color} />
+          <StatusTag label={t(statusConfig.labelKey)} color={statusConfig.color} />
         </Descriptions.Item>
         <Descriptions.Item label={t('catalog.category')}>
           <span className="text-text-secondary">{article.category}</span>

@@ -11,10 +11,17 @@ import {
   Button,
   message,
 } from 'antd'
-import { ImagePlus } from 'lucide-react'
+import { X } from 'lucide-react'
 import { uploadChatMedia } from '@app/lib/api'
-import type { Product } from '@app/lib/api/agent-api'
-import type { UploadFile } from 'antd'
+import type { Product, Collection } from '@app/lib/api/agent-api'
+
+/** Normalize currency aliases to ISO 4217 */
+function normalizeCurrency(c?: string): string {
+  if (!c) return 'XAF'
+  const upper = c.toUpperCase()
+  if (upper === 'FCFA' || upper === 'CFA') return 'XAF'
+  return upper
+}
 
 /** Common Google Product Categories used in catalogs */
 const CATEGORY_SUGGESTIONS = [
@@ -55,25 +62,28 @@ interface ProductModalProps {
     availability?: string
     brand?: string
     condition?: string
+    collectionId?: string
   }) => void
   product?: Product
   loading?: boolean
+  collections?: Collection[]
 }
 
-export function ProductModal({ open, onClose, onSubmit, product, loading }: ProductModalProps) {
+export function ProductModal({
+  open,
+  onClose,
+  onSubmit,
+  product,
+  loading,
+  collections,
+}: ProductModalProps) {
   const { t } = useTranslation()
   const [form] = Form.useForm()
   const currency = Form.useWatch('currency', form) as string | undefined
   const imageUrls = (Form.useWatch('imageUrls', form) as string[] | undefined) || []
   const [uploading, setUploading] = useState(false)
 
-  // Derive fileList from form field — no separate state needed
-  const fileList: UploadFile[] = imageUrls.map((url, i) => ({
-    uid: `img-${i}`,
-    name: `image-${i + 1}`,
-    status: 'done' as const,
-    url,
-  }))
+  // fileList no longer needed — we render thumbnails manually
 
   const initialValues = product
     ? {
@@ -81,7 +91,7 @@ export function ProductModal({ open, onClose, onSubmit, product, loading }: Prod
         description: product.description,
         imageUrls: product.imageUrl ? [product.imageUrl] : [],
         price: product.price,
-        currency: product.currency || 'XAF',
+        currency: normalizeCurrency(product.currency),
         category: product.category,
         url: product.url,
         availability: product.availability,
@@ -154,32 +164,70 @@ export function ProductModal({ open, onClose, onSubmit, product, loading }: Prod
             },
           ]}
         >
-          <Upload.Dragger
-            fileList={fileList}
-            multiple
-            beforeUpload={(file) => {
-              handleUpload(file)
-              return false
-            }}
-            onRemove={(file) => {
-              const current: string[] = form.getFieldValue('imageUrls') || []
-              form.setFieldValue(
-                'imageUrls',
-                current.filter((u) => u !== file.url),
-              )
-              setTimeout(() => form.validateFields(['imageUrls']))
-            }}
-            accept=".jpg,.jpeg,.png,.webp"
-            showUploadList={{ showPreviewIcon: false }}
-          >
-            <div className="flex flex-col items-center gap-1 py-2">
-              <ImagePlus size={28} strokeWidth={1.5} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-primary">
-                {uploading ? t('common.loading') : t('catalog.upload_images_title')}
-              </span>
-              <span className="text-xs text-text-muted">{t('catalog.upload_images_hint')}</span>
+          {imageUrls.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap gap-2">
+                {imageUrls.map((url, i) => (
+                  <div key={i} className="relative">
+                    <img
+                      src={url}
+                      alt={`image-${i + 1}`}
+                      className="h-20 w-20 rounded-lg object-cover"
+                    />
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<X size={12} />}
+                      className="product-modal-img-remove"
+                      onClick={() => {
+                        const current: string[] = form.getFieldValue('imageUrls') || []
+                        form.setFieldValue(
+                          'imageUrls',
+                          current.filter((u) => u !== url),
+                        )
+                        setTimeout(() => form.validateFields(['imageUrls']))
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <Upload.Dragger
+                showUploadList={false}
+                multiple
+                accept=".jpg,.jpeg,.png,.webp"
+                beforeUpload={(file) => {
+                  handleUpload(file)
+                  return false
+                }}
+                customRequest={() => {}}
+              >
+                <div className="flex flex-col items-center gap-1 py-1">
+                  <span className="text-xs text-text-muted">
+                    {uploading ? t('common.loading') : t('catalog.upload_images_title')}
+                  </span>
+                </div>
+              </Upload.Dragger>
             </div>
-          </Upload.Dragger>
+          ) : (
+            <Upload.Dragger
+              showUploadList={false}
+              multiple
+              accept=".jpg,.jpeg,.png,.webp"
+              beforeUpload={(file) => {
+                handleUpload(file)
+                return false
+              }}
+              customRequest={() => {}}
+            >
+              <div className="flex flex-col items-center gap-2 py-2">
+                <UploadImageIcon />
+                <span className="text-sm font-medium text-text-primary">
+                  {uploading ? t('common.loading') : t('catalog.upload_images_title')}
+                </span>
+                <span className="text-xs text-text-muted">{t('catalog.upload_images_hint')}</span>
+              </div>
+            </Upload.Dragger>
+          )}
         </Form.Item>
 
         {/* Prix : currency select + montant stacked comme la réduction promo */}
@@ -199,15 +247,24 @@ export function ProductModal({ open, onClose, onSubmit, product, loading }: Prod
           </div>
         </Form.Item>
 
-        <Form.Item name="category" label={t('catalog.category')}>
-          <AutoComplete
-            options={categoryOptions}
-            placeholder={t('catalog.category_placeholder')}
-            filterOption={(input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
-            }
-          />
-        </Form.Item>
+        <div className="flex gap-4">
+          <Form.Item name="category" label={t('catalog.category')} className="flex-1">
+            <AutoComplete
+              options={categoryOptions}
+              placeholder={t('catalog.category_placeholder')}
+              filterOption={(input, option) =>
+                (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+            />
+          </Form.Item>
+          <Form.Item name="collectionId" label={t('catalog.collection')} className="flex-1">
+            <Select
+              allowClear
+              placeholder={t('catalog.collection')}
+              options={(collections || []).map((c) => ({ label: c.name, value: c.id }))}
+            />
+          </Form.Item>
+        </div>
 
         <Form.Item name="url" label={t('catalog.product_url')}>
           <Input type="url" placeholder="https://..." />
@@ -248,5 +305,32 @@ export function ProductModal({ open, onClose, onSubmit, product, loading }: Prod
         </Form.Item>
       </Form>
     </Modal>
+  )
+}
+
+/* ─── Icons ─── */
+
+function UploadImageIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M7.65037 3.5C5.12937 3.5 3.50037 5.227 3.50037 7.899V16.051C3.50037 18.724 5.12937 20.45 7.65037 20.45H16.3004C18.8274 20.45 20.4604 18.724 20.4604 16.051V7.899C20.4604 5.227 18.8274 3.5 16.3004 3.5H7.65037ZM16.3004 21.95H7.65037C4.27037 21.95 2.00037 19.579 2.00037 16.051V7.899C2.00037 4.371 4.27037 2 7.65037 2H16.3004C19.6854 2 21.9604 4.371 21.9604 7.899V16.051C21.9604 19.579 19.6854 21.95 16.3004 21.95Z"
+        fill="currentColor"
+      />
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M5.28138 17.1805C5.09538 17.1805 4.91038 17.1125 4.76538 16.9745C4.46438 16.6905 4.45238 16.2145 4.73738 15.9155L6.26538 14.3025C7.07438 13.4435 8.43938 13.4015 9.30238 14.2115L10.2604 15.1835C10.5274 15.4535 10.9614 15.4585 11.2294 15.1945C11.3304 15.0755 13.5084 12.4305 13.5084 12.4305C13.9224 11.9285 14.5064 11.6185 15.1554 11.5545C15.8054 11.4975 16.4364 11.6865 16.9394 12.0995C16.9824 12.1345 17.0214 12.1685 19.2174 14.4235C19.5064 14.7195 19.5014 15.1945 19.2044 15.4835C18.9084 15.7745 18.4324 15.7655 18.1434 15.4695C18.1434 15.4695 16.0944 13.3665 15.9484 13.2245C15.7934 13.0975 15.5444 13.0235 15.2994 13.0475C15.0504 13.0725 14.8264 13.1915 14.6674 13.3845C12.3434 16.2035 12.3154 16.2305 12.2774 16.2675C11.4194 17.1095 10.0344 17.0955 9.19138 16.2355C9.19138 16.2355 8.26138 15.2915 8.24538 15.2725C8.01438 15.0585 7.60238 15.0725 7.35538 15.3335L5.82538 16.9465C5.67738 17.1025 5.47938 17.1805 5.28138 17.1805Z"
+        fill="currentColor"
+      />
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M8.55757 8.12891C8.00457 8.12891 7.55457 8.57891 7.55457 9.13291C7.55457 9.68691 8.00457 10.1379 8.55857 10.1379C9.11257 10.1379 9.56357 9.68691 9.56357 9.13291C9.56357 8.57991 9.11257 8.12991 8.55757 8.12891ZM8.55857 11.6379C7.17757 11.6379 6.05457 10.5139 6.05457 9.13291C6.05457 7.75191 7.17757 6.62891 8.55857 6.62891C9.94057 6.62991 11.0636 7.75391 11.0636 9.13291C11.0636 10.5139 9.93957 11.6379 8.55857 11.6379Z"
+        fill="currentColor"
+      />
+    </svg>
   )
 }

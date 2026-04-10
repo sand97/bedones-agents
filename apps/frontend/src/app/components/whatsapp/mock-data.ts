@@ -832,12 +832,14 @@ export function getTicketDetail(entry: TicketListEntry): Ticket {
 
 export type CatalogArticleStatus = 'published' | 'draft' | 'archived'
 
-export const CATALOG_STATUS_CONFIG: Record<CatalogArticleStatus, { label: string; color: string }> =
-  {
-    published: { label: 'Actif', color: '#22c55e' },
-    draft: { label: 'Brouillon', color: '#f59e0b' },
-    archived: { label: 'Rupture', color: '#ef4444' },
-  }
+export const CATALOG_STATUS_CONFIG: Record<
+  CatalogArticleStatus,
+  { labelKey: string; color: string }
+> = {
+  published: { labelKey: 'catalog.status_published', color: '#22c55e' },
+  draft: { labelKey: 'catalog.status_draft', color: '#f59e0b' },
+  archived: { labelKey: 'catalog.status_archived', color: '#ef4444' },
+}
 
 export interface CatalogArticle {
   id: string
@@ -849,6 +851,7 @@ export interface CatalogArticle {
   category: string
   status: CatalogArticleStatus
   stock: number
+  collection?: string
   createdAt: string
 }
 

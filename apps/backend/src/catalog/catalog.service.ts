@@ -10,6 +10,7 @@ import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { EncryptionService } from '../auth/encryption.service'
+import { resolveGoogleCategory } from './google-product-categories'
 
 @Injectable()
 export class CatalogService {
@@ -103,13 +104,13 @@ export class CatalogService {
       })
     }
 
-    return this.findById(catalogId)
+    return this.findById(userId, catalogId)
   }
 
   // ─── Meta Product Fields ───
 
   private static readonly META_PRODUCT_FIELDS =
-    'id,name,description,image_url,price,currency,category,product_type,url,availability,brand,condition,inventory,review_status'
+    'id,name,description,image_url,price,currency,category,product_type,url,availability,brand,condition,inventory,review_status,product_sets{id,name}'
 
   /**
    * Parse Meta price format like "FCFA10,000" or "1999 XAF" or "$25.99"
@@ -119,11 +120,46 @@ export class CatalogService {
     const match = cleaned.match(/^([A-Z$€£]+)?(\d+(?:\.\d+)?)([A-Z]+)?$/)
     if (!match) return { amount: 0, currency: 'XAF' }
     const amount = parseFloat(match[2])
-    const currency = match[1]?.replace(/[$€£]/, '') || match[3] || 'XAF'
+    let currency = match[1]?.replace(/[$€£]/, '') || match[3] || 'XAF'
+    // Normalize non-ISO currency aliases
+    if (currency === 'FCFA' || currency === 'CFA') currency = 'XAF'
     return { amount, currency }
   }
 
+  /** Ensure currency is a valid ISO 4217 code for Meta */
+  private normalizeIsoCurrency(currency?: string): string {
+    if (!currency) return 'XAF'
+    const upper = currency.toUpperCase()
+    if (upper === 'FCFA' || upper === 'CFA') return 'XAF'
+    return upper
+  }
+
   // ─── Products (Meta Graph API proxy) ───
+
+  private mapMetaProduct(p: Record<string, unknown>) {
+    const priceInfo = p.price ? this.parseMetaPrice(String(p.price)) : null
+    return {
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      imageUrl: p.image_url,
+      price: priceInfo?.amount ?? null,
+      currency: priceInfo?.currency ?? 'XAF',
+      category:
+        (p.product_type as string) ||
+        (p.category ? resolveGoogleCategory(String(p.category)) : undefined),
+      url: p.url,
+      availability: p.availability,
+      brand: p.brand,
+      condition: p.condition,
+      status: (p.review_status as string) || 'approved',
+      inventory: p.inventory,
+      collectionId: (p.product_sets as { data?: Array<{ id: string; name: string }> })?.data?.[0]
+        ?.id,
+      collectionName: (p.product_sets as { data?: Array<{ id: string; name: string }> })?.data?.[0]
+        ?.name,
+    }
+  }
 
   async findProducts(
     catalogId: string,
@@ -132,6 +168,7 @@ export class CatalogService {
       status?: string
       after?: string
       limit?: number
+      collectionId?: string
     },
   ) {
     const [accessToken, providerId] = await Promise.all([
@@ -139,6 +176,8 @@ export class CatalogService {
       this.getCatalogProviderId(catalogId),
     ])
 
+    // When filtering by collection, fetch from the product set endpoint
+    const baseId = params?.collectionId || providerId
     const limit = params?.limit || 20
     const query = new URLSearchParams({
       fields: CatalogService.META_PRODUCT_FIELDS,
@@ -147,9 +186,8 @@ export class CatalogService {
       access_token: accessToken,
     })
     if (params?.after) query.set('after', params.after)
-    if (params?.status) query.set('filter', JSON.stringify({ review_status: params.status }))
 
-    const url = `${this.META_API_BASE}/${providerId}/products?${query}`
+    const url = `${this.META_API_BASE}/${baseId}/products?${query}`
     const response = await fetch(url)
 
     if (!response.ok) {
@@ -164,30 +202,18 @@ export class CatalogService {
       summary?: { total_count?: number }
     }
 
-    const products = (data.data || []).map((p) => {
-      const priceInfo = p.price ? this.parseMetaPrice(String(p.price)) : null
-      return {
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        imageUrl: p.image_url,
-        price: priceInfo?.amount ?? null,
-        currency: priceInfo?.currency ?? 'XAF',
-        category: p.product_type || p.category,
-        url: p.url,
-        availability: p.availability,
-        brand: p.brand,
-        condition: p.condition,
-        status: p.review_status || 'approved',
-        inventory: p.inventory,
-      }
-    })
+    const products = (data.data || []).map((p) => this.mapMetaProduct(p))
 
-    // Client-side search filter (Meta doesn't support search on products endpoint)
+    // Server-side filtering (Meta doesn't support filter/search on products endpoint)
     let filtered = products
+
+    if (params?.status) {
+      filtered = filtered.filter((p) => p.status === params.status)
+    }
+
     if (params?.search) {
       const q = params.search.toLowerCase()
-      filtered = products.filter(
+      filtered = filtered.filter(
         (p) =>
           (p.name as string)?.toLowerCase().includes(q) ||
           (p.description as string)?.toLowerCase().includes(q),
@@ -353,6 +379,7 @@ export class CatalogService {
       availability?: string
       brand?: string
       condition?: string
+      collectionId?: string
     },
   ) {
     const [accessToken, providerId] = await Promise.all([
@@ -362,25 +389,30 @@ export class CatalogService {
 
     const retailerId = randomUUID()
 
-    const productData: Record<string, string> = { name: data.name }
-    if (data.description) productData.description = data.description
-    if (data.imageUrl) productData.image_url = data.imageUrl
-    if (data.price) productData.price = data.price
-    if (data.currency) productData.currency = data.currency
-    if (data.url) productData.url = data.url
-    if (data.availability) productData.availability = data.availability
-    if (data.brand) productData.brand = data.brand
-    if (data.category) productData.product_type = data.category
-    if (data.condition) productData.condition = data.condition
+    const body: Record<string, unknown> = {
+      access_token: accessToken,
+      retailer_id: retailerId,
+      name: data.name,
+    }
+    if (data.description) body.description = data.description
+    if (data.imageUrl) body.image_url = data.imageUrl
+    if (data.price) {
+      const iso = this.normalizeIsoCurrency(data.currency)
+      body.price = Math.round(parseFloat(data.price) * 100)
+      body.currency = iso
+    } else if (data.currency) {
+      body.currency = this.normalizeIsoCurrency(data.currency)
+    }
+    if (data.url) body.url = data.url
+    if (data.availability) body.availability = data.availability
+    if (data.brand) body.brand = data.brand
+    if (data.category) body.product_type = data.category
+    if (data.condition) body.condition = data.condition
 
     const response = await fetch(`${this.META_API_BASE}/${providerId}/products`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        access_token: accessToken,
-        retailer_id: retailerId,
-        data: productData,
-      }),
+      body: JSON.stringify(body),
     })
 
     if (!response.ok) {
@@ -389,7 +421,26 @@ export class CatalogService {
       throw new BadRequestException(`Meta API error: ${error}`)
     }
 
-    return response.json()
+    const result = (await response.json()) as { id: string }
+
+    // Add product to collection if specified
+    if (data.collectionId && result.id) {
+      const addRes = await fetch(`${this.META_API_BASE}/${data.collectionId}/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          access_token: accessToken,
+          product_ids: [result.id],
+        }),
+      })
+      if (!addRes.ok) {
+        this.logger.warn(
+          `Failed to add product ${result.id} to collection ${data.collectionId}: ${await addRes.text()}`,
+        )
+      }
+    }
+
+    return result
   }
 
   async updateProduct(
@@ -410,12 +461,17 @@ export class CatalogService {
   ) {
     const accessToken = await this.resolveAccessToken(catalogId)
 
-    const productData: Record<string, string> = {}
+    const productData: Record<string, unknown> = {}
     if (data.name) productData.name = data.name
     if (data.description) productData.description = data.description
     if (data.imageUrl) productData.image_url = data.imageUrl
-    if (data.price) productData.price = data.price
-    if (data.currency) productData.currency = data.currency
+    if (data.price) {
+      const iso = this.normalizeIsoCurrency(data.currency)
+      productData.price = Math.round(parseFloat(data.price) * 100)
+      productData.currency = iso
+    } else if (data.currency) {
+      productData.currency = this.normalizeIsoCurrency(data.currency)
+    }
     if (data.url) productData.url = data.url
     if (data.availability) productData.availability = data.availability
     if (data.brand) productData.brand = data.brand
@@ -464,17 +520,29 @@ export class CatalogService {
       this.getCatalogProviderId(catalogId),
     ])
 
-    const response = await fetch(
-      `${this.META_API_BASE}/${providerId}/product_sets?fields=id,name,product_count&access_token=${accessToken}`,
-    )
+    const allCollections: Array<{ id: string; name: string; product_count?: number }> = []
+    let url: string | null =
+      `${this.META_API_BASE}/${providerId}/product_sets?fields=id,name,product_count&limit=100&access_token=${accessToken}`
 
-    if (!response.ok) {
-      const error = await response.text()
-      this.logger.error(`Meta list collections error: ${error}`)
-      throw new BadRequestException(`Meta API error: ${error}`)
+    while (url) {
+      const response = await fetch(url)
+
+      if (!response.ok) {
+        const error = await response.text()
+        this.logger.error(`Meta list collections error: ${error}`)
+        throw new BadRequestException(`Meta API error: ${error}`)
+      }
+
+      const data = (await response.json()) as {
+        data: Array<{ id: string; name: string; product_count?: number }>
+        paging?: { next?: string }
+      }
+
+      allCollections.push(...(data.data || []))
+      url = data.paging?.next || null
     }
 
-    return response.json()
+    return allCollections
   }
 
   async createCollection(catalogId: string, data: { name: string; productIds?: string[] }) {
@@ -483,13 +551,29 @@ export class CatalogService {
       this.getCatalogProviderId(catalogId),
     ])
 
+    const body: Record<string, unknown> = {
+      access_token: accessToken,
+      name: data.name,
+    }
+
+    // Meta requires a filter to distinguish product sets from the default "All products" set.
+    // Without a filter it throws "duplicate product set" error.
+    // With a filter matching 0 products it throws "cannot create empty set" error.
+    // Solution: use a broad filter that matches all products (contains empty string).
+    if (data.productIds?.length) {
+      body.filter = JSON.stringify({
+        retailer_id: { is_any: data.productIds },
+      })
+    } else {
+      body.filter = JSON.stringify({
+        product_type: { contains: '' },
+      })
+    }
+
     const response = await fetch(`${this.META_API_BASE}/${providerId}/product_sets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        access_token: accessToken,
-        name: data.name,
-      }),
+      body: JSON.stringify(body),
     })
 
     if (!response.ok) {

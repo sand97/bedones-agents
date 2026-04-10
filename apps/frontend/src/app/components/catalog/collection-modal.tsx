@@ -43,7 +43,7 @@ export function CollectionModal({
       onOk={handleOk}
       confirmLoading={loading}
       title={collection ? t('catalog.edit_collection') : t('catalog.add_collection')}
-      okText={collection ? t('common.save') : t('common.create')}
+      okText={collection ? t('common.save') : t('common.add')}
       cancelText={t('common.cancel')}
       destroyOnClose
     >

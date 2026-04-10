@@ -99,7 +99,7 @@ export class TicketService {
         provider: data.provider as 'FACEBOOK' | 'INSTAGRAM' | 'WHATSAPP' | 'TIKTOK' | undefined,
         conversationId: data.conversationId,
         assignedTo: data.assignedTo,
-        metadata: data.metadata || undefined,
+        metadata: (data.metadata as Record<string, unknown> & object) || undefined,
       },
       include: { status: true },
     })
@@ -127,7 +127,7 @@ export class TicketService {
         statusId: data.statusId,
         priority: data.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | undefined,
         assignedTo: data.assignedTo,
-        metadata: data.metadata || undefined,
+        metadata: (data.metadata as Record<string, unknown> & object) || undefined,
         resolvedAt: data.statusId ? undefined : undefined, // Will be set by status change logic
       },
       include: {

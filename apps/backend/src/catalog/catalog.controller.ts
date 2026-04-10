@@ -36,11 +36,6 @@ export class CatalogController {
     return this.catalogService.getWhatsAppCommerceSettings(user.id, phoneNumberId)
   }
 
-  @Get(':id')
-  async findOne(@CurrentUser() user: { id: string }, @Param('id') id: string) {
-    return this.catalogService.findById(user.id, id)
-  }
-
   @Post()
   async create(@CurrentUser() user: { id: string }, @Body() dto: CreateCatalogDto) {
     return this.catalogService.create(user.id, dto)
@@ -69,6 +64,8 @@ export class CatalogController {
     return this.catalogService.linkSocialAccounts(user.id, id, dto.socialAccountIds)
   }
 
+  // ─── Products ───
+
   @Get(':id/products')
   async findProducts(
     @CurrentUser() user: { id: string },
@@ -77,6 +74,7 @@ export class CatalogController {
     @Query('status') status?: string,
     @Query('after') after?: string,
     @Query('limit') limit?: string,
+    @Query('collectionId') collectionId?: string,
   ) {
     await this.catalogService.assertCatalogAccess(user.id, id)
     return this.catalogService.findProducts(id, {
@@ -84,6 +82,7 @@ export class CatalogController {
       status,
       after,
       limit: limit ? parseInt(limit) : undefined,
+      collectionId,
     })
   }
 
@@ -116,12 +115,6 @@ export class CatalogController {
   ) {
     await this.catalogService.assertCatalogAccess(user.id, catalogId)
     return this.catalogService.deleteProduct(catalogId, productId)
-  }
-
-  @Get(':id/analysis-progress')
-  async getAnalysisProgress(@CurrentUser() user: { id: string }, @Param('id') id: string) {
-    await this.catalogService.assertCatalogAccess(user.id, id)
-    return this.catalogService.getAnalysisProgress(id)
   }
 
   // ─── Collections (Product Sets) ───
@@ -163,6 +156,14 @@ export class CatalogController {
     return this.catalogService.deleteCollection(catalogId, collectionId)
   }
 
+  // ─── Analysis Progress ───
+
+  @Get(':id/analysis-progress')
+  async getAnalysisProgress(@CurrentUser() user: { id: string }, @Param('id') id: string) {
+    await this.catalogService.assertCatalogAccess(user.id, id)
+    return this.catalogService.getAnalysisProgress(id)
+  }
+
   // ─── Catalog-Phone Association ───
 
   @Post(':id/associate-phone')
@@ -183,5 +184,12 @@ export class CatalogController {
   ) {
     await this.catalogService.assertCatalogAccess(user.id, id)
     return this.catalogService.dissociatePhone(id, phoneNumberId)
+  }
+
+  // ─── Single catalog (must be last to avoid catching :id/products, :id/collections etc.) ───
+
+  @Get(':id')
+  async findOne(@CurrentUser() user: { id: string }, @Param('id') id: string) {
+    return this.catalogService.findById(user.id, id)
   }
 }

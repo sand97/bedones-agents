@@ -138,7 +138,10 @@ export interface Product {
   brand?: string
   condition?: string
   status: string
+  inventory?: number
   needsIndexing: boolean
+  collectionId?: string
+  collectionName?: string
 }
 
 export interface Collection {
@@ -173,6 +176,7 @@ export const catalogApi = {
       status?: string
       after?: string
       limit?: number
+      collectionId?: string
     },
   ) => {
     const query = new URLSearchParams()
@@ -180,6 +184,7 @@ export const catalogApi = {
     if (params?.status) query.set('status', params.status)
     if (params?.after) query.set('after', params.after)
     if (params?.limit) query.set('limit', String(params.limit))
+    if (params?.collectionId) query.set('collectionId', params.collectionId)
     return fetchJson<{
       products: Product[]
       total: number
@@ -202,13 +207,14 @@ export const catalogApi = {
       name: string
       description?: string
       imageUrl?: string
-      price?: number
+      price?: string
       currency?: string
       category?: string
       url?: string
       availability?: string
       brand?: string
       condition?: string
+      collectionId?: string
     },
   ) =>
     fetchJson<Product>(`/catalog/${catalogId}/products`, {
@@ -219,14 +225,18 @@ export const catalogApi = {
   updateProduct: (
     catalogId: string,
     productId: string,
-    data: Partial<{
-      name: string
-      description: string
-      imageUrl: string
-      price: number
-      currency: string
-      category: string
-    }>,
+    data: {
+      name?: string
+      description?: string
+      imageUrl?: string
+      price?: string
+      currency?: string
+      category?: string
+      url?: string
+      availability?: string
+      brand?: string
+      condition?: string
+    },
   ) =>
     fetchJson<Product>(`/catalog/${catalogId}/products/${productId}`, {
       method: 'PATCH',

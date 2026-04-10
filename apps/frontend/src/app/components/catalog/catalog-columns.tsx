@@ -34,6 +34,15 @@ export function useCatalogColumns(): ColumnsType<CatalogArticle> {
       render: (cat: string) => <span className="text-sm text-text-secondary">{cat}</span>,
     },
     {
+      title: t('catalog.collection'),
+      dataIndex: 'collection',
+      key: 'collection',
+      width: 140,
+      render: (col: string | undefined) => (
+        <span className="text-sm text-text-secondary">{col || '—'}</span>
+      ),
+    },
+    {
       title: t('catalog.price'),
       key: 'price',
       width: 140,
@@ -63,7 +72,7 @@ export function useCatalogColumns(): ColumnsType<CatalogArticle> {
       width: 120,
       render: (status: CatalogArticleStatus) => {
         const config = CATALOG_STATUS_CONFIG[status] ?? CATALOG_STATUS_CONFIG.draft
-        return <StatusTag label={config.label} color={config.color} />
+        return <StatusTag label={t(config.labelKey)} color={config.color} />
       },
     },
   ]

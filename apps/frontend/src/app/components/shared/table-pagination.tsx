@@ -1,4 +1,5 @@
 import { Select } from 'antd'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30]
@@ -59,7 +60,7 @@ export function TablePagination({
               onClick={() => onChange(current - 1, pageSize)}
               className="tickets-pagination-btn"
             >
-              {t('pagination.previous')}
+              <ArrowLeft size={16} />
             </button>
             <span className="tickets-pagination-indicator">
               {totalPages ? `${current} / ${totalPages}` : `${current}`}
@@ -70,7 +71,7 @@ export function TablePagination({
               onClick={() => onChange(current + 1, pageSize)}
               className="tickets-pagination-btn"
             >
-              {t('pagination.next')}
+              <ArrowRight size={16} />
             </button>
           </div>
         )}
