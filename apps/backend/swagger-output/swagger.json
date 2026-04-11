@@ -1155,6 +1155,107 @@
         ]
       }
     },
+    "/labels/account/{socialAccountId}": {
+      "get": {
+        "operationId": "LabelController_findAll",
+        "parameters": [
+          {
+            "name": "socialAccountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Labels"
+        ]
+      }
+    },
+    "/labels": {
+      "post": {
+        "operationId": "LabelController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLabelDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Labels"
+        ]
+      }
+    },
+    "/labels/{id}": {
+      "patch": {
+        "operationId": "LabelController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLabelDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Labels"
+        ]
+      },
+      "delete": {
+        "operationId": "LabelController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Labels"
+        ]
+      }
+    },
     "/organisations/{orgId}/members": {
       "get": {
         "operationId": "MemberController_list",
@@ -3618,6 +3719,14 @@
         "required": [
           "conversationId"
         ]
+      },
+      "CreateLabelDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateLabelDto": {
+        "type": "object",
+        "properties": {}
       },
       "MemberUserDto": {
         "type": "object",

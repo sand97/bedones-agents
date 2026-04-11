@@ -9,10 +9,18 @@ import { MessagingController } from './messaging.controller'
 import { TikTokWebhookController } from './tiktok-webhook.controller'
 import { MessagingService } from './messaging.service'
 import { AIService } from './ai.service'
+import { LabelController } from './label.controller'
+import { LabelService } from './label.service'
 
 @Module({
   imports: [AuthModule, UploadModule],
-  controllers: [SocialController, WebhookController, TikTokWebhookController, MessagingController],
-  providers: [SocialService, WebhookService, MessagingService, AIService],
+  controllers: [
+    SocialController,
+    WebhookController,
+    TikTokWebhookController,
+    MessagingController,
+    LabelController,
+  ],
+  providers: [SocialService, WebhookService, MessagingService, AIService, LabelService],
 })
 export class SocialModule {}

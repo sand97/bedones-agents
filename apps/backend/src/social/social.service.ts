@@ -218,13 +218,13 @@ export class SocialService {
       where: {
         provider_providerAccountId: {
           provider: 'FACEBOOK_CATALOG',
-          providerAccountId: organisationId,
+          providerAccountId: `catalog_${organisationId}`,
         },
       },
       create: {
         organisationId,
         provider: 'FACEBOOK_CATALOG',
-        providerAccountId: organisationId,
+        providerAccountId: `catalog_${organisationId}`,
         pageName: 'Catalog',
         accessToken: encryptedToken,
         scopes: scopes ?? ['catalog_management'],
@@ -710,6 +710,7 @@ export class SocialService {
         organisationId,
         provider: 'WHATSAPP',
         providerAccountId: phoneId,
+        wabaId: wabaId || null,
         pageName: displayName,
         username: displayPhone || null,
         accessToken: encryptedToken,
@@ -719,6 +720,7 @@ export class SocialService {
         pageName: displayName,
         username: displayPhone || null,
         accessToken: encryptedToken,
+        wabaId: wabaId || null,
       },
     })
 

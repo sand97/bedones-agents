@@ -17,6 +17,7 @@ enum AuthType {
 
 enum SocialProvider {
   FACEBOOK
+  FACEBOOK_CATALOG
   INSTAGRAM
   WHATSAPP
   TIKTOK
@@ -148,6 +149,7 @@ model SocialAccount {
   organisation      Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   provider          SocialProvider
   providerAccountId String
+  wabaId            String?        // WhatsApp Business Account ID (for WHATSAPP provider)
   pageName          String?
   pageAbout         String?
   username          String?
@@ -164,8 +166,22 @@ model SocialAccount {
   conversations Conversation[]
   catalogs      CatalogSocialAccount[]
   agentLink     AgentSocialAccount?
+  labels        Label[]
 
   @@unique([provider, providerAccountId])
+}
+
+model Label {
+  id              String        @id @default(uuid())
+  socialAccountId String
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  name            String
+  color           String        @default("#1677ff")
+  order           Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([socialAccountId])
 }
 
 // ─── Catalog & Products ───

@@ -1,24 +1,30 @@
-import { useState } from 'react'
-import { Button, ColorPicker, Divider, Input, Modal, Tag, Typography } from 'antd'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Button, Divider, Input, Modal, Select, Typography } from 'antd'
+import { Plus, ShoppingBag, Trash2, Unlink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Catalog } from '@app/lib/api/agent-api'
-import { catalogApi } from '@app/lib/api/agent-api'
+import { catalogApi, labelApi } from '@app/lib/api/agent-api'
+import type { LabelItem } from '@app/lib/api/agent-api'
 
 const { Text } = Typography
 
-interface LabelItem {
-  id: string
-  name: string
-  color: string
-}
-
-const DEFAULT_LABELS: LabelItem[] = [
-  { id: '1', name: 'VIP', color: '#FFD700' },
-  { id: '2', name: 'New Customer', color: '#52c41a' },
-  { id: '3', name: 'Pending', color: '#faad14' },
-  { id: '4', name: 'Urgent', color: '#ff4d4f' },
+const LABEL_COLORS = [
+  { value: '#f5222d', label: 'Red' },
+  { value: '#fa541c', label: 'Orange' },
+  { value: '#fa8c16', label: 'Gold' },
+  { value: '#fadb14', label: 'Yellow' },
+  { value: '#a0d911', label: 'Lime' },
+  { value: '#52c41a', label: 'Green' },
+  { value: '#13c2c2', label: 'Cyan' },
+  { value: '#1677ff', label: 'Blue' },
+  { value: '#2f54eb', label: 'Indigo' },
+  { value: '#722ed1', label: 'Purple' },
+  { value: '#eb2f96', label: 'Pink' },
+  { value: '#8c8c8c', label: 'Grey' },
+  { value: '#434343', label: 'Dark' },
+  { value: '#d4b106', label: 'Amber' },
+  { value: '#08979c', label: 'Teal' },
 ]
 
 interface WhatsappConfigModalProps {
@@ -26,64 +32,100 @@ interface WhatsappConfigModalProps {
   onClose: () => void
   phoneNumberId: string
   accountName: string
+  socialAccountId: string
   catalogs: Catalog[]
-  commerceData?: { data: Array<{ is_catalog_visible: boolean; id?: string }> }
+  commerceData?: { data: Array<{ id: string; name: string }> }
+  onOpenCatalogLink: () => void
 }
 
 export function WhatsappConfigModal({
   open,
   onClose,
   phoneNumberId,
-  accountName,
+  accountName: _accountName,
+  socialAccountId,
   catalogs,
   commerceData,
+  onOpenCatalogLink,
 }: WhatsappConfigModalProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
 
-  // ─── Labels state ───
-  const [labels, setLabels] = useState<LabelItem[]>(DEFAULT_LABELS)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editingName, setEditingName] = useState('')
+  // ─── Labels from API ───
+  const labelsQuery = useQuery({
+    queryKey: ['labels', socialAccountId],
+    queryFn: () => labelApi.list(socialAccountId),
+    enabled: open && !!socialAccountId,
+  })
+
+  const labels = labelsQuery.data || []
+
+  const [newLabelName, setNewLabelName] = useState('')
+  const [newLabelColor, setNewLabelColor] = useState('#1677ff')
+
+  const labelsKey = ['labels', socialAccountId]
+
+  const createLabelMutation = useMutation({
+    mutationFn: (data: { socialAccountId: string; name: string; color?: string }) =>
+      labelApi.create(data),
+    onSuccess: (created) => {
+      queryClient.setQueryData<LabelItem[]>(labelsKey, (old) => [...(old || []), created])
+      setNewLabelName('')
+      setNewLabelColor('#1677ff')
+    },
+  })
+
+  const updateLabelMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { name?: string; color?: string } }) =>
+      labelApi.update(id, data),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<LabelItem[]>(labelsKey, (old) =>
+        (old || []).map((l) => (l.id === updated.id ? updated : l)),
+      )
+    },
+  })
+
+  const deleteLabelMutation = useMutation({
+    mutationFn: (id: string) => labelApi.remove(id),
+    onSuccess: (_data, deletedId) => {
+      queryClient.setQueryData<LabelItem[]>(labelsKey, (old) =>
+        (old || []).filter((l) => l.id !== deletedId),
+      )
+    },
+  })
 
   const handleAddLabel = () => {
-    const newLabel: LabelItem = {
-      id: crypto.randomUUID(),
-      name: t('whatsapp_config.label_name'),
-      color: '#1677ff',
-    }
-    setLabels((prev) => [...prev, newLabel])
-    setEditingId(newLabel.id)
-    setEditingName(newLabel.name)
+    if (!newLabelName.trim()) return
+    createLabelMutation.mutate({
+      socialAccountId,
+      name: newLabelName.trim(),
+      color: newLabelColor,
+    })
   }
 
   const handleDeleteLabel = (id: string) => {
-    setLabels((prev) => prev.filter((l) => l.id !== id))
-    if (editingId === id) setEditingId(null)
+    deleteLabelMutation.mutate(id)
   }
 
-  const handleStartEdit = (label: LabelItem) => {
-    setEditingId(label.id)
-    setEditingName(label.name)
+  const handleNameChange = (label: LabelItem, name: string) => {
+    updateLabelMutation.mutate({ id: label.id, data: { name } })
   }
 
-  const handleFinishEdit = () => {
-    if (editingId && editingName.trim()) {
-      setLabels((prev) =>
-        prev.map((l) => (l.id === editingId ? { ...l, name: editingName.trim() } : l)),
-      )
+  const handleColorChange = (label: LabelItem, color: string) => {
+    updateLabelMutation.mutate({ id: label.id, data: { color } })
+  }
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!open) {
+      setNewLabelName('')
+      setNewLabelColor('#1677ff')
     }
-    setEditingId(null)
-    setEditingName('')
-  }
-
-  const handleColorChange = (id: string, color: string) => {
-    setLabels((prev) => prev.map((l) => (l.id === id ? { ...l, color } : l)))
-  }
+  }, [open])
 
   // ─── Catalog association ───
-  const associatedCatalogId = commerceData?.data?.[0]?.id
-  const associatedCatalog = catalogs.find((c) => c.providerId === associatedCatalogId)
+  const linkedMeta = commerceData?.data?.[0]
+  const localCatalog = linkedMeta ? catalogs.find((c) => c.providerId === linkedMeta.id) : undefined
 
   const dissociateMutation = useMutation({
     mutationFn: (catalogId: string) => catalogApi.dissociatePhone(catalogId, phoneNumberId),
@@ -92,26 +134,25 @@ export function WhatsappConfigModal({
     },
   })
 
-  const associateMutation = useMutation({
-    mutationFn: (catalogId: string) => catalogApi.associatePhone(catalogId, phoneNumberId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-commerce', phoneNumberId] })
-    },
-  })
-
   const handleDissociate = () => {
-    if (!associatedCatalog) return
+    if (!localCatalog) return
     Modal.confirm({
       title: t('whatsapp_config.dissociate'),
       content: t('whatsapp_config.dissociate_confirm'),
       okButtonProps: { danger: true },
-      onOk: () => dissociateMutation.mutateAsync(associatedCatalog.id),
+      onOk: () => dissociateMutation.mutateAsync(localCatalog.id),
     })
   }
 
-  const handleAssociate = (catalogId: string) => {
-    associateMutation.mutate(catalogId)
-  }
+  const colorSelectOptions = LABEL_COLORS.map((c) => ({
+    value: c.value,
+    label: (
+      <div className="flex items-center gap-2">
+        <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: c.value }} />
+        {c.label}
+      </div>
+    ),
+  }))
 
   return (
     <Modal
@@ -121,111 +162,114 @@ export function WhatsappConfigModal({
       footer={null}
       width={520}
     >
-      {/* ── Section 1: Phone Info ── */}
+      {/* ── Section 1: Catalog ── */}
       <div className="mb-4">
-        <Text strong>{t('whatsapp_config.phone_info')}</Text>
-        <div className="mt-2 flex flex-col gap-1">
-          <Text className="text-text-secondary">{accountName}</Text>
-          <Text className="text-text-muted" copyable>
-            {phoneNumberId}
-          </Text>
+        <Text strong>{t('whatsapp_config.catalog_section')}</Text>
+        <div className="mt-2">
+          {linkedMeta ? (
+            <div className="flex items-center justify-between rounded-lg border border-border-subtle px-4 py-3">
+              <div className="flex items-center gap-3">
+                <ShoppingBag size={18} className="text-text-muted" />
+                <div className="flex flex-col">
+                  <Text strong>{linkedMeta.name}</Text>
+                  <Text className="text-text-muted">{linkedMeta.id}</Text>
+                </div>
+              </div>
+              {localCatalog && (
+                <Button
+                  danger
+                  size="small"
+                  icon={<Unlink size={14} />}
+                  loading={dissociateMutation.isPending}
+                  onClick={handleDissociate}
+                >
+                  {t('whatsapp_config.dissociate')}
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="create-ticket-empty-section">
+              <ShoppingBag size={32} strokeWidth={1.5} className="text-text-muted opacity-50" />
+              <div className="text-sm font-medium text-text-primary">
+                {t('whatsapp_config.no_catalog')}
+              </div>
+              <div className="text-xs text-text-muted">{t('whatsapp_config.no_catalog_desc')}</div>
+              <Button onClick={onOpenCatalogLink} className="mt-2">
+                {t('whatsapp_config.connect_catalog')}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
       <Divider className="my-3" />
 
       {/* ── Section 2: Labels ── */}
-      <div className="mb-4">
+      <div className="mb-2">
         <Text strong>{t('whatsapp_config.labels')}</Text>
-        <div className="mt-2 flex flex-col gap-2">
+
+        {/* Existing labels */}
+        <div className="mt-3 flex flex-col gap-2">
           {labels.map((label) => (
-            <div key={label.id} className="flex items-center gap-2">
-              <ColorPicker
+            <div key={label.id} className="wa-label-row">
+              <Select
                 value={label.color}
-                size="small"
-                onChange={(_, hex) => handleColorChange(label.id, hex)}
+                className="wa-label-color"
+                onChange={(color) => handleColorChange(label, color)}
+                options={colorSelectOptions}
+                optionLabelProp="label"
               />
-              {editingId === label.id ? (
-                <Input
-                  size="small"
-                  value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
-                  onPressEnter={handleFinishEdit}
-                  onBlur={handleFinishEdit}
-                  autoFocus
-                  className="flex-1"
-                />
-              ) : (
-                <Tag
-                  className="flex-1 cursor-default"
-                  style={{ borderColor: label.color, color: label.color }}
-                >
-                  {label.name}
-                </Tag>
-              )}
-              <Button
-                type="text"
-                size="small"
-                icon={<Pencil size={14} />}
-                onClick={() => handleStartEdit(label)}
+              <Input
+                defaultValue={label.name}
+                className="wa-label-name"
+                onBlur={(e) => {
+                  const val = e.target.value.trim()
+                  if (val && val !== label.name) handleNameChange(label, val)
+                }}
+                onPressEnter={(e) => {
+                  const val = (e.target as HTMLInputElement).value.trim()
+                  if (val && val !== label.name) handleNameChange(label, val)
+                }}
               />
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<Trash2 size={14} />}
+              <button
+                type="button"
+                className="wa-label-delete-btn"
                 onClick={() => handleDeleteLabel(label.id)}
-              />
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
           ))}
-          <Button type="dashed" size="small" icon={<Plus size={14} />} onClick={handleAddLabel}>
+        </div>
+
+        {/* Add new label */}
+        <Divider className="my-3" />
+        <div className="flex flex-col gap-2">
+          <div className="wa-label-row">
+            <Select
+              value={newLabelColor}
+              className="wa-label-color"
+              onChange={setNewLabelColor}
+              options={colorSelectOptions}
+              optionLabelProp="label"
+            />
+            <Input
+              placeholder={t('whatsapp_config.label_placeholder')}
+              value={newLabelName}
+              onChange={(e) => setNewLabelName(e.target.value)}
+              onPressEnter={handleAddLabel}
+              className="wa-label-name wa-label-name--last"
+            />
+          </div>
+          <Button
+            type="dashed"
+            icon={<Plus size={14} />}
+            loading={createLabelMutation.isPending}
+            disabled={!newLabelName.trim()}
+            onClick={handleAddLabel}
+          >
             {t('whatsapp_config.add_label')}
           </Button>
-        </div>
-      </div>
-
-      <Divider className="my-3" />
-
-      {/* ── Section 3: Catalog ── */}
-      <div>
-        <Text strong>{t('whatsapp_config.catalog_section')}</Text>
-        <div className="mt-2">
-          {associatedCatalog ? (
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <Text>{t('whatsapp_config.current_catalog')}</Text>
-                <Text strong>{associatedCatalog.name}</Text>
-              </div>
-              <Button
-                danger
-                size="small"
-                loading={dissociateMutation.isPending}
-                onClick={handleDissociate}
-              >
-                {t('whatsapp_config.dissociate')}
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <Text className="text-text-muted">{t('whatsapp_config.no_catalog')}</Text>
-              {catalogs.length > 0 ? (
-                catalogs.map((catalog) => (
-                  <Button
-                    key={catalog.id}
-                    size="small"
-                    loading={
-                      associateMutation.isPending && associateMutation.variables === catalog.id
-                    }
-                    onClick={() => handleAssociate(catalog.id)}
-                  >
-                    {catalog.name}
-                  </Button>
-                ))
-              ) : (
-                <Text className="text-text-muted">{t('whatsapp_config.associate_catalog')}</Text>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </Modal>

@@ -29,12 +29,20 @@ export function ArticleDescriptionCard({ article, actions }: ArticleDescriptionC
         size="small"
         className="ticket-list-card-bordered catalog-card__details"
       >
+        <Descriptions.Item label={t('catalog.content_id')}>
+          <span className="text-xs text-text-muted">{article.id}</span>
+        </Descriptions.Item>
         <Descriptions.Item label={t('catalog.status')}>
           <StatusTag label={t(statusConfig.labelKey)} color={statusConfig.color} />
         </Descriptions.Item>
         <Descriptions.Item label={t('catalog.category')}>
           <span className="text-text-secondary">{article.category}</span>
         </Descriptions.Item>
+        {article.collection && (
+          <Descriptions.Item label={t('catalog.collection')}>
+            <span className="text-text-secondary">{article.collection}</span>
+          </Descriptions.Item>
+        )}
         <Descriptions.Item label={t('catalog.price')}>
           <span className="font-medium">{formatPrice(article.price, article.currency)}</span>
         </Descriptions.Item>

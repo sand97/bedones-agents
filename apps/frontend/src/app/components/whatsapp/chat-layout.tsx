@@ -3,10 +3,11 @@ import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Button, Popover, Checkbox } from 'antd'
-import { MessageCircle, Sparkles } from 'lucide-react'
+import { MessageCircle, Sparkles, ShoppingBag, EllipsisVertical } from 'lucide-react'
 import { ConversationList } from './conversation-list'
 import { ChatWindow } from './chat-window'
 import { SocialSetup } from '@app/components/social/social-setup'
+import { HeaderHelper } from '@app/components/shared/header-helper'
 import {
   WhatsAppIcon,
   InstagramIcon,
@@ -74,8 +75,14 @@ interface ChatLayoutProps {
   onChatClick?: () => void
   /** Whether a ready/active agent is configured for this provider */
   hasReadyAgent?: boolean
+  /** Whether a catalog is associated with the current WhatsApp number */
+  hasCatalogAssociated?: boolean
   /** Callback when user clicks the "configure agent" button */
   onConfigureAgent?: () => void
+  /** Callback when user clicks the "configure catalog" button */
+  onConfigureCatalog?: () => void
+  /** Callback when user clicks the Options button */
+  onOpenOptions?: () => void
 }
 
 /* ── Labels filter popover ── */
@@ -131,6 +138,24 @@ function LabelsFilterPopover({
   )
 }
 
+/**
+ * Determine which single setup state to show, in priority order:
+ * 1. No catalog (WhatsApp only) → configure catalog
+ * 2. Catalog but no agent → configure agent
+ * 3. Everything configured → null (show conversations or "empty" state)
+ */
+type SetupState = 'catalog' | 'agent' | null
+
+function useSetupState(
+  provider: ChatProvider,
+  hasCatalogAssociated: boolean,
+  hasReadyAgent: boolean,
+): SetupState {
+  if (provider === 'whatsapp' && !hasCatalogAssociated) return 'catalog'
+  if (!hasReadyAgent) return 'agent'
+  return null
+}
+
 export function ChatLayout({
   conversations,
   loading = false,
@@ -142,8 +167,11 @@ export function ChatLayout({
   syncing: _syncing,
   onRetry,
   onChatClick,
-  hasReadyAgent,
+  hasReadyAgent = false,
+  hasCatalogAssociated = true,
   onConfigureAgent,
+  onConfigureCatalog,
+  onOpenOptions,
 }: ChatLayoutProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -154,6 +182,9 @@ export function ChatLayout({
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
 
   const selectedConversation = conversations.find((c) => c.id === selectedConvId)
+
+  const setupState = useSetupState(provider, hasCatalogAssociated, hasReadyAgent)
+  const hasConversations = conversations.length > 0
 
   const selectConversation = (conv: Conversation) => {
     if (onSelectConversation) {
@@ -193,12 +224,95 @@ export function ChatLayout({
     )
   }
 
+  /* ── Desktop SocialSetup (right panel) ── */
+  const renderDesktopSetup = () => {
+    // Priority: catalog > agent > empty conversations > select conversation
+    if (setupState === 'catalog') {
+      return (
+        <SocialSetup
+          icon={<ShoppingBag size={40} strokeWidth={1.5} />}
+          color={providerConfig.color}
+          title={t('chat.configure_catalog_title')}
+          description={t('chat.configure_catalog_desc')}
+          buttonLabel={t('chat.configure_catalog_btn')}
+          onAction={onConfigureCatalog}
+        />
+      )
+    }
+    if (setupState === 'agent') {
+      return (
+        <SocialSetup
+          icon={<Sparkles size={40} strokeWidth={1.5} />}
+          color={providerConfig.color}
+          title={t('chat.configure_agent_title')}
+          description={t('chat.configure_agent_desc')}
+          buttonLabel={t('chat.configure_agent_btn')}
+          onAction={onConfigureAgent}
+        />
+      )
+    }
+    if (!hasConversations) {
+      return (
+        <SocialSetup
+          icon={<MessageCircle size={40} strokeWidth={1.5} />}
+          color={providerConfig.color}
+          title={t(providerConfig.noConvTitleKey)}
+          description={t('chat.conversations_will_appear')}
+        />
+      )
+    }
+    return (
+      <SocialSetup
+        icon={providerConfig.icon}
+        color={providerConfig.color}
+        title={t(providerConfig.selectTitleKey)}
+        description={t(providerConfig.selectDescKey)}
+      />
+    )
+  }
+
+  /* ── Mobile HeaderHelper (above conversation list) ── */
+  const renderMobileHeaderHelper = () => {
+    if (!hasConversations) return null // Will show SocialSetup instead
+    if (setupState === 'catalog') {
+      return (
+        <HeaderHelper
+          icon={<ShoppingBag size={18} strokeWidth={1.5} />}
+          title={t('chat.no_catalog_associated')}
+          subtitle={t('chat.catalog_association_desc')}
+          primaryAction={{ title: t('chat.associate'), onClick: () => onConfigureCatalog?.() }}
+        />
+      )
+    }
+    if (setupState === 'agent') {
+      return (
+        <HeaderHelper
+          icon={<Sparkles size={18} strokeWidth={1.5} />}
+          title={t('agent.no_agent_configured')}
+          subtitle={t('agent.setup_banner_desc', {
+            provider:
+              provider === 'whatsapp'
+                ? 'WhatsApp'
+                : provider === 'instagram-dm'
+                  ? 'Instagram'
+                  : 'Messenger',
+          })}
+          primaryAction={{ title: t('agent.configure'), onClick: () => onConfigureAgent?.() }}
+        />
+      )
+    }
+    return null
+  }
+
   return (
     <div className="chat-split">
       {/* Left: conversation list */}
       <div
         className={`chat-split__left ${selectedConversation ? 'chat-split__left--hidden-mobile' : ''}`}
       >
+        {/* Mobile: show HeaderHelper if conversations exist + setup needed */}
+        {renderMobileHeaderHelper()}
+
         {/* Filter bar */}
         <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-3.5">
           <Button
@@ -226,14 +340,49 @@ export function ChatLayout({
               Labels{selectedLabelIds.length > 0 ? ` (${selectedLabelIds.length})` : ''}
             </Button>
           </LabelsFilterPopover>
+          {provider === 'whatsapp' && (
+            <div className="ml-auto">
+              <Button
+                type="text"
+                size="small"
+                icon={<EllipsisVertical size={16} />}
+                onClick={onOpenOptions}
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <ConversationList
-            conversations={filteredConversations}
-            selectedId={selectedConvId}
-            onSelect={selectConversation}
-          />
+          {/* Mobile only: show SocialSetup when no conversations + setup needed */}
+          {!hasConversations && setupState ? (
+            <div className="md:hidden">
+              {setupState === 'catalog' ? (
+                <SocialSetup
+                  icon={<ShoppingBag size={40} strokeWidth={1.5} />}
+                  color={providerConfig.color}
+                  title={t('chat.configure_catalog_title')}
+                  description={t('chat.configure_catalog_desc')}
+                  buttonLabel={t('chat.configure_catalog_btn')}
+                  onAction={onConfigureCatalog}
+                />
+              ) : (
+                <SocialSetup
+                  icon={<Sparkles size={40} strokeWidth={1.5} />}
+                  color={providerConfig.color}
+                  title={t('chat.configure_agent_title')}
+                  description={t('chat.configure_agent_desc')}
+                  buttonLabel={t('chat.configure_agent_btn')}
+                  onAction={onConfigureAgent}
+                />
+              )}
+            </div>
+          ) : (
+            <ConversationList
+              conversations={filteredConversations}
+              selectedId={selectedConvId}
+              onSelect={selectConversation}
+            />
+          )}
         </div>
       </div>
 
@@ -250,29 +399,8 @@ export function ChatLayout({
             onUploadAndSend={onUploadAndSend}
             onRetry={onRetry}
           />
-        ) : conversations.length === 0 && !hasReadyAgent ? (
-          <SocialSetup
-            icon={<Sparkles size={40} strokeWidth={1.5} />}
-            color={providerConfig.color}
-            title={t('chat.configure_agent_title')}
-            description={t('chat.configure_agent_desc')}
-            buttonLabel={t('chat.configure_agent_btn')}
-            onAction={onConfigureAgent}
-          />
-        ) : conversations.length === 0 ? (
-          <SocialSetup
-            icon={<MessageCircle size={40} strokeWidth={1.5} />}
-            color={providerConfig.color}
-            title={t(providerConfig.noConvTitleKey)}
-            description={t('chat.conversations_will_appear')}
-          />
         ) : (
-          <SocialSetup
-            icon={providerConfig.icon}
-            color={providerConfig.color}
-            title={t(providerConfig.selectTitleKey)}
-            description={t(providerConfig.selectDescKey)}
-          />
+          renderDesktopSetup()
         )}
       </div>
     </div>

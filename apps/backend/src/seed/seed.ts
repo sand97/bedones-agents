@@ -85,6 +85,7 @@ async function main() {
     // Upsert WhatsApp SocialAccount
     const whatsappPhoneId = process.env.SEED_WHATSAPP_PHONE_NUMBER_ID
     const whatsappToken = process.env.SEED_WHATSAPP_TOKEN
+    const whatsappWabaId = process.env.SEED_WHATSAPP_WABA_ID
 
     let whatsappAccount: { id: string } | null = null
 
@@ -100,17 +101,19 @@ async function main() {
         },
         update: {
           accessToken: encryptedToken,
+          wabaId: whatsappWabaId || null,
         },
         create: {
           organisationId: org.id,
           provider: 'WHATSAPP',
           providerAccountId: whatsappPhoneId,
+          wabaId: whatsappWabaId || null,
           pageName: 'WhatsApp Test',
           accessToken: encryptedToken,
           scopes: ['whatsapp_business_management', 'whatsapp_business_messaging'],
         },
       })
-      console.log(`✓ WhatsApp SocialAccount: ${whatsappPhoneId}`)
+      console.log(`✓ WhatsApp SocialAccount: ${whatsappPhoneId} (WABA: ${whatsappWabaId || 'N/A'})`)
     } else {
       console.log('⚠ Skipping WhatsApp seed (missing SEED_WHATSAPP_* env vars)')
     }

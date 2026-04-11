@@ -235,7 +235,19 @@
     "no_catalog_associated": "No catalog associated",
     "catalog_association_desc": "Associate a catalog with this WhatsApp number to enable product browsing.",
     "associate": "Associate",
-    "ignore": "Ignore"
+    "ignore": "Ignore",
+    "configure_catalog_title": "Associate a catalog",
+    "configure_catalog_desc": "Link a product catalog to this number so your customers can browse your products on WhatsApp.",
+    "configure_catalog_btn": "Associate a catalog",
+    "options": "Options"
+  },
+
+  "catalog_link": {
+    "title": "Associate a catalog",
+    "phone_number": "WhatsApp number",
+    "select_catalog": "Choose a catalog",
+    "select_placeholder": "Select a catalog...",
+    "associate": "Associate"
   },
 
   "whatsapp_config": {
@@ -247,10 +259,13 @@
     "label_name": "Label name",
     "catalog_section": "Catalog",
     "current_catalog": "Current catalog",
-    "no_catalog": "No catalog associated",
+    "no_catalog": "Associate a catalog",
+    "no_catalog_desc": "Connect your number to a Meta Commerce Manager Catalog",
+    "connect_catalog": "Connect a catalog",
     "dissociate": "Dissociate",
     "dissociate_confirm": "Are you sure you want to dissociate this catalog?",
-    "associate_catalog": "Associate catalog"
+    "associate_catalog": "Associate catalog",
+    "label_placeholder": "Label name"
   },
 
   "members": {
@@ -399,6 +414,7 @@
     "article": "Article",
     "price": "Price",
     "stock": "Stock",
+    "content_id": "Content ID",
     "status": "Status",
     "unit_count": "{{count}} units",
     "no_collections": "No collections found",

@@ -235,7 +235,19 @@
     "no_catalog_associated": "Aucun catalogue associé",
     "catalog_association_desc": "Associez un catalogue à ce numéro WhatsApp pour permettre la navigation de produits.",
     "associate": "Associer",
-    "ignore": "Ignorer"
+    "ignore": "Ignorer",
+    "configure_catalog_title": "Associer un catalogue",
+    "configure_catalog_desc": "Liez un catalogue de produits à ce numéro pour que vos clients puissent parcourir vos produits sur WhatsApp.",
+    "configure_catalog_btn": "Associer un catalogue",
+    "options": "Options"
+  },
+
+  "catalog_link": {
+    "title": "Associer un catalogue",
+    "phone_number": "Numéro WhatsApp",
+    "select_catalog": "Choisir un catalogue",
+    "select_placeholder": "Sélectionner un catalogue...",
+    "associate": "Associer"
   },
 
   "whatsapp_config": {
@@ -247,10 +259,13 @@
     "label_name": "Nom de l'étiquette",
     "catalog_section": "Catalogue",
     "current_catalog": "Catalogue actuel",
-    "no_catalog": "Aucun catalogue associé",
+    "no_catalog": "Associer un catalogue",
+    "no_catalog_desc": "Connecter votre numéro à un Catalog de Meta Commerce Manager",
+    "connect_catalog": "Connecter un catalogue",
     "dissociate": "Dissocier",
     "dissociate_confirm": "Êtes-vous sûr de vouloir dissocier ce catalogue ?",
-    "associate_catalog": "Associer un catalogue"
+    "associate_catalog": "Associer un catalogue",
+    "label_placeholder": "Nom de l'étiquette"
   },
 
   "members": {
@@ -399,6 +414,7 @@
     "article": "Article",
     "price": "Prix",
     "stock": "Stock",
+    "content_id": "Content ID",
     "status": "Statut",
     "unit_count": "{{count}} unités",
     "no_collections": "Aucune collection trouvée",

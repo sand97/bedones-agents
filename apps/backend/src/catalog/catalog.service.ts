@@ -340,24 +340,15 @@ export class CatalogService {
 
   async getWhatsAppCommerceSettings(userId: string, phoneNumberId: string) {
     await this.assertWhatsAppAccess(userId, phoneNumberId)
-    const socialAccount = await this.prisma.socialAccount.findFirst({
-      where: { provider: 'WHATSAPP', providerAccountId: phoneNumberId },
-      omit: { accessToken: false },
-    })
-
-    if (!socialAccount) {
-      throw new NotFoundException('Compte WhatsApp introuvable pour ce numéro')
-    }
-
-    const accessToken = await this.encryptionService.decrypt(socialAccount.accessToken)
+    const { accessToken, wabaId } = await this.resolveWhatsAppAccount(phoneNumberId)
 
     const response = await fetch(
-      `${this.META_API_BASE}/${phoneNumberId}/whatsapp_commerce_settings?access_token=${accessToken}`,
+      `${this.META_API_BASE}/${wabaId}/product_catalogs?access_token=${accessToken}`,
     )
 
     if (!response.ok) {
       const error = await response.text()
-      this.logger.error(`WhatsApp commerce settings API error: ${error}`)
+      this.logger.error(`WABA product_catalogs API error: ${error}`)
       throw new BadRequestException(`Meta API error: ${error}`)
     }
 
@@ -642,59 +633,102 @@ export class CatalogService {
     return response.json()
   }
 
-  // ─── Catalog-Phone Association ───
+  // ─── Catalog-Phone Association (via WABA) ───
+
+  private async resolveWhatsAppAccount(phoneNumberId: string) {
+    const account = await this.prisma.socialAccount.findFirst({
+      where: { provider: 'WHATSAPP', providerAccountId: phoneNumberId },
+      omit: { accessToken: false },
+    })
+    if (!account) throw new NotFoundException('Compte WhatsApp introuvable')
+    if (!account.wabaId) throw new BadRequestException('WABA ID manquant pour ce numéro WhatsApp')
+    const accessToken = await this.encryptionService.decrypt(account.accessToken)
+    return { account, accessToken, wabaId: account.wabaId }
+  }
 
   async associatePhone(catalogId: string, phoneNumberId: string) {
-    const [accessToken, providerId] = await Promise.all([
-      this.resolveAccessToken(catalogId),
+    const [providerId, catalogToken] = await Promise.all([
       this.getCatalogProviderId(catalogId),
+      this.resolveAccessToken(catalogId),
     ])
+    const { accessToken: whatsappToken, wabaId } = await this.resolveWhatsAppAccount(phoneNumberId)
 
-    const response = await fetch(
-      `${this.META_API_BASE}/${providerId}/whatsapp_catalog_phone_numbers`,
+    // 1. Link catalog to WABA (idempotent — ignore "already linked" errors)
+    const wabaRes = await fetch(`${this.META_API_BASE}/${wabaId}/product_catalogs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${catalogToken}` },
+      body: JSON.stringify({ catalog_id: providerId }),
+    })
+    const wabaBody = await wabaRes.text()
+    if (!wabaRes.ok) {
+      this.logger.warn(`Meta link catalog to WABA (may already be linked): ${wabaBody}`)
+    } else {
+      this.logger.log(`[Catalog] WABA link response: ${wabaBody}`)
+    }
+
+    // 2. Activate commerce settings on phone number
+    const phoneRes = await fetch(
+      `${this.META_API_BASE}/${phoneNumberId}/whatsapp_commerce_settings`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${whatsappToken}` },
         body: JSON.stringify({
-          access_token: accessToken,
-          phone_number_id: phoneNumberId,
+          catalog_id: providerId,
+          is_catalog_visible: true,
+          is_cart_enabled: true,
         }),
       },
     )
-
-    if (!response.ok) {
-      const error = await response.text()
-      this.logger.error(`Meta associate phone error: ${error}`)
-      throw new BadRequestException(`Meta API error: ${error}`)
+    if (!phoneRes.ok) {
+      const error = await phoneRes.text()
+      this.logger.warn(`Meta activate commerce settings (may already be set): ${error}`)
     }
 
-    return response.json()
+    this.logger.log(
+      `[Catalog] Associated catalog ${providerId} to phone ${phoneNumberId} via WABA ${wabaId}`,
+    )
+    return { success: true }
   }
 
   async dissociatePhone(catalogId: string, phoneNumberId: string) {
-    const [accessToken, providerId] = await Promise.all([
-      this.resolveAccessToken(catalogId),
+    const [providerId, catalogToken] = await Promise.all([
       this.getCatalogProviderId(catalogId),
+      this.resolveAccessToken(catalogId),
     ])
+    const { accessToken: whatsappToken, wabaId } = await this.resolveWhatsAppAccount(phoneNumberId)
 
-    const response = await fetch(
-      `${this.META_API_BASE}/${providerId}/whatsapp_catalog_phone_numbers`,
+    // 1. Deactivate commerce settings on phone number
+    const phoneRes = await fetch(
+      `${this.META_API_BASE}/${phoneNumberId}/whatsapp_commerce_settings`,
       {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${whatsappToken}` },
         body: JSON.stringify({
-          access_token: accessToken,
-          phone_number_id: phoneNumberId,
+          catalog_id: '',
+          is_catalog_visible: false,
+          is_cart_enabled: false,
         }),
       },
     )
-
-    if (!response.ok) {
-      const error = await response.text()
-      this.logger.error(`Meta dissociate phone error: ${error}`)
-      throw new BadRequestException(`Meta API error: ${error}`)
+    if (!phoneRes.ok) {
+      const error = await phoneRes.text()
+      this.logger.warn(`Meta deactivate commerce settings (may already be off): ${error}`)
     }
 
-    return response.json()
+    // 2. Remove catalog from WABA
+    const wabaRes = await fetch(`${this.META_API_BASE}/${wabaId}/product_catalogs`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${catalogToken}` },
+      body: JSON.stringify({ catalog_id: providerId }),
+    })
+    if (!wabaRes.ok) {
+      const error = await wabaRes.text()
+      this.logger.warn(`Meta remove catalog from WABA (may already be removed): ${error}`)
+    }
+
+    this.logger.log(
+      `[Catalog] Dissociated catalog ${providerId} from phone ${phoneNumberId} via WABA ${wabaId}`,
+    )
+    return { success: true }
   }
 }

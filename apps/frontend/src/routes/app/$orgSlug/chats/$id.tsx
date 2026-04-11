@@ -3,16 +3,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { usePersistedQuery } from '@app/lib/use-persisted-query'
 import { Button } from 'antd'
-import { ArrowLeft, Settings } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { SocialSetup } from '@app/components/social/social-setup'
-import { AgentSetupBanner } from '@app/components/shared/agent-setup-banner'
-import {
-  CatalogAssociationBanner,
-  useCatalogIgnored,
-} from '@app/components/whatsapp/catalog-association-banner'
 import { WhatsappConfigModal } from '@app/components/whatsapp/whatsapp-config-modal'
+import { CatalogLinkModal } from '@app/components/whatsapp/catalog-link-modal'
 import { AccountSwitcher, type SocialAccount } from '@app/components/social/account-switcher'
 import { ChatLayout } from '@app/components/whatsapp/chat-layout'
 import { uploadChatMedia } from '@app/lib/api'
@@ -208,12 +205,13 @@ function ChatsPage() {
 
   const [connecting, setConnecting] = useState(false)
   const [whatsappConfigOpen, setWhatsappConfigOpen] = useState(false)
+  const [catalogLinkOpen, setCatalogLinkOpen] = useState(false)
 
   // ─── Agents query: check if any agent covers the current provider ───
-  const agentsQuery = useQuery({
+  const agentsQuery = usePersistedQuery({
     queryKey: ['agents', orgSlug],
     queryFn: () => agentApi.list(orgSlug),
-    staleTime: 30_000,
+    staleTime: 60_000,
   })
 
   const hasReadyAgent = useMemo(() => {
@@ -246,12 +244,11 @@ function ChatsPage() {
   const currentAccount = accounts.find((a) => a.id === currentAccountId) || accounts[0] || null
 
   // ─── WhatsApp commerce settings query ───
-  const commerceQuery = useQuery({
+  const commerceQuery = usePersistedQuery({
     queryKey: ['whatsapp-commerce', currentAccount?.providerAccountId],
     queryFn: () => catalogApi.getWhatsappCommerceSettings(currentAccount?.providerAccountId || ''),
     enabled: id === 'whatsapp' && !!currentAccountId && !!currentAccount,
     staleTime: 5 * 60 * 1000,
-    retry: 1,
   })
 
   const hasCatalogAssociated = useMemo(() => {
@@ -267,8 +264,6 @@ function ChatsPage() {
     enabled: id === 'whatsapp' && !!currentAccountId,
     staleTime: 30_000,
   })
-
-  const { ignored: catalogIgnored } = useCatalogIgnored(currentAccount?.providerAccountId || '')
 
   // Auto-select first account
   const setAccountInUrl = useCallback(
@@ -761,13 +756,6 @@ function ChatsPage() {
         mobileTitle={config.mobileLabel}
         action={
           <div className="flex items-center gap-2">
-            {id === 'whatsapp' && (
-              <Button
-                type="text"
-                icon={<Settings size={16} />}
-                onClick={() => setWhatsappConfigOpen(true)}
-              />
-            )}
             <AccountSwitcher
               accounts={accountSwitcherItems}
               currentAccount={currentSwitcherItem}
@@ -779,17 +767,6 @@ function ChatsPage() {
         }
         mobileLeft={hasSelectedConv && !isDesktop ? <MobileBackButton /> : undefined}
       />
-      {!hasReadyAgent && <AgentSetupBanner provider={PROVIDER_MAP[id] || 'FACEBOOK'} />}
-      {id === 'whatsapp' &&
-        hasReadyAgent &&
-        !hasCatalogAssociated &&
-        !catalogIgnored &&
-        currentAccount && (
-          <CatalogAssociationBanner
-            phoneNumberId={currentAccount.providerAccountId}
-            onConfigure={() => setWhatsappConfigOpen(true)}
-          />
-        )}
       <ChatLayout
         conversations={apiConversations}
         loading={conversationsQuery.isLoading}
@@ -802,19 +779,38 @@ function ChatsPage() {
         onRetry={handleRetry}
         onChatClick={handleChatClick}
         hasReadyAgent={hasReadyAgent}
+        hasCatalogAssociated={id !== 'whatsapp' || hasCatalogAssociated}
         onConfigureAgent={handleConfigureAgent}
+        onConfigureCatalog={() => setCatalogLinkOpen(true)}
+        onOpenOptions={() => setWhatsappConfigOpen(true)}
       />
       {id === 'whatsapp' && currentAccount && (
-        <WhatsappConfigModal
-          open={whatsappConfigOpen}
-          onClose={() => setWhatsappConfigOpen(false)}
-          phoneNumberId={currentAccount.providerAccountId}
-          accountName={
-            currentAccount.pageName || currentAccount.username || currentAccount.providerAccountId
-          }
-          catalogs={catalogsQuery.data || []}
-          commerceData={commerceQuery.data}
-        />
+        <>
+          <WhatsappConfigModal
+            open={whatsappConfigOpen}
+            onClose={() => setWhatsappConfigOpen(false)}
+            phoneNumberId={currentAccount.providerAccountId}
+            accountName={
+              currentAccount.pageName || currentAccount.username || currentAccount.providerAccountId
+            }
+            socialAccountId={currentAccount.id}
+            catalogs={catalogsQuery.data || []}
+            commerceData={commerceQuery.data}
+            onOpenCatalogLink={() => {
+              setWhatsappConfigOpen(false)
+              setCatalogLinkOpen(true)
+            }}
+          />
+          <CatalogLinkModal
+            open={catalogLinkOpen}
+            onClose={() => setCatalogLinkOpen(false)}
+            phoneNumberId={currentAccount.providerAccountId}
+            accountName={
+              currentAccount.pageName || currentAccount.username || currentAccount.providerAccountId
+            }
+            catalogs={catalogsQuery.data || []}
+          />
+        </>
       )}
     </div>
   )
