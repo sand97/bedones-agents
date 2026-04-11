@@ -315,6 +315,7 @@ function CatalogPage() {
   // Map products to the format expected by catalogColumns
   const tableData = filteredProducts.map((p) => ({
     id: p.id,
+    contentId: p.retailerId || p.id,
     name: p.name,
     description: p.description || '',
     imageUrl: p.imageUrl || '',

@@ -30,7 +30,7 @@ export function ArticleDescriptionCard({ article, actions }: ArticleDescriptionC
         className="ticket-list-card-bordered catalog-card__details"
       >
         <Descriptions.Item label={t('catalog.content_id')}>
-          <span className="text-xs text-text-muted">{article.id}</span>
+          <span className="text-xs text-text-muted">{article.contentId}</span>
         </Descriptions.Item>
         <Descriptions.Item label={t('catalog.status')}>
           <StatusTag label={t(statusConfig.labelKey)} color={statusConfig.color} />

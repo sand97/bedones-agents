@@ -843,6 +843,7 @@ export const CATALOG_STATUS_CONFIG: Record<
 
 export interface CatalogArticle {
   id: string
+  contentId?: string
   name: string
   description: string
   imageUrl: string

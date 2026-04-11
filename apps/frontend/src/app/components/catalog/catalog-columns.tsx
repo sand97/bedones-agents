@@ -28,10 +28,10 @@ export function useCatalogColumns(): ColumnsType<CatalogArticle> {
     },
     {
       title: t('catalog.content_id'),
-      dataIndex: 'id',
+      dataIndex: 'contentId',
       key: 'contentId',
       width: 160,
-      render: (id: string) => <span className="text-xs text-text-muted">{id}</span>,
+      render: (contentId: string) => <span className="text-xs text-text-muted">{contentId}</span>,
     },
     {
       title: t('catalog.category'),

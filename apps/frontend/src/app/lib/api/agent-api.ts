@@ -127,6 +127,7 @@ export interface Catalog {
 
 export interface Product {
   id: string
+  retailerId?: string
   name: string
   description?: string
   imageUrl?: string

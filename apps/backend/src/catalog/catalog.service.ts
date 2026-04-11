@@ -110,7 +110,7 @@ export class CatalogService {
   // ─── Meta Product Fields ───
 
   private static readonly META_PRODUCT_FIELDS =
-    'id,name,description,image_url,price,currency,category,product_type,url,availability,brand,condition,inventory,review_status,product_sets{id,name}'
+    'id,retailer_id,name,description,image_url,price,currency,category,product_type,url,availability,brand,condition,inventory,review_status,product_sets{id,name}'
 
   /**
    * Parse Meta price format like "FCFA10,000" or "1999 XAF" or "$25.99"
@@ -140,6 +140,7 @@ export class CatalogService {
     const priceInfo = p.price ? this.parseMetaPrice(String(p.price)) : null
     return {
       id: p.id,
+      retailerId: p.retailer_id,
       name: p.name,
       description: p.description,
       imageUrl: p.image_url,
