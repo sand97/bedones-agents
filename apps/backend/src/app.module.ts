@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
+import { EventEmitterModule } from '@nestjs/event-emitter'
 import { I18nModule, AcceptLanguageResolver, I18nJsonLoader } from 'nestjs-i18n'
 import * as path from 'path'
 import { AppController } from './app.controller'
@@ -15,10 +16,12 @@ import { CatalogModule } from './catalog/catalog.module'
 import { AgentModule } from './agent/agent.module'
 import { TicketModule } from './ticket/ticket.module'
 import { PromotionModule } from './promotion/promotion.module'
+import { ImageProcessingModule } from './image-processing/image-processing.module'
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    EventEmitterModule.forRoot(),
     I18nModule.forRoot({
       fallbackLanguage: 'fr',
       loader: I18nJsonLoader,
@@ -39,6 +42,7 @@ import { PromotionModule } from './promotion/promotion.module'
     AgentModule,
     TicketModule,
     PromotionModule,
+    ImageProcessingModule,
   ],
   controllers: [AppController],
 })

@@ -60,9 +60,18 @@ enum AgentStatus {
   PAUSED
 }
 
+enum AiActivationMode {
+  OFF
+  ALL
+  CONTACTS
+  LABELS
+  EXCLUDE_LABELS
+}
+
 enum CatalogAnalysisStatus {
   PENDING
   ANALYZING
+  INDEXING
   COMPLETED
   FAILED
 }
@@ -181,7 +190,22 @@ model Label {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  conversationLabels ConversationLabel[]
+
   @@index([socialAccountId])
+}
+
+model ConversationLabel {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  labelId        String
+  label          Label        @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([conversationId, labelId])
+  @@index([conversationId])
+  @@index([labelId])
 }
 
 // ─── Catalog & Products ───
@@ -262,12 +286,15 @@ model Agent {
 }
 
 model AgentSocialAccount {
-  id              String        @id @default(uuid())
-  agentId         String
-  agent           Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  socialAccountId String        @unique // A social account can only be in ONE agent
-  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
-  createdAt       DateTime      @default(now())
+  id                  String           @id @default(uuid())
+  agentId             String
+  agent               Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  socialAccountId     String           @unique // A social account can only be in ONE agent
+  socialAccount       SocialAccount    @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  aiActivationMode      AiActivationMode @default(OFF)
+  aiActivationLabels    String[]         // Label IDs for LABELS / EXCLUDE_LABELS modes
+  aiActivationContacts  String[]         // Phone numbers (WhatsApp) or profile names (IG/Messenger)
+  createdAt             DateTime         @default(now())
 
   @@unique([agentId, socialAccountId])
   @@index([agentId])
@@ -446,6 +473,7 @@ model Conversation {
   lastMessageAt     DateTime?
   unreadCount       Int            @default(0)
   messages          DirectMessage[]
+  conversationLabels ConversationLabel[]
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 

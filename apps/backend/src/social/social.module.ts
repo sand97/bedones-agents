@@ -22,5 +22,6 @@ import { LabelService } from './label.service'
     LabelController,
   ],
   providers: [SocialService, WebhookService, MessagingService, AIService, LabelService],
+  exports: [MessagingService, LabelService],
 })
 export class SocialModule {}

@@ -97,6 +97,23 @@ export const agentApi = {
       method: 'PUT',
       body: JSON.stringify(statuses),
     }),
+
+  activate: (
+    id: string,
+    data: {
+      mode: 'CONTACTS' | 'LABELS' | 'EXCLUDE_LABELS'
+      labelIds?: string[]
+      contacts?: Record<string, string[]>
+    },
+  ) =>
+    fetchJson<Agent>(`/agent/${id}/activate`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deactivate: (id: string) => fetchJson<Agent>(`/agent/${id}/deactivate`, { method: 'PUT' }),
+
+  getLabels: (id: string) => fetchJson<LabelItem[]>(`/agent/${id}/labels`),
 }
 
 // ─── Catalog ───
@@ -116,7 +133,7 @@ export interface Catalog {
   name: string
   providerId?: string
   description?: string
-  analysisStatus: 'PENDING' | 'ANALYZING' | 'COMPLETED' | 'FAILED'
+  analysisStatus: 'PENDING' | 'ANALYZING' | 'INDEXING' | 'COMPLETED' | 'FAILED'
   productCount: number
   indexedCount: number
   createdAt: string

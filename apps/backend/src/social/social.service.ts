@@ -693,10 +693,27 @@ export class SocialService {
       displayPhone = phoneInfo.display_phone_number || ''
     }
 
-    // 5. Webhook subscription is configured at app level in the Meta Dashboard
+    // 5. Fetch profile picture URL
+    let profilePictureUrl: string | null = null
+    try {
+      const profileRes = await fetch(
+        `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${phoneId}/whatsapp_business_profile?fields=profile_picture_url`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      )
+      if (profileRes.ok) {
+        const profileData = (await profileRes.json()) as {
+          data?: Array<{ profile_picture_url?: string }>
+        }
+        profilePictureUrl = profileData.data?.[0]?.profile_picture_url || null
+      }
+    } catch {
+      this.logger.warn(`[WhatsApp] Could not fetch profile picture for ${phoneId}`)
+    }
+
+    // 6. Webhook subscription is configured at app level in the Meta Dashboard
     // (same as Instagram — no per-account subscription needed)
 
-    // 6. Save the account
+    // 7. Save the account
     const encryptedToken = await this.encryptionService.encrypt(accessToken)
 
     const socialAccount = await this.prisma.socialAccount.upsert({
@@ -713,12 +730,14 @@ export class SocialService {
         wabaId: wabaId || null,
         pageName: displayName,
         username: displayPhone || null,
+        profilePictureUrl,
         accessToken: encryptedToken,
         scopes: ['whatsapp_business_management', 'whatsapp_business_messaging'],
       },
       update: {
         pageName: displayName,
         username: displayPhone || null,
+        profilePictureUrl,
         accessToken: encryptedToken,
         wabaId: wabaId || null,
       },

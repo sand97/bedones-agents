@@ -18,9 +18,11 @@ const SOCIAL_ICON_MAP: Record<string, React.ComponentType<React.SVGProps<SVGSVGE
 interface SocialBadgeProps {
   network: SocialNetwork
   size?: number
+  /** Override background color (e.g. "white" for avatar overlay badges) */
+  bg?: string
 }
 
-export function SocialBadge({ network, size = 22 }: SocialBadgeProps) {
+export function SocialBadge({ network, size = 22, bg }: SocialBadgeProps) {
   const config = SOCIAL_NETWORK_CONFIG[network]
   const IconComponent = SOCIAL_ICON_MAP[network]
   const iconSize = Math.round(size * 0.55)
@@ -31,7 +33,8 @@ export function SocialBadge({ network, size = 22 }: SocialBadgeProps) {
       style={{
         width: size,
         height: size,
-        background: `color-mix(in srgb, ${config.color} 12%, transparent)`,
+        background: bg ?? `color-mix(in srgb, ${config.color} 12%, transparent)`,
+        ...(bg ? { border: '1px solid var(--color-border-subtle)' } : {}),
       }}
     >
       <IconComponent width={iconSize} height={iconSize} style={{ color: config.color }} />

@@ -11,9 +11,25 @@ export class CreateAgentDto {
   name?: string
 }
 
-export class SendMessageDto {
+export class SendAgentMessageDto {
   @ApiProperty()
   content: string
+}
+
+export class ActivateAgentDto {
+  @ApiProperty({ enum: ['CONTACTS', 'LABELS', 'EXCLUDE_LABELS'] })
+  mode: 'CONTACTS' | 'LABELS' | 'EXCLUDE_LABELS'
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Label IDs for LABELS / EXCLUDE_LABELS modes',
+  })
+  labelIds?: string[]
+
+  @ApiPropertyOptional({
+    description: 'Per-social-account contacts for CONTACTS mode',
+  })
+  contacts?: Record<string, string[]> // socialAccountId → phone numbers or profile names
 }
 
 export class AgentResponseDto {

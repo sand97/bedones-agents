@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react'
-import { Modal, Checkbox, Alert, Tag, Tooltip } from 'antd'
+import { useState, useEffect, useMemo } from 'react'
+import { Modal, Avatar, Checkbox, Alert, Tag, Tooltip, Input } from 'antd'
 import { Link } from '@tanstack/react-router'
 import { AlertTriangle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { SocialBadge } from '@app/components/shared/social-badge'
+import type { SocialNetwork } from '@app/components/whatsapp/mock-data'
 import type { SocialAccount, Agent } from '@app/lib/api/agent-api'
 
 interface AgentCreateModalProps {
   open: boolean
   onClose: () => void
-  onSubmit: (socialAccountIds: string[]) => void
+  onSubmit: (name: string, socialAccountIds: string[]) => void
   socialAccounts: SocialAccount[]
   existingAgents: Agent[]
   catalogs: Array<{ socialAccounts: Array<{ socialAccount: { id: string } }> }>
@@ -16,18 +18,12 @@ interface AgentCreateModalProps {
   orgSlug: string
 }
 
+const SUPPORTED_PROVIDERS = ['WHATSAPP', 'INSTAGRAM', 'FACEBOOK']
+
 const PROVIDER_LABELS: Record<string, string> = {
   WHATSAPP: 'WhatsApp',
-  FACEBOOK: 'Facebook',
+  FACEBOOK: 'Messenger',
   INSTAGRAM: 'Instagram',
-  TIKTOK: 'TikTok',
-}
-
-const PROVIDER_COLORS: Record<string, string> = {
-  WHATSAPP: 'var(--color-brand-whatsapp)',
-  FACEBOOK: 'var(--color-brand-facebook)',
-  INSTAGRAM: 'var(--color-brand-instagram)',
-  TIKTOK: 'var(--color-brand-tiktok)',
 }
 
 export function AgentCreateModal({
@@ -41,32 +37,46 @@ export function AgentCreateModal({
   orgSlug,
 }: AgentCreateModalProps) {
   const { t } = useTranslation()
+  const [name, setName] = useState('')
   const [selected, setSelected] = useState<string[]>([])
 
   useEffect(() => {
-    if (open) setSelected([])
+    if (open) {
+      setSelected([])
+      setName('')
+    }
   }, [open])
 
-  // Filter to only show WhatsApp accounts
-  const whatsappAccounts = socialAccounts.filter((a) => a.provider === 'WHATSAPP')
+  // Show all messaging-capable accounts (WhatsApp, Instagram DM, Messenger)
+  const availableAccounts = socialAccounts.filter((a) => SUPPORTED_PROVIDERS.includes(a.provider))
 
   // Build a map of socialAccountId -> agentId
-  const accountToAgent = new Map<string, Agent>()
-  for (const agent of existingAgents) {
-    for (const sa of agent.socialAccounts) {
-      accountToAgent.set(sa.socialAccount.id, agent)
+  const accountToAgent = useMemo(() => {
+    const map = new Map<string, Agent>()
+    for (const agent of existingAgents) {
+      for (const sa of agent.socialAccounts) {
+        map.set(sa.socialAccount.id, agent)
+      }
     }
-  }
+    return map
+  }, [existingAgents])
 
-  // Build a set of social accounts linked to at least one catalog
-  const accountsWithCatalog = new Set<string>()
-  for (const catalog of catalogs) {
-    for (const link of catalog.socialAccounts) {
-      accountsWithCatalog.add(link.socialAccount.id)
+  // Build a set of WhatsApp social accounts linked to at least one catalog
+  const whatsappAccountsWithCatalog = useMemo(() => {
+    const set = new Set<string>()
+    for (const catalog of catalogs) {
+      for (const link of catalog.socialAccounts) {
+        set.add(link.socialAccount.id)
+      }
     }
-  }
+    return set
+  }, [catalogs])
 
-  const hasNoCatalogWarning = selected.some((id) => !accountsWithCatalog.has(id))
+  // Catalog warning only for WhatsApp accounts without catalog
+  const hasNoCatalogWarning = selected.some((id) => {
+    const account = socialAccounts.find((a) => a.id === id)
+    return account?.provider === 'WHATSAPP' && !whatsappAccountsWithCatalog.has(id)
+  })
 
   const handleToggle = (id: string) => {
     setSelected((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]))
@@ -77,19 +87,36 @@ export function AgentCreateModal({
       title={t('agent.create_modal_title')}
       open={open}
       onCancel={onClose}
-      onOk={() => onSubmit(selected)}
+      onOk={() => onSubmit(name.trim(), selected)}
       okText={t('agent.create_modal_ok')}
       cancelText={t('agent.create_modal_cancel')}
       okButtonProps={{ disabled: selected.length === 0, loading }}
     >
-      <p className="mb-3 text-sm text-text-muted">
-        {t('agent.create_modal_desc')}
-      </p>
+      <div className="mb-4">
+        <label className="mb-1.5 block text-sm font-medium text-text-primary">
+          {t('agent.name_label')}
+        </label>
+        <Input
+          placeholder={t('agent.name_placeholder')}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Alert type="info" showIcon className="mt-2!" message={t('agent.name_info')} />
+      </div>
+
+      <label className="mb-1.5 block text-sm font-medium text-text-primary">
+        {t('agent.accounts_label')}
+      </label>
 
       <div className="flex flex-col gap-2">
-        {whatsappAccounts.map((account) => {
+        {availableAccounts.map((account) => {
           const linkedAgent = accountToAgent.get(account.id)
           const isDisabled = !!linkedAgent
+          const network = (
+            account.provider === 'FACEBOOK' ? 'messenger' : account.provider.toLowerCase()
+          ) as SocialNetwork
+          const isWhatsappWithoutCatalog =
+            account.provider === 'WHATSAPP' && !whatsappAccountsWithCatalog.has(account.id)
 
           return (
             <div
@@ -108,20 +135,32 @@ export function AgentCreateModal({
                 disabled={isDisabled}
                 style={{ pointerEvents: 'none' }}
               />
-              <span
-                className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
-                style={{ background: PROVIDER_COLORS[account.provider] || '#999' }}
-              />
+              <div className="relative flex-shrink-0">
+                <Avatar src={account.profilePictureUrl} size={36}>
+                  {(account.pageName || account.username || '?')[0]}
+                </Avatar>
+                <span className="absolute -right-1 -bottom-1">
+                  <SocialBadge network={network} size={18} bg="white" />
+                </span>
+              </div>
               <div className="flex flex-1 flex-col">
                 <span className="text-sm font-medium text-text-primary">
                   {account.pageName || account.username || account.providerAccountId}
                 </span>
                 <span className="text-xs text-text-muted">
                   {PROVIDER_LABELS[account.provider] || account.provider}
+                  {account.provider === 'WHATSAPP' && account.username && (
+                    <span> • {account.username}</span>
+                  )}
+                  {account.provider !== 'WHATSAPP' && account.username && account.pageName && (
+                    <span> • @{account.username}</span>
+                  )}
                 </span>
               </div>
               {isDisabled && linkedAgent && (
-                <Tooltip title={t('agent.linked_to_agent', { name: linkedAgent.name || linkedAgent.id })}>
+                <Tooltip
+                  title={t('agent.linked_to_agent', { name: linkedAgent.name || linkedAgent.id })}
+                >
                   <Link
                     to="/app/$orgSlug/agents"
                     params={{ orgSlug }}
@@ -132,7 +171,7 @@ export function AgentCreateModal({
                   </Link>
                 </Tooltip>
               )}
-              {!isDisabled && !accountsWithCatalog.has(account.id) && (
+              {!isDisabled && isWhatsappWithoutCatalog && (
                 <Tag
                   icon={<AlertTriangle size={12} />}
                   style={{
@@ -150,20 +189,11 @@ export function AgentCreateModal({
       </div>
 
       {hasNoCatalogWarning && selected.length > 0 && (
-        <Alert
-          type="warning"
-          showIcon
-          className="mt-3"
-          message={t('agent.no_catalog_warning')}
-        />
+        <Alert type="warning" showIcon className="mt-3" message={t('agent.no_catalog_warning')} />
       )}
 
-      {whatsappAccounts.length === 0 && (
-        <Alert
-          type="info"
-          showIcon
-          message={t('agent.no_social_accounts')}
-        />
+      {availableAccounts.length === 0 && (
+        <Alert type="info" showIcon message={t('agent.no_social_accounts')} />
       )}
     </Modal>
   )

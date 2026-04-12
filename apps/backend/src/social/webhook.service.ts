@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { Prisma } from 'generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
@@ -8,6 +9,20 @@ import { AIService, type AIAnalysisResult } from './ai.service'
 import { MessagingService } from './messaging.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
+
+export interface IncomingMessageEvent {
+  conversationId: string
+  socialAccountId: string
+  provider: 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK'
+  orgId: string
+  message: {
+    text: string
+    mediaUrl: string | null
+    mediaType: string | null
+    senderId: string
+    senderName: string
+  }
+}
 
 @Injectable()
 export class WebhookService {
@@ -24,6 +39,7 @@ export class WebhookService {
     private aiService: AIService,
     private messagingService: MessagingService,
     private eventsGateway: EventsGateway,
+    private eventEmitter: EventEmitter2,
   ) {
     this.facebookAppSecret = this.configService.getOrThrow<string>('FACEBOOK_APP_SECRET')
     this.instagramAppSecret = this.configService.getOrThrow<string>('INSTAGRAM_APP_SECRET')
@@ -550,6 +566,20 @@ export class WebhookService {
       socialAccountId,
       provider: 'FACEBOOK',
     })
+
+    this.eventEmitter.emit('message.incoming', {
+      conversationId: conversation.id,
+      socialAccountId,
+      provider: 'FACEBOOK',
+      orgId,
+      message: {
+        text: message.text || '',
+        mediaUrl,
+        mediaType,
+        senderId,
+        senderName,
+      },
+    } satisfies IncomingMessageEvent)
   }
 
   // ─── Instagram DM handling ───
@@ -673,6 +703,20 @@ export class WebhookService {
       socialAccountId,
       provider: 'INSTAGRAM',
     })
+
+    this.eventEmitter.emit('message.incoming', {
+      conversationId: conversation.id,
+      socialAccountId,
+      provider: 'INSTAGRAM',
+      orgId,
+      message: {
+        text: message.text || '',
+        mediaUrl,
+        mediaType,
+        senderId,
+        senderName,
+      },
+    } satisfies IncomingMessageEvent)
   }
 
   // ─── Reaction handling ───
@@ -854,6 +898,14 @@ export class WebhookService {
       socialAccountId,
       provider: 'WHATSAPP',
     })
+
+    this.eventEmitter.emit('message.incoming', {
+      conversationId: conversation.id,
+      socialAccountId,
+      provider: 'WHATSAPP',
+      orgId,
+      message: { text: messageText, mediaUrl, mediaType, senderId, senderName },
+    } satisfies IncomingMessageEvent)
   }
 
   private async handleWhatsAppStatus(

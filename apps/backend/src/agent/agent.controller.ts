@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } fro
 import { ApiTags } from '@nestjs/swagger'
 import { AuthGuard } from '../auth/auth.guard'
 import { AgentService } from './agent.service'
-import { CreateAgentDto, SendMessageDto } from './dto/agent.dto'
+import { ActivateAgentDto, CreateAgentDto, SendAgentMessageDto } from './dto/agent.dto'
 
 @ApiTags('Agent')
 @Controller('agent')
@@ -44,7 +44,7 @@ export class AgentController {
   @Post(':id/messages')
   async sendMessage(
     @Param('id') id: string,
-    @Body() dto: SendMessageDto,
+    @Body() dto: SendAgentMessageDto,
     @Query('organisationId') organisationId: string,
   ) {
     return this.agentService.processUserMessage(id, dto.content, organisationId)
@@ -71,6 +71,23 @@ export class AgentController {
   async areCatalogsAnalyzed(@Param('id') id: string) {
     const analyzed = await this.agentService.areCatalogsAnalyzed(id)
     return { analyzed }
+  }
+
+  // ─── Activation ───
+
+  @Put(':id/activate')
+  async activate(@Param('id') id: string, @Body() dto: ActivateAgentDto) {
+    return this.agentService.activate(id, dto)
+  }
+
+  @Put(':id/deactivate')
+  async deactivate(@Param('id') id: string) {
+    return this.agentService.deactivate(id)
+  }
+
+  @Get(':id/labels')
+  async getLabels(@Param('id') id: string) {
+    return this.agentService.getLabelsForAgent(id)
   }
 
   // ─── Ticket Statuses ───

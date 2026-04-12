@@ -1,5 +1,7 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, BadRequestException, Inject } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { InjectQueue } from '@nestjs/bullmq'
+import { Queue } from 'bullmq'
 import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
@@ -7,6 +9,8 @@ import { AgentDbToolsService } from './tools/agent-db-tools.service'
 import { ChatOpenAI } from '@langchain/openai'
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
+import { CATALOG_INDEXING_QUEUE } from '../queue/queue.module'
+import type { CatalogIndexingJobData } from '../image-processing/catalog-indexing.processor'
 
 const DEFAULT_TICKET_STATUSES = [
   { name: 'Nouveau', color: '#1677ff', order: 0, isDefault: true },
@@ -26,6 +30,7 @@ export class AgentService {
     private gateway: EventsGateway,
     private prompts: AgentPromptsService,
     private dbTools: AgentDbToolsService,
+    @InjectQueue(CATALOG_INDEXING_QUEUE) private catalogIndexingQueue: Queue,
   ) {}
 
   // ─── CRUD ───
@@ -89,6 +94,24 @@ export class AgentService {
       const agentNames = existingLinks.map((l) => l.agent.name || l.agent.id)
       throw new BadRequestException(
         `Certains réseaux sociaux sont déjà associés à un agent: ${agentNames.join(', ')}`,
+      )
+    }
+
+    // Check if any linked social account has a catalog still being indexed
+    const catalogsInProgress = await this.prisma.catalogSocialAccount.findMany({
+      where: {
+        socialAccountId: { in: data.socialAccountIds },
+        catalog: { analysisStatus: { in: ['PENDING', 'ANALYZING', 'INDEXING'] } },
+      },
+      include: { catalog: { select: { name: true, analysisStatus: true } } },
+    })
+
+    if (catalogsInProgress.length > 0) {
+      const catalogNames = catalogsInProgress.map((c) => c.catalog.name).join(', ')
+      throw new BadRequestException(
+        `Veuillez patienter, l'indexation de vos catalogues est en cours (${catalogNames}). ` +
+          `Nos IA apprennent à connaître vos produits et services afin de mieux répondre à vos clients. ` +
+          `Vous pourrez créer votre agent une fois l'indexation terminée.`,
       )
     }
 
@@ -359,7 +382,7 @@ export class AgentService {
 
         await this.prisma.catalog.update({
           where: { id: catalog.id },
-          data: { analysisStatus: 'COMPLETED', description },
+          data: { analysisStatus: 'INDEXING', description },
         })
 
         this.gateway.emitToOrg(organisationId, 'catalog:analyzed', {
@@ -367,6 +390,13 @@ export class AgentService {
           agentId,
           description,
         })
+
+        // Trigger background Qdrant indexing for this catalog
+        await this.catalogIndexingQueue.add('index-catalog', {
+          catalogId: catalog.id,
+          organisationId,
+        } satisfies CatalogIndexingJobData)
+        this.logger.log(`Queued Qdrant indexing for catalog ${catalog.id}`)
       } catch (error) {
         this.logger.error(`Catalog analysis failed for ${catalog.id}: ${error}`)
         await this.prisma.catalog.update({
@@ -420,6 +450,80 @@ export class AgentService {
         order: s.order,
         isDefault: s.isDefault,
       })),
+    })
+  }
+
+  // ─── Activation ───
+
+  async activate(
+    agentId: string,
+    dto: {
+      mode: 'CONTACTS' | 'LABELS' | 'EXCLUDE_LABELS'
+      labelIds?: string[]
+      contacts?: Record<string, string[]>
+    },
+  ) {
+    const agent = await this.findById(agentId)
+
+    // Update all social accounts of the agent
+    for (const sa of agent.socialAccounts) {
+      const updateData: Record<string, unknown> = {
+        aiActivationMode: dto.mode,
+      }
+
+      if (dto.mode === 'CONTACTS') {
+        updateData.aiActivationContacts = dto.contacts?.[sa.socialAccount.id] || []
+        updateData.aiActivationLabels = []
+      } else if (dto.mode === 'LABELS' || dto.mode === 'EXCLUDE_LABELS') {
+        updateData.aiActivationLabels = dto.labelIds || []
+        updateData.aiActivationContacts = []
+      }
+
+      await this.prisma.agentSocialAccount.update({
+        where: { id: sa.id },
+        data: updateData,
+      })
+    }
+
+    // Set agent status to ACTIVE
+    return this.prisma.agent.update({
+      where: { id: agentId },
+      data: { status: 'ACTIVE' },
+      include: {
+        socialAccounts: { include: { socialAccount: true } },
+      },
+    })
+  }
+
+  async deactivate(agentId: string) {
+    // Set all social accounts to OFF
+    await this.prisma.agentSocialAccount.updateMany({
+      where: { agentId },
+      data: { aiActivationMode: 'OFF' },
+    })
+
+    return this.prisma.agent.update({
+      where: { id: agentId },
+      data: { status: 'PAUSED' },
+      include: {
+        socialAccounts: { include: { socialAccount: true } },
+      },
+    })
+  }
+
+  async getLabelsForAgent(agentId: string) {
+    const agent = await this.prisma.agent.findUnique({
+      where: { id: agentId },
+      include: { socialAccounts: { select: { socialAccountId: true } } },
+    })
+
+    if (!agent) throw new NotFoundException('Agent introuvable')
+
+    const socialAccountIds = agent.socialAccounts.map((sa) => sa.socialAccountId)
+
+    return this.prisma.label.findMany({
+      where: { socialAccountId: { in: socialAccountIds } },
+      orderBy: [{ socialAccountId: 'asc' }, { order: 'asc' }],
     })
   }
 

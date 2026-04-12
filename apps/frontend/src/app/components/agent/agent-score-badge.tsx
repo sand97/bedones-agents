@@ -1,35 +1,23 @@
-import { Tooltip } from 'antd'
+import { Progress, Tooltip } from 'antd'
+import { useTranslation } from 'react-i18next'
 
 interface AgentScoreBadgeProps {
   score: number
 }
 
 export function AgentScoreBadge({ score }: AgentScoreBadgeProps) {
+  const { t } = useTranslation()
   const isReady = score >= 80
 
   return (
-    <Tooltip
-      title={
-        isReady
-          ? 'Votre agent peut être activé.'
-          : 'Votre agent doit avoir un score > 80 pour être activé.'
-      }
-    >
-      <div
-        className="flex cursor-help items-center gap-2 rounded-full border px-3 py-1"
-        style={{
-          borderColor: isReady ? 'var(--ant-color-success)' : 'var(--ant-color-border)',
-          color: isReady ? 'var(--ant-color-success)' : 'var(--ant-color-text)',
-        }}
-      >
-        <div
-          className="h-2 w-2 rounded-full"
-          style={{
-            background: isReady ? 'var(--ant-color-success)' : 'var(--ant-color-border)',
-          }}
-        />
-        <span className="text-xs font-medium">{score}/100</span>
-      </div>
+    <Tooltip title={isReady ? t('agent.score_ready_tooltip') : t('agent.score_not_ready_tooltip')}>
+      <Progress
+        type="circle"
+        percent={score}
+        size={40}
+        strokeColor="var(--ant-color-text)"
+        format={(p) => <span style={{ fontSize: 11, fontWeight: 600 }}>{p}</span>}
+      />
     </Tooltip>
   )
 }

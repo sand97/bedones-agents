@@ -13,6 +13,7 @@ import {
   ShoppingBag,
 } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
+import { CatalogIndexingBanner } from '@app/components/catalog/catalog-indexing-banner'
 import { CatalogEmpty } from '@app/components/catalog/catalog-empty'
 import { TablePagination } from '@app/components/shared/table-pagination'
 import { FilterPopover } from '@app/components/shared/filter-popover'
@@ -358,6 +359,8 @@ function CatalogPage() {
           )
         }
       />
+
+      <CatalogIndexingBanner catalogs={catalogs} />
 
       <div className="flex-1 p-4 pb-16 lg:p-6 lg:pb-16">
         <div className="tickets-filters catalog-filters">

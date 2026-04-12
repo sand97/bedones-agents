@@ -92,6 +92,45 @@ async function main() {
     if (whatsappPhoneId && whatsappToken) {
       const encryptedToken = await encryptToken(whatsappToken)
 
+      // Fetch phone number info from Meta API
+      let displayName = 'WhatsApp Test'
+      let displayPhone: string | null = null
+      let profilePictureUrl: string | null = null
+
+      try {
+        const phoneInfoRes = await fetch(
+          `https://graph.facebook.com/v22.0/${whatsappPhoneId}?fields=display_phone_number,verified_name`,
+          { headers: { Authorization: `Bearer ${whatsappToken}` } },
+        )
+        if (phoneInfoRes.ok) {
+          const phoneInfo = (await phoneInfoRes.json()) as {
+            display_phone_number?: string
+            verified_name?: string
+          }
+          displayName = phoneInfo.verified_name || phoneInfo.display_phone_number || displayName
+          displayPhone = phoneInfo.display_phone_number || null
+          console.log(`  → Phone info: ${displayName} (${displayPhone || 'no number'})`)
+        }
+      } catch (err) {
+        console.warn('  ⚠ Could not fetch phone info from Meta API:', err)
+      }
+
+      try {
+        const profileRes = await fetch(
+          `https://graph.facebook.com/v22.0/${whatsappPhoneId}/whatsapp_business_profile?fields=profile_picture_url`,
+          { headers: { Authorization: `Bearer ${whatsappToken}` } },
+        )
+        if (profileRes.ok) {
+          const profileData = (await profileRes.json()) as {
+            data?: Array<{ profile_picture_url?: string }>
+          }
+          profilePictureUrl = profileData.data?.[0]?.profile_picture_url || null
+          if (profilePictureUrl) console.log(`  → Profile picture found`)
+        }
+      } catch (err) {
+        console.warn('  ⚠ Could not fetch profile picture from Meta API:', err)
+      }
+
       whatsappAccount = await prisma.socialAccount.upsert({
         where: {
           provider_providerAccountId: {
@@ -102,18 +141,25 @@ async function main() {
         update: {
           accessToken: encryptedToken,
           wabaId: whatsappWabaId || null,
+          pageName: displayName,
+          username: displayPhone,
+          profilePictureUrl,
         },
         create: {
           organisationId: org.id,
           provider: 'WHATSAPP',
           providerAccountId: whatsappPhoneId,
           wabaId: whatsappWabaId || null,
-          pageName: 'WhatsApp Test',
+          pageName: displayName,
+          username: displayPhone,
+          profilePictureUrl,
           accessToken: encryptedToken,
           scopes: ['whatsapp_business_management', 'whatsapp_business_messaging'],
         },
       })
-      console.log(`✓ WhatsApp SocialAccount: ${whatsappPhoneId} (WABA: ${whatsappWabaId || 'N/A'})`)
+      console.log(
+        `✓ WhatsApp SocialAccount: ${displayName} (${whatsappPhoneId}, WABA: ${whatsappWabaId || 'N/A'})`,
+      )
     } else {
       console.log('⚠ Skipping WhatsApp seed (missing SEED_WHATSAPP_* env vars)')
     }

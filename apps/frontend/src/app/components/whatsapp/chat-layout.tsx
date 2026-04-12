@@ -311,7 +311,7 @@ export function ChatLayout({
         className={`chat-split__left ${selectedConversation ? 'chat-split__left--hidden-mobile' : ''}`}
       >
         {/* Mobile: show HeaderHelper if conversations exist + setup needed */}
-        {renderMobileHeaderHelper()}
+        <div className="md:hidden">{renderMobileHeaderHelper()}</div>
 
         {/* Filter bar */}
         <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-3.5">

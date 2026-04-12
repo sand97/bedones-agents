@@ -204,6 +204,78 @@ export class MessagingService {
     }
   }
 
+  // ─── Send message as AI agent (no user auth check) ───
+
+  async sendMessageAsAgent(
+    conversationId: string,
+    message: string,
+  ): Promise<{ id: string; message: string }> {
+    const conversation = await this.prisma.conversation.findUniqueOrThrow({
+      where: { id: conversationId },
+      include: {
+        socialAccount: {
+          select: {
+            id: true,
+            provider: true,
+            providerAccountId: true,
+            organisationId: true,
+          },
+        },
+      },
+    })
+
+    const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
+    const provider = conversation.socialAccount.provider
+
+    let platformMsgId: string | null = null
+
+    if (provider === 'FACEBOOK') {
+      platformMsgId = await this.sendFacebookMessage(
+        conversation.socialAccount.providerAccountId,
+        conversation.participantId,
+        accessToken,
+        message,
+      )
+    } else if (provider === 'INSTAGRAM') {
+      platformMsgId = await this.sendInstagramMessage(
+        conversation.participantId,
+        accessToken,
+        message,
+      )
+    } else if (provider === 'WHATSAPP') {
+      platformMsgId = await this.sendWhatsAppMessage(
+        conversation.socialAccount.providerAccountId,
+        conversation.participantId,
+        accessToken,
+        message,
+      )
+    }
+
+    const savedMessage = await this.prisma.directMessage.create({
+      data: {
+        conversationId,
+        platformMsgId,
+        message,
+        senderId: conversation.socialAccount.providerAccountId,
+        senderName: 'AI Agent',
+        isFromPage: true,
+        isRead: true,
+        deliveryStatus: provider === 'WHATSAPP' ? 'sent' : null,
+        createdTime: new Date(),
+      },
+    })
+
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        lastMessageText: message,
+        lastMessageAt: new Date(),
+      },
+    })
+
+    return { id: savedMessage.id, message: savedMessage.message }
+  }
+
   // ─── Mark conversation as read ───
 
   async markConversationAsRead(userId: string, conversationId: string) {

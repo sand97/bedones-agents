@@ -2261,7 +2261,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SendMessageDto"
+                "$ref": "#/components/schemas/SendAgentMessageDto"
               }
             }
           }
@@ -2341,6 +2341,85 @@
     "/agent/{id}/catalogs-analyzed": {
       "get": {
         "operationId": "AgentController_areCatalogsAnalyzed",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/agent/{id}/activate": {
+      "put": {
+        "operationId": "AgentController_activate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateAgentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/agent/{id}/deactivate": {
+      "put": {
+        "operationId": "AgentController_deactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/agent/{id}/labels": {
+      "get": {
+        "operationId": "AgentController_getLabels",
         "parameters": [
           {
             "name": "id",
@@ -3701,12 +3780,40 @@
       "SendMessageDto": {
         "type": "object",
         "properties": {
-          "content": {
+          "conversationId": {
             "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "mediaUrl": {
+            "type": "string",
+            "description": "Public URL of the media file to send"
+          },
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video",
+              "audio",
+              "file"
+            ]
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Original file name"
+          },
+          "fileSize": {
+            "type": "number",
+            "description": "File size in bytes"
+          },
+          "replyToId": {
+            "type": "string",
+            "description": "ID of the message to reply to"
           }
         },
         "required": [
-          "content"
+          "conversationId"
         ]
       },
       "MarkConversationReadDto": {
@@ -4035,6 +4142,44 @@
         "required": [
           "organisationId",
           "socialAccountIds"
+        ]
+      },
+      "SendAgentMessageDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "ActivateAgentDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "CONTACTS",
+              "LABELS",
+              "EXCLUDE_LABELS"
+            ]
+          },
+          "labelIds": {
+            "description": "Label IDs for LABELS / EXCLUDE_LABELS modes",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contacts": {
+            "type": "object",
+            "description": "Per-social-account contacts for CONTACTS mode"
+          }
+        },
+        "required": [
+          "mode"
         ]
       },
       "CreateTicketDto": {

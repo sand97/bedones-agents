@@ -150,12 +150,50 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       )
     }
 
+    const handleCatalogIndexingProgress = (data: {
+      catalogId: string
+      percentage: number
+      processed?: number
+      total?: number
+    }) => {
+      // Update the catalog in the catalogs list cache directly
+      queryClient.setQueriesData<
+        { id: string; analysisStatus: string; indexedCount: number; productCount: number }[]
+      >({ queryKey: ['catalogs'] }, (old) => {
+        if (!old) return old
+        return old.map((c) =>
+          c.id === data.catalogId
+            ? {
+                ...c,
+                analysisStatus: 'INDEXING' as const,
+                indexedCount: data.processed ?? c.indexedCount,
+                productCount: data.total ?? c.productCount,
+              }
+            : c,
+        )
+      })
+    }
+
+    const handleCatalogIndexingCompleted = (data: { catalogId: string; indexedCount: number }) => {
+      // Invalidate catalogs to refresh the list with COMPLETED status
+      queryClient.invalidateQueries({ queryKey: ['catalogs'] })
+      queryClient.removeQueries({ queryKey: ['catalog-indexing-progress', data.catalogId] })
+    }
+
+    const handleCatalogIndexingFailed = (data: { catalogId: string }) => {
+      queryClient.invalidateQueries({ queryKey: ['catalogs'] })
+      queryClient.removeQueries({ queryKey: ['catalog-indexing-progress', data.catalogId] })
+    }
+
     socket.on('comment:new', handleCommentNew)
     socket.on('comment:updated', handleCommentUpdated)
     socket.on('comment:removed', handleCommentRemoved)
     socket.on('message:new', handleMessageNew)
     socket.on('message:reaction', handleMessageReaction)
     socket.on('message:status', handleMessageStatus)
+    socket.on('catalog:indexing-progress', handleCatalogIndexingProgress)
+    socket.on('catalog:indexing-completed', handleCatalogIndexingCompleted)
+    socket.on('catalog:indexing-failed', handleCatalogIndexingFailed)
 
     return () => {
       socket.off('comment:new', handleCommentNew)
@@ -164,6 +202,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socket.off('message:new', handleMessageNew)
       socket.off('message:reaction', handleMessageReaction)
       socket.off('message:status', handleMessageStatus)
+      socket.off('catalog:indexing-progress', handleCatalogIndexingProgress)
+      socket.off('catalog:indexing-completed', handleCatalogIndexingCompleted)
+      socket.off('catalog:indexing-failed', handleCatalogIndexingFailed)
       disconnectSocket()
     }
   }, [orgSlug, queryClient])

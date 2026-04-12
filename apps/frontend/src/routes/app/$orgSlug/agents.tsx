@@ -2,13 +2,17 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { createFileRoute, useParams } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, Empty, Spin } from 'antd'
-import { Plus, Sparkles } from 'lucide-react'
+import { Plus, Sparkles, Bot, Zap } from 'lucide-react'
 import dayjs from 'dayjs'
+import { useTranslation } from 'react-i18next'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { AgentChat } from '@app/components/agent/agent-chat'
 import { AgentCreateModal } from '@app/components/agent/agent-create-modal'
+import { AgentActivateModal } from '@app/components/agent/agent-activate-modal'
 import { AgentListItem } from '@app/components/agent/agent-list-item'
 import { AgentScoreBadge } from '@app/components/agent/agent-score-badge'
+import { HeaderHelper } from '@app/components/shared/header-helper'
+import { SocialSetup } from '@app/components/social/social-setup'
 import { useLayout } from '@app/contexts/layout-context'
 import { getSocket } from '@app/lib/socket'
 import {
@@ -16,6 +20,7 @@ import {
   catalogApi,
   socialApi,
   type AgentMessage as ApiAgentMessage,
+  type LabelItem,
 } from '@app/lib/api/agent-api'
 import type { AgentMessage, AgentChoiceOption } from '@app/components/agent/mock-data'
 
@@ -30,17 +35,23 @@ function mapApiMessage(m: ApiAgentMessage): AgentMessage {
     from: m.role === 'user' ? 'user' : 'agent',
     text: m.content,
     timestamp: m.createdAt,
-    options: m.metadata?.options as AgentChoiceOption[] | undefined,
+    options: Array.isArray(m.metadata?.options)
+      ? (m.metadata.options as (string | AgentChoiceOption)[]).map((o, i) =>
+          typeof o === 'string' ? { id: `opt-${i}`, label: o } : o,
+        )
+      : undefined,
   }
 }
 
 function AgentsPage() {
+  const { t } = useTranslation()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
   const { isDesktop } = useLayout()
   const queryClient = useQueryClient()
 
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [activateOpen, setActivateOpen] = useState(false)
   const [messages, setMessages] = useState<AgentMessage[]>([])
   const [pendingQuestion, setPendingQuestion] = useState<AgentMessage | null>(null)
   const [isThinking, setIsThinking] = useState(false)
@@ -70,6 +81,13 @@ function AgentsPage() {
     () => agentsQuery.data?.find((a) => a.id === selectedAgentId) ?? null,
     [agentsQuery.data, selectedAgentId],
   )
+
+  const labelsQuery = useQuery({
+    queryKey: ['agent-labels', selectedAgentId],
+    queryFn: () => agentApi.getLabels(selectedAgentId!),
+    enabled: !!selectedAgentId,
+    staleTime: 30_000,
+  })
 
   // ─── Load messages when agent selected ───
 
@@ -155,12 +173,24 @@ function AgentsPage() {
   // ─── Mutations ───
 
   const createMutation = useMutation({
-    mutationFn: (socialAccountIds: string[]) =>
-      agentApi.create({ organisationId: orgSlug, socialAccountIds }),
+    mutationFn: ({ name, socialAccountIds }: { name?: string; socialAccountIds: string[] }) =>
+      agentApi.create({ organisationId: orgSlug, socialAccountIds, name }),
     onSuccess: (newAgent) => {
       queryClient.invalidateQueries({ queryKey: ['agents', orgSlug] })
       setSelectedAgentId(newAgent.id)
       setCreateOpen(false)
+    },
+  })
+
+  const activateMutation = useMutation({
+    mutationFn: (data: {
+      mode: 'CONTACTS' | 'LABELS' | 'EXCLUDE_LABELS'
+      labelIds?: string[]
+      contacts?: Record<string, string[]>
+    }) => agentApi.activate(selectedAgentId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents', orgSlug] })
+      setActivateOpen(false)
     },
   })
 
@@ -225,31 +255,23 @@ function AgentsPage() {
   if (!agentsQuery.isLoading && agents.length === 0 && !selectedAgentId) {
     return (
       <div className="flex h-screen flex-col">
-        <DashboardHeader title="Mes Agents" />
-        <div className="flex flex-1 items-center justify-center">
-          <Empty
-            image={<Sparkles size={48} strokeWidth={1.5} className="text-text-muted" />}
-            description={
-              <div className="mt-2">
-                <div className="text-sm font-medium text-text-primary">
-                  Créer votre premier agent
-                </div>
-                <div className="mx-auto mt-1 max-w-sm text-xs text-text-muted">
-                  Mettez en place un process de discussions entre l'IA et vos clients pour collecter
-                  les informations dont vous avez besoin et créer des tickets au besoin
-                </div>
-                <Button type="primary" className="mt-4" onClick={() => setCreateOpen(true)}>
-                  Commencer
-                </Button>
-              </div>
-            }
-          />
-        </div>
+        <DashboardHeader title={t('agent.page_title')} />
+        <SocialSetup
+          icon={<Bot size={48} strokeWidth={1.5} />}
+          color="var(--ant-color-text-secondary)"
+          title={t('agent.empty_title')}
+          description={t('agent.empty_desc')}
+          buttonLabel={t('common.start')}
+          buttonIcon={<Sparkles size={18} />}
+          onAction={() => setCreateOpen(true)}
+        />
 
         <AgentCreateModal
           open={createOpen}
           onClose={() => setCreateOpen(false)}
-          onSubmit={(ids) => createMutation.mutate(ids)}
+          onSubmit={(name, ids) =>
+            createMutation.mutate({ name: name || undefined, socialAccountIds: ids })
+          }
           socialAccounts={socialAccounts}
           existingAgents={agents}
           catalogs={catalogs}
@@ -266,9 +288,7 @@ function AgentsPage() {
     if (!selectedAgent) {
       return (
         <div className="flex flex-1 items-center justify-center">
-          <div className="text-center text-sm text-text-muted">
-            Sélectionnez un agent pour commencer
-          </div>
+          <div className="text-center text-sm text-text-muted">{t('agent.select_agent')}</div>
         </div>
       )
     }
@@ -281,17 +301,17 @@ function AgentsPage() {
             image={<Sparkles size={48} strokeWidth={1.5} className="text-text-muted" />}
             description={
               <div className="mt-2">
-                <div className="text-sm font-medium text-text-primary">Votre agent est créé</div>
-                <div className="mt-1 text-xs text-text-muted">
-                  Vous pouvez maintenant discuter avec nous pour le configurer
+                <div className="text-sm font-medium text-text-primary">
+                  {t('agent.draft_title')}
                 </div>
+                <div className="mt-1 text-xs text-text-muted">{t('agent.draft_desc')}</div>
                 <Button
                   type="primary"
                   className="mt-4"
                   loading={isThinking}
                   onClick={handleStartConfig}
                 >
-                  Commencez la config
+                  {t('agent.start_config')}
                 </Button>
               </div>
             }
@@ -303,6 +323,17 @@ function AgentsPage() {
     // CONFIGURING / READY / ACTIVE: show chat
     return (
       <div className="flex flex-1 flex-col overflow-hidden">
+        {selectedAgent.score >= 80 && selectedAgent.status === 'READY' && (
+          <HeaderHelper
+            icon={<Zap size={20} />}
+            title={t('agent.activate_banner_title')}
+            subtitle={t('agent.activate_banner_desc')}
+            primaryAction={{
+              title: t('agent.activate_banner_btn'),
+              onClick: () => setActivateOpen(true),
+            }}
+          />
+        )}
         <AgentChat
           messages={messages}
           onSendMessage={handleSendMessage}
@@ -312,7 +343,7 @@ function AgentsPage() {
         {isThinking && (
           <div className="flex items-center justify-center gap-2 py-2 text-xs text-text-muted">
             <Spin size="small" />
-            <span>L'agent réfléchit...</span>
+            <span>{t('agent.thinking')}</span>
           </div>
         )}
       </div>
@@ -324,12 +355,12 @@ function AgentsPage() {
   return (
     <div className="flex h-screen flex-col">
       <DashboardHeader
-        title="Mes Agents"
+        title={t('agent.page_title')}
         action={
           <div className="flex items-center gap-2">
             {selectedAgent && <AgentScoreBadge score={selectedAgent.score} />}
             <Button onClick={() => setCreateOpen(true)} icon={<Plus size={16} strokeWidth={1.5} />}>
-              Nouvel agent
+              {t('agent.new_agent')}
             </Button>
           </div>
         }
@@ -337,7 +368,7 @@ function AgentsPage() {
           !showList && selectedAgent ? (
             <div className="flex items-center gap-2">
               <Button type="text" onClick={() => setShowList(true)} size="small">
-                Retour
+                {t('common.back')}
               </Button>
               <span className="truncate text-sm font-medium text-text-primary">
                 {selectedAgent.name}
@@ -350,8 +381,10 @@ function AgentsPage() {
       <div className="chat-split flex-1 overflow-hidden">
         {/* Agent List */}
         {(isDesktop || showList) && (
-          <div className="chat-split__list">
-            <div className="flex flex-col gap-0.5 overflow-y-auto p-2">
+          <div
+            className={`chat-split__left ${!isDesktop && !showList ? 'chat-split__left--hidden-mobile' : ''}`}
+          >
+            <div className="flex flex-col overflow-y-auto">
               {agentsQuery.isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Spin />
@@ -370,22 +403,39 @@ function AgentsPage() {
           </div>
         )}
 
-        {/* Agent Chat */}
+        {/* Agent Chat — full remaining width */}
         {(isDesktop || !showList) && (
-          <div className="chat-split__window flex flex-col">{renderAgentContent()}</div>
+          <div
+            className={`chat-split__right ${!isDesktop && !showList ? 'chat-split__right--visible' : ''}`}
+          >
+            {renderAgentContent()}
+          </div>
         )}
       </div>
 
       <AgentCreateModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onSubmit={(ids) => createMutation.mutate(ids)}
+        onSubmit={(name, ids) =>
+          createMutation.mutate({ name: name || undefined, socialAccountIds: ids })
+        }
         socialAccounts={socialAccounts}
         existingAgents={agents}
         catalogs={catalogs}
         loading={createMutation.isPending}
         orgSlug={orgSlug}
       />
+
+      {selectedAgent && (
+        <AgentActivateModal
+          open={activateOpen}
+          onClose={() => setActivateOpen(false)}
+          onSubmit={(data) => activateMutation.mutate(data)}
+          agent={selectedAgent}
+          labels={(labelsQuery.data as LabelItem[]) || []}
+          loading={activateMutation.isPending}
+        />
+      )}
     </div>
   )
 }

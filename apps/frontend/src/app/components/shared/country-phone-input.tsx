@@ -23,9 +23,10 @@ const UNIQUE_OPTIONS = COUNTRY_OPTIONS.filter((o) => {
 interface CountryPhoneInputProps {
   value?: string
   onChange?: (value: string) => void
+  addonAfter?: React.ReactNode
 }
 
-export function CountryPhoneInput({ value = '', onChange }: CountryPhoneInputProps) {
+export function CountryPhoneInput({ value = '', onChange, addonAfter }: CountryPhoneInputProps) {
   const [defaultCode, setDefaultCode] = useState(DEFAULT_DIAL_CODE)
   const [initialized, setInitialized] = useState(false)
 
@@ -75,6 +76,7 @@ export function CountryPhoneInput({ value = '', onChange }: CountryPhoneInputPro
   return (
     <Input
       addonBefore={selectBefore}
+      addonAfter={addonAfter}
       value={parsed.number}
       onChange={handleNumberChange}
       placeholder="07 01 02 03 04"

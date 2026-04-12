@@ -1,12 +1,6 @@
-import dayjs from 'dayjs'
+import { SocialBadge } from '@app/components/shared/social-badge'
+import type { SocialNetwork } from '@app/components/whatsapp/mock-data'
 import type { Agent } from '@app/lib/api/agent-api'
-
-const PROVIDER_COLORS: Record<string, string> = {
-  WHATSAPP: 'var(--color-brand-whatsapp)',
-  FACEBOOK: 'var(--color-brand-facebook)',
-  INSTAGRAM: 'var(--color-brand-instagram)',
-  TIKTOK: 'var(--color-brand-tiktok)',
-}
 
 interface AgentListItemProps {
   agent: Agent
@@ -21,8 +15,6 @@ export function AgentListItem({ agent, isActive, onClick }: AgentListItemProps) 
     )
     .join(', ')
 
-  const lastUpdate = dayjs(agent.updatedAt).format('DD/MM/YYYY HH:mm')
-
   return (
     <button
       type="button"
@@ -32,21 +24,18 @@ export function AgentListItem({ agent, isActive, onClick }: AgentListItemProps) 
       <div className="flex flex-1 flex-col gap-1 overflow-hidden">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
-            {agent.socialAccounts.map((sa) => (
-              <span
-                key={sa.id}
-                className="h-2 w-2 flex-shrink-0 rounded-full"
-                style={{ background: PROVIDER_COLORS[sa.socialAccount.provider] || '#999' }}
-              />
-            ))}
+            {agent.socialAccounts.map((sa) => {
+              const network = (
+                sa.socialAccount.provider === 'FACEBOOK'
+                  ? 'messenger'
+                  : sa.socialAccount.provider.toLowerCase()
+              ) as SocialNetwork
+              return <SocialBadge key={sa.id} network={network} size={18} />
+            })}
           </div>
           <span className="flex-1 truncate text-sm font-medium text-text-primary">
             {agent.name || socialNames}
           </span>
-          <span className="flex-shrink-0 text-xs text-text-muted">{lastUpdate}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="truncate text-xs text-text-muted">{socialNames}</span>
           <span
             className="flex-shrink-0 text-xs"
             style={{
@@ -57,6 +46,7 @@ export function AgentListItem({ agent, isActive, onClick }: AgentListItemProps) 
             {agent.score}/100
           </span>
         </div>
+        {agent.name && <span className="truncate text-xs text-text-muted">{socialNames}</span>}
       </div>
     </button>
   )
