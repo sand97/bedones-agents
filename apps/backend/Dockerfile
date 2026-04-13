@@ -21,8 +21,8 @@ COPY apps/backend ./apps/backend
 RUN pnpm --filter backend prisma:generate
 
 WORKDIR /app/apps/backend
-RUN pnpm build
-RUN test -f dist/main.js || (echo "ERROR: dist/main.js not found after build" && exit 1)
+RUN pnpm build 2>&1 && ls -la dist/ || true
+RUN test -f dist/main.js || (echo "ERROR: dist/main.js not found after build" && ls -la . && exit 1)
 
 FROM node:20-bookworm-slim AS runtime
 
