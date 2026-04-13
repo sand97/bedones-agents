@@ -19,7 +19,10 @@ RUN pnpm install --frozen-lockfile --filter backend...
 COPY apps/backend ./apps/backend
 
 RUN pnpm --filter backend prisma:generate
-RUN pnpm --filter backend build
+
+WORKDIR /app/apps/backend
+RUN pnpm build
+RUN test -f dist/main.js || (echo "ERROR: dist/main.js not found after build" && exit 1)
 
 FROM node:20-bookworm-slim AS runtime
 
