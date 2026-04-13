@@ -4,7 +4,7 @@
  * form items, or mock data imports. Only ADD to this file, never delete or replace.
  * Any agent that removes functionality from this modal will break the ticket creation flow.
  */
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Modal, Form, Select, AutoComplete, InputNumber, Space } from 'antd'
 import { Input } from 'antd'
@@ -26,12 +26,58 @@ export interface SelectedArticle {
   quantity: number
 }
 
+/** Contact data from the real API (conversations) */
+export interface TicketContact {
+  conversationId: string
+  participantId: string
+  participantName: string
+  participantAvatar?: string
+  provider: string
+}
+
+/** Data shape passed back to the parent on submit */
+export interface TicketSubmitData {
+  title: string
+  description?: string
+  contactName?: string
+  contactId?: string
+  provider?: string
+  conversationId?: string
+  metadata?: Record<string, unknown>
+}
+
+/** Promotion option from the real API */
+export interface TicketPromotionOption {
+  id: string
+  name: string
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT'
+  discountValue: number
+}
+
 interface CreateTicketModalProps {
   open: boolean
   onClose: () => void
   onOpenArticlePicker: () => void
   selectedArticles: SelectedArticle[]
   setSelectedArticles: React.Dispatch<React.SetStateAction<SelectedArticle[]>>
+  /** Real contacts from conversations API — when provided, used instead of MOCK_CONVERSATIONS */
+  contacts?: TicketContact[]
+  /** Real promotions from API — when provided, used instead of MOCK_PROMOTIONS */
+  promotionOptions?: TicketPromotionOption[]
+  /** Called on submit with the ticket data — when provided, sends to API instead of just closing */
+  onSubmit?: (data: TicketSubmitData) => void
+  /** Whether submit is loading */
+  submitLoading?: boolean
+  /** When provided, opens modal in edit mode with pre-filled data */
+  editingTicket?: {
+    id: string
+    title: string
+    description?: string
+    priority?: string
+    contactName?: string
+    provider?: string
+    metadata?: Record<string, unknown> | null
+  } | null
 }
 
 const SOCIAL_PLATFORMS = (Object.keys(SOCIAL_NETWORK_CONFIG) as SocialNetwork[]).map((key) => ({
@@ -75,6 +121,11 @@ export function CreateTicketModal({
   onOpenArticlePicker,
   selectedArticles,
   setSelectedArticles,
+  contacts,
+  promotionOptions,
+  onSubmit,
+  submitLoading,
+  editingTicket,
 }: CreateTicketModalProps) {
   const { t } = useTranslation()
   const [form] = Form.useForm()
@@ -83,12 +134,117 @@ export function CreateTicketModal({
   ])
   const [selectedPromoIds, setSelectedPromoIds] = useState<string[]>([])
 
+  const isEditing = !!editingTicket
+
+  // Pre-fill form when editing
+  useEffect(() => {
+    if (open && editingTicket) {
+      const providerToPlat: Record<string, string> = {
+        WHATSAPP: 'whatsapp',
+        INSTAGRAM: 'instagram',
+        FACEBOOK: 'messenger',
+      }
+      form.setFieldsValue({
+        title: editingTicket.title,
+        description: editingTicket.description,
+        platform: editingTicket.provider ? providerToPlat[editingTicket.provider] : undefined,
+        contact: editingTicket.contactName,
+      })
+
+      // Restore articles, charges and promotions from metadata
+      const meta = editingTicket.metadata as Record<string, unknown> | null | undefined
+      if (meta) {
+        const metaArticles = (meta.articles ?? []) as Array<{
+          id: string
+          name: string
+          price: number
+          currency: string
+          imageUrl?: string
+          quantity: number
+        }>
+        if (metaArticles.length > 0) {
+          setSelectedArticles(
+            metaArticles.map((a) => ({
+              article: {
+                id: a.id,
+                name: a.name,
+                price: a.price,
+                currency: a.currency,
+                imageUrl: a.imageUrl ?? '',
+                description: '',
+                category: '',
+                status: 'ACTIVE' as const,
+                stock: 0,
+                createdAt: '',
+              },
+              quantity: a.quantity,
+            })),
+          )
+        }
+        const metaCharges = (meta.charges ?? []) as Array<{
+          id: string
+          reason: string
+          amount: number
+          isDefault?: boolean
+        }>
+        if (metaCharges.length > 0) {
+          setCharges(metaCharges)
+        }
+        const metaPromoIds = (meta.promotionIds ?? []) as string[]
+        if (metaPromoIds.length > 0) {
+          setSelectedPromoIds(metaPromoIds)
+        }
+      }
+    }
+  }, [open, editingTicket, form])
+
   const selectedPlatform = Form.useWatch('platform', form)
 
-  const selectedPromos = useMemo(
-    () => MOCK_PROMOTIONS.filter((p) => selectedPromoIds.includes(p.id)),
-    [selectedPromoIds],
-  )
+  // Real contacts filtered by selected platform, fallback to mock
+  const contactOptions = useMemo(() => {
+    if (contacts !== undefined) {
+      const platformMap: Record<string, string> = {
+        whatsapp: 'WHATSAPP',
+        instagram: 'INSTAGRAM',
+        messenger: 'FACEBOOK',
+        facebook: 'FACEBOOK',
+      }
+      const apiProvider = platformMap[selectedPlatform] || selectedPlatform?.toUpperCase()
+      const filtered = apiProvider ? contacts.filter((c) => c.provider === apiProvider) : contacts
+      return filtered.map((c) => ({
+        value: c.participantName,
+        label: `${c.participantName} — ${c.participantId}`,
+        contactData: c,
+      }))
+    }
+    return CONTACT_OPTIONS
+  }, [contacts, selectedPlatform])
+
+  // Real promotion options, fallback to mock
+  const promoOptions = useMemo(() => {
+    if (promotionOptions !== undefined) {
+      return promotionOptions.map((p) => ({
+        value: p.id,
+        label: `${p.name} (${p.discountType === 'PERCENTAGE' ? `-${p.discountValue}%` : `-${p.discountValue} FCFA`})`,
+      }))
+    }
+    return PROMO_OPTIONS
+  }, [promotionOptions])
+
+  // Promo data for discount calculations — use real when available
+  const selectedPromos = useMemo(() => {
+    if (promotionOptions !== undefined) {
+      return promotionOptions
+        .filter((p) => selectedPromoIds.includes(p.id))
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          type: p.discountType === 'PERCENTAGE' ? ('percent' as const) : ('fixed' as const),
+          value: p.discountValue,
+        }))
+    }
+    return MOCK_PROMOTIONS.filter((p) => selectedPromoIds.includes(p.id))
+  }, [promotionOptions, selectedPromoIds])
 
   const removeArticle = (articleId: string) => {
     setSelectedArticles((prev) => prev.filter((sa) => sa.article.id !== articleId))
@@ -154,9 +310,37 @@ export function CreateTicketModal({
   const grandTotal = subtotalDiscounted + chargesTotal
 
   const handleSubmit = () => {
-    form.validateFields().then(() => {
-      resetForm()
-      onClose()
+    form.validateFields().then((values) => {
+      if (onSubmit) {
+        // Find the selected contact from real data
+        const selectedContact = contacts?.find((c) => c.participantName === values.contact)
+        onSubmit({
+          title: values.title,
+          description: values.description,
+          contactName: selectedContact?.participantName || values.contact,
+          contactId: selectedContact?.participantId,
+          provider: selectedContact?.provider || values.platform?.toUpperCase(),
+          conversationId: selectedContact?.conversationId,
+          metadata: {
+            articles: selectedArticles.map((sa) => ({
+              id: sa.article.id,
+              name: sa.article.name,
+              price: sa.article.price,
+              currency: sa.article.currency,
+              imageUrl: sa.article.imageUrl,
+              quantity: sa.quantity,
+            })),
+            charges: charges.filter((c) => c.amount > 0),
+            promotionIds: selectedPromoIds,
+            subtotal: subtotalDiscounted,
+            chargesTotal,
+            grandTotal,
+          },
+        })
+      } else {
+        resetForm()
+        onClose()
+      }
     })
   }
 
@@ -174,7 +358,7 @@ export function CreateTicketModal({
 
   return (
     <Modal
-      title={t('tickets.create')}
+      title={isEditing ? t('tickets.edit') : t('tickets.create')}
       open={open}
       onCancel={handleClose}
       width={640}
@@ -190,8 +374,8 @@ export function CreateTicketModal({
           )}
           <div className="space-x-2">
             <Button onClick={handleClose}>Annuler</Button>
-            <Button type="primary" onClick={handleSubmit}>
-              Créer le ticket
+            <Button type="primary" onClick={handleSubmit} loading={submitLoading}>
+              {isEditing ? t('common.save') : t('tickets.create_button')}
             </Button>
           </div>
         </div>
@@ -223,7 +407,7 @@ export function CreateTicketModal({
             </Form.Item>
             <Form.Item name="contact" noStyle rules={[{ required: true, message: 'Requis' }]}>
               <AutoComplete
-                options={CONTACT_OPTIONS}
+                options={contactOptions}
                 placeholder="Rechercher un contact"
                 disabled={!selectedPlatform}
                 filterOption={(input, option) =>
@@ -294,7 +478,7 @@ export function CreateTicketModal({
             filterOption={(input, option) =>
               (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
             }
-            options={PROMO_OPTIONS}
+            options={promoOptions}
             style={{ width: '100%' }}
           />
         </Form.Item>

@@ -1,15 +1,30 @@
 import { Button } from 'antd'
 import { ExternalLink } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { SocialBadge } from '@app/components/shared/social-badge'
-import type { TicketListEntry } from '@app/components/whatsapp/mock-data'
+import type { SocialNetwork } from '@app/components/whatsapp/mock-data'
+import type { Ticket } from '@app/lib/api/agent-api'
 
-export function ContactCell({ entry }: { entry: TicketListEntry }) {
+const PROVIDER_TO_NETWORK: Record<string, SocialNetwork> = {
+  FACEBOOK: 'messenger',
+  INSTAGRAM: 'instagram',
+  WHATSAPP: 'whatsapp',
+}
+
+export function ContactCell({ ticket }: { ticket: Ticket }) {
+  const { t } = useTranslation()
+  const network = ticket.provider ? PROVIDER_TO_NETWORK[ticket.provider] : undefined
+
+  if (!ticket.contactName && !ticket.contactId) {
+    return <span className="text-sm text-text-muted">{t('tickets.no_contact')}</span>
+  }
+
   return (
     <div className="flex items-center gap-2">
-      <SocialBadge network={entry.socialNetwork} />
+      {network && <SocialBadge network={network} />}
       <div className="min-w-0">
         <div className="truncate text-sm font-medium text-text-primary">
-          {entry.contact.identifier}
+          {ticket.contactName || ticket.contactId}
         </div>
       </div>
       <Button icon={<ExternalLink size={13} />} size="small" type="text" />

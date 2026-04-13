@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { AuthGuard } from '../auth/auth.guard'
 import { TicketService } from './ticket.service'
@@ -9,6 +20,28 @@ import { CreateTicketDto, UpdateTicketDto } from './dto/ticket.dto'
 @UseGuards(AuthGuard)
 export class TicketController {
   constructor(private ticketService: TicketService) {}
+
+  // ─── Ticket Statuses ───
+
+  @Get('org/:organisationId/statuses')
+  async getStatuses(@Param('organisationId') organisationId: string) {
+    return this.ticketService.getStatuses(organisationId)
+  }
+
+  @Put('org/:organisationId/statuses')
+  async updateStatuses(
+    @Param('organisationId') organisationId: string,
+    @Body()
+    statuses: Array<{
+      id?: string
+      name: string
+      color: string
+      order: number
+      isDefault: boolean
+    }>,
+  ) {
+    return this.ticketService.updateStatuses(organisationId, statuses)
+  }
 
   @Get('org/:organisationId')
   async findAll(

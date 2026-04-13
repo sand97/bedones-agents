@@ -40,6 +40,7 @@ export class TicketService {
         include: {
           status: true,
           agent: { select: { id: true, name: true } },
+          activities: { orderBy: { createdAt: 'desc' } },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
@@ -57,6 +58,7 @@ export class TicketService {
       include: {
         status: true,
         agent: { select: { id: true, name: true } },
+        activities: { orderBy: { createdAt: 'desc' } },
       },
     })
     if (!ticket) throw new NotFoundException('Ticket introuvable')
@@ -77,11 +79,11 @@ export class TicketService {
     assignedTo?: string
     metadata?: Record<string, unknown>
   }) {
-    // If no statusId provided, find the default for this agent
+    // If no statusId provided, find the default for this organisation
     let statusId = data.statusId
-    if (!statusId && data.agentId) {
+    if (!statusId && data.organisationId) {
       const defaultStatus = await this.prisma.ticketStatus.findFirst({
-        where: { agentId: data.agentId, isDefault: true },
+        where: { organisationId: data.organisationId, isDefault: true },
       })
       statusId = defaultStatus?.id
     }
@@ -100,8 +102,14 @@ export class TicketService {
         conversationId: data.conversationId,
         assignedTo: data.assignedTo,
         metadata: (data.metadata as Record<string, unknown> & object) || undefined,
+        activities: {
+          create: {
+            type: 'created',
+            author: data.contactName || 'System',
+          },
+        },
       },
-      include: { status: true },
+      include: { status: true, activities: true },
     })
 
     this.gateway.emitToOrg(data.organisationId, 'ticket:created', ticket)
@@ -119,6 +127,13 @@ export class TicketService {
       metadata?: Record<string, unknown>
     },
   ) {
+    // Fetch current ticket to detect changes for activity log
+    const current = await this.prisma.ticket.findUnique({
+      where: { id },
+      include: { status: true },
+    })
+    if (!current) throw new NotFoundException('Ticket introuvable')
+
     const ticket = await this.prisma.ticket.update({
       where: { id },
       data: {
@@ -128,13 +143,43 @@ export class TicketService {
         priority: data.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | undefined,
         assignedTo: data.assignedTo,
         metadata: (data.metadata as Record<string, unknown> & object) || undefined,
-        resolvedAt: data.statusId ? undefined : undefined, // Will be set by status change logic
       },
       include: {
         status: true,
+        activities: { orderBy: { createdAt: 'desc' } },
         organisation: { select: { id: true } },
       },
     })
+
+    // Create activity for status change
+    if (data.statusId && data.statusId !== current.statusId) {
+      const newStatus = ticket.status
+      await this.prisma.ticketActivity.create({
+        data: {
+          ticketId: id,
+          type: 'status_change',
+          author: 'System',
+          fromStatus: current.status?.name || 'N/A',
+          toStatus: newStatus?.name || 'N/A',
+        },
+      })
+    }
+
+    // Create activity for description change
+    if (data.description !== undefined && data.description !== current.description) {
+      await this.prisma.ticketActivity.create({
+        data: {
+          ticketId: id,
+          type: 'description_change',
+          author: 'System',
+          diff: {
+            field: 'description',
+            before: current.description || '',
+            after: data.description || '',
+          },
+        },
+      })
+    }
 
     this.gateway.emitToOrg(ticket.organisationId, 'ticket:updated', ticket)
     return ticket
@@ -147,6 +192,39 @@ export class TicketService {
     })
     this.gateway.emitToOrg(ticket.organisationId, 'ticket:removed', { id })
     return ticket
+  }
+
+  // ─── Ticket Statuses ───
+
+  async getStatuses(organisationId: string) {
+    return this.prisma.ticketStatus.findMany({
+      where: { organisationId },
+      orderBy: { order: 'asc' },
+    })
+  }
+
+  async updateStatuses(
+    organisationId: string,
+    statuses: Array<{
+      id?: string
+      name: string
+      color: string
+      order: number
+      isDefault: boolean
+    }>,
+  ) {
+    // Delete existing and recreate
+    await this.prisma.ticketStatus.deleteMany({ where: { organisationId } })
+
+    return this.prisma.ticketStatus.createMany({
+      data: statuses.map((s) => ({
+        organisationId,
+        name: s.name,
+        color: s.color,
+        order: s.order,
+        isDefault: s.isDefault,
+      })),
+    })
   }
 
   async getStats(organisationId: string) {

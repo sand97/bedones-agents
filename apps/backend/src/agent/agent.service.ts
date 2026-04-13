@@ -12,14 +12,6 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { CATALOG_INDEXING_QUEUE } from '../queue/queue.module'
 import type { CatalogIndexingJobData } from '../image-processing/catalog-indexing.processor'
 
-const DEFAULT_TICKET_STATUSES = [
-  { name: 'Nouveau', color: '#1677ff', order: 0, isDefault: true },
-  { name: 'En cours', color: '#fa8c16', order: 1, isDefault: false },
-  { name: 'En attente', color: '#faad14', order: 2, isDefault: false },
-  { name: 'Résolu', color: '#52c41a', order: 3, isDefault: false },
-  { name: 'Annulé', color: '#ff4d4f', order: 4, isDefault: false },
-]
-
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name)
@@ -76,7 +68,6 @@ export class AgentService {
             },
           },
         },
-        ticketStatuses: { orderBy: { order: 'asc' } },
       },
     })
     if (!agent) throw new NotFoundException('Agent introuvable')
@@ -136,15 +127,11 @@ export class AgentService {
             socialAccountId,
           })),
         },
-        ticketStatuses: {
-          create: DEFAULT_TICKET_STATUSES,
-        },
       },
       include: {
         socialAccounts: {
           include: { socialAccount: true },
         },
-        ticketStatuses: true,
       },
     })
 
@@ -418,39 +405,6 @@ export class AgentService {
     const catalogs = await this.getAgentCatalogs(agentId)
     if (catalogs.length === 0) return true
     return catalogs.every((c) => c.analysisStatus === 'COMPLETED')
-  }
-
-  // ─── Ticket Statuses ───
-
-  async getTicketStatuses(agentId: string) {
-    return this.prisma.ticketStatus.findMany({
-      where: { agentId },
-      orderBy: { order: 'asc' },
-    })
-  }
-
-  async updateTicketStatuses(
-    agentId: string,
-    statuses: Array<{
-      id?: string
-      name: string
-      color: string
-      order: number
-      isDefault: boolean
-    }>,
-  ) {
-    // Delete existing and recreate
-    await this.prisma.ticketStatus.deleteMany({ where: { agentId } })
-
-    return this.prisma.ticketStatus.createMany({
-      data: statuses.map((s) => ({
-        agentId,
-        name: s.name,
-        color: s.color,
-        order: s.order,
-        isDefault: s.isDefault,
-      })),
-    })
   }
 
   // ─── Activation ───

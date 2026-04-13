@@ -16,10 +16,23 @@ import {
   type PromotionEligibility,
   type PromotionFull,
 } from '@app/components/whatsapp/mock-data'
+import type { PickerProduct } from '@app/components/promotions/product-picker-modal'
 
 dayjs.locale('fr')
 
 const { RangePicker } = DatePicker
+
+export interface PromotionSubmitData {
+  name: string
+  code: string
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT'
+  discountValue: number
+  startDate: string
+  endDate: string
+  eligibility: PromotionEligibility
+  productIds: string[]
+  stackable: boolean
+}
 
 interface PromotionModalProps {
   open: boolean
@@ -29,6 +42,12 @@ interface PromotionModalProps {
   onOpenProductPicker: () => void
   selectedProductIds: string[]
   setSelectedProductIds: React.Dispatch<React.SetStateAction<string[]>>
+  /** Called with form data when user clicks create/save */
+  onSubmit?: (data: PromotionSubmitData) => void
+  /** Loading state for the submit button */
+  submitLoading?: boolean
+  /** Full product objects selected via the product picker */
+  selectedProducts?: PickerProduct[]
 }
 
 export function PromotionModal({
@@ -38,6 +57,9 @@ export function PromotionModal({
   onOpenProductPicker,
   selectedProductIds,
   setSelectedProductIds,
+  onSubmit,
+  submitLoading,
+  selectedProducts,
 }: PromotionModalProps) {
   const { t } = useTranslation()
   const [form] = Form.useForm()
@@ -56,28 +78,79 @@ export function PromotionModal({
   const isEditing = !!editingPromo
   const promoType = Form.useWatch('type', form)
 
-  const selectedArticles = MOCK_CATALOG_ARTICLES.filter((a) => selectedProductIds.includes(a.id))
+  // Use real product objects when provided, fallback to mocks
+  const selectedArticles =
+    selectedProducts !== undefined
+      ? selectedProducts
+      : MOCK_CATALOG_ARTICLES.filter((a) => selectedProductIds.includes(a.id))
 
   useEffect(() => {
     if (open && editingPromo) {
+      // Support both mock PromotionFull shape and API PromotionItem shape
+      const promo = editingPromo as PromotionFull & Record<string, unknown>
+      const formType = promo.type ?? (promo.discountType === 'PERCENTAGE' ? 'percent' : 'fixed')
+      const formValue = promo.value ?? promo.discountValue ?? 0
+      const formEligibility =
+        promo.eligibility ??
+        ((promo as Record<string, unknown>).products &&
+        (promo as Record<string, unknown>).products instanceof Array &&
+        ((promo as Record<string, unknown>).products as unknown[]).length > 0
+          ? 'specific'
+          : 'all')
+      const formProductIds =
+        promo.eligibleProductIds ??
+        ((promo as Record<string, unknown>).products
+          ? ((promo as Record<string, unknown>).products as Array<{ product?: { id: string } }>)
+              .map((p) => p.product?.id)
+              .filter(Boolean)
+          : [])
+
       form.setFieldsValue({
         name: editingPromo.name,
-        code: editingPromo.code,
-        type: editingPromo.type,
-        value: editingPromo.value,
-        period: [dayjs(editingPromo.startDate), dayjs(editingPromo.endDate)],
-        eligibility: editingPromo.eligibility,
-        stackable: editingPromo.stackable,
+        code: editingPromo.code ?? (promo as Record<string, unknown>).code,
+        type: formType,
+        value: formValue,
+        period:
+          (editingPromo.startDate || (promo as Record<string, unknown>).startDate) &&
+          (editingPromo.endDate || (promo as Record<string, unknown>).endDate)
+            ? [
+                dayjs(
+                  (editingPromo.startDate as string) ||
+                    ((promo as Record<string, unknown>).startDate as string),
+                ),
+                dayjs(
+                  (editingPromo.endDate as string) ||
+                    ((promo as Record<string, unknown>).endDate as string),
+                ),
+              ]
+            : undefined,
+        eligibility: formEligibility,
+        stackable: editingPromo.stackable ?? (promo as Record<string, unknown>).stackable ?? false,
       })
-      setEligibility(editingPromo.eligibility)
-      setSelectedProductIds(editingPromo.eligibleProductIds)
+      setEligibility(formEligibility as PromotionEligibility)
+      setSelectedProductIds(formProductIds as string[])
     }
   }, [open, editingPromo, form, setSelectedProductIds])
 
   const handleSubmit = () => {
-    form.validateFields().then(() => {
-      resetForm()
-      onClose()
+    form.validateFields().then((values) => {
+      if (onSubmit) {
+        const [startDate, endDate] = values.period || []
+        onSubmit({
+          name: values.name,
+          code: values.code,
+          discountType: values.type === 'percent' ? 'PERCENTAGE' : 'FIXED_AMOUNT',
+          discountValue: values.value,
+          startDate: startDate ? startDate.toISOString() : '',
+          endDate: endDate ? endDate.toISOString() : '',
+          eligibility: values.eligibility,
+          productIds: values.eligibility === 'specific' ? selectedProductIds : [],
+          stackable: values.stackable ?? false,
+        })
+      } else {
+        resetForm()
+        onClose()
+      }
     })
   }
 
@@ -106,7 +179,7 @@ export function PromotionModal({
       footer={
         <div className="flex items-center justify-end gap-2">
           <Button onClick={handleClose}>{t('promotions.cancel')}</Button>
-          <Button type="primary" onClick={handleSubmit}>
+          <Button type="primary" onClick={handleSubmit} loading={submitLoading}>
             {isEditing ? t('promotions.save') : t('promotions.create_button')}
           </Button>
         </div>

@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react'
-import { Modal, Input, Button } from 'antd'
+import { useQuery } from '@tanstack/react-query'
+import { Modal, Input, Button, Select, Spin } from 'antd'
 import { Search, Plus, Minus, ShoppingBag } from 'lucide-react'
 // TODO(mock): Remplacer MOCK_CATALOG_ARTICLES par un appel API réel (catalogApi.getProducts)
 import { MOCK_CATALOG_ARTICLES, type CatalogArticle } from '@app/components/whatsapp/mock-data'
+import { catalogApi, type Catalog } from '@app/lib/api/agent-api'
 
 interface SelectedEntry {
   article: CatalogArticle
@@ -15,6 +17,8 @@ interface ArticlePickerModalProps {
   onSave: (entries: SelectedEntry[]) => void
   /** Already selected article IDs to pre-populate quantities */
   initialSelection?: SelectedEntry[]
+  /** Available catalogs — when provided, shows a catalog Select and fetches products from API */
+  catalogs?: Catalog[]
 }
 
 function formatPrice(price: number, currency: string) {
@@ -26,8 +30,10 @@ export function ArticlePickerModal({
   onClose,
   onSave,
   initialSelection = [],
+  catalogs,
 }: ArticlePickerModalProps) {
   const [search, setSearch] = useState('')
+  const [selectedCatalogId, setSelectedCatalogId] = useState<string | undefined>(undefined)
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     const map: Record<string, number> = {}
     for (const entry of initialSelection) {
@@ -36,18 +42,58 @@ export function ArticlePickerModal({
     return map
   })
 
-  const activeArticles = useMemo(
-    () => MOCK_CATALOG_ARTICLES.filter((a) => a.status === 'active' || a.status === 'published'),
-    [],
-  )
+  // Auto-select first catalog when catalogs are provided
+  const effectiveCatalogId = selectedCatalogId || catalogs?.[0]?.id
+
+  // Fetch products from API when a catalog is selected
+  const productsQuery = useQuery({
+    queryKey: ['catalog-products', effectiveCatalogId, search],
+    queryFn: () =>
+      catalogApi.getProducts(effectiveCatalogId!, {
+        search: search || undefined,
+        limit: 50,
+      }),
+    enabled: !!effectiveCatalogId && !!catalogs?.length,
+    staleTime: Infinity,
+    refetchOnMount: true,
+  })
+
+  // Map API products to CatalogArticle shape for compatibility
+  const apiArticles: CatalogArticle[] = useMemo(() => {
+    if (!productsQuery.data?.products) return []
+    return productsQuery.data.products.map((p) => ({
+      id: p.id,
+      contentId: p.retailerId,
+      name: p.name,
+      description: p.description || '',
+      imageUrl: p.imageUrl || '',
+      price: p.price || 0,
+      currency: p.currency || 'FCFA',
+      category: p.category || '',
+      status: p.status as CatalogArticle['status'],
+      stock: p.inventory || 0,
+      collection: p.collectionName,
+      createdAt: '',
+    }))
+  }, [productsQuery.data])
+
+  // Use API articles when catalogs provided, else fall back to mock
+  const hasCatalogs = catalogs && catalogs.length > 0
+
+  const activeArticles = useMemo(() => {
+    if (hasCatalogs) return apiArticles
+    return MOCK_CATALOG_ARTICLES.filter((a) => a.status === 'active' || a.status === 'published')
+  }, [hasCatalogs, apiArticles])
 
   const filtered = useMemo(() => {
+    // When using API, search is handled server-side
+    if (hasCatalogs) return activeArticles
     if (!search) return activeArticles
     const q = search.toLowerCase()
     return activeArticles.filter(
       (a) => a.name.toLowerCase().includes(q) || a.category.toLowerCase().includes(q),
     )
-  }, [search, activeArticles])
+  }, [search, activeArticles, hasCatalogs])
 
   const setQty = (id: string, qty: number) => {
     setQuantities((prev) => {
@@ -65,9 +111,10 @@ export function ArticlePickerModal({
 
   const handleSave = () => {
     const entries: SelectedEntry[] = []
+    const allArticles = hasCatalogs ? apiArticles : MOCK_CATALOG_ARTICLES
     for (const [id, qty] of Object.entries(quantities)) {
       if (qty <= 0) continue
-      const article = MOCK_CATALOG_ARTICLES.find((a) => a.id === id)
+      const article = allArticles.find((a) => a.id === id)
       if (article) entries.push({ article, quantity: qty })
     }
     onSave(entries)
@@ -88,19 +135,35 @@ export function ArticlePickerModal({
     }
     setQuantities(map)
     setSearch('')
+    if (catalogs?.length && !selectedCatalogId) {
+      setSelectedCatalogId(catalogs[0].id)
+    }
   }
+
+  const isLoadingProducts = hasCatalogs && productsQuery.isLoading
 
   return (
     <Modal
       title={
-        <Input
-          placeholder="Rechercher un article..."
-          prefix={<Search size={16} className="text-text-muted" />}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          allowClear
-          style={{ fontWeight: 'normal' }}
-        />
+        <div className="flex flex-col gap-2">
+          {hasCatalogs && (
+            <Select
+              value={effectiveCatalogId}
+              onChange={setSelectedCatalogId}
+              options={catalogs!.map((c) => ({ value: c.id, label: c.name }))}
+              style={{ fontWeight: 'normal', width: '100%' }}
+              placeholder="Sélectionner un catalogue"
+            />
+          )}
+          <Input
+            placeholder="Rechercher un article..."
+            prefix={<Search size={16} className="text-text-muted" />}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            allowClear
+            style={{ fontWeight: 'normal' }}
+          />
+        </div>
       }
       open={open}
       onCancel={handleClose}
@@ -120,7 +183,11 @@ export function ArticlePickerModal({
     >
       {/* Article list */}
       <div className="flex flex-col">
-        {filtered.length === 0 ? (
+        {isLoadingProducts ? (
+          <div className="flex items-center justify-center py-12">
+            <Spin />
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-text-muted">
             <ShoppingBag size={32} strokeWidth={1.5} className="mb-2 opacity-40" />
             <span className="text-sm">Aucun article trouvé</span>

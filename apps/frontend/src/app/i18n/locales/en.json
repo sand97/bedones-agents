@@ -359,7 +359,29 @@
     "col_title": "Title",
     "no_contact": "No contact",
     "date_start": "Start date",
-    "date_end": "End date"
+    "date_end": "End date",
+    "add": "Add",
+    "details": "Details",
+    "articles": "Articles",
+    "status": "Status",
+    "priority_label": "Priority",
+    "priority_low": "Low",
+    "priority_medium": "Medium",
+    "priority_high": "High",
+    "priority_urgent": "Urgent",
+    "edit": "Edit ticket",
+    "updated": "Ticket updated successfully",
+    "create_button": "Create ticket",
+    "confirm_delete": "Delete this ticket?",
+    "confirm_delete_message": "The ticket \"{{name}}\" will be permanently deleted.",
+    "manage_statuses": "Manage statuses",
+    "statuses_title": "Ticket statuses",
+    "statuses_desc": "Configure available statuses for your tickets. The default status will be automatically applied on creation.",
+    "status_name_placeholder": "Status name",
+    "add_status": "Add a status",
+    "default_status": "Default",
+    "statuses_updated": "Statuses updated",
+    "all_statuses": "All statuses"
   },
 
   "catalog": {
@@ -488,7 +510,13 @@
     "edit_selection": "Edit selection",
     "picker_search": "Search an article...",
     "picker_save": "Save {{count}} product(s)",
-    "picker_no_results": "No articles found"
+    "picker_no_results": "No articles found",
+    "status_draft": "Draft",
+    "status_active": "Active",
+    "status_paused": "Paused",
+    "status_expired": "Expired",
+    "created": "Promotion created successfully",
+    "updated": "Promotion updated successfully"
   },
 
   "agent": {

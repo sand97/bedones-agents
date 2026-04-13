@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
+import { Injectable, Logger, UnauthorizedException, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 import { I18nContext } from 'nestjs-i18n'
@@ -201,7 +201,7 @@ export class AuthService {
   // ─── Get current user with organisations ───
 
   async getMe(userId: string) {
-    const user = await this.prisma.user.findUniqueOrThrow({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -235,6 +235,7 @@ export class AuthService {
         },
       },
     })
+    if (!user) throw new NotFoundException('User not found')
 
     const active = user.memberships.filter((m) => m.status === 'ACTIVE')
     const invited = user.memberships.filter((m) => m.status === 'INVITED')

@@ -1,17 +1,27 @@
-import { Button, Descriptions } from 'antd'
+import { Button, Descriptions, Tag } from 'antd'
 import { Eye } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { StatusTag } from '@app/components/shared/status-tag'
-import { formatPrice, formatDateTime } from '@app/lib/format'
+import { formatDateTime } from '@app/lib/format'
 import { ContactCell } from './contact-cell'
-import { TICKET_STATUS_CONFIG, type TicketListEntry } from '@app/components/whatsapp/mock-data'
+import type { Ticket } from '@app/lib/api/agent-api'
+
+const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
+  LOW: { label: 'Basse', color: '#52c41a' },
+  MEDIUM: { label: 'Moyenne', color: '#faad14' },
+  HIGH: { label: 'Haute', color: '#fa8c16' },
+  URGENT: { label: 'Urgente', color: '#f5222d' },
+}
 
 interface TicketDescriptionCardProps {
-  entry: TicketListEntry
+  entry: Ticket
   onViewDetails: () => void
 }
 
 export function TicketDescriptionCard({ entry, onViewDetails }: TicketDescriptionCardProps) {
-  const statusConfig = TICKET_STATUS_CONFIG[entry.status]
+  const { t } = useTranslation()
+  const priorityConfig = PRIORITY_CONFIG[entry.priority] ?? { label: entry.priority, color: '#888' }
+
   return (
     <div className="catalog-card">
       <div className="catalog-card__header">
@@ -26,26 +36,35 @@ export function TicketDescriptionCard({ entry, onViewDetails }: TicketDescriptio
         size="small"
         className="ticket-list-card-bordered catalog-card__details"
       >
-        <Descriptions.Item label="Status">
-          <StatusTag label={statusConfig.label} color={statusConfig.color} />
+        <Descriptions.Item label={t('tickets.filter_status')}>
+          {entry.status ? (
+            <StatusTag label={entry.status.name} color={entry.status.color} />
+          ) : (
+            <span className="text-text-muted">N/A</span>
+          )}
         </Descriptions.Item>
-        <Descriptions.Item label="Articles">
-          <span className="font-medium">
-            {entry.itemCount} article{entry.itemCount > 1 ? 's' : ''}
-          </span>
-          <span className="ml-2 text-xs text-text-muted">
-            {formatPrice(entry.totalAmount, entry.currency)}
-          </span>
+        <Descriptions.Item label={t('tickets.priority')}>
+          <Tag
+            bordered={false}
+            style={{
+              background: priorityConfig.color,
+              color: '#fff',
+              borderRadius: 9999,
+              fontWeight: 600,
+            }}
+          >
+            {priorityConfig.label}
+          </Tag>
         </Descriptions.Item>
-        <Descriptions.Item label="Créé le">
+        <Descriptions.Item label={t('tickets.created_at')}>
           <span className="text-text-secondary">{formatDateTime(entry.createdAt)}</span>
         </Descriptions.Item>
-        <Descriptions.Item label="Contact">
-          <ContactCell entry={entry} />
+        <Descriptions.Item label={t('tickets.contact')}>
+          <ContactCell ticket={entry} />
         </Descriptions.Item>
-        <Descriptions.Item label="Actions">
+        <Descriptions.Item label="">
           <Button type="default" size="small" icon={<Eye size={15} />} onClick={onViewDetails}>
-            Détails
+            {t('tickets.details')}
           </Button>
         </Descriptions.Item>
       </Descriptions>

@@ -27,7 +27,9 @@ export class PromotionService {
         include: {
           products: {
             include: {
-              product: { select: { id: true, name: true, imageUrl: true, price: true } },
+              product: {
+                select: { id: true, name: true, imageUrl: true, price: true, currency: true },
+              },
             },
           },
           _count: { select: { products: true } },
@@ -59,6 +61,23 @@ export class PromotionService {
     return promotion
   }
 
+  /**
+   * Resolve product IDs that may be either internal UUIDs or external provider IDs (Meta/WhatsApp).
+   * Returns the internal UUIDs for use with PromotionProduct FK.
+   */
+  private async resolveProductIds(productIds: string[]): Promise<string[]> {
+    if (productIds.length === 0) return []
+
+    const products = await this.prisma.product.findMany({
+      where: {
+        OR: [{ id: { in: productIds } }, { providerProductId: { in: productIds } }],
+      },
+      select: { id: true },
+    })
+
+    return products.map((p) => p.id)
+  }
+
   async create(data: {
     organisationId: string
     name: string
@@ -69,7 +88,10 @@ export class PromotionService {
     startDate?: string
     endDate?: string
     productIds?: string[]
+    stackable?: boolean
   }) {
+    const resolvedIds = data.productIds?.length ? await this.resolveProductIds(data.productIds) : []
+
     const promotion = await this.prisma.promotion.create({
       data: {
         organisationId: data.organisationId,
@@ -80,9 +102,10 @@ export class PromotionService {
         code: data.code,
         startDate: data.startDate ? new Date(data.startDate) : null,
         endDate: data.endDate ? new Date(data.endDate) : null,
-        products: data.productIds?.length
+        stackable: data.stackable ?? false,
+        products: resolvedIds.length
           ? {
-              create: data.productIds.map((productId) => ({ productId })),
+              create: resolvedIds.map((productId) => ({ productId })),
             }
           : undefined,
       },
@@ -108,6 +131,7 @@ export class PromotionService {
       endDate?: string
       status?: string
       productIds?: string[]
+      stackable?: boolean
     },
   ) {
     // Update promotion data
@@ -122,6 +146,7 @@ export class PromotionService {
         startDate: data.startDate ? new Date(data.startDate) : undefined,
         endDate: data.endDate ? new Date(data.endDate) : undefined,
         status: data.status as 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'EXPIRED' | undefined,
+        stackable: data.stackable,
       },
     })
 
@@ -129,9 +154,12 @@ export class PromotionService {
     if (data.productIds !== undefined) {
       await this.prisma.promotionProduct.deleteMany({ where: { promotionId: id } })
       if (data.productIds.length > 0) {
-        await this.prisma.promotionProduct.createMany({
-          data: data.productIds.map((productId) => ({ promotionId: id, productId })),
-        })
+        const resolvedIds = await this.resolveProductIds(data.productIds)
+        if (resolvedIds.length > 0) {
+          await this.prisma.promotionProduct.createMany({
+            data: resolvedIds.map((productId) => ({ promotionId: id, productId })),
+          })
+        }
       }
     }
 

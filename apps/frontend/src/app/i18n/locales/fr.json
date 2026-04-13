@@ -352,14 +352,36 @@
     "before": "Avant",
     "after": "Après",
     "search_placeholder": "Rechercher par titre ou contact...",
-    "filter_status": "Filtrer par status",
+    "filter_status": "Status",
     "filter_priority": "Filtrer par priorité",
     "priority": "Priorité",
     "contact": "Contact",
     "col_title": "Titre",
     "no_contact": "Sans contact",
     "date_start": "Date début",
-    "date_end": "Date fin"
+    "date_end": "Date fin",
+    "add": "Ajouter",
+    "details": "Détails",
+    "articles": "Articles",
+    "status": "Status",
+    "priority_label": "Priorité",
+    "priority_low": "Basse",
+    "priority_medium": "Moyenne",
+    "priority_high": "Haute",
+    "priority_urgent": "Urgente",
+    "edit": "Modifier le ticket",
+    "updated": "Ticket mis à jour avec succès",
+    "create_button": "Créer le ticket",
+    "confirm_delete": "Supprimer ce ticket ?",
+    "confirm_delete_message": "Le ticket « {{name}} » sera définitivement supprimé.",
+    "manage_statuses": "Gérer les status",
+    "statuses_title": "Status des tickets",
+    "statuses_desc": "Configurez les status disponibles pour vos tickets. Le status par défaut sera appliqué automatiquement à la création.",
+    "status_name_placeholder": "Nom du status",
+    "add_status": "Ajouter un status",
+    "default_status": "Par défaut",
+    "statuses_updated": "Status mis à jour",
+    "all_statuses": "Tous les status"
   },
 
   "catalog": {
@@ -488,7 +510,13 @@
     "edit_selection": "Modifier la sélection",
     "picker_search": "Rechercher un article...",
     "picker_save": "Sauvegarder {{count}} produit(s)",
-    "picker_no_results": "Aucun article trouvé"
+    "picker_no_results": "Aucun article trouvé",
+    "status_draft": "Brouillon",
+    "status_active": "Active",
+    "status_paused": "En pause",
+    "status_expired": "Expirée",
+    "created": "Promotion créée avec succès",
+    "updated": "Promotion mise à jour avec succès"
   },
 
   "agent": {

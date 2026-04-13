@@ -27,6 +27,9 @@ export class CreatePromotionDto {
 
   @ApiPropertyOptional({ type: [String] })
   productIds?: string[]
+
+  @ApiPropertyOptional()
+  stackable?: boolean
 }
 
 export class UpdatePromotionDto {
@@ -56,4 +59,7 @@ export class UpdatePromotionDto {
 
   @ApiPropertyOptional({ type: [String] })
   productIds?: string[]
+
+  @ApiPropertyOptional()
+  stackable?: boolean
 }

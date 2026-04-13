@@ -101,9 +101,9 @@ export class AgentDbToolsService {
         provider,
         conversationId,
       }) => {
-        // Get the default status for this agent
+        // Get the default status for this organisation
         const defaultStatus = await this.prisma.ticketStatus.findFirst({
-          where: { agentId, isDefault: true },
+          where: { organisationId, isDefault: true },
         })
 
         const ticket = await this.prisma.ticket.create({

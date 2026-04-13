@@ -42,7 +42,6 @@ export interface Agent {
   createdAt: string
   updatedAt: string
   socialAccounts: AgentSocialAccount[]
-  ticketStatuses?: TicketStatusItem[]
   _count?: { messages: number; tickets: number }
 }
 
@@ -89,14 +88,6 @@ export const agentApi = {
 
   areCatalogsAnalyzed: (id: string) =>
     fetchJson<{ analyzed: boolean }>(`/agent/${id}/catalogs-analyzed`),
-
-  getTicketStatuses: (id: string) => fetchJson<TicketStatusItem[]>(`/agent/${id}/ticket-statuses`),
-
-  updateTicketStatuses: (id: string, statuses: TicketStatusItem[]) =>
-    fetchJson<void>(`/agent/${id}/ticket-statuses`, {
-      method: 'PUT',
-      body: JSON.stringify(statuses),
-    }),
 
   activate: (
     id: string,
@@ -376,6 +367,7 @@ export const ticketApi = {
       statusId?: string
       priority?: string
       assignedTo?: string
+      metadata?: Record<string, unknown>
     },
   ) => fetchJson<Ticket>(`/ticket/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
@@ -387,6 +379,14 @@ export const ticketApi = {
       byPriority: Array<{ priority: string; count: number }>
       byStatus: Array<{ statusId: string; count: number }>
     }>(`/ticket/org/${orgId}/stats`),
+
+  getStatuses: (orgId: string) => fetchJson<TicketStatusItem[]>(`/ticket/org/${orgId}/statuses`),
+
+  updateStatuses: (orgId: string, statuses: TicketStatusItem[]) =>
+    fetchJson<void>(`/ticket/org/${orgId}/statuses`, {
+      method: 'PUT',
+      body: JSON.stringify(statuses),
+    }),
 }
 
 // ─── Promotion ───
@@ -401,9 +401,12 @@ export interface PromotionItem {
   startDate?: string
   endDate?: string
   status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'EXPIRED'
+  stackable: boolean
   createdAt: string
   updatedAt: string
-  products: Array<{ product: { id: string; name: string; imageUrl?: string; price?: number } }>
+  products: Array<{
+    product: { id: string; name: string; imageUrl?: string; price?: number; currency?: string }
+  }>
   _count?: { products: number }
 }
 
@@ -437,6 +440,7 @@ export const promotionApi = {
     startDate?: string
     endDate?: string
     productIds?: string[]
+    stackable?: boolean
   }) => fetchJson<PromotionItem>('/promotion', { method: 'POST', body: JSON.stringify(data) }),
 
   update: (
@@ -451,6 +455,7 @@ export const promotionApi = {
       endDate?: string
       status?: string
       productIds?: string[]
+      stackable?: boolean
     },
   ) =>
     fetchJson<PromotionItem>(`/promotion/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
@@ -496,4 +501,22 @@ export interface SocialAccount {
 
 export const socialApi = {
   listAccounts: (orgId: string) => fetchJson<SocialAccount[]>(`/social/accounts/${orgId}`),
+}
+
+// ─── Conversations ───
+
+export interface ConversationItem {
+  id: string
+  socialAccountId: string
+  participantId: string
+  participantName: string
+  participantAvatar?: string
+  lastMessageText?: string
+  lastMessageAt?: string
+  unreadCount: number
+}
+
+export const conversationApi = {
+  listByAccount: (accountId: string) =>
+    fetchJson<ConversationItem[]>(`/messaging/conversations/${accountId}`),
 }

@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common'
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
 import { MediaConverterService } from '../upload/media-converter.service'
@@ -19,10 +19,11 @@ export class MessagingService {
   // ─── Get conversations for a social account ───
 
   async getConversations(userId: string, accountId: string) {
-    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+    const account = await this.prisma.socialAccount.findUnique({
       where: { id: accountId },
       select: { organisationId: true, scopes: true },
     })
+    if (!account) throw new NotFoundException('Social account not found')
     await this.assertMembership(userId, account.organisationId)
     this.assertScope(account.scopes, 'messages')
 
@@ -35,12 +36,13 @@ export class MessagingService {
   // ─── Get messages for a conversation ───
 
   async getMessages(userId: string, conversationId: string) {
-    const conversation = await this.prisma.conversation.findUniqueOrThrow({
+    const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
       include: {
         socialAccount: { select: { organisationId: true } },
       },
     })
+    if (!conversation) throw new NotFoundException('Conversation not found')
     await this.assertMembership(userId, conversation.socialAccount.organisationId)
 
     const messages = await this.prisma.directMessage.findMany({
@@ -79,7 +81,7 @@ export class MessagingService {
     fileSize?: number,
     replyToId?: string,
   ) {
-    const conversation = await this.prisma.conversation.findUniqueOrThrow({
+    const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
       include: {
         socialAccount: {
@@ -93,6 +95,7 @@ export class MessagingService {
         },
       },
     })
+    if (!conversation) throw new NotFoundException('Conversation not found')
     await this.assertMembership(userId, conversation.socialAccount.organisationId)
     this.assertScope(conversation.socialAccount.scopes, 'messages')
 
@@ -210,7 +213,7 @@ export class MessagingService {
     conversationId: string,
     message: string,
   ): Promise<{ id: string; message: string }> {
-    const conversation = await this.prisma.conversation.findUniqueOrThrow({
+    const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
       include: {
         socialAccount: {
@@ -223,6 +226,7 @@ export class MessagingService {
         },
       },
     })
+    if (!conversation) throw new NotFoundException('Conversation not found')
 
     const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
     const provider = conversation.socialAccount.provider
@@ -279,10 +283,11 @@ export class MessagingService {
   // ─── Mark conversation as read ───
 
   async markConversationAsRead(userId: string, conversationId: string) {
-    const conversation = await this.prisma.conversation.findUniqueOrThrow({
+    const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
       include: { socialAccount: { select: { organisationId: true } } },
     })
+    if (!conversation) throw new NotFoundException('Conversation not found')
     await this.assertMembership(userId, conversation.socialAccount.organisationId)
 
     await this.prisma.directMessage.updateMany({
@@ -301,7 +306,7 @@ export class MessagingService {
   // ─── Sync conversations from platform ───
 
   async syncConversations(userId: string, accountId: string) {
-    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+    const account = await this.prisma.socialAccount.findUnique({
       where: { id: accountId },
       select: {
         id: true,
@@ -311,6 +316,7 @@ export class MessagingService {
         scopes: true,
       },
     })
+    if (!account) throw new NotFoundException('Social account not found')
     await this.assertMembership(userId, account.organisationId)
     this.assertScope(account.scopes, 'messages')
 
@@ -433,6 +439,9 @@ export class MessagingService {
       // Find the participant that is NOT the page
       const participant = conv.participants.data.find((p) => p.id !== pageId)
       if (!participant) continue
+
+      // Note: Facebook Messenger doesn't expose profile_pic via conversations API
+      // and /{PSID}?fields=profile_pic requires "Business Asset User Profile Access"
 
       // Upsert conversation
       const conversation = await this.prisma.conversation.upsert({
@@ -604,6 +613,35 @@ export class MessagingService {
 
       const participantName = participant.username || participant.name || 'Utilisateur Instagram'
 
+      // Fetch avatar if not already stored
+      let participantAvatar: string | null = null
+      const existingConv = await this.prisma.conversation.findUnique({
+        where: {
+          socialAccountId_participantId: {
+            socialAccountId,
+            participantId: participant.id,
+          },
+        },
+        select: { participantAvatar: true },
+      })
+
+      if (!existingConv?.participantAvatar) {
+        try {
+          const profileRes = await fetch(
+            `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${participant.id}?fields=profile_pic&access_token=${accessToken}`,
+          )
+          if (profileRes.ok) {
+            const profile = (await profileRes.json()) as { profile_pic?: string }
+            if (profile.profile_pic) {
+              participantAvatar =
+                (await this.uploadService.uploadFromUrl(profile.profile_pic, 'avatars')) || null
+            }
+          }
+        } catch {
+          this.logger.warn(`[Instagram Sync] Failed to fetch avatar for ${participant.id}`)
+        }
+      }
+
       const conversation = await this.prisma.conversation.upsert({
         where: {
           socialAccountId_participantId: {
@@ -616,12 +654,14 @@ export class MessagingService {
           platformThreadId: conv.id,
           participantId: participant.id,
           participantName,
+          participantAvatar,
           lastMessageText: conv.messages?.data?.[0]?.message || null,
           lastMessageAt: new Date(conv.updated_time),
         },
         update: {
           platformThreadId: conv.id,
           participantName,
+          ...(participantAvatar ? { participantAvatar } : {}),
           lastMessageText: conv.messages?.data?.[0]?.message || undefined,
           lastMessageAt: new Date(conv.updated_time),
         },
@@ -934,10 +974,11 @@ export class MessagingService {
   // ─── Helpers ───
 
   private async getDecryptedToken(socialAccountId: string): Promise<string> {
-    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+    const account = await this.prisma.socialAccount.findUnique({
       where: { id: socialAccountId },
       select: { accessToken: true },
     })
+    if (!account) throw new NotFoundException('Social account not found')
     return this.encryptionService.decrypt(account.accessToken)
   }
 

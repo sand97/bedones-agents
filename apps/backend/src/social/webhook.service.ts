@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { Prisma } from 'generated/prisma/client'
@@ -192,9 +192,16 @@ export class WebhookService {
     const commentFrom = (commentData as { from?: { id: string; name: string } }).from
     const commentParentId = (commentData as { parent?: { id: string } }).parent?.id
     const commentCreatedTime = (commentData as { created_time?: string }).created_time
-    const fromAvatar =
+    const rawFromAvatar =
       (commentData as { from?: { picture?: { data?: { url?: string } } } }).from?.picture?.data
         ?.url || null
+
+    // Upload avatar to Minio for permanent storage
+    let fromAvatar: string | null = null
+    if (rawFromAvatar) {
+      fromAvatar =
+        (await this.uploadService.uploadFromUrl(rawFromAvatar, 'avatars')) || rawFromAvatar
+    }
 
     const isOwnComment = commentFrom?.id === pageId
 
@@ -343,10 +350,11 @@ export class WebhookService {
     const baseUrl = `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}`
 
     // Fetch access token for API calls
-    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+    const account = await this.prisma.socialAccount.findUnique({
       where: { id: socialAccountId },
       select: { accessToken: true },
     })
+    if (!account) throw new NotFoundException('Social account not found')
     const accessToken = await this.encryptionService.decrypt(account.accessToken)
 
     // Fetch media details if we don't have them yet
@@ -407,6 +415,26 @@ export class WebhookService {
 
     const createdTime = value.timestamp ? new Date(value.timestamp) : new Date()
 
+    // Fetch commenter avatar from Instagram API
+    let fromAvatar: string | null = null
+    const commenterId = value.from?.id
+    if (commenterId && !isOwnComment) {
+      try {
+        const profileRes = await fetch(
+          `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/${commenterId}?fields=profile_pic&access_token=${accessToken}`,
+        )
+        if (profileRes.ok) {
+          const profile = (await profileRes.json()) as { profile_pic?: string }
+          if (profile.profile_pic) {
+            fromAvatar =
+              (await this.uploadService.uploadFromUrl(profile.profile_pic, 'avatars')) || null
+          }
+        }
+      } catch {
+        this.logger.warn(`[Instagram Comment] Failed to fetch avatar for ${commenterId}`)
+      }
+    }
+
     await this.prisma.comment.upsert({
       where: { id: commentId },
       create: {
@@ -414,14 +442,16 @@ export class WebhookService {
         postId: mediaId,
         parentId: value.parent_id || null,
         message: value.text || '',
-        fromId: value.from?.id || 'unknown',
+        fromId: commenterId || 'unknown',
         fromName: value.from?.username || 'Utilisateur Instagram',
+        fromAvatar,
         createdTime,
         isRead: isOwnComment,
         isPageReply: isOwnComment,
       },
       update: {
         message: value.text || '',
+        ...(fromAvatar ? { fromAvatar } : {}),
       },
     })
 
@@ -504,28 +534,60 @@ export class WebhookService {
     const isFromPage = senderId === pageId
     if (isFromPage) return
 
-    // Get sender name and avatar from Graph API
+    // Get sender name via conversations API (direct /{PSID} requires extra permissions)
     let senderName = 'Utilisateur'
     let senderAvatar: string | null = null
     try {
-      const accessToken = await this.encryptionService.decrypt(
-        (
-          await this.prisma.socialAccount.findUniqueOrThrow({
-            where: { id: socialAccountId },
-            select: { accessToken: true },
-          })
-        ).accessToken,
-      )
-      const profileRes = await fetch(
-        `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${senderId}?fields=name,profile_pic&access_token=${accessToken}`,
-      )
-      if (profileRes.ok) {
-        const profile = (await profileRes.json()) as { name?: string; profile_pic?: string }
-        senderName = profile.name || senderName
-        senderAvatar = profile.profile_pic || null
+      const _account = await this.prisma.socialAccount.findUnique({
+        where: { id: socialAccountId },
+        select: { accessToken: true },
+      })
+      if (!_account) throw new NotFoundException('Social account not found')
+      const accessToken = await this.encryptionService.decrypt(_account.accessToken)
+
+      // Check existing conversation first
+      const existingConv = await this.prisma.conversation.findUnique({
+        where: {
+          socialAccountId_participantId: {
+            socialAccountId,
+            participantId: senderId,
+          },
+        },
+        select: { participantName: true, participantAvatar: true },
+      })
+
+      const hasValidName =
+        existingConv?.participantName &&
+        existingConv.participantName !== 'Utilisateur' &&
+        existingConv.participantName !== senderId
+      if (hasValidName) {
+        // Already have a valid name stored
+        senderName = existingConv.participantName
+        senderAvatar = existingConv.participantAvatar || null
+      } else {
+        // Fetch participant name from conversations API filtered by user_id
+        const convRes = await fetch(
+          `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${pageId}/conversations?fields=participants&user_id=${senderId}&access_token=${accessToken}`,
+        )
+        if (convRes.ok) {
+          const convData = (await convRes.json()) as {
+            data?: Array<{
+              participants: { data: Array<{ id: string; name?: string }> }
+            }>
+          }
+          const participant = convData.data?.[0]?.participants?.data?.find((p) => p.id === senderId)
+          if (participant?.name) {
+            senderName = participant.name
+          }
+        } else {
+          const errorBody = await convRes.text()
+          this.logger.warn(
+            `[Messenger] Conversation fetch failed (${convRes.status}): ${errorBody}`,
+          )
+        }
       }
-    } catch {
-      // fallback to default name
+    } catch (error) {
+      this.logger.warn(`[Messenger] Failed to fetch profile for ${senderId}`, error)
     }
 
     let mediaUrl: string | null = null
@@ -641,14 +703,12 @@ export class WebhookService {
     let senderName = senderId
     let senderAvatar: string | null = null
     try {
-      const accessToken = await this.encryptionService.decrypt(
-        (
-          await this.prisma.socialAccount.findUniqueOrThrow({
-            where: { id: socialAccountId },
-            select: { accessToken: true },
-          })
-        ).accessToken,
-      )
+      const _account = await this.prisma.socialAccount.findUnique({
+        where: { id: socialAccountId },
+        select: { accessToken: true },
+      })
+      if (!_account) throw new NotFoundException('Social account not found')
+      const accessToken = await this.encryptionService.decrypt(_account.accessToken)
       const profileRes = await fetch(
         `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/${senderId}?fields=name,username,profile_pic&access_token=${accessToken}`,
       )
@@ -659,10 +719,32 @@ export class WebhookService {
           profile_pic?: string
         }
         senderName = profile.username || profile.name || senderName
-        senderAvatar = profile.profile_pic || null
+
+        // Check if we already have a stored Minio avatar for this conversation
+        const existingConv = await this.prisma.conversation.findUnique({
+          where: {
+            socialAccountId_participantId: {
+              socialAccountId,
+              participantId: senderId,
+            },
+          },
+          select: { participantAvatar: true },
+        })
+
+        const hasMinioAvatar = existingConv?.participantAvatar?.includes('/avatars/')
+        if (hasMinioAvatar) {
+          senderAvatar = existingConv?.participantAvatar ?? null
+        } else if (profile.profile_pic) {
+          // Download avatar to Minio for permanent storage
+          senderAvatar =
+            (await this.uploadService.uploadFromUrl(profile.profile_pic, 'avatars')) || null
+        }
+      } else {
+        const errorBody = await profileRes.text()
+        this.logger.warn(`[Instagram DM] Profile fetch failed (${profileRes.status}): ${errorBody}`)
       }
-    } catch {
-      this.logger.warn(`[Instagram DM] Failed to fetch profile for ${senderId}`)
+    } catch (error) {
+      this.logger.warn(`[Instagram DM] Failed to fetch profile for ${senderId}`, error)
     }
 
     let mediaUrl: string | null = null
@@ -952,10 +1034,11 @@ export class WebhookService {
     if (!mediaId) return null
 
     try {
-      const account = await this.prisma.socialAccount.findUniqueOrThrow({
+      const account = await this.prisma.socialAccount.findUnique({
         where: { id: socialAccountId },
         select: { accessToken: true },
       })
+      if (!account) throw new NotFoundException('Social account not found')
       const accessToken = await this.encryptionService.decrypt(account.accessToken)
 
       // 1. Get media URL from WhatsApp
@@ -1429,10 +1512,11 @@ export class WebhookService {
       if (result.action === 'none') return
 
       // Get access token for API calls
-      const account = await this.prisma.socialAccount.findUniqueOrThrow({
+      const account = await this.prisma.socialAccount.findUnique({
         where: { id: socialAccountId },
         select: { accessToken: true },
       })
+      if (!account) throw new NotFoundException('Social account not found')
       const accessToken = await this.encryptionService.decrypt(account.accessToken)
 
       await this.executeAIAction(
@@ -1634,10 +1718,11 @@ export class WebhookService {
       if (!replyComment) return
 
       // Get the open_id (business_id) for the Business API
-      const account = await this.prisma.socialAccount.findUniqueOrThrow({
+      const account = await this.prisma.socialAccount.findUnique({
         where: { id: socialAccountId },
         select: { providerAccountId: true },
       })
+      if (!account) throw new NotFoundException('Social account not found')
 
       const response = await fetch(
         'https://business-api.tiktok.com/open_api/v1.3/business/comment/reply/create/',

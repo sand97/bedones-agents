@@ -2440,12 +2440,12 @@
         ]
       }
     },
-    "/agent/{id}/ticket-statuses": {
+    "/ticket/org/{organisationId}/statuses": {
       "get": {
-        "operationId": "AgentController_getTicketStatuses",
+        "operationId": "TicketController_getStatuses",
         "parameters": [
           {
-            "name": "id",
+            "name": "organisationId",
             "required": true,
             "in": "path",
             "schema": {
@@ -2459,14 +2459,14 @@
           }
         },
         "tags": [
-          "Agent"
+          "Ticket"
         ]
       },
       "put": {
-        "operationId": "AgentController_updateTicketStatuses",
+        "operationId": "TicketController_updateStatuses",
         "parameters": [
           {
-            "name": "id",
+            "name": "organisationId",
             "required": true,
             "in": "path",
             "schema": {
@@ -2493,7 +2493,7 @@
           }
         },
         "tags": [
-          "Agent"
+          "Ticket"
         ]
       }
     },
@@ -4304,6 +4304,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "stackable": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -4353,6 +4356,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "stackable": {
+            "type": "boolean"
           }
         }
       }

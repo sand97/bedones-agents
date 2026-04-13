@@ -1,6 +1,14 @@
-import { Injectable, ForbiddenException } from '@nestjs/common'
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { I18nContext } from 'nestjs-i18n'
 import { PrismaService } from '../prisma/prisma.service'
+
+const DEFAULT_TICKET_STATUSES = [
+  { name: 'Nouveau', color: '#1677ff', order: 0, isDefault: true },
+  { name: 'En cours', color: '#fa8c16', order: 1, isDefault: false },
+  { name: 'En attente', color: '#faad14', order: 2, isDefault: false },
+  { name: 'Résolu', color: '#52c41a', order: 3, isDefault: false },
+  { name: 'Annulé', color: '#ff4d4f', order: 4, isDefault: false },
+]
 
 @Injectable()
 export class OrganisationService {
@@ -15,6 +23,9 @@ export class OrganisationService {
             userId,
             role: 'OWNER',
           },
+        },
+        ticketStatuses: {
+          create: DEFAULT_TICKET_STATUSES,
         },
       },
       include: {
@@ -36,7 +47,7 @@ export class OrganisationService {
   async findById(userId: string, orgId: string) {
     await this.assertMembership(userId, orgId)
 
-    return this.prisma.organisation.findUniqueOrThrow({
+    const organisation = await this.prisma.organisation.findUnique({
       where: { id: orgId },
       include: {
         socialAccounts: {
@@ -65,6 +76,8 @@ export class OrganisationService {
         },
       },
     })
+    if (!organisation) throw new NotFoundException('Organisation not found')
+    return organisation
   }
 
   private async assertMembership(userId: string, orgId: string) {

@@ -3,14 +3,10 @@ import { Button, Descriptions, Tag, Tooltip } from 'antd'
 import { Pencil, Trash2 } from 'lucide-react'
 import { StatusTag } from '@app/components/shared/status-tag'
 import { formatPrice, formatDate } from '@app/lib/format'
-import {
-  PROMOTION_STATUS_CONFIG,
-  MOCK_CATALOG_ARTICLES,
-  type PromotionFull,
-} from '@app/components/whatsapp/mock-data'
+import type { PromotionItem } from '@app/lib/api/agent-api'
 
 interface PromotionDescriptionCardProps {
-  promo: PromotionFull
+  promo: PromotionItem
   onEdit: () => void
   onDelete: () => void
 }
@@ -21,27 +17,36 @@ export function PromotionDescriptionCard({
   onDelete,
 }: PromotionDescriptionCardProps) {
   const { t } = useTranslation()
-  const statusConfig = PROMOTION_STATUS_CONFIG[promo.status]
 
-  const eligibilityLabel =
-    promo.eligibility === 'all'
-      ? t('promotions.eligibility_all')
-      : t('promotions.product_count', { count: promo.eligibleProductIds.length })
+  const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+    DRAFT: { label: t('promotions.status_draft'), color: '#8b5cf6' },
+    ACTIVE: { label: t('promotions.status_active'), color: '#22c55e' },
+    PAUSED: { label: t('promotions.status_paused'), color: '#f59e0b' },
+    EXPIRED: { label: t('promotions.status_expired'), color: '#ef4444' },
+  }
 
-  const eligibleNames =
-    promo.eligibility === 'specific'
-      ? promo.eligibleProductIds
-          .map((id) => MOCK_CATALOG_ARTICLES.find((a) => a.id === id)?.name)
-          .filter(Boolean)
-          .join(', ')
-      : undefined
+  const statusConfig = STATUS_CONFIG[promo.status]
+
+  const hasProducts = promo.products.length > 0
+  const eligibilityLabel = hasProducts
+    ? t('promotions.product_count', { count: promo.products.length })
+    : t('promotions.eligibility_all')
+
+  const eligibleNames = hasProducts
+    ? promo.products
+        .map((p) => p.product.name)
+        .filter(Boolean)
+        .join(', ')
+    : undefined
 
   return (
     <div className="catalog-card">
       <div className="catalog-card__header">
         <div className="min-w-0 flex-1">
           <div className="font-medium text-text-primary">{promo.name}</div>
-          <div className="truncate font-mono text-xs text-text-muted">#{promo.code}</div>
+          {promo.code && (
+            <div className="truncate font-mono text-xs text-text-muted">#{promo.code}</div>
+          )}
         </div>
       </div>
       <Descriptions
@@ -51,13 +56,15 @@ export function PromotionDescriptionCard({
         className="ticket-list-card-bordered catalog-card__details"
       >
         <Descriptions.Item label={t('promotions.status')}>
-          <StatusTag label={statusConfig.label} color={statusConfig.color} />
+          {statusConfig ? (
+            <StatusTag label={statusConfig.label} color={statusConfig.color} />
+          ) : null}
         </Descriptions.Item>
         <Descriptions.Item label={t('promotions.discount')}>
           <span className="font-medium">
-            {promo.type === 'percent'
-              ? `-${promo.value}%`
-              : `-${formatPrice(promo.value, promo.currency)}`}
+            {promo.discountType === 'PERCENTAGE'
+              ? `-${promo.discountValue}%`
+              : `-${formatPrice(promo.discountValue, 'FCFA')}`}
           </span>
         </Descriptions.Item>
         <Descriptions.Item label={t('promotions.products')}>
@@ -76,7 +83,8 @@ export function PromotionDescriptionCard({
         </Descriptions.Item>
         <Descriptions.Item label={t('promotions.period')}>
           <span className="text-text-secondary">
-            {formatDate(promo.startDate)} — {formatDate(promo.endDate)}
+            {promo.startDate ? formatDate(promo.startDate) : '—'} —{' '}
+            {promo.endDate ? formatDate(promo.endDate) : '—'}
           </span>
         </Descriptions.Item>
         <Descriptions.Item label={t('promotions.actions')}>

@@ -1,4 +1,10 @@
-import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common'
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
@@ -759,10 +765,11 @@ export class SocialService {
   // ─── TikTok: Refresh token ───
 
   private async refreshTikTokToken(socialAccountId: string): Promise<string> {
-    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+    const account = await this.prisma.socialAccount.findUnique({
       where: { id: socialAccountId },
       select: { refreshToken: true, tokenExpiresAt: true, accessToken: true },
     })
+    if (!account) throw new NotFoundException('Social account not found')
 
     // Check if token is still valid
     if (account.tokenExpiresAt && account.tokenExpiresAt > new Date()) {
@@ -818,10 +825,11 @@ export class SocialService {
   // ─── TikTok: Fetch videos (posts) ───
 
   async syncTikTokVideos(userId: string, accountId: string) {
-    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+    const account = await this.prisma.socialAccount.findUnique({
       where: { id: accountId },
       select: { id: true, provider: true, organisationId: true },
     })
+    if (!account) throw new NotFoundException('Social account not found')
     if (account.provider !== 'TIKTOK') {
       throw new BadRequestException('Not a TikTok account')
     }
@@ -889,10 +897,11 @@ export class SocialService {
   // ─── TikTok: Fetch comments for a video ───
 
   async syncTikTokComments(userId: string, accountId: string, videoId: string) {
-    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+    const account = await this.prisma.socialAccount.findUnique({
       where: { id: accountId },
       select: { id: true, provider: true, organisationId: true },
     })
+    if (!account) throw new NotFoundException('Social account not found')
     if (account.provider !== 'TIKTOK') {
       throw new BadRequestException('Not a TikTok account')
     }
@@ -962,7 +971,7 @@ export class SocialService {
   // ─── TikTok: Reply to a comment ───
 
   async replyTikTokComment(userId: string, commentId: string, message: string) {
-    const comment = await this.prisma.comment.findUniqueOrThrow({
+    const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
       include: {
         post: {
@@ -972,6 +981,7 @@ export class SocialService {
         },
       },
     })
+    if (!comment) throw new NotFoundException('Comment not found')
 
     if (comment.post.socialAccount.provider !== 'TIKTOK') {
       throw new BadRequestException('Not a TikTok comment')
@@ -981,10 +991,11 @@ export class SocialService {
     const accessToken = await this.refreshTikTokToken(comment.post.socialAccount.id)
 
     // Get the open_id (business_id) for the Business API
-    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+    const account = await this.prisma.socialAccount.findUnique({
       where: { id: comment.post.socialAccount.id },
       select: { providerAccountId: true },
     })
+    if (!account) throw new NotFoundException('Social account not found')
 
     const response = await fetch(
       'https://business-api.tiktok.com/open_api/v1.3/business/comment/reply/create/',
@@ -1157,10 +1168,11 @@ export class SocialService {
       faqRules?: { question: string; answer: string }[]
     },
   ) {
-    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+    const account = await this.prisma.socialAccount.findUnique({
       where: { id: socialAccountId },
       select: { organisationId: true },
     })
+    if (!account) throw new NotFoundException('Social account not found')
 
     await this.assertMembership(userId, account.organisationId)
 
@@ -1196,10 +1208,12 @@ export class SocialService {
       }
     }
 
-    return this.prisma.pageSettings.findUniqueOrThrow({
+    const pageSettings = await this.prisma.pageSettings.findUnique({
       where: { id: settings.id },
       include: { faqRules: true },
     })
+    if (!pageSettings) throw new NotFoundException('Page settings not found')
+    return pageSettings
   }
 
   // ─── Get social accounts for org ───
@@ -1220,10 +1234,11 @@ export class SocialService {
   // ─── Get posts with comments for a social account ───
 
   async getPostsForAccount(userId: string, socialAccountId: string) {
-    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+    const account = await this.prisma.socialAccount.findUnique({
       where: { id: socialAccountId },
       select: { organisationId: true },
     })
+    if (!account) throw new NotFoundException('Social account not found')
 
     await this.assertMembership(userId, account.organisationId)
 
@@ -1247,10 +1262,11 @@ export class SocialService {
   // ─── User stats ───
 
   async getUserStats(userId: string, accountId: string, fromId: string) {
-    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+    const account = await this.prisma.socialAccount.findUnique({
       where: { id: accountId },
       select: { organisationId: true },
     })
+    if (!account) throw new NotFoundException('Social account not found')
 
     await this.assertMembership(userId, account.organisationId)
 
@@ -1278,10 +1294,11 @@ export class SocialService {
   // ─── Mark comments as read ───
 
   async markCommentsAsRead(userId: string, postId: string) {
-    const post = await this.prisma.post.findUniqueOrThrow({
+    const post = await this.prisma.post.findUnique({
       where: { id: postId },
       select: { socialAccount: { select: { organisationId: true } } },
     })
+    if (!post) throw new NotFoundException('Post not found')
 
     await this.assertMembership(userId, post.socialAccount.organisationId)
 
@@ -1294,12 +1311,13 @@ export class SocialService {
   // ─── Comment on a post (top-level) ───
 
   async commentOnPost(userId: string, postId: string, message: string) {
-    const post = await this.prisma.post.findUniqueOrThrow({
+    const post = await this.prisma.post.findUnique({
       where: { id: postId },
       include: {
         socialAccount: { select: { id: true, provider: true, organisationId: true } },
       },
     })
+    if (!post) throw new NotFoundException('Post not found')
 
     await this.assertMembership(userId, post.socialAccount.organisationId)
     const provider = post.socialAccount.provider
@@ -1346,7 +1364,7 @@ export class SocialService {
   // ─── Reply to a comment ───
 
   async replyToComment(userId: string, commentId: string, message: string) {
-    const comment = await this.prisma.comment.findUniqueOrThrow({
+    const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
       include: {
         post: {
@@ -1356,6 +1374,7 @@ export class SocialService {
         },
       },
     })
+    if (!comment) throw new NotFoundException('Comment not found')
 
     await this.assertMembership(userId, comment.post.socialAccount.organisationId)
 
@@ -1394,7 +1413,7 @@ export class SocialService {
   // ─── Hide a comment ───
 
   async hideComment(userId: string, commentId: string) {
-    const comment = await this.prisma.comment.findUniqueOrThrow({
+    const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
       include: {
         post: {
@@ -1404,6 +1423,7 @@ export class SocialService {
         },
       },
     })
+    if (!comment) throw new NotFoundException('Comment not found')
 
     await this.assertMembership(userId, comment.post.socialAccount.organisationId)
 
@@ -1425,7 +1445,7 @@ export class SocialService {
   // ─── Unhide a comment ───
 
   async unhideComment(userId: string, commentId: string) {
-    const comment = await this.prisma.comment.findUniqueOrThrow({
+    const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
       include: {
         post: {
@@ -1435,6 +1455,7 @@ export class SocialService {
         },
       },
     })
+    if (!comment) throw new NotFoundException('Comment not found')
 
     await this.assertMembership(userId, comment.post.socialAccount.organisationId)
 
@@ -1456,7 +1477,7 @@ export class SocialService {
   // ─── Delete a comment ───
 
   async deleteComment(userId: string, commentId: string) {
-    const comment = await this.prisma.comment.findUniqueOrThrow({
+    const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
       include: {
         post: {
@@ -1466,6 +1487,7 @@ export class SocialService {
         },
       },
     })
+    if (!comment) throw new NotFoundException('Comment not found')
 
     await this.assertMembership(userId, comment.post.socialAccount.organisationId)
 
@@ -1648,10 +1670,11 @@ export class SocialService {
   // ─── Get decrypted access token ───
 
   async getDecryptedToken(socialAccountId: string): Promise<string> {
-    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+    const account = await this.prisma.socialAccount.findUnique({
       where: { id: socialAccountId },
       select: { accessToken: true },
     })
+    if (!account) throw new NotFoundException('Social account not found')
     return this.encryptionService.decrypt(account.accessToken)
   }
 

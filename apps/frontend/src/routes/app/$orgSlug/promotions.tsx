@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useParams } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { Table, Input, Button, Modal } from 'antd'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Table, Input, Button, Modal, App } from 'antd'
 import { Search, ChevronDown, Plus } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { TablePagination } from '@app/components/shared/table-pagination'
@@ -9,14 +10,13 @@ import { FilterPopover } from '@app/components/shared/filter-popover'
 import { useLayout } from '@app/contexts/layout-context'
 import { PromotionDescriptionCard } from '@app/components/promotions/promotion-description-card'
 import { PromotionModal } from '@app/components/promotions/create-promotion-modal'
-import { ProductPickerModal } from '@app/components/promotions/product-picker-modal'
-import { usePromotionColumns } from '@app/components/promotions/promotion-columns'
 import {
-  MOCK_PROMOTIONS_FULL,
-  PROMOTION_STATUS_CONFIG,
-  type PromotionFull,
-  type PromotionStatus,
-} from '@app/components/whatsapp/mock-data'
+  ProductPickerModal,
+  type PickerProduct,
+} from '@app/components/promotions/product-picker-modal'
+import { usePromotionColumns } from '@app/components/promotions/promotion-columns'
+import { promotionApi, catalogApi, type PromotionItem } from '@app/lib/api/agent-api'
+import type { PromotionSubmitData } from '@app/components/promotions/create-promotion-modal'
 
 export const Route = createFileRoute('/app/$orgSlug/promotions')({
   component: PromotionsPage,
@@ -24,21 +24,25 @@ export const Route = createFileRoute('/app/$orgSlug/promotions')({
 
 const DEFAULT_PAGE_SIZE = 8
 
-const ALL_STATUSES = Object.keys(PROMOTION_STATUS_CONFIG) as PromotionStatus[]
-
-const STATUS_FILTER_OPTIONS = ALL_STATUSES.map((status) => ({
-  key: status,
-  label: PROMOTION_STATUS_CONFIG[status].label,
-  color: PROMOTION_STATUS_CONFIG[status].color,
-}))
+type PromotionStatus = PromotionItem['status']
 
 function PromotionsPage() {
   const { t } = useTranslation()
   const { isDesktop } = useLayout()
+  const { message } = App.useApp()
+  const queryClient = useQueryClient()
+  const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
+
+  const STATUS_FILTER_OPTIONS: Array<{ key: string; label: string; color: string }> = [
+    { key: 'DRAFT', label: t('promotions.status_draft'), color: '#8b5cf6' },
+    { key: 'ACTIVE', label: t('promotions.status_active'), color: '#22c55e' },
+    { key: 'PAUSED', label: t('promotions.status_paused'), color: '#f59e0b' },
+    { key: 'EXPIRED', label: t('promotions.status_expired'), color: '#ef4444' },
+  ]
 
   const TYPE_FILTER_OPTIONS = [
-    { key: 'percent', label: t('promotions.type_percent') },
-    { key: 'fixed', label: t('promotions.type_fixed') },
+    { key: 'PERCENTAGE', label: t('promotions.type_percent') },
+    { key: 'FIXED_AMOUNT', label: t('promotions.type_fixed') },
   ]
 
   const STACKABLE_FILTER_OPTIONS = [
@@ -53,9 +57,108 @@ function PromotionsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [modalOpen, setModalOpen] = useState(false)
-  const [editingPromo, setEditingPromo] = useState<PromotionFull | null>(null)
+  const [editingPromo, setEditingPromo] = useState<PromotionItem | null>(null)
   const [productPickerOpen, setProductPickerOpen] = useState(false)
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
+  const [selectedProducts, setSelectedProducts] = useState<PickerProduct[]>([])
+
+  // Build API status param: only pass if single status selected (API accepts one status)
+  const apiStatus = selectedStatuses.length === 1 ? selectedStatuses[0] : undefined
+
+  const catalogsQuery = useQuery({
+    queryKey: ['catalogs', orgSlug],
+    queryFn: () => catalogApi.list(orgSlug),
+    staleTime: Infinity,
+    refetchOnMount: 'always',
+  })
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['promotions', orgSlug, searchText, apiStatus, currentPage, pageSize],
+    queryFn: () =>
+      promotionApi.list(orgSlug, {
+        search: searchText || undefined,
+        status: apiStatus,
+        page: currentPage,
+        pageSize,
+      }),
+    enabled: !!orgSlug,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => promotionApi.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['promotions', orgSlug] })
+      message.success(t('common.delete'))
+    },
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (data: PromotionSubmitData) =>
+      promotionApi.create({
+        organisationId: orgSlug,
+        name: data.name,
+        code: data.code,
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        productIds: data.productIds,
+        stackable: data.stackable,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['promotions', orgSlug] })
+      message.success(t('promotions.created'))
+      handleCloseModal()
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: PromotionSubmitData }) =>
+      promotionApi.update(id, {
+        name: data.name,
+        code: data.code,
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        productIds: data.productIds,
+        stackable: data.stackable,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['promotions', orgSlug] })
+      message.success(t('promotions.updated'))
+      handleCloseModal()
+    },
+  })
+
+  const handlePromoSubmit = (data: PromotionSubmitData) => {
+    if (editingPromo) {
+      updateMutation.mutate({ id: editingPromo.id, data })
+    } else {
+      createMutation.mutate(data)
+    }
+  }
+
+  // Apply client-side filters that the API doesn't support
+  const filteredPromotions = useMemo(() => {
+    let result = data?.promotions ?? []
+
+    // If multiple statuses selected, API can't filter — do it client-side
+    if (selectedStatuses.length > 1) {
+      result = result.filter((p) => selectedStatuses.includes(p.status))
+    }
+
+    if (selectedTypes.length > 0) {
+      result = result.filter((p) => selectedTypes.includes(p.discountType))
+    }
+
+    if (selectedStackable.length > 0) {
+      result = result.filter((p) => selectedStackable.includes(String(p.stackable)))
+    }
+
+    return result
+  }, [data?.promotions, selectedStatuses, selectedTypes, selectedStackable])
+
+  const total = data?.total ?? 0
 
   const toggleStatus = (status: string) => {
     setSelectedStatuses((prev) =>
@@ -80,36 +183,6 @@ function PromotionsPage() {
     setCurrentPage(1)
   }
 
-  const filteredPromotions = useMemo(() => {
-    let result = MOCK_PROMOTIONS_FULL
-
-    if (searchText) {
-      const q = searchText.toLowerCase()
-      result = result.filter(
-        (p) => p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q),
-      )
-    }
-
-    if (selectedStatuses.length > 0) {
-      result = result.filter((p) => selectedStatuses.includes(p.status))
-    }
-
-    if (selectedTypes.length > 0) {
-      result = result.filter((p) => selectedTypes.includes(p.type))
-    }
-
-    if (selectedStackable.length > 0) {
-      result = result.filter((p) => selectedStackable.includes(String(p.stackable)))
-    }
-
-    return result
-  }, [searchText, selectedStatuses, selectedTypes, selectedStackable])
-
-  const paginatedPromotions = useMemo(() => {
-    const start = (currentPage - 1) * pageSize
-    return filteredPromotions.slice(start, start + pageSize)
-  }, [filteredPromotions, currentPage, pageSize])
-
   const statusButtonLabel =
     selectedStatuses.length > 0 ? `Status (${selectedStatuses.length})` : 'Status'
 
@@ -120,8 +193,23 @@ function PromotionsPage() {
       ? t('promotions.stackable_with_count', { count: selectedStackable.length })
       : t('promotions.stackable')
 
-  const handleEdit = (promo: PromotionFull) => {
+  const handleEdit = (promo: PromotionItem) => {
     setEditingPromo(promo)
+    // Populate selectedProducts from the promo's linked products so they appear in the modal
+    if (promo.products && promo.products.length > 0) {
+      setSelectedProducts(
+        promo.products.map((pp) => ({
+          id: pp.product.id,
+          name: pp.product.name,
+          description: '',
+          imageUrl: pp.product.imageUrl || '',
+          price: pp.product.price || 0,
+          currency: pp.product.currency || 'FCFA',
+        })),
+      )
+    } else {
+      setSelectedProducts([])
+    }
     setModalOpen(true)
   }
 
@@ -133,19 +221,17 @@ function PromotionsPage() {
   const handleCloseModal = () => {
     setModalOpen(false)
     setEditingPromo(null)
-    setSelectedProductIds([])
+    setSelectedProducts([])
   }
 
-  const handleDelete = (promo: PromotionFull) => {
+  const handleDelete = (promo: PromotionItem) => {
     Modal.confirm({
       title: t('promotions.confirm_delete'),
       content: t('promotions.confirm_delete_message', { name: promo.name }),
       okText: t('common.delete'),
       okButtonProps: { danger: true },
       cancelText: t('common.cancel'),
-      onOk: () => {
-        // TODO: call API to delete
-      },
+      onOk: () => deleteMutation.mutateAsync(promo.id),
     })
   }
 
@@ -212,22 +298,23 @@ function PromotionsPage() {
 
         {isDesktop ? (
           <Table
-            dataSource={paginatedPromotions}
+            dataSource={filteredPromotions}
             columns={columns}
             bordered
             rowKey="id"
             pagination={false}
             className="tickets-table"
             size="middle"
+            loading={isLoading}
           />
         ) : (
           <div className="flex flex-col gap-3">
-            {paginatedPromotions.length === 0 ? (
+            {filteredPromotions.length === 0 ? (
               <div className="flex items-center justify-center py-12 text-sm text-text-muted">
                 {t('promotions.no_promotions')}
               </div>
             ) : (
-              paginatedPromotions.map((promo) => (
+              filteredPromotions.map((promo) => (
                 <PromotionDescriptionCard
                   key={promo.id}
                   promo={promo}
@@ -242,7 +329,7 @@ function PromotionsPage() {
         <TablePagination
           current={currentPage}
           pageSize={pageSize}
-          total={filteredPromotions.length}
+          total={total}
           onChange={(page, size) => {
             setCurrentPage(page)
             setPageSize(size)
@@ -254,16 +341,30 @@ function PromotionsPage() {
       <PromotionModal
         open={modalOpen}
         onClose={handleCloseModal}
-        editingPromo={editingPromo}
+        editingPromo={editingPromo as any}
         onOpenProductPicker={() => setProductPickerOpen(true)}
-        selectedProductIds={selectedProductIds}
-        setSelectedProductIds={setSelectedProductIds}
+        selectedProductIds={selectedProducts.map((p) => p.id)}
+        setSelectedProductIds={(ids) => {
+          if (typeof ids === 'function') {
+            setSelectedProducts((prev) => {
+              const newIds = ids(prev.map((p) => p.id))
+              return prev.filter((p) => newIds.includes(p.id))
+            })
+          } else {
+            setSelectedProducts((prev) => prev.filter((p) => ids.includes(p.id)))
+          }
+        }}
+        selectedProducts={selectedProducts}
+        onSubmit={handlePromoSubmit}
+        submitLoading={createMutation.isPending || updateMutation.isPending}
       />
       <ProductPickerModal
         open={productPickerOpen}
         onClose={() => setProductPickerOpen(false)}
-        onSave={setSelectedProductIds}
-        initialSelection={selectedProductIds}
+        onSave={() => {}}
+        onSaveProducts={setSelectedProducts}
+        initialSelection={selectedProducts.map((p) => p.id)}
+        catalogs={catalogsQuery.data}
       />
     </div>
   )

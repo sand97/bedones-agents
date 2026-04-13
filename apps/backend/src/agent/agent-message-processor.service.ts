@@ -20,6 +20,8 @@ import { createCommunicationTools } from './tools/live/communication.tools'
 import { createCatalogTools } from './tools/live/catalog.tools'
 import { createLabelTools } from './tools/live/label.tools'
 import { createMessageTools } from './tools/live/message.tools'
+import { createTicketTools } from './tools/live/ticket.tools'
+import { createPromotionTools } from './tools/live/promotion.tools'
 
 @Injectable()
 export class AgentMessageProcessorService {
@@ -213,6 +215,17 @@ export class AgentMessageProcessorService {
       ...createMessageTools({
         prisma: this.prisma,
         conversationId: event.conversationId,
+      }),
+      ...createTicketTools({
+        prisma: this.prisma,
+        gateway: this.gateway,
+        agentId: agent.id,
+        organisationId: agent.organisationId,
+        conversationId: event.conversationId,
+      }),
+      ...createPromotionTools({
+        prisma: this.prisma,
+        organisationId: agent.organisationId,
       }),
     ]
 

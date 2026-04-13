@@ -1,4 +1,9 @@
-import { Injectable, ForbiddenException, ConflictException } from '@nestjs/common'
+import {
+  Injectable,
+  ForbiddenException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common'
 import { I18nContext } from 'nestjs-i18n'
 import { PrismaService } from '../prisma/prisma.service'
 import type { InviteMemberDto } from './dto/member.dto'
@@ -90,9 +95,10 @@ export class MemberService {
   async removeMember(userId: string, orgId: string, memberId: string) {
     await this.assertAdmin(userId, orgId)
 
-    const member = await this.prisma.organisationMember.findUniqueOrThrow({
+    const member = await this.prisma.organisationMember.findUnique({
       where: { id: memberId },
     })
+    if (!member) throw new NotFoundException('Member not found')
 
     if (member.role === 'OWNER') {
       throw new ForbiddenException(

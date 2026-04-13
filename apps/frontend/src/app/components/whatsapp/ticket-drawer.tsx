@@ -1,18 +1,68 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Drawer, Popover, Tooltip } from 'antd'
-import { ArrowLeft, Pencil } from 'lucide-react'
+import { Button, Drawer, Popover, Tag, Tooltip } from 'antd'
+import { ArrowLeft, Pencil, User, Phone, MessageSquare } from 'lucide-react'
 import dayjs from 'dayjs'
-import type { Ticket, TicketActivity, TicketActivityDiff, TicketItem } from './mock-data'
+import type { TicketActivity, TicketActivityDiff, TicketItem } from './mock-data'
 import { TICKET_STATUS_CONFIG } from './mock-data'
 import { ArticleListItem } from '@app/components/catalog/article-list-item'
 
+/** Metadata shape stored in the ticket */
+interface TicketMetadata {
+  articles?: Array<{
+    id: string
+    name: string
+    price: number
+    currency: string
+    quantity: number
+    imageUrl?: string
+    description?: string
+  }>
+  charges?: Array<{
+    id: string
+    reason: string
+    amount: number
+  }>
+  promotionIds?: string[]
+  subtotal?: number
+  chargesTotal?: number
+  grandTotal?: number
+}
+
+/** Real API ticket shape (activities use createdAt, status is an object) */
+interface RealTicket {
+  id: string
+  title: string
+  description?: string
+  status?: { id: string; name: string; color: string } | null
+  priority?: string
+  contactName?: string
+  contactId?: string
+  provider?: string
+  conversationId?: string
+  createdAt: string
+  metadata?: TicketMetadata | null
+  activities?: Array<{
+    id: string
+    type: string
+    author: string
+    fromStatus?: string | null
+    toStatus?: string | null
+    diff?: TicketActivityDiff | null
+    createdAt: string
+  }>
+  items?: TicketItem[]
+  [key: string]: unknown
+}
+
 interface TicketDrawerProps {
-  ticket: Ticket | null
-  allTickets?: Ticket[]
+  ticket: RealTicket | null
+  allTickets?: RealTicket[]
   open: boolean
   onClose: () => void
-  onSwitchTicket?: (ticket: Ticket) => void
+  onSwitchTicket?: (ticket: RealTicket) => void
+  /** Called when user clicks "Modifier le ticket" */
+  onEdit?: () => void
 }
 
 /* ── Diff popover (before / after) ── */
@@ -69,21 +119,24 @@ function ActivityItem({ activity }: { activity: TicketActivity }) {
   }
 
   if (activity.type === 'status_change' && activity.fromStatus && activity.toStatus) {
-    const to = TICKET_STATUS_CONFIG[activity.toStatus]
+    // Support real status names (not mock config keys)
+    const toConfig = TICKET_STATUS_CONFIG[activity.toStatus]
+    const toColor = toConfig?.color ?? '#666'
+    const toLabel = toConfig?.label ?? activity.toStatus
     const time = dayjs(activity.timestamp).format(t('format.date_time'))
 
     return (
       <div className="ticket-activity-item">
-        <div className="ticket-activity-dot" style={{ background: to.color }} />
+        <div className="ticket-activity-dot" style={{ background: toColor }} />
         <div className="ticket-activity-line" />
         <div className="flex-1 min-w-0">
           <div className="text-sm text-text-primary">
             <span className="font-semibold">{activity.author}</span> {t('tickets.status_changed')}{' '}
             <span
               className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold text-white align-middle"
-              style={{ background: to.color }}
+              style={{ background: toColor }}
             >
-              {to.label}
+              {toLabel}
             </span>
           </div>
           <div className="text-xs text-text-muted mt-0.5">{time}</div>
@@ -131,6 +184,20 @@ function formatPrice(price: number, currency: string) {
   return `${price.toLocaleString('fr-FR')} ${currency}`
 }
 
+const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
+  LOW: { label: 'Basse', color: '#52c41a' },
+  MEDIUM: { label: 'Moyenne', color: '#faad14' },
+  HIGH: { label: 'Haute', color: '#fa8c16' },
+  URGENT: { label: 'Urgente', color: '#f5222d' },
+}
+
+const PROVIDER_CONFIG: Record<string, { label: string }> = {
+  WHATSAPP: { label: 'WhatsApp' },
+  INSTAGRAM: { label: 'Instagram' },
+  FACEBOOK: { label: 'Facebook' },
+  TIKTOK: { label: 'TikTok' },
+}
+
 /* ── Main drawer ── */
 
 export function TicketDrawer({
@@ -139,15 +206,51 @@ export function TicketDrawer({
   open,
   onClose,
   onSwitchTicket: _onSwitchTicket,
+  onEdit,
 }: TicketDrawerProps) {
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({})
 
   if (!ticket) return null
 
-  const statusConfig = TICKET_STATUS_CONFIG[ticket.status]
-  const sortedActivity = [...ticket.activity].sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-  )
+  // Support both real API shape (status object) and mock shape (status string)
+  const statusConfig =
+    typeof ticket.status === 'object' && ticket.status
+      ? { label: ticket.status.name, color: ticket.status.color }
+      : TICKET_STATUS_CONFIG[(ticket as Record<string, unknown>).status as string] || {
+          label: 'N/A',
+          color: '#999',
+        }
+
+  // Normalize activities: API uses `createdAt`, mock uses `timestamp`
+  const rawActivities = (ticket.activities ||
+    (ticket as Record<string, unknown>).activity ||
+    []) as Array<TicketActivity & { createdAt?: string }>
+  const sortedActivity: TicketActivity[] = rawActivities
+    .map((a) => ({
+      ...a,
+      timestamp: a.timestamp || a.createdAt || '',
+    }))
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+  // Extract items from metadata or from ticket.items (mock)
+  const meta = (ticket.metadata ?? {}) as TicketMetadata
+  const metaArticles = meta.articles ?? []
+  const items: TicketItem[] =
+    ticket.items && ticket.items.length > 0
+      ? ticket.items
+      : metaArticles.map((a) => ({
+          id: a.id,
+          title: a.name,
+          description: a.description || '',
+          imageUrl: a.imageUrl || '',
+          unitPrice: a.price,
+          quantity: a.quantity,
+          currency: a.currency,
+        }))
+
+  const charges = meta.charges ?? []
+  const priorityConfig = PRIORITY_CONFIG[ticket.priority ?? '']
+  const providerConfig = PROVIDER_CONFIG[ticket.provider ?? '']
 
   const getItemQuantity = (item: TicketItem) => itemQuantities[item.id] ?? item.quantity
 
@@ -156,8 +259,9 @@ export function TicketDrawer({
     setItemQuantities((prev) => ({ ...prev, [id]: quantity }))
   }
 
-  const items = ticket.items ?? []
   const totalPrice = items.reduce((sum, item) => sum + item.unitPrice * getItemQuantity(item), 0)
+  const chargesTotal = charges.reduce((sum, c) => sum + (c.amount || 0), 0)
+  const grandTotal = meta.grandTotal ?? totalPrice + chargesTotal
   const currency = items[0]?.currency ?? 'FCFA'
 
   return (
@@ -166,10 +270,12 @@ export function TicketDrawer({
       onClose={onClose}
       footer={[
         <Button
+          key="edit"
           type="default"
           block
           icon={<Pencil size={14} />}
           className="flex items-center justify-center gap-2"
+          onClick={onEdit}
         >
           Modifier le ticket
         </Button>,
@@ -210,13 +316,55 @@ export function TicketDrawer({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          {/* Description */}
+          {/* Info row: priority, contact, platform, date */}
           <div className="border-b border-border-subtle px-4 py-4">
-            <div className="mb-2 text-xs text-text-muted">Description</div>
-            <div className="text-sm font-normal text-text-primary leading-relaxed">
-              {ticket.description}
+            <div className="flex flex-wrap gap-3">
+              {priorityConfig && (
+                <Tag
+                  bordered={false}
+                  style={{
+                    background: priorityConfig.color,
+                    color: '#fff',
+                    borderRadius: 9999,
+                    fontWeight: 600,
+                  }}
+                >
+                  {priorityConfig.label}
+                </Tag>
+              )}
+              {ticket.contactName && (
+                <div className="flex items-center gap-1.5 text-sm text-text-secondary">
+                  <User size={14} className="text-text-muted" />
+                  <span>{ticket.contactName}</span>
+                </div>
+              )}
+              {providerConfig && (
+                <div className="flex items-center gap-1.5 text-sm text-text-secondary">
+                  <MessageSquare size={14} className="text-text-muted" />
+                  <span>{providerConfig.label}</span>
+                </div>
+              )}
+              {ticket.contactId && (
+                <div className="flex items-center gap-1.5 text-sm text-text-secondary">
+                  <Phone size={14} className="text-text-muted" />
+                  <span className="text-xs">{ticket.contactId}</span>
+                </div>
+              )}
+            </div>
+            <div className="mt-2 text-xs text-text-muted">
+              {dayjs(ticket.createdAt).format('DD MMMM YYYY [à] HH:mm')}
             </div>
           </div>
+
+          {/* Description */}
+          {ticket.description && (
+            <div className="border-b border-border-subtle px-4 py-4">
+              <div className="mb-2 text-xs text-text-muted">Description</div>
+              <div className="text-sm font-normal text-text-primary leading-relaxed">
+                {ticket.description}
+              </div>
+            </div>
+          )}
 
           {/* Products */}
           {items.length > 0 && (
@@ -246,14 +394,50 @@ export function TicketDrawer({
             </div>
           )}
 
+          {/* Charges */}
+          {charges.length > 0 && (
+            <div className="border-b border-border-subtle px-4 py-4">
+              <div className="mb-3 text-xs text-text-muted">Charges additionnelles</div>
+              <div className="flex flex-col gap-2">
+                {charges.map((charge) => (
+                  <div
+                    key={charge.id}
+                    className="flex items-center justify-between text-sm text-text-secondary"
+                  >
+                    <span>{charge.reason}</span>
+                    <span className="font-medium text-text-primary">
+                      {formatPrice(charge.amount, 'FCFA')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Total */}
+          {(items.length > 0 || charges.length > 0) && (
+            <div className="border-b border-border-subtle px-4 py-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-text-primary">Total</span>
+                <span className="text-sm font-semibold text-text-primary">
+                  {formatPrice(grandTotal, currency)}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Activity */}
           <div className="px-4 py-4">
             <div className="mb-4 text-xs text-text-muted">Activité</div>
-            <div className="ticket-activity-timeline">
-              {sortedActivity.map((act) => (
-                <ActivityItem key={act.id} activity={act} />
-              ))}
-            </div>
+            {sortedActivity.length > 0 ? (
+              <div className="ticket-activity-timeline">
+                {sortedActivity.map((act) => (
+                  <ActivityItem key={act.id} activity={act} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-text-muted">Aucune activité</div>
+            )}
           </div>
         </div>
       </div>

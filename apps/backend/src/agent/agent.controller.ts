@@ -89,26 +89,4 @@ export class AgentController {
   async getLabels(@Param('id') id: string) {
     return this.agentService.getLabelsForAgent(id)
   }
-
-  // ─── Ticket Statuses ───
-
-  @Get(':id/ticket-statuses')
-  async getTicketStatuses(@Param('id') id: string) {
-    return this.agentService.getTicketStatuses(id)
-  }
-
-  @Put(':id/ticket-statuses')
-  async updateTicketStatuses(
-    @Param('id') id: string,
-    @Body()
-    statuses: Array<{
-      id?: string
-      name: string
-      color: string
-      order: number
-      isDefault: boolean
-    }>,
-  ) {
-    return this.agentService.updateTicketStatuses(id, statuses)
-  }
 }

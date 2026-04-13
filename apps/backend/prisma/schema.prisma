@@ -137,6 +137,7 @@ model Organisation {
   agents         Agent[]
   tickets        Ticket[]
   promotions     Promotion[]
+  ticketStatuses TicketStatus[]
 }
 
 model OrganisationMember {
@@ -279,7 +280,6 @@ model Agent {
 
   socialAccounts AgentSocialAccount[]
   messages       AgentMessage[]
-  ticketStatuses TicketStatus[]
   tickets        Ticket[]
 
   @@index([organisationId])
@@ -317,17 +317,17 @@ model AgentMessage {
 // ─── Tickets ───
 
 model TicketStatus {
-  id        String  @id @default(uuid())
-  agentId   String
-  agent     Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  name      String
-  color     String  @default("#000000")
-  order     Int     @default(0)
-  isDefault Boolean @default(false)
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  name           String
+  color          String       @default("#000000")
+  order          Int          @default(0)
+  isDefault      Boolean      @default(false)
 
   tickets Ticket[]
 
-  @@index([agentId])
+  @@index([organisationId])
 }
 
 model Ticket {
@@ -351,10 +351,26 @@ model Ticket {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
+  activities TicketActivity[]
+
   @@index([organisationId])
   @@index([agentId])
   @@index([statusId])
   @@index([createdAt])
+}
+
+model TicketActivity {
+  id         String   @id @default(uuid())
+  ticketId   String
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  type       String   // 'created' | 'status_change' | 'description_change'
+  author     String   // e.g. 'System', user name
+  fromStatus String?  // Previous status name (for status_change)
+  toStatus   String?  // New status name (for status_change)
+  diff       Json?    // { field, before, after } (for description_change)
+  createdAt  DateTime @default(now())
+
+  @@index([ticketId])
 }
 
 // ─── Promotions ───
@@ -371,6 +387,7 @@ model Promotion {
   startDate      DateTime?
   endDate        DateTime?
   status         PromotionStatus       @default(DRAFT)
+  stackable      Boolean               @default(false)
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
