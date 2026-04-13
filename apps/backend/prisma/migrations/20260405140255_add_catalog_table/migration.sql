@@ -13,26 +13,21 @@ CREATE TYPE "PromotionStatus" AS ENUM ('DRAFT', 'ACTIVE', 'PAUSED', 'EXPIRED');
 -- CreateEnum
 CREATE TYPE "PromotionDiscountType" AS ENUM ('PERCENTAGE', 'FIXED_AMOUNT');
 
--- DropForeignKey
-ALTER TABLE "Catalog" DROP CONSTRAINT "Catalog_socialAccountId_fkey";
+-- CreateTable
+CREATE TABLE "Catalog" (
+    "id" TEXT NOT NULL,
+    "organisationId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "providerId" TEXT,
+    "description" TEXT,
+    "analysisStatus" "CatalogAnalysisStatus" NOT NULL DEFAULT 'PENDING',
+    "productCount" INTEGER NOT NULL DEFAULT 0,
+    "indexedCount" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
--- DropIndex
-DROP INDEX "Catalog_catalogId_key";
-
--- DropIndex
-DROP INDEX "Catalog_socialAccountId_idx";
-
--- AlterTable
-ALTER TABLE "Catalog" DROP COLUMN "catalogId",
-DROP COLUMN "catalogToken",
-DROP COLUMN "socialAccountId",
-ADD COLUMN     "analysisStatus" "CatalogAnalysisStatus" NOT NULL DEFAULT 'PENDING',
-ADD COLUMN     "description" TEXT,
-ADD COLUMN     "indexedCount" INTEGER NOT NULL DEFAULT 0,
-ADD COLUMN     "organisationId" TEXT NOT NULL,
-ADD COLUMN     "productCount" INTEGER NOT NULL DEFAULT 0,
-ADD COLUMN     "providerId" TEXT,
-ALTER COLUMN "name" SET NOT NULL;
+    CONSTRAINT "Catalog_pkey" PRIMARY KEY ("id")
+);
 
 -- AlterTable
 ALTER TABLE "SocialAccount" ADD COLUMN     "pageAbout" TEXT;
