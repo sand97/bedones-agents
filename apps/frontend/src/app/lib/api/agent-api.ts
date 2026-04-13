@@ -405,7 +405,14 @@ export interface PromotionItem {
   createdAt: string
   updatedAt: string
   products: Array<{
-    product: { id: string; name: string; imageUrl?: string; price?: number; currency?: string }
+    product: {
+      id: string
+      providerProductId?: string
+      name: string
+      imageUrl?: string
+      price?: number
+      currency?: string
+    }
   }>
   _count?: { products: number }
 }

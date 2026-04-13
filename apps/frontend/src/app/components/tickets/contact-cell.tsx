@@ -1,5 +1,3 @@
-import { Button } from 'antd'
-import { ExternalLink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { SocialBadge } from '@app/components/shared/social-badge'
 import type { SocialNetwork } from '@app/components/whatsapp/mock-data'
@@ -27,7 +25,6 @@ export function ContactCell({ ticket }: { ticket: Ticket }) {
           {ticket.contactName || ticket.contactId}
         </div>
       </div>
-      <Button icon={<ExternalLink size={13} />} size="small" type="text" />
     </div>
   )
 }

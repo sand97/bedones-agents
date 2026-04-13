@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Drawer, Popover, Tag, Tooltip } from 'antd'
-import { ArrowLeft, Pencil, User, Phone, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Eye, Pencil, User, MessageSquare } from 'lucide-react'
 import dayjs from 'dayjs'
 import type { TicketActivity, TicketActivityDiff, TicketItem } from './mock-data'
 import { TICKET_STATUS_CONFIG } from './mock-data'
@@ -55,6 +55,16 @@ interface RealTicket {
   [key: string]: unknown
 }
 
+/** Promotion option from the real API */
+interface DrawerPromotionOption {
+  id: string
+  name: string
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT'
+  discountValue: number
+  /** When empty/undefined, the promotion applies to all products */
+  productIds?: string[]
+}
+
 interface TicketDrawerProps {
   ticket: RealTicket | null
   allTickets?: RealTicket[]
@@ -63,6 +73,8 @@ interface TicketDrawerProps {
   onSwitchTicket?: (ticket: RealTicket) => void
   /** Called when user clicks "Modifier le ticket" */
   onEdit?: () => void
+  /** Available promotions to compute discounted prices */
+  promotionOptions?: DrawerPromotionOption[]
 }
 
 /* ── Diff popover (before / after) ── */
@@ -158,15 +170,8 @@ function ActivityItem({ activity }: { activity: TicketActivity }) {
             {t('tickets.description_changed')}
           </div>
           <DiffPopover diff={activity.diff}>
-            <Button
-              type="text"
-              block
-              className="mt-1.5 h-auto! p-3! text-left! rounded-lg! border border-border-subtle!"
-            >
-              <span className="text-sm text-text-secondary leading-relaxed line-clamp-3">
-                {activity.diff.before}
-              </span>
-              <div className="mt-1.5 text-xs text-text-muted">Voir avant / après</div>
+            <Button type="default" icon={<Eye size={14} />} className="mt-1.5">
+              {t('tickets.view_diff')}
             </Button>
           </DiffPopover>
           <div className="text-xs text-text-muted mt-1">{time}</div>
@@ -207,8 +212,26 @@ export function TicketDrawer({
   onClose,
   onSwitchTicket: _onSwitchTicket,
   onEdit,
+  promotionOptions,
 }: TicketDrawerProps) {
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({})
+
+  // Compute active promotions from metadata + available promotions
+  const activePromos = useMemo(() => {
+    if (!ticket || !promotionOptions) return []
+    const meta = (ticket.metadata ?? {}) as TicketMetadata
+    const promoIds = meta.promotionIds ?? []
+    if (promoIds.length === 0) return []
+    return promotionOptions
+      .filter((p) => promoIds.includes(p.id))
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        type: p.discountType === 'PERCENTAGE' ? ('percent' as const) : ('fixed' as const),
+        value: p.discountValue,
+        productIds: p.productIds,
+      }))
+  }, [ticket, promotionOptions])
 
   if (!ticket) return null
 
@@ -259,9 +282,32 @@ export function TicketDrawer({
     setItemQuantities((prev) => ({ ...prev, [id]: quantity }))
   }
 
+  const getDiscountedPrice = (price: number, articleId?: string) => {
+    let discounted = price
+    for (const promo of activePromos) {
+      if (promo.value <= 0) continue
+      if (promo.productIds && promo.productIds.length > 0 && articleId) {
+        if (!promo.productIds.includes(articleId)) continue
+      }
+      if (promo.type === 'percent') {
+        discounted -= discounted * (promo.value / 100)
+      } else {
+        discounted -= promo.value
+      }
+    }
+    return Math.max(0, Math.round(discounted))
+  }
+
+  const hasActivePromos = activePromos.length > 0
   const totalPrice = items.reduce((sum, item) => sum + item.unitPrice * getItemQuantity(item), 0)
+  const totalDiscounted = items.reduce(
+    (sum, item) => sum + getDiscountedPrice(item.unitPrice, item.id) * getItemQuantity(item),
+    0,
+  )
   const chargesTotal = charges.reduce((sum, c) => sum + (c.amount || 0), 0)
-  const grandTotal = meta.grandTotal ?? totalPrice + chargesTotal
+  const grandTotal = hasActivePromos
+    ? totalDiscounted + chargesTotal
+    : (meta.grandTotal ?? totalPrice + chargesTotal)
   const currency = items[0]?.currency ?? 'FCFA'
 
   return (
@@ -344,12 +390,6 @@ export function TicketDrawer({
                   <span>{providerConfig.label}</span>
                 </div>
               )}
-              {ticket.contactId && (
-                <div className="flex items-center gap-1.5 text-sm text-text-secondary">
-                  <Phone size={14} className="text-text-muted" />
-                  <span className="text-xs">{ticket.contactId}</span>
-                </div>
-              )}
             </div>
             <div className="mt-2 text-xs text-text-muted">
               {dayjs(ticket.createdAt).format('DD MMMM YYYY [à] HH:mm')}
@@ -366,30 +406,65 @@ export function TicketDrawer({
             </div>
           )}
 
+          {/* Promotions */}
+          {hasActivePromos && (
+            <div className="border-b border-border-subtle px-4 py-4">
+              <div className="mb-2 text-xs text-text-muted">Promotions</div>
+              <div className="flex flex-wrap gap-2">
+                {activePromos.map((promo) => (
+                  <Tag key={promo.id} bordered={false} color="orange">
+                    {promo.name} (
+                    {promo.type === 'percent'
+                      ? `-${promo.value}%`
+                      : `-${formatPrice(promo.value, 'FCFA')}`}
+                    )
+                  </Tag>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Products */}
           {items.length > 0 && (
             <div className="border-b border-border-subtle px-4 py-4">
               <div className="mb-3 flex items-center justify-between">
                 <div className="text-xs text-text-muted">Articles ({items.length})</div>
                 <div className="text-sm font-semibold text-text-primary">
-                  {formatPrice(totalPrice, currency)}
+                  {hasActivePromos && totalDiscounted < totalPrice ? (
+                    <>
+                      {formatPrice(totalDiscounted, currency)}
+                      <span className="ml-2 text-xs text-text-muted font-normal line-through">
+                        {formatPrice(totalPrice, currency)}
+                      </span>
+                    </>
+                  ) : (
+                    formatPrice(totalPrice, currency)
+                  )}
                 </div>
               </div>
               <div className="flex flex-col gap-3">
-                {items.map((item) => (
-                  <ArticleListItem
-                    key={item.id}
-                    id={item.id}
-                    title={item.title}
-                    description={item.description}
-                    imageUrl={item.imageUrl}
-                    unitPrice={item.unitPrice}
-                    quantity={getItemQuantity(item)}
-                    currency={item.currency}
-                    onQuantityChange={handleQuantityChange}
-                    variant="detailed"
-                  />
-                ))}
+                {items.map((item) => {
+                  const qty = getItemQuantity(item)
+                  const original = item.unitPrice * qty
+                  const discounted = getDiscountedPrice(item.unitPrice, item.id) * qty
+                  return (
+                    <ArticleListItem
+                      key={item.id}
+                      id={item.id}
+                      title={item.title}
+                      description={item.description}
+                      imageUrl={item.imageUrl}
+                      unitPrice={item.unitPrice}
+                      quantity={qty}
+                      currency={item.currency}
+                      discountedTotal={
+                        hasActivePromos && discounted < original ? discounted : undefined
+                      }
+                      onQuantityChange={handleQuantityChange}
+                      variant="detailed"
+                    />
+                  )
+                })}
               </div>
             </div>
           )}

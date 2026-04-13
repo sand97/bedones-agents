@@ -28,7 +28,14 @@ export class PromotionService {
           products: {
             include: {
               product: {
-                select: { id: true, name: true, imageUrl: true, price: true, currency: true },
+                select: {
+                  id: true,
+                  providerProductId: true,
+                  name: true,
+                  imageUrl: true,
+                  price: true,
+                  currency: true,
+                },
               },
             },
           },
@@ -51,7 +58,14 @@ export class PromotionService {
         products: {
           include: {
             product: {
-              select: { id: true, name: true, imageUrl: true, price: true, currency: true },
+              select: {
+                id: true,
+                providerProductId: true,
+                name: true,
+                imageUrl: true,
+                price: true,
+                currency: true,
+              },
             },
           },
         },

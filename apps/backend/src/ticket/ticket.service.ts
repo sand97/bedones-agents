@@ -65,20 +65,23 @@ export class TicketService {
     return ticket
   }
 
-  async create(data: {
-    organisationId: string
-    agentId?: string
-    title: string
-    description?: string
-    statusId?: string
-    priority?: string
-    contactName?: string
-    contactId?: string
-    provider?: string
-    conversationId?: string
-    assignedTo?: string
-    metadata?: Record<string, unknown>
-  }) {
+  async create(
+    data: {
+      organisationId: string
+      agentId?: string
+      title: string
+      description?: string
+      statusId?: string
+      priority?: string
+      contactName?: string
+      contactId?: string
+      provider?: string
+      conversationId?: string
+      assignedTo?: string
+      metadata?: Record<string, unknown>
+    },
+    user?: { id: string; name: string },
+  ) {
     // If no statusId provided, find the default for this organisation
     let statusId = data.statusId
     if (!statusId && data.organisationId) {
@@ -105,7 +108,7 @@ export class TicketService {
         activities: {
           create: {
             type: 'created',
-            author: data.contactName || 'System',
+            author: user?.name || data.contactName || 'System',
           },
         },
       },
@@ -126,6 +129,7 @@ export class TicketService {
       assignedTo?: string
       metadata?: Record<string, unknown>
     },
+    user?: { id: string; name: string },
   ) {
     // Fetch current ticket to detect changes for activity log
     const current = await this.prisma.ticket.findUnique({
@@ -158,7 +162,7 @@ export class TicketService {
         data: {
           ticketId: id,
           type: 'status_change',
-          author: 'System',
+          author: user?.name || 'System',
           fromStatus: current.status?.name || 'N/A',
           toStatus: newStatus?.name || 'N/A',
         },
@@ -171,7 +175,7 @@ export class TicketService {
         data: {
           ticketId: id,
           type: 'description_change',
-          author: 'System',
+          author: user?.name || 'System',
           diff: {
             field: 'description',
             before: current.description || '',

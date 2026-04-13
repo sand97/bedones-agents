@@ -381,7 +381,8 @@
     "add_status": "Ajouter un status",
     "default_status": "Par défaut",
     "statuses_updated": "Status mis à jour",
-    "all_statuses": "Tous les status"
+    "all_statuses": "Tous les status",
+    "view_diff": "Voir avant / après"
   },
 
   "catalog": {

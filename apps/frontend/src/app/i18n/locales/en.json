@@ -381,7 +381,8 @@
     "add_status": "Add a status",
     "default_status": "Default",
     "statuses_updated": "Statuses updated",
-    "all_statuses": "All statuses"
+    "all_statuses": "All statuses",
+    "view_diff": "View before / after"
   },
 
   "catalog": {

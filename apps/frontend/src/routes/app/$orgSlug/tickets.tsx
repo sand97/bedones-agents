@@ -163,6 +163,7 @@ function TicketsPage() {
         name: p.name,
         discountType: p.discountType,
         discountValue: p.discountValue,
+        productIds: p.products?.map((pp) => pp.product.providerProductId ?? pp.product.id) ?? [],
       })),
     [promotionsQuery.data],
   )
@@ -438,6 +439,7 @@ function TicketsPage() {
         onEdit={() => {
           if (drawerTicket) handleEdit(drawerTicket)
         }}
+        promotionOptions={promotionOptions}
       />
 
       <CreateTicketModal

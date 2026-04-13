@@ -52,6 +52,8 @@ export interface TicketPromotionOption {
   name: string
   discountType: 'PERCENTAGE' | 'FIXED_AMOUNT'
   discountValue: number
+  /** When empty/undefined, the promotion applies to all products */
+  productIds?: string[]
 }
 
 interface CreateTicketModalProps {
@@ -241,6 +243,7 @@ export function CreateTicketModal({
           name: p.name,
           type: p.discountType === 'PERCENTAGE' ? ('percent' as const) : ('fixed' as const),
           value: p.discountValue,
+          productIds: p.productIds,
         }))
     }
     return MOCK_PROMOTIONS.filter((p) => selectedPromoIds.includes(p.id))
@@ -269,10 +272,14 @@ export function CreateTicketModal({
     setCharges((prev) => prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)))
   }
 
-  const getDiscountedPrice = (price: number) => {
+  const getDiscountedPrice = (price: number, articleId?: string) => {
     let discounted = price
     for (const promo of selectedPromos) {
       if (promo.value <= 0) continue
+      // Skip promo if it targets specific products and this article is not in the list
+      if (promo.productIds && promo.productIds.length > 0 && articleId) {
+        if (!promo.productIds.includes(articleId)) continue
+      }
       if (promo.type === 'percent') {
         discounted -= discounted * (promo.value / 100)
       } else {
@@ -282,11 +289,15 @@ export function CreateTicketModal({
     return Math.max(0, Math.round(discounted))
   }
 
-  const getPromoTooltip = (price: number) => {
+  const getPromoTooltip = (price: number, articleId?: string) => {
     const lines: string[] = [`Prix original : ${formatPrice(price, 'FCFA')}`]
     let current = price
     for (const promo of selectedPromos) {
       if (promo.value <= 0) continue
+      // Skip promo if it targets specific products and this article is not in the list
+      if (promo.productIds && promo.productIds.length > 0 && articleId) {
+        if (!promo.productIds.includes(articleId)) continue
+      }
       if (promo.type === 'percent') {
         const discount = Math.round(current * (promo.value / 100))
         current -= discount
@@ -303,7 +314,7 @@ export function CreateTicketModal({
 
   const subtotal = selectedArticles.reduce((sum, sa) => sum + sa.article.price * sa.quantity, 0)
   const subtotalDiscounted = selectedArticles.reduce(
-    (sum, sa) => sum + getDiscountedPrice(sa.article.price) * sa.quantity,
+    (sum, sa) => sum + getDiscountedPrice(sa.article.price, sa.article.id) * sa.quantity,
     0,
   )
   const chargesTotal = charges.reduce((sum, c) => sum + (c.amount || 0), 0)
@@ -444,7 +455,7 @@ export function CreateTicketModal({
             <div className="flex flex-col gap-2">
               {selectedArticles.map(({ article, quantity }) => {
                 const original = article.price * quantity
-                const discounted = getDiscountedPrice(article.price) * quantity
+                const discounted = getDiscountedPrice(article.price, article.id) * quantity
                 return (
                   <ArticleListItem
                     key={article.id}
@@ -459,7 +470,9 @@ export function CreateTicketModal({
                       hasActivePromos && discounted < original ? discounted : undefined
                     }
                     discountTooltip={
-                      hasActivePromos ? getPromoTooltip(article.price * quantity) : undefined
+                      hasActivePromos
+                        ? getPromoTooltip(article.price * quantity, article.id)
+                        : undefined
                     }
                     onQuantityChange={(_id, qty) => updateArticleQty(article.id, qty)}
                   />

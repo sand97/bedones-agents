@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { AuthGuard } from '../auth/auth.guard'
+import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { TicketService } from './ticket.service'
 import { CreateTicketDto, UpdateTicketDto } from './dto/ticket.dto'
 
@@ -74,13 +75,17 @@ export class TicketController {
   }
 
   @Post()
-  async create(@Body() dto: CreateTicketDto) {
-    return this.ticketService.create(dto)
+  async create(@CurrentUser() user: { id: string; name: string }, @Body() dto: CreateTicketDto) {
+    return this.ticketService.create(dto, user)
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateTicketDto) {
-    return this.ticketService.update(id, dto)
+  async update(
+    @CurrentUser() user: { id: string; name: string },
+    @Param('id') id: string,
+    @Body() dto: UpdateTicketDto,
+  ) {
+    return this.ticketService.update(id, dto, user)
   }
 
   @Delete(':id')

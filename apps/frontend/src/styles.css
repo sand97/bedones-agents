@@ -2053,6 +2053,12 @@ a {
   height: var(--height-input) !important;
 }
 
+.ant-select-multiple .ant-select-selector {
+  height: auto !important;
+  min-height: var(--height-input) !important;
+  padding-block: 4px !important;
+}
+
 .ant-select-selector,
 .ant-input-affix-wrapper,
 .ant-input-number-affix-wrapper {
