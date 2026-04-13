@@ -21,8 +21,7 @@ COPY apps/backend ./apps/backend
 RUN pnpm --filter backend prisma:generate
 
 WORKDIR /app/apps/backend
-RUN pnpm build 2>&1 && ls -la dist/ || true
-RUN test -f dist/main.js || (echo "ERROR: dist/main.js not found after build" && ls -la . && exit 1)
+RUN pnpm build
 
 FROM node:20-bookworm-slim AS runtime
 
@@ -54,5 +53,5 @@ CMD ["sh", "-c", "\
     echo \"Migration attempt $attempts failed, retrying in 5s...\"; \
     sleep 5; \
   done; \
-  exec node dist/main \
+  exec node dist/src/main \
 "]
