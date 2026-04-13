@@ -181,7 +181,7 @@ jobs:
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
             docker pull ghcr.io/sand97/bedones-moderator-cropper:main 
-            docker pull ghcr.io/${{ steps.vars.outputs.owner }}/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
+            docker pull ghcr.io/sand97/bedones-moderator-backend:main
 
             docker service update \
               --force \
