@@ -1,0 +1,193 @@
+name: Container Images
+
+concurrency:
+  group: container-images-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+on:
+  pull_request:
+    paths:
+      - ".dockerignore"
+      - ".github/workflows/container-images.yml"
+      - "apps/backend/**"
+      - "services/image-cropper/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - ".dockerignore"
+      - ".github/workflows/container-images.yml"
+      - "apps/backend/**"
+      - "services/image-cropper/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  workflow_dispatch:
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      cropper: ${{ steps.filter.outputs.cropper }}
+      shared: ${{ steps.filter.outputs.shared }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            shared:
+              - '.dockerignore'
+              - '.github/workflows/container-images.yml'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+            backend:
+              - 'apps/backend/**'
+            cropper:
+              - 'services/image-cropper/**'
+
+  build:
+    needs: changes
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: backend
+            context: .
+            dockerfile: apps/backend/Dockerfile
+            image: bedones-moderator-backend
+          - id: cropper
+            context: services/image-cropper
+            dockerfile: services/image-cropper/Dockerfile
+            image: bedones-moderator-cropper
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compute registry namespace
+        id: vars
+        shell: bash
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "${GITHUB_OUTPUT}"
+          echo "push=$([[ '${{ github.event_name }}' == 'push' && '${{ github.ref }}' == 'refs/heads/main' ]] && echo true || echo false)" >> "${GITHUB_OUTPUT}"
+
+      - name: Decide whether to build image
+        id: plan
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MATRIX_ID: ${{ matrix.id }}
+          SHARED_CHANGED: ${{ needs.changes.outputs.shared }}
+          BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
+          CROPPER_CHANGED: ${{ needs.changes.outputs.cropper }}
+        run: |
+          should_build=false
+
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" || "${SHARED_CHANGED}" == "true" ]]; then
+            should_build=true
+          else
+            case "${MATRIX_ID}" in
+              backend)
+                [[ "${BACKEND_CHANGED}" == "true" ]] && should_build=true
+                ;;
+              cropper)
+                [[ "${CROPPER_CHANGED}" == "true" ]] && should_build=true
+                ;;
+            esac
+          fi
+
+          echo "build=${should_build}" >> "${GITHUB_OUTPUT}"
+
+      - name: Skip unchanged image
+        if: steps.plan.outputs.build != 'true'
+        run: echo "Skipping ${{ matrix.id }} because no relevant files changed."
+
+      - name: Set up Docker Buildx
+        if: steps.plan.outputs.build == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: steps.plan.outputs.build == 'true' && steps.vars.outputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        if: steps.plan.outputs.build == 'true'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ steps.vars.outputs.owner }}/${{ matrix.image }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=git-${{ github.sha }},enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+            type=raw,value=main,enable={{is_default_branch}}
+
+      - name: Build and optionally push image
+        if: steps.plan.outputs.build == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: ${{ steps.vars.outputs.push == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.id }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.id }}
+          platforms: linux/amd64
+
+  deploy-backend:
+    needs:
+      - changes
+      - build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.shared == 'true' || needs.changes.outputs.backend == 'true')
+
+    steps:
+      - name: Compute backend deploy variables
+        id: vars
+        shell: bash
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "${GITHUB_OUTPUT}"
+          echo "image=bedones-moderator-backend" >> "${GITHUB_OUTPUT}"
+          echo "tag=git-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "stack=bedones-moderator-stack" >> "${GITHUB_OUTPUT}"
+          echo "service=backend" >> "${GITHUB_OUTPUT}"
+
+      - name: Deploy backend to Docker Swarm
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            docker pull ghcr.io/${{ steps.vars.outputs.owner }}/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
+
+            docker service update \
+              --force \
+              --image ghcr.io/${{ steps.vars.outputs.owner }}/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }} \
+              --with-registry-auth \
+              ${{ steps.vars.outputs.stack }}_${{ steps.vars.outputs.service }}
+
+            echo "Waiting for service update..."
+            sleep 5
+            docker service ps ${{ steps.vars.outputs.stack }}_${{ steps.vars.outputs.service }} --filter "desired-state=running" --format "{{.Name}} {{.Image}} {{.CurrentState}}"

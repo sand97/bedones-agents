@@ -4,6 +4,7 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import svgr from 'vite-plugin-svgr'
+import { cloudflare } from '@cloudflare/vite-plugin'
 
 export default defineConfig({
   server: {
@@ -11,10 +12,11 @@ export default defineConfig({
     allowedHosts: ['localhost', 'moderator.bedones.local'],
   },
   plugins: [
-    tsconfigPaths({ projects: ['./tsconfig.json'] }),
+    cloudflare({ viteEnvironment: { name: 'ssr' } }),
     svgr(),
+    tsconfigPaths({ projects: ['./tsconfig.json'] }),
     tailwindcss(),
-    tanstackStart({ target: 'server' }),
+    tanstackStart(),
     viteReact(),
   ],
 })

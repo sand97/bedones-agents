@@ -9,3 +9,4 @@
 /apps/backend/.env
 /apps/frontend/.env
 /apps/frontend/dist/
+/apps/frontend/.wrangler/

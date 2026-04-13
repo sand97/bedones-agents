@@ -43,7 +43,7 @@ async function main() {
     console.log('🌱 Seeding database...')
 
     const email = 'test@bedones.com'
-    const password = 'test1234'
+    const password = 'BAAAAAtzc2gtZWQyNTUxOQAAACB'
     const passwordHash = await bcrypt.hash(password, 10)
 
     // Upsert test user

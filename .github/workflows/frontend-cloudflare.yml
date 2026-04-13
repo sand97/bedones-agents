@@ -1,0 +1,76 @@
+name: Frontend Cloudflare
+
+concurrency:
+  group: frontend-cloudflare-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/frontend-cloudflare.yml'
+      - 'apps/frontend/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+  pull_request:
+    paths:
+      - '.github/workflows/frontend-cloudflare.yml'
+      - 'apps/frontend/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          HUSKY: 0
+
+      - name: Export VITE variables
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
+        run: |
+          echo "${VARS_JSON}" | jq -r '
+            to_entries
+            | sort_by(.key)
+            | .[]
+            | select(.key | startswith("VITE_"))
+            | select(.value != null)
+            | select((.value | tostring | contains("\n")) | not)
+            | "\(.key)=\(.value|tostring)"
+          ' >> "${GITHUB_ENV}"
+
+      - name: Build frontend
+        working-directory: apps/frontend
+        run: pnpm build
+
+      - name: Deploy frontend to Cloudflare Worker
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/frontend
+          command: deploy
