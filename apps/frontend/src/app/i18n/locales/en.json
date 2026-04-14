@@ -352,7 +352,7 @@
     "before": "Before",
     "after": "After",
     "search_placeholder": "Search by title or contact...",
-    "filter_status": "Filter by status",
+    "filter_status": "Status",
     "filter_priority": "Filter by priority",
     "priority": "Priority",
     "contact": "Contact",
