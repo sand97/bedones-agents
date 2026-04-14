@@ -223,7 +223,16 @@ function ConditionsVentePage() {
             apr&egrave;s cette date vaut acceptation des nouvelles conditions.
           </P>
 
-          <SectionTitle>14. Droit applicable et litiges</SectionTitle>
+          <SectionTitle>14. Cookies</SectionTitle>
+          <P>
+            En acc&eacute;dant &agrave; la plateforme, l&apos;utilisateur est invit&eacute; &agrave;
+            exprimer son choix concernant les cookies via une fen&ecirc;tre de consentement. Ce
+            choix peut &ecirc;tre modifi&eacute; &agrave; tout moment. Pour plus de d&eacute;tails,
+            consultez notre <a href="/legal/privacy">politique de confidentialit&eacute;</a> et nos{' '}
+            <a href="/legal/mentions">mentions l&eacute;gales</a>.
+          </P>
+
+          <SectionTitle>15. Droit applicable et litiges</SectionTitle>
           <P>
             Les pr&eacute;sentes CGV sont r&eacute;gies par le droit ivoirien. En cas de litige
             relatif &agrave; l&apos;interpr&eacute;tation ou l&apos;ex&eacute;cution des

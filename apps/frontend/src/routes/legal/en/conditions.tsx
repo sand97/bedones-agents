@@ -203,7 +203,15 @@ function TermsOfSalePage() {
             service after that date constitutes acceptance of the updated Terms.
           </P>
 
-          <SectionTitle>14. Governing Law and Disputes</SectionTitle>
+          <SectionTitle>14. Cookies</SectionTitle>
+          <P>
+            When accessing the platform, users are prompted to express their cookie preferences
+            through a consent dialog. This choice can be changed at any time. For more details,
+            please refer to our <a href="/legal/privacy">privacy policy</a> and our{' '}
+            <a href="/legal/mentions">legal notices</a>.
+          </P>
+
+          <SectionTitle>15. Governing Law and Disputes</SectionTitle>
           <P>
             These Terms are governed by Ivorian law. In the event of a dispute relating to the
             interpretation or performance of these Terms, the parties agree to seek an amicable

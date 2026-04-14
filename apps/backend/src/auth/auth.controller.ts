@@ -17,6 +17,7 @@ import { AuthService } from './auth.service'
 import { AuthGuard } from './auth.guard'
 import { CurrentUser } from './decorators/current-user.decorator'
 import { LoginDto } from './dto/login.dto'
+import { CookieConsentDto } from './dto/cookie-consent.dto'
 import { MeResponseDto, StatusResponseDto } from './dto/auth-response.dto'
 
 @ApiTags('Auth')
@@ -43,6 +44,26 @@ export class AuthController {
   async login(@Body() body: LoginDto, @Res({ passthrough: true }) res: Response) {
     const { jwt, expiresAt } = await this.authService.loginWithPassword(body.email, body.password)
     this.setSessionCookie(res, jwt, expiresAt)
+    return { status: 'success' }
+  }
+
+  // ─── Cookie Consent ───
+
+  @Post('cookie-consent')
+  @HttpCode(200)
+  @ApiBody({ type: CookieConsentDto })
+  @ApiOkResponse({ type: StatusResponseDto })
+  async setCookieConsent(
+    @Body() body: CookieConsentDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.cookie('cookie_consent', body.consent, {
+      httpOnly: false,
+      secure: this.isProduction,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 365 * 24 * 60 * 60 * 1000,
+    })
     return { status: 'success' }
   }
 

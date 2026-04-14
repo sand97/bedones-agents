@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Button, Card, Input, Modal, Typography, message } from 'antd'
+import { Button, Card, Form, Input, Modal, Select, Typography, message } from 'antd'
 import { useState } from 'react'
-import { Lock, Mail, BookOpen } from 'lucide-react'
+import { Lock, Mail, BookOpen, HelpCircle, Send } from 'lucide-react'
 import { featuresConfig, type Feature } from '@app/data/features'
 import { login, fetchMe } from '@app/lib/api'
+import { CookieConsentModal } from '@app/components/auth/cookie-consent-modal'
 
 const { Title, Text } = Typography
 
@@ -17,6 +18,12 @@ function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [supportOpen, setSupportOpen] = useState(false)
+  const [supportForm] = Form.useForm()
+  const [submitting, setSubmitting] = useState(false)
+  const [cookieConsentOpen, setCookieConsentOpen] = useState(() => {
+    return !document.cookie.split('; ').some((c) => c.startsWith('cookie_consent='))
+  })
 
   const handleLogin = async () => {
     if (!email || !password) return
@@ -43,6 +50,23 @@ function LoginPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const motifOptions = [
+    { value: 'bug', label: 'Signaler un bug' },
+    { value: 'account', label: 'Problème de compte' },
+    { value: 'billing', label: 'Facturation' },
+    { value: 'other', label: 'Autre' },
+  ]
+
+  const handleSupportSubmit = async (_values: Record<string, string>) => {
+    setSubmitting(true)
+    // TODO: integrate real API
+    await new Promise((r) => setTimeout(r, 800))
+    setSubmitting(false)
+    supportForm.resetFields()
+    setSupportOpen(false)
+    message.success('Votre message a bien été envoyé. Nous reviendrons vers vous rapidement.')
   }
 
   return (
@@ -112,15 +136,26 @@ function LoginPage() {
           </div>
         </Card>
 
-        <Button
-          type="default"
-          icon={<BookOpen size={16} />}
-          href="/blog"
-          size="large"
-          style={{ height: 44 }}
-        >
-          Conseils pour votre business
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            type="default"
+            icon={<HelpCircle size={16} />}
+            size="large"
+            style={{ height: 44 }}
+            onClick={() => setSupportOpen(true)}
+          >
+            Aide
+          </Button>
+          <Button
+            type="default"
+            icon={<BookOpen size={16} />}
+            href="/blog"
+            size="large"
+            style={{ height: 44 }}
+          >
+            Conseils pour votre business
+          </Button>
+        </div>
       </div>
 
       {/* Features Section */}
@@ -172,6 +207,54 @@ function LoginPage() {
           <p className="text-base text-text-secondary">{selectedFeature.description}</p>
         )}
       </Modal>
+
+      {/* Contact support modal */}
+      <Modal
+        open={supportOpen}
+        onCancel={() => setSupportOpen(false)}
+        title="Contacter le support"
+        footer={null}
+        destroyOnClose
+      >
+        <Form
+          form={supportForm}
+          layout="vertical"
+          onFinish={handleSupportSubmit}
+          requiredMark={false}
+        >
+          <Form.Item
+            name="email"
+            label="Votre adresse email"
+            rules={[{ required: true, message: 'Veuillez entrer votre email' }]}
+          >
+            <Input placeholder="email@exemple.com" />
+          </Form.Item>
+
+          <Form.Item
+            name="motif"
+            label="Motif"
+            rules={[{ required: true, message: 'Veuillez sélectionner un motif' }]}
+          >
+            <Select placeholder="Sélectionnez un motif" options={motifOptions} />
+          </Form.Item>
+
+          <Form.Item
+            name="description"
+            label="Description"
+            rules={[{ required: true, message: 'Veuillez décrire votre problème' }]}
+          >
+            <Input.TextArea rows={4} placeholder="Décrivez votre problème ou votre question..." />
+          </Form.Item>
+
+          <div className="flex justify-end">
+            <Button type="primary" htmlType="submit" loading={submitting} icon={<Send size={14} />}>
+              Envoyer
+            </Button>
+          </div>
+        </Form>
+      </Modal>
+
+      <CookieConsentModal open={cookieConsentOpen} onClose={() => setCookieConsentOpen(false)} />
     </div>
   )
 }

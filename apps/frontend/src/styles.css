@@ -2159,3 +2159,7 @@ a {
   height: 40px !important;
 }
 
+
+.ant-card .ant-card-body {
+  @apply p-4 md:p-6;
+}

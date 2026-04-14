@@ -184,10 +184,15 @@ function PrivacyPolicyPage() {
 
           <SectionTitle>10. Cookies</SectionTitle>
           <P>
-            Bedones uses only cookies that are strictly necessary for the operation of the platform
-            (authentication, session preferences). No advertising, tracking, or behavioral analytics
-            cookies are deployed. Therefore, no prior consent is required for these technical
-            cookies.
+            Bedones uses cookies that are strictly necessary for the operation of the platform
+            (authentication, session, preferences). Additionally, optional cookies may be used to
+            improve your experience.
+          </P>
+          <P>
+            On your first visit, a consent dialog allows you to choose between accepting all cookies
+            or only essential cookies. Your choice is stored in a <code>cookie_consent</code> cookie
+            valid for one year. You can change your preference at any time by deleting this cookie
+            from your browser.
           </P>
 
           <SectionTitle>11. Security</SectionTitle>

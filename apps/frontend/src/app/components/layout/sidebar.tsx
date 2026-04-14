@@ -13,6 +13,7 @@ import {
   LogOut,
   Bell,
   Languages,
+  LayoutDashboard,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { logout } from '@app/lib/api'
@@ -322,6 +323,19 @@ export function Sidebar() {
               placement={collapsed && isDesktop ? 'rightBottom' : 'topRight'}
               content={
                 <div className="flex flex-col" style={{ minWidth: 200 }}>
+                  <Button
+                    type={'text'}
+                    onClick={() => {
+                      if (!isDesktop) setMobileMenuOpen(false)
+                      navigate({
+                        to: '/app/$orgSlug/dashboard' as string,
+                        params: { orgSlug },
+                      })
+                    }}
+                    icon={<LayoutDashboard size={16} strokeWidth={1} />}
+                  >
+                    {t('sidebar.recap')}
+                  </Button>
                   <Button
                     type={'text'}
                     onClick={() => {

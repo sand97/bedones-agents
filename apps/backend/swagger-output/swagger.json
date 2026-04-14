@@ -47,6 +47,37 @@
         ]
       }
     },
+    "/auth/cookie-consent": {
+      "post": {
+        "operationId": "AuthController_setCookieConsent",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CookieConsentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/callback/facebook": {
       "get": {
         "operationId": "AuthController_facebookCallback",
@@ -2889,6 +2920,22 @@
         },
         "required": [
           "status"
+        ]
+      },
+      "CookieConsentDto": {
+        "type": "object",
+        "properties": {
+          "consent": {
+            "type": "string",
+            "enum": [
+              "all",
+              "essential"
+            ],
+            "example": "all"
+          }
+        },
+        "required": [
+          "consent"
         ]
       },
       "UserDto": {

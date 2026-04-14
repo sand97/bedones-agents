@@ -199,11 +199,17 @@ function PrivacyPolicyPage() {
 
           <SectionTitle>10. Cookies</SectionTitle>
           <P>
-            Bedones utilise uniquement des cookies strictement n&eacute;cessaires au fonctionnement
-            de la plateforme (authentification, pr&eacute;f&eacute;rences de session). Aucun cookie
-            publicitaire, de tracking ou d&apos;analyse comportementale n&apos;est
-            d&eacute;pos&eacute;. Aucun consentement pr&eacute;alable n&apos;est donc requis pour
-            ces cookies techniques.
+            Bedones utilise des cookies techniques strictement n&eacute;cessaires au fonctionnement
+            de la plateforme (authentification, session, pr&eacute;f&eacute;rences). En
+            compl&eacute;ment, des cookies optionnels peuvent &ecirc;tre utilis&eacute;s pour
+            am&eacute;liorer votre exp&eacute;rience.
+          </P>
+          <P>
+            Lors de votre premi&egrave;re visite, une fen&ecirc;tre de consentement vous permet de
+            choisir d&apos;accepter tous les cookies ou uniquement les cookies essentiels. Votre
+            choix est enregistr&eacute; dans un cookie <code>cookie_consent</code> valable un an.
+            Vous pouvez modifier votre pr&eacute;f&eacute;rence &agrave; tout moment en supprimant
+            ce cookie de votre navigateur.
           </P>
 
           <SectionTitle>11. S&eacute;curit&eacute;</SectionTitle>

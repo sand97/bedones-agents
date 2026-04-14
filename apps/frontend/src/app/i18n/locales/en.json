@@ -47,7 +47,8 @@
     "collapse_sidebar": "Collapse sidebar",
     "expand_sidebar": "Expand sidebar",
     "use_english": "Use English",
-    "use_french": "Utiliser le Français"
+    "use_french": "Utiliser le Français",
+    "recap": "Overview"
   },
 
   "auth": {
@@ -697,6 +698,20 @@
 
   "format": {
     "date_time": "MM/DD at HH:mm"
+  },
+
+  "dashboard": {
+    "title": "Overview",
+    "welcome_title": "Welcome to Bedones",
+    "welcome_description": "Centralize your social interactions and convert your prospects into customers. Connect your networks to get started.",
+    "comments_title": "Comments",
+    "comments_description": "Connect your social media and let AI manage your comments for you.",
+    "messaging_title": "Messaging",
+    "messaging_description": "Connect your social media and let AI reply to your customers.",
+    "agent_title": "Create your agent",
+    "agent_description": "Create an agent to manage your conversations and create tickets that will be sent to your team members.",
+    "agent_members_link": "Add team members",
+    "agent_description_2": " to your team. You can also create promotions that will be taken into account by the agent."
   },
 
   "meta": {

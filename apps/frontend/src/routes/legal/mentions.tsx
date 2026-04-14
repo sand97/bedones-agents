@@ -113,6 +113,28 @@ function MentionsLegalesPage() {
             Pour toute question relative aux présentes mentions légales, vous pouvez nous contacter
             à l&apos;adresse : legal@bedones.com
           </P>
+
+          <SectionTitle>8. Cookies et consentement</SectionTitle>
+          <P>
+            Lors de votre premi&egrave;re visite sur la plateforme Bedones, une fen&ecirc;tre de
+            consentement vous permet de choisir entre accepter tous les cookies ou uniquement les
+            cookies essentiels.
+          </P>
+          <P>
+            <strong>Cookies essentiels :</strong> n&eacute;cessaires au fonctionnement du service
+            (authentification, pr&eacute;f&eacute;rences de session). Ils ne peuvent pas &ecirc;tre
+            d&eacute;sactiv&eacute;s.
+          </P>
+          <P>
+            <strong>Cookies optionnels :</strong> permettent d&apos;am&eacute;liorer votre
+            exp&eacute;rience utilisateur et d&apos;analyser l&apos;utilisation de la plateforme.
+          </P>
+          <P>
+            Votre choix est enregistr&eacute; dans un cookie <code>cookie_consent</code> valable un
+            an. Vous pouvez modifier votre pr&eacute;f&eacute;rence &agrave; tout moment en
+            supprimant ce cookie de votre navigateur. Pour plus d&apos;informations, consultez notre{' '}
+            <a href="/legal/privacy">politique de confidentialit&eacute;</a>.
+          </P>
         </div>
       </div>
     </div>
