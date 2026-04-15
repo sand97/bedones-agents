@@ -234,6 +234,7 @@ function DeliveryCheck({
   provider?: ChatProvider
   isRead: boolean
 }) {
+  const { t } = useTranslation()
   // WhatsApp: use deliveryStatus for granular check marks
   if (provider === 'whatsapp' && deliveryStatus) {
     if (deliveryStatus === 'read') {
