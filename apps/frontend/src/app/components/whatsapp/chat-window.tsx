@@ -243,10 +243,15 @@ function DeliveryCheck({
         </Tooltip>
       )
     }
-    const { t } = useTranslation()
-    const label = deliveryStatus === 'delivered' ? t('chat.delivered') : t('chat.sent')
+    if (deliveryStatus === 'delivered') {
+      return (
+        <Tooltip title={t('chat.delivered')}>
+          <DoubleCheckIcon width={14} height={14} className="text-text-muted" />
+        </Tooltip>
+      )
+    }
     return (
-      <Tooltip title={label}>
+      <Tooltip title={t('chat.sent')}>
         <SingleCheckIcon width={14} height={14} className="text-text-muted" />
       </Tooltip>
     )

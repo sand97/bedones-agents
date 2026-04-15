@@ -126,13 +126,15 @@ function mapApiConversation(
     createdTime: string
     isRead: boolean
   }>,
+  provider?: string,
 ): Conversation {
+  const isWhatsApp = provider === 'whatsapp'
   return {
     id: conv.id,
     contact: {
       id: conv.participantId,
       name: conv.participantName,
-      phone: '',
+      phone: isWhatsApp && conv.participantId ? `+${conv.participantId}` : '',
       avatarUrl: conv.participantAvatar ?? undefined,
     },
     messages: messages.map((m) => {
@@ -312,6 +314,7 @@ function ChatsPage() {
       return mapApiConversation(
         conv as Parameters<typeof mapApiConversation>[0],
         msgs as Parameters<typeof mapApiConversation>[1],
+        id,
       )
     })
   }, [conversationsQuery.data, messagesQuery.data, search.conv, id])
