@@ -124,12 +124,12 @@ function LoginPage() {
 
             <Text type="secondary" className="text-center text-xs">
               En continuant, vous acceptez nos{' '}
-              <a href="/auth/terms" className="link-underline-hover text-text-primary">
+              <a href="/legal/conditions" className="link-underline-hover text-text-primary">
                 conditions d&apos;utilisation
               </a>{' '}
               et notre{' '}
-              <a href="/auth/privacy" className="link-underline-hover text-text-primary">
-                politique de confidentialite
+              <a href="/legal/privacy" className="link-underline-hover text-text-primary">
+                politique de confidentialité
               </a>
               .
             </Text>
