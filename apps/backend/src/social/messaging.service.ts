@@ -942,9 +942,10 @@ export class MessagingService {
     conversationId: string,
     productRetailerIds: string[],
     catalogId: string,
-    format: 'product' | 'product_list',
+    format: 'product' | 'product_list' | 'carousel' | 'catalog_message',
     headerText?: string,
     bodyText?: string,
+    footerText?: string,
   ) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
@@ -970,7 +971,7 @@ export class MessagingService {
 
     const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
 
-    const platformMsgId = await this.sendWhatsAppProductMessage(
+    const { platformMsgIds, displayText } = await this.dispatchWhatsAppProductMessage(
       conversation.socialAccount.providerAccountId,
       conversation.participantId,
       accessToken,
@@ -979,20 +980,19 @@ export class MessagingService {
       format,
       headerText,
       bodyText,
+      footerText,
     )
-
-    const displayText = `[${productRetailerIds.length} product(s)]`
 
     const savedMessage = await this.prisma.directMessage.create({
       data: {
         conversationId,
-        platformMsgId,
+        platformMsgId: platformMsgIds[0] || null,
         message: displayText,
         senderId: conversation.socialAccount.providerAccountId,
         senderName: 'Page',
         isFromPage: true,
         isRead: true,
-        mediaType: 'catalog',
+        mediaType: format === 'catalog_message' ? 'catalog_message' : 'catalog',
         deliveryStatus: 'sent',
         createdTime: new Date(),
       },
@@ -1015,9 +1015,10 @@ export class MessagingService {
     conversationId: string,
     productRetailerIds: string[],
     catalogId: string,
-    format: 'product' | 'product_list',
+    format: 'product' | 'product_list' | 'carousel' | 'catalog_message',
     headerText?: string,
     bodyText?: string,
+    footerText?: string,
   ): Promise<{ id: string; message: string }> {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
@@ -1040,7 +1041,7 @@ export class MessagingService {
 
     const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
 
-    const platformMsgId = await this.sendWhatsAppProductMessage(
+    const { platformMsgIds, displayText } = await this.dispatchWhatsAppProductMessage(
       conversation.socialAccount.providerAccountId,
       conversation.participantId,
       accessToken,
@@ -1049,20 +1050,19 @@ export class MessagingService {
       format,
       headerText,
       bodyText,
+      footerText,
     )
-
-    const displayText = `[${productRetailerIds.length} product(s)]`
 
     const savedMessage = await this.prisma.directMessage.create({
       data: {
         conversationId,
-        platformMsgId,
+        platformMsgId: platformMsgIds[0] || null,
         message: displayText,
         senderId: conversation.socialAccount.providerAccountId,
         senderName: 'AI Agent',
         isFromPage: true,
         isRead: true,
-        mediaType: 'catalog',
+        mediaType: format === 'catalog_message' ? 'catalog_message' : 'catalog',
         deliveryStatus: 'sent',
         createdTime: new Date(),
       },
@@ -1079,50 +1079,137 @@ export class MessagingService {
     return { id: savedMessage.id, message: savedMessage.message }
   }
 
-  private async sendWhatsAppProductMessage(
+  /**
+   * Dispatch the product message to WhatsApp. Handles format-specific payload
+   * building and the single-product loop (when format=product and N>1).
+   */
+  private async dispatchWhatsAppProductMessage(
     phoneNumberId: string,
     recipientPhone: string,
     accessToken: string,
     productRetailerIds: string[],
     catalogId: string,
-    format: 'product' | 'product_list',
+    format: 'product' | 'product_list' | 'carousel' | 'catalog_message',
     headerText?: string,
     bodyText?: string,
-  ): Promise<string | null> {
-    const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${phoneNumberId}/messages`
+    footerText?: string,
+  ): Promise<{ platformMsgIds: string[]; displayText: string }> {
+    const platformMsgIds: string[] = []
 
-    let interactive: Record<string, unknown>
+    if (format === 'product') {
+      // Single product format: loop through every retailer ID and send each as its own message
+      for (const retailerId of productRetailerIds) {
+        const interactive: Record<string, unknown> = {
+          type: 'product',
+          action: {
+            catalog_id: catalogId,
+            product_retailer_id: retailerId,
+          },
+        }
+        // Only attach body when non-empty — empty text is rejected by WhatsApp (#131009)
+        const trimmedBody = bodyText?.trim()
+        if (trimmedBody) interactive.body = { text: trimmedBody }
 
-    if (format === 'product' && productRetailerIds.length === 1) {
-      // Single product message
-      interactive = {
-        type: 'product',
-        body: { text: bodyText || '' },
-        action: {
-          catalog_id: catalogId,
-          product_retailer_id: productRetailerIds[0],
-        },
+        const msgId = await this.sendWhatsAppInteractivePayload(
+          phoneNumberId,
+          recipientPhone,
+          accessToken,
+          interactive,
+          `product (${retailerId})`,
+        )
+        if (msgId) platformMsgIds.push(msgId)
       }
-    } else {
-      // Multi-product message (product_list)
-      interactive = {
+      const count = productRetailerIds.length
+      return {
+        platformMsgIds,
+        displayText: count > 1 ? `[${count} products]` : '[product]',
+      }
+    }
+
+    if (format === 'product_list') {
+      const interactive: Record<string, unknown> = {
         type: 'product_list',
-        header: { type: 'text', text: headerText || 'Products' },
-        body: { text: bodyText || 'Here are the products:' },
+        header: { type: 'text', text: headerText?.trim() || 'Products' },
+        body: { text: bodyText?.trim() || headerText?.trim() || 'Here are the products:' },
         action: {
           catalog_id: catalogId,
           sections: [
             {
-              title: headerText || 'Products',
-              product_items: productRetailerIds.map((id) => ({
-                product_retailer_id: id,
-              })),
+              title: headerText?.trim() || 'Products',
+              product_items: productRetailerIds.map((id) => ({ product_retailer_id: id })),
             },
           ],
         },
       }
+      const msgId = await this.sendWhatsAppInteractivePayload(
+        phoneNumberId,
+        recipientPhone,
+        accessToken,
+        interactive,
+        `product_list (${productRetailerIds.length} items)`,
+      )
+      if (msgId) platformMsgIds.push(msgId)
+      return { platformMsgIds, displayText: `[${productRetailerIds.length} products]` }
     }
 
+    if (format === 'carousel') {
+      const interactive: Record<string, unknown> = {
+        type: 'carousel',
+        body: { text: bodyText?.trim() || headerText?.trim() || 'Here are the products:' },
+        action: {
+          cards: productRetailerIds.map((retailerId, index) => ({
+            card_index: index,
+            type: 'product',
+            action: {
+              product_retailer_id: retailerId,
+              catalog_id: catalogId,
+            },
+          })),
+        },
+      }
+      const msgId = await this.sendWhatsAppInteractivePayload(
+        phoneNumberId,
+        recipientPhone,
+        accessToken,
+        interactive,
+        `carousel (${productRetailerIds.length} items)`,
+      )
+      if (msgId) platformMsgIds.push(msgId)
+      return { platformMsgIds, displayText: `[${productRetailerIds.length} products]` }
+    }
+
+    // format === 'catalog_message'
+    const action: Record<string, unknown> = { name: 'catalog_message' }
+    if (productRetailerIds[0]) {
+      action.parameters = { thumbnail_product_retailer_id: productRetailerIds[0] }
+    }
+    const interactive: Record<string, unknown> = {
+      type: 'catalog_message',
+      body: { text: bodyText?.trim() || 'View our catalog' },
+      action,
+    }
+    const footer = footerText?.trim()
+    if (footer) interactive.footer = { text: footer }
+
+    const msgId = await this.sendWhatsAppInteractivePayload(
+      phoneNumberId,
+      recipientPhone,
+      accessToken,
+      interactive,
+      'catalog_message',
+    )
+    if (msgId) platformMsgIds.push(msgId)
+    return { platformMsgIds, displayText: '[catalog]' }
+  }
+
+  private async sendWhatsAppInteractivePayload(
+    phoneNumberId: string,
+    recipientPhone: string,
+    accessToken: string,
+    interactive: Record<string, unknown>,
+    logLabel: string,
+  ): Promise<string | null> {
+    const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${phoneNumberId}/messages`
     const body = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -1131,9 +1218,7 @@ export class MessagingService {
       interactive,
     }
 
-    this.logger.log(
-      `[WhatsApp] Sending ${format} message (${productRetailerIds.length} products) to ${recipientPhone}`,
-    )
+    this.logger.log(`[WhatsApp] Sending ${logLabel} message to ${recipientPhone}`)
 
     const response = await fetch(url, {
       method: 'POST',

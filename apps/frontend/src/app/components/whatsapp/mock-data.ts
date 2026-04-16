@@ -5,7 +5,15 @@ export interface Contact {
   avatarUrl?: string
 }
 
-export type MessageType = 'text' | 'audio' | 'video' | 'image' | 'file' | 'catalog' | 'button'
+export type MessageType =
+  | 'text'
+  | 'audio'
+  | 'video'
+  | 'image'
+  | 'file'
+  | 'catalog'
+  | 'catalog_message'
+  | 'button'
 
 export type MessageStatus = 'sending' | 'sent' | 'error'
 

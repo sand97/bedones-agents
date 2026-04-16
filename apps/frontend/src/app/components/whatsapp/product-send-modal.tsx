@@ -7,7 +7,7 @@ import {
 } from '@app/components/promotions/product-picker-modal'
 import type { Catalog } from '@app/lib/api/agent-api'
 
-type ProductFormat = 'product' | 'product_list'
+type ProductFormat = 'product' | 'product_list' | 'carousel'
 
 interface ProductSendModalProps {
   open: boolean
@@ -47,11 +47,6 @@ export function ProductSendModal({ open, onClose, catalog, onSend }: ProductSend
 
   const handleSend = async () => {
     if (selectedProducts.length === 0) return
-
-    if (format === 'product' && selectedProducts.length > 1) {
-      message.warning(t('chat.product_single_limit'))
-      return
-    }
 
     if (selectedProducts.length > 30) {
       message.warning(t('chat.product_max_limit'))
@@ -143,6 +138,7 @@ export function ProductSendModal({ open, onClose, catalog, onSend }: ProductSend
               options={[
                 { value: 'product', label: t('chat.format_single_product') },
                 { value: 'product_list', label: t('chat.format_product_list') },
+                { value: 'carousel', label: t('chat.format_carousel') },
               ]}
               style={{ width: '100%' }}
             />

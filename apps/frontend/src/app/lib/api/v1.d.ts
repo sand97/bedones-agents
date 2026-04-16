@@ -1593,19 +1593,21 @@ export interface components {
         };
         SendProductMessageDto: {
             conversationId: string;
-            /** @description Retailer IDs of products to send */
+            /** @description Retailer IDs of products to send. Ignored when format is "catalog_message" except for thumbnail (first ID). */
             productRetailerIds: string[];
             /** @description Meta catalog ID linked to the WhatsApp number */
             catalogId: string;
             /**
-             * @description Single product or multi-product list
+             * @description Message format: "product" (single, loops if multiple IDs), "product_list" (sectioned list), "carousel" (swipeable cards), "catalog_message" (catalog CTA)
              * @enum {string}
              */
-            format: "product" | "product_list";
+            format: "product" | "product_list" | "carousel" | "catalog_message";
             /** @description Header text for product list messages */
             headerText?: string;
             /** @description Body text accompanying the products */
             bodyText?: string;
+            /** @description Footer text (catalog_message only) */
+            footerText?: string;
         };
         MarkConversationReadDto: {
             conversationId: string;

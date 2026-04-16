@@ -74,6 +74,7 @@ export class MessagingController {
       body.format,
       body.headerText,
       body.bodyText,
+      body.footerText,
     )
   }
 

@@ -90,6 +90,8 @@ interface ChatLayoutProps {
   hasCatalogForProducts?: boolean
   /** Called when user clicks the "Product" attachment option */
   onProductClick?: () => void
+  /** Called when user clicks the "Send catalog" attachment option */
+  onCatalogClick?: () => void
 }
 
 /* ── Labels filter popover ── */
@@ -184,6 +186,7 @@ export function ChatLayout({
   socialAccountId,
   hasCatalogForProducts,
   onProductClick,
+  onCatalogClick,
 }: ChatLayoutProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -423,6 +426,7 @@ export function ChatLayout({
             onRetry={onRetry}
             hasCatalog={hasCatalogForProducts}
             onProductClick={onProductClick}
+            onCatalogClick={onCatalogClick}
           />
         ) : (
           renderDesktopSetup()

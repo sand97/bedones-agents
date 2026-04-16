@@ -40,9 +40,9 @@ export function createProductMessagingTools(deps: {
           .describe('Array of product retailer IDs to send'),
         catalogId: z.string().describe('Internal catalog ID (from search_products context)'),
         format: z
-          .enum(['product', 'product_list'])
+          .enum(['product', 'product_list', 'carousel', 'catalog_message'])
           .describe(
-            'Message format: "product" for single product, "product_list" for multiple products',
+            'Message format: "product" (single, loops if multiple IDs), "product_list" (sectioned list), "carousel" (swipeable product cards), "catalog_message" (catalog CTA with optional thumbnail)',
           ),
         headerText: z
           .string()

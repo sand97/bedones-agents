@@ -38,6 +38,7 @@ interface ChatWindowProps {
   onRetry?: (messageId: string) => void
   hasCatalog?: boolean
   onProductClick?: () => void
+  onCatalogClick?: () => void
 }
 
 function formatTime(timestamp: string): string {
@@ -284,11 +285,14 @@ function MessageBubble({
   onReply?: (message: Message) => void
   onMediaLoad?: () => void
 }) {
+  const { t } = useTranslation()
   const isOutgoing = message.from === 'business'
   const isSending = message.status === 'sending'
   const isError = message.status === 'error'
   const hasMedia =
-    message.type === 'image' || message.type === 'video' || message.type === 'catalog'
+    message.type === 'image' ||
+    message.type === 'video' ||
+    (message.type === 'catalog' && !!message.catalogItem)
 
   const bubbleClasses = [
     'chat-bubble',
@@ -411,23 +415,47 @@ function MessageBubble({
         )
 
       case 'catalog':
-        if (!message.catalogItem) return null
-        return (
-          <div className="overflow-hidden rounded-lg">
-            <img src={message.catalogItem.imageUrl} alt="" className="h-32 w-full object-cover" />
-            <div className="p-2 pt-4">
-              <div className="flex items-start gap-2">
-                <ShoppingBag size={14} className="mt-0.5 flex-shrink-0 text-text-muted" />
-                <div className="text-sm font-semibold text-text-primary">
-                  {message.catalogItem.title}
+        if (message.catalogItem) {
+          return (
+            <div className="overflow-hidden rounded-lg">
+              <img src={message.catalogItem.imageUrl} alt="" className="h-32 w-full object-cover" />
+              <div className="p-2 pt-4">
+                <div className="flex items-start gap-2">
+                  <ShoppingBag size={14} className="mt-0.5 flex-shrink-0 text-text-muted" />
+                  <div className="text-sm font-semibold text-text-primary">
+                    {message.catalogItem.title}
+                  </div>
+                </div>
+                <div className="mt-0.5 text-xs text-text-muted">
+                  {message.catalogItem.description}
+                </div>
+                <div className="mt-1 text-sm font-bold text-text-primary">
+                  {message.catalogItem.price}
                 </div>
               </div>
-              <div className="mt-0.5 text-xs text-text-muted">
-                {message.catalogItem.description}
-              </div>
-              <div className="mt-1 text-sm font-bold text-text-primary">
-                {message.catalogItem.price}
-              </div>
+            </div>
+          )
+        }
+        // No detailed catalogItem → fallback summary bubble for outgoing product sends
+        return (
+          <div className="flex items-center gap-2 py-0.5">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-orange-50 text-orange-500">
+              <ShoppingBag size={16} />
+            </div>
+            <div className="text-sm font-medium text-text-primary">
+              {message.text || t('chat.products_sent')}
+            </div>
+          </div>
+        )
+
+      case 'catalog_message':
+        return (
+          <div className="flex items-center gap-2 py-0.5">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-pink-50 text-pink-500">
+              <ShoppingBag size={16} />
+            </div>
+            <div className="text-sm font-medium text-text-primary">
+              {message.text || t('chat.catalog_sent')}
             </div>
           </div>
         )
@@ -605,6 +633,7 @@ export function ChatWindow({
   onRetry,
   hasCatalog,
   onProductClick,
+  onCatalogClick,
 }: ChatWindowProps) {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -753,6 +782,7 @@ export function ChatWindow({
         onCancelReply={() => setReplyTo(null)}
         hasCatalog={hasCatalog}
         onProductClick={onProductClick}
+        onCatalogClick={onCatalogClick}
       />
 
       {/* Ticket drawer */}

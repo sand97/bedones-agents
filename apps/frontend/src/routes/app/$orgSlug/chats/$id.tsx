@@ -13,6 +13,7 @@ import { CatalogLinkModal } from '@app/components/whatsapp/catalog-link-modal'
 import { AccountSwitcher, type SocialAccount } from '@app/components/social/account-switcher'
 import { ChatLayout } from '@app/components/whatsapp/chat-layout'
 import { ProductSendModal } from '@app/components/whatsapp/product-send-modal'
+import { CatalogSendModal } from '@app/components/whatsapp/catalog-send-modal'
 import { uploadChatMedia } from '@app/lib/api'
 import { WhatsAppIcon, InstagramIcon, MessengerIcon } from '@app/components/icons/social-icons'
 import { useLayout } from '@app/contexts/layout-context'
@@ -145,7 +146,15 @@ function mapApiConversation(
       const deliveryStatus = raw.deliveryStatus as 'sent' | 'delivered' | 'read' | undefined
       return {
         id: m.id,
-        type: (m.mediaType as 'text' | 'image' | 'video' | 'audio' | 'file') || 'text',
+        type:
+          (m.mediaType as
+            | 'text'
+            | 'image'
+            | 'video'
+            | 'audio'
+            | 'file'
+            | 'catalog'
+            | 'catalog_message') || 'text',
         from: (m.isFromPage ? 'business' : 'customer') as 'business' | 'customer',
         text: m.message,
         timestamp: m.createdTime,
@@ -210,6 +219,7 @@ function ChatsPage() {
   const [whatsappConfigOpen, setWhatsappConfigOpen] = useState(false)
   const [catalogLinkOpen, setCatalogLinkOpen] = useState(false)
   const [productSendOpen, setProductSendOpen] = useState(false)
+  const [catalogSendOpen, setCatalogSendOpen] = useState(false)
 
   // ─── Agents query: check if any agent covers the current provider ───
   const agentsQuery = usePersistedQuery<Agent[]>({
@@ -630,9 +640,10 @@ function ChatsPage() {
   const handleSendProducts = async (data: {
     productRetailerIds: string[]
     catalogId: string
-    format: 'product' | 'product_list'
+    format: 'product' | 'product_list' | 'carousel' | 'catalog_message'
     headerText?: string
     bodyText?: string
+    footerText?: string
   }) => {
     if (!search.conv) return
     const convId = search.conv
@@ -835,6 +846,7 @@ function ChatsPage() {
         socialAccountId={currentAccount?.id}
         hasCatalogForProducts={!!linkedCatalog}
         onProductClick={() => setProductSendOpen(true)}
+        onCatalogClick={() => setCatalogSendOpen(true)}
       />
       {id === 'whatsapp' && currentAccount && (
         <>
@@ -865,12 +877,20 @@ function ChatsPage() {
             catalogs={catalogsQuery.data || []}
           />
           {linkedCatalog && (
-            <ProductSendModal
-              open={productSendOpen}
-              onClose={() => setProductSendOpen(false)}
-              catalog={linkedCatalog}
-              onSend={handleSendProducts}
-            />
+            <>
+              <ProductSendModal
+                open={productSendOpen}
+                onClose={() => setProductSendOpen(false)}
+                catalog={linkedCatalog}
+                onSend={handleSendProducts}
+              />
+              <CatalogSendModal
+                open={catalogSendOpen}
+                onClose={() => setCatalogSendOpen(false)}
+                catalog={linkedCatalog}
+                onSend={handleSendProducts}
+              />
+            </>
           )}
         </>
       )}

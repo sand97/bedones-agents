@@ -1,7 +1,17 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Input, Popover, message } from 'antd'
-import { Send, Mic, Paperclip, FileText, Video, ImageIcon, X, ShoppingBag } from 'lucide-react'
+import {
+  Send,
+  Mic,
+  Paperclip,
+  FileText,
+  Video,
+  ImageIcon,
+  X,
+  ShoppingBag,
+  Store,
+} from 'lucide-react'
 import { AudioRecorder } from './audio-recorder'
 import type { Message } from './mock-data'
 
@@ -34,12 +44,14 @@ function AttachmentPopover({
   provider,
   hasCatalog,
   onProductClick,
+  onCatalogClick,
 }: {
   children: React.ReactNode
   onSelectFiles: (files: FileList, type: MediaType) => void
   provider?: string
   hasCatalog?: boolean
   onProductClick?: () => void
+  onCatalogClick?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const { t } = useTranslation()
@@ -92,6 +104,20 @@ function AttachmentPopover({
             onClick: () => {
               setOpen(false)
               onProductClick()
+            },
+          },
+        ]
+      : []),
+    ...(provider === 'whatsapp' && hasCatalog && onCatalogClick
+      ? [
+          {
+            icon: <Store size={18} />,
+            label: t('chat.send_catalog'),
+            color: 'text-pink-500',
+            bgColor: 'bg-pink-50',
+            onClick: () => {
+              setOpen(false)
+              onCatalogClick()
             },
           },
         ]
@@ -168,6 +194,7 @@ export function ChatInput({
   onCancelReply,
   hasCatalog,
   onProductClick,
+  onCatalogClick,
 }: {
   onSend?: (
     message: string,
@@ -179,6 +206,7 @@ export function ChatInput({
   onCancelReply?: () => void
   hasCatalog?: boolean
   onProductClick?: () => void
+  onCatalogClick?: () => void
 }) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<InputMode>('text')
@@ -264,6 +292,7 @@ export function ChatInput({
           provider={provider}
           hasCatalog={hasCatalog}
           onProductClick={onProductClick}
+          onCatalogClick={onCatalogClick}
         >
           <Button
             type="text"

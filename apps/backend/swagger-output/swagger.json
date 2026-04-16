@@ -3901,7 +3901,7 @@
             "type": "string"
           },
           "productRetailerIds": {
-            "description": "Retailer IDs of products to send",
+            "description": "Retailer IDs of products to send. Ignored when format is \"catalog_message\" except for thumbnail (first ID).",
             "type": "array",
             "items": {
               "type": "string"
@@ -3915,9 +3915,11 @@
             "type": "string",
             "enum": [
               "product",
-              "product_list"
+              "product_list",
+              "carousel",
+              "catalog_message"
             ],
-            "description": "Single product or multi-product list"
+            "description": "Message format: \"product\" (single, loops if multiple IDs), \"product_list\" (sectioned list), \"carousel\" (swipeable cards), \"catalog_message\" (catalog CTA)"
           },
           "headerText": {
             "type": "string",
@@ -3926,6 +3928,10 @@
           "bodyText": {
             "type": "string",
             "description": "Body text accompanying the products"
+          },
+          "footerText": {
+            "type": "string",
+            "description": "Footer text (catalog_message only)"
           }
         },
         "required": [

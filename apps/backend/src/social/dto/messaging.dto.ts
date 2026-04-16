@@ -128,23 +128,31 @@ export class SendProductMessageDto {
   @ApiProperty()
   conversationId: string
 
-  @ApiProperty({ description: 'Retailer IDs of products to send', type: [String] })
+  @ApiProperty({
+    description:
+      'Retailer IDs of products to send. Ignored when format is "catalog_message" except for thumbnail (first ID).',
+    type: [String],
+  })
   productRetailerIds: string[]
 
   @ApiProperty({ description: 'Meta catalog ID linked to the WhatsApp number' })
   catalogId: string
 
   @ApiProperty({
-    enum: ['product', 'product_list'],
-    description: 'Single product or multi-product list',
+    enum: ['product', 'product_list', 'carousel', 'catalog_message'],
+    description:
+      'Message format: "product" (single, loops if multiple IDs), "product_list" (sectioned list), "carousel" (swipeable cards), "catalog_message" (catalog CTA)',
   })
-  format: 'product' | 'product_list'
+  format: 'product' | 'product_list' | 'carousel' | 'catalog_message'
 
   @ApiPropertyOptional({ description: 'Header text for product list messages' })
   headerText?: string
 
   @ApiPropertyOptional({ description: 'Body text accompanying the products' })
   bodyText?: string
+
+  @ApiPropertyOptional({ description: 'Footer text (catalog_message only)' })
+  footerText?: string
 }
 
 export class MarkConversationReadDto {
