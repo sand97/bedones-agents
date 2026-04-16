@@ -1,13 +1,21 @@
-import i18n from '@app/i18n'
+import { useEffect, useState } from 'react'
+import i18n, { loadCategoriesNamespace } from '@app/i18n'
+
+// Kick off the lazy load as soon as anything from this module is imported,
+// so translations are ready (or close to ready) by the time the UI renders.
+void loadCategoriesNamespace()
+
+type CategoryTFunction = (key: string) => string
 
 /**
- * Resolve a Google Product Category numeric ID to a translated label.
- * Meta uses these IDs in the `category` field of product catalogs.
+ * Google Product Categories mapping.
+ * Meta stores the numeric ID in the `google_product_category` field.
  * Full taxonomy: https://support.google.com/merchants/answer/6324436
  *
- * Returns the translated label or the raw ID if unknown.
+ * Label translations live in `apps/frontend/src/app/i18n/locales/categories.{fr,en}.json`
+ * and are loaded lazily via `loadCategoriesNamespace()`.
  */
-const CATEGORY_KEYS: Record<string, string> = {
+export const CATEGORY_KEYS: Record<string, string> = {
   // Top-level
   '1': 'animals_pet_supplies',
   '8': 'arts_entertainment',
@@ -59,9 +67,60 @@ const CATEGORY_KEYS: Record<string, string> = {
   '486': 'haircare',
 }
 
-export function resolveCategory(categoryId?: string): string {
+function translate(t: CategoryTFunction | undefined, key: string): string {
+  if (!t) return i18n.t(key, { ns: 'categories' })
+  return t(key)
+}
+
+/**
+ * Resolve a Google Product Category numeric ID to a translated label.
+ * Falls back to the raw value for legacy free-text categories.
+ *
+ * Pass the `t` returned by `useTranslation('categories')` when calling from
+ * a component to ensure re-render when the namespace finishes loading.
+ */
+export function resolveCategory(categoryId?: string, t?: CategoryTFunction): string {
   if (!categoryId) return ''
   const key = CATEGORY_KEYS[categoryId]
   if (!key) return categoryId
-  return i18n.t(`product_categories.${key}`)
+  return translate(t, key)
+}
+
+/**
+ * Build Select options from the Google category mapping.
+ * Value = numeric Google ID, label = translated name.
+ * Duplicate labels are deduped.
+ */
+export function getCategoryOptions(
+  t: (key: string) => string,
+): Array<{ value: string; label: string }> {
+  const seen = new Set<string>()
+  const options: Array<{ value: string; label: string }> = []
+  for (const [id, key] of Object.entries(CATEGORY_KEYS)) {
+    if (seen.has(key)) continue
+    seen.add(key)
+    options.push({ value: id, label: t(key) })
+  }
+  return options.sort((a, b) => a.label.localeCompare(b.label))
+}
+
+/**
+ * Ensures the `categories` i18n namespace is loaded, returning `true` when ready.
+ * Triggers the dynamic import once; subsequent calls resolve immediately.
+ */
+export function useCategoriesReady(): boolean {
+  const [ready, setReady] = useState(
+    () => i18n.hasResourceBundle('fr', 'categories') && i18n.hasResourceBundle('en', 'categories'),
+  )
+  useEffect(() => {
+    if (ready) return
+    let cancelled = false
+    loadCategoriesNamespace().then(() => {
+      if (!cancelled) setReady(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [ready])
+  return ready
 }

@@ -39,4 +39,26 @@ i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false },
 })
 
+/**
+ * Lazy-load the `categories` namespace (Google Product Categories).
+ * Translations are split into their own chunk to keep the main bundle lean.
+ * Safe to call multiple times — the promise is cached and resolves immediately
+ * if the bundle is already present.
+ */
+let categoriesPromise: Promise<void> | null = null
+export function loadCategoriesNamespace(): Promise<void> {
+  if (i18n.hasResourceBundle('fr', 'categories') && i18n.hasResourceBundle('en', 'categories')) {
+    return Promise.resolve()
+  }
+  if (categoriesPromise) return categoriesPromise
+  categoriesPromise = Promise.all([
+    import('./locales/categories.fr.json'),
+    import('./locales/categories.en.json'),
+  ]).then(([frCat, enCat]) => {
+    i18n.addResourceBundle('fr', 'categories', frCat.default, true, true)
+    i18n.addResourceBundle('en', 'categories', enCat.default, true, true)
+  })
+  return categoriesPromise
+}
+
 export default i18n

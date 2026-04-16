@@ -32,6 +32,11 @@ import {
   type TicketStatusItem,
   type SocialAccount,
 } from '@app/lib/api/agent-api'
+import {
+  prependListItemCache,
+  removeListItemCache,
+  updateListItemCache,
+} from '@app/lib/query-cache'
 
 dayjs.locale('fr')
 
@@ -182,8 +187,8 @@ function TicketsPage() {
         conversationId: submitData.conversationId,
         metadata: submitData.metadata,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets', orgSlug] })
+    onSuccess: (ticket) => {
+      prependListItemCache<Ticket, 'tickets'>(queryClient, ['tickets', orgSlug], 'tickets', ticket)
       setCreateOpen(false)
       setSelectedArticles([])
     },
@@ -196,17 +201,20 @@ function TicketsPage() {
         description: data.description,
         metadata: data.metadata,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets', orgSlug] })
+    onSuccess: (ticket) => {
+      updateListItemCache<Ticket, 'tickets'>(queryClient, ['tickets', orgSlug], 'tickets', ticket)
       message.success(t('tickets.updated'))
       handleCloseModal()
     },
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => ticketApi.remove(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets', orgSlug] })
+    mutationFn: async (id: string) => {
+      await ticketApi.remove(id)
+      return id
+    },
+    onSuccess: (id) => {
+      removeListItemCache<Ticket, 'tickets'>(queryClient, ['tickets', orgSlug], 'tickets', id)
       message.success(t('common.delete'))
     },
   })

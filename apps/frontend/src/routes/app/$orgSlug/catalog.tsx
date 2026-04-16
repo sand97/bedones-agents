@@ -26,7 +26,15 @@ import { AccountSwitcher } from '@app/components/social/account-switcher'
 import { useLayout } from '@app/contexts/layout-context'
 import { catalogApi } from '@app/lib/api/agent-api'
 import { setAuthRedirect, buildFacebookOAuthUrl } from '@app/lib/auth-redirect'
-import type { Product } from '@app/lib/api/agent-api'
+import type { Product, Collection } from '@app/lib/api/agent-api'
+import {
+  prependDirectListCache,
+  prependListItemCache,
+  removeDirectListCache,
+  removeListItemCache,
+  updateDirectListCache,
+  updateListItemCache,
+} from '@app/lib/query-cache'
 
 export const Route = createFileRoute('/app/$orgSlug/catalog')({
   component: CatalogPage,
@@ -156,65 +164,143 @@ function CatalogPage() {
 
   // Product mutations
   const createProductMutation = useMutation({
-    mutationFn: (data: Parameters<typeof catalogApi.createProduct>[1]) =>
-      selectedCatalog ? catalogApi.createProduct(selectedCatalog.id, data) : Promise.reject(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['catalog-products', selectedCatalog?.id] })
+    mutationFn: async (data: Parameters<typeof catalogApi.createProduct>[1]) => {
+      if (!selectedCatalog) throw new Error('No catalog selected')
+      const result = await catalogApi.createProduct(selectedCatalog.id, data)
+      return { result, data }
+    },
+    onSuccess: ({ result, data }) => {
+      if (!selectedCatalog) return
+      // Meta create returns only { id }. Construct an optimistic Product from the DTO.
+      const optimistic: Product = {
+        id: (result as unknown as { id: string }).id,
+        name: data.name,
+        description: data.description,
+        imageUrl: data.imageUrl,
+        additionalImageUrls: data.additionalImageUrls,
+        price: data.price ? Number(data.price) : undefined,
+        currency: data.currency,
+        category: data.category,
+        url: data.url,
+        availability: data.availability,
+        brand: data.brand,
+        condition: data.condition,
+        status: 'pending',
+        needsIndexing: true,
+        collectionId: data.collectionId,
+      }
+      prependListItemCache<Product, 'products'>(
+        queryClient,
+        ['catalog-products', selectedCatalog.id],
+        'products',
+        optimistic,
+      )
       setModalProductConfig({ isOpen: false })
     },
   })
 
   const updateProductMutation = useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       productId,
       data,
     }: {
       productId: string
       data: Parameters<typeof catalogApi.updateProduct>[2]
-    }) =>
-      selectedCatalog
-        ? catalogApi.updateProduct(selectedCatalog.id, productId, data)
-        : Promise.reject(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['catalog-products', selectedCatalog?.id] })
+    }) => {
+      if (!selectedCatalog) throw new Error('No catalog selected')
+      await catalogApi.updateProduct(selectedCatalog.id, productId, data)
+      return { productId, data }
+    },
+    onSuccess: ({ productId, data }) => {
+      if (!selectedCatalog) return
+      const patch: Partial<Product> & { id: string } = {
+        id: productId,
+        ...data,
+        price: data.price ? Number(data.price) : undefined,
+      }
+      updateListItemCache<Product, 'products'>(
+        queryClient,
+        ['catalog-products', selectedCatalog.id],
+        'products',
+        patch,
+      )
       setModalProductConfig({ isOpen: false })
     },
   })
 
   const deleteProductMutation = useMutation({
-    mutationFn: (productId: string) =>
-      selectedCatalog ? catalogApi.deleteProduct(selectedCatalog.id, productId) : Promise.reject(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['catalog-products', selectedCatalog?.id] })
+    mutationFn: async (productId: string) => {
+      if (!selectedCatalog) throw new Error('No catalog selected')
+      await catalogApi.deleteProduct(selectedCatalog.id, productId)
+      return productId
+    },
+    onSuccess: (productId) => {
+      if (!selectedCatalog) return
+      removeListItemCache<Product, 'products'>(
+        queryClient,
+        ['catalog-products', selectedCatalog.id],
+        'products',
+        productId,
+      )
     },
   })
 
   // Collection mutations
   const createCollectionMutation = useMutation({
-    mutationFn: (data: { name: string }) =>
-      selectedCatalog ? catalogApi.createCollection(selectedCatalog.id, data) : Promise.reject(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['catalog-collections', selectedCatalog?.id] })
+    mutationFn: async (data: { name: string }) => {
+      if (!selectedCatalog) throw new Error('No catalog selected')
+      const result = await catalogApi.createCollection(selectedCatalog.id, data)
+      return { result, data }
+    },
+    onSuccess: ({ result, data }) => {
+      if (!selectedCatalog) return
+      const optimistic: Collection = {
+        id: (result as unknown as { id: string }).id,
+        name: data.name,
+        product_count: 0,
+      }
+      prependDirectListCache<Collection>(
+        queryClient,
+        ['catalog-collections', selectedCatalog.id],
+        optimistic,
+      )
     },
   })
 
   const updateCollectionMutation = useMutation({
-    mutationFn: ({ collectionId, data }: { collectionId: string; data: { name?: string } }) =>
-      selectedCatalog
-        ? catalogApi.updateCollection(selectedCatalog.id, collectionId, data)
-        : Promise.reject(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['catalog-collections', selectedCatalog?.id] })
+    mutationFn: async ({
+      collectionId,
+      data,
+    }: {
+      collectionId: string
+      data: { name?: string }
+    }) => {
+      if (!selectedCatalog) throw new Error('No catalog selected')
+      await catalogApi.updateCollection(selectedCatalog.id, collectionId, data)
+      return { collectionId, data }
+    },
+    onSuccess: ({ collectionId, data }) => {
+      if (!selectedCatalog) return
+      updateDirectListCache<Collection>(queryClient, ['catalog-collections', selectedCatalog.id], {
+        id: collectionId,
+        ...data,
+      })
     },
   })
 
   const deleteCollectionMutation = useMutation({
-    mutationFn: (collectionId: string) =>
-      selectedCatalog
-        ? catalogApi.deleteCollection(selectedCatalog.id, collectionId)
-        : Promise.reject(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['catalog-collections', selectedCatalog?.id] })
+    mutationFn: async (collectionId: string) => {
+      if (!selectedCatalog) throw new Error('No catalog selected')
+      await catalogApi.deleteCollection(selectedCatalog.id, collectionId)
+      return collectionId
+    },
+    onSuccess: (collectionId) => {
+      if (!selectedCatalog) return
+      removeDirectListCache<Collection>(
+        queryClient,
+        ['catalog-collections', selectedCatalog.id],
+        collectionId,
+      )
     },
   })
 

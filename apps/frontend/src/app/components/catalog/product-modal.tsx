@@ -1,19 +1,10 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  Modal,
-  Form,
-  Input,
-  InputNumber,
-  Select,
-  Upload,
-  AutoComplete,
-  Button,
-  message,
-} from 'antd'
+import { Modal, Form, Input, InputNumber, Select, Upload, Button, message } from 'antd'
 import { X } from 'lucide-react'
 import { uploadChatMedia } from '@app/lib/api'
 import type { Product, Collection } from '@app/lib/api/agent-api'
+import { getCategoryOptions } from '@app/lib/product-categories'
 
 /** Normalize currency aliases to ISO 4217 */
 function normalizeCurrency(c?: string): string {
@@ -22,24 +13,6 @@ function normalizeCurrency(c?: string): string {
   if (upper === 'FCFA' || upper === 'CFA') return 'XAF'
   return upper
 }
-
-/** Common Google Product Categories used in catalogs */
-const CATEGORY_SUGGESTIONS = [
-  'Robes',
-  'Ensembles',
-  'Chemises',
-  'Accessoires',
-  'Chaussures',
-  'Bijoux',
-  'Sacs',
-  'Pantalons',
-  'Jupes',
-  'Vêtements enfant',
-  'Cosmétiques',
-  'Alimentation',
-  'Électronique',
-  'Maison & Décoration',
-]
 
 const CURRENCY_OPTIONS = [
   { value: 'XAF', label: 'XAF (FCFA)' },
@@ -138,6 +111,7 @@ interface ProductModalContentProps {
 const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalContentProps>(
   function ProductModalContent({ onSubmit, product, collections, onUploadingChange }, ref) {
     const { t } = useTranslation()
+    const { t: tCat } = useTranslation('categories')
     const [form] = Form.useForm()
     const currency = Form.useWatch('currency', form) as string | undefined
     const [uploading, setUploading] = useState(false)
@@ -238,7 +212,7 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
 
     useImperativeHandle(ref, () => ({ submit: handleSubmit }), [handleSubmit])
 
-    const categoryOptions = CATEGORY_SUGGESTIONS.map((c) => ({ value: c }))
+    const categoryOptions = getCategoryOptions(tCat)
 
     return (
       <>
@@ -338,11 +312,13 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
 
           <div className="flex gap-4">
             <Form.Item name="category" label={t('catalog.category')} className="flex-1">
-              <AutoComplete
+              <Select
+                showSearch
+                allowClear
                 options={categoryOptions}
                 placeholder={t('catalog.category_placeholder')}
                 filterOption={(input, option) =>
-                  (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                 }
               />
             </Form.Item>

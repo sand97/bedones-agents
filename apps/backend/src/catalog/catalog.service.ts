@@ -10,7 +10,6 @@ import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { EncryptionService } from '../auth/encryption.service'
-import { resolveGoogleCategory } from './google-product-categories'
 
 @Injectable()
 export class CatalogService {
@@ -110,7 +109,7 @@ export class CatalogService {
   // ─── Meta Product Fields ───
 
   private static readonly META_PRODUCT_FIELDS =
-    'id,retailer_id,name,description,image_url,additional_image_urls,price,currency,category,product_type,url,availability,brand,condition,inventory,review_status,product_sets{id,name}'
+    'id,retailer_id,name,description,image_url,additional_image_urls,price,currency,category,google_product_category,product_type,url,availability,brand,condition,inventory,review_status,product_sets{id,name}'
 
   /**
    * Parse Meta price format like "FCFA10,000" or "1999 XAF" or "$25.99"
@@ -149,9 +148,12 @@ export class CatalogService {
         : [],
       price: priceInfo?.amount ?? null,
       currency: priceInfo?.currency ?? 'XAF',
+      // Prefer the numeric Google Product Category id (so the frontend can
+      // localize) and fall back to the free-text product_type for legacy products.
       category:
-        (p.product_type as string) ||
-        (p.category ? resolveGoogleCategory(String(p.category)) : undefined),
+        (p.google_product_category as string | undefined) ||
+        (p.category as string | undefined) ||
+        (p.product_type as string | undefined),
       url: p.url,
       availability: p.availability,
       brand: p.brand,
@@ -405,7 +407,12 @@ export class CatalogService {
     if (data.url) body.url = data.url
     if (data.availability) body.availability = data.availability
     if (data.brand) body.brand = data.brand
-    if (data.category) body.product_type = data.category
+    if (data.category) {
+      // `category` is the Google Product Category numeric ID (e.g. "5344").
+      // Meta accepts it as `google_product_category` and auto-fills product_type
+      // with the resolved label.
+      body.google_product_category = data.category
+    }
     if (data.condition) body.condition = data.condition
 
     const response = await fetch(`${this.META_API_BASE}/${providerId}/products`, {
@@ -478,7 +485,9 @@ export class CatalogService {
     if (data.url) productData.url = data.url
     if (data.availability) productData.availability = data.availability
     if (data.brand) productData.brand = data.brand
-    if (data.category) productData.product_type = data.category
+    if (data.category) {
+      productData.google_product_category = data.category
+    }
     if (data.condition) productData.condition = data.condition
 
     const response = await fetch(`${this.META_API_BASE}/${productId}`, {

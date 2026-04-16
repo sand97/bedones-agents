@@ -17,6 +17,11 @@ import {
 import { usePromotionColumns } from '@app/components/promotions/promotion-columns'
 import { promotionApi, catalogApi, type PromotionItem } from '@app/lib/api/agent-api'
 import type { PromotionSubmitData } from '@app/components/promotions/create-promotion-modal'
+import {
+  prependListItemCache,
+  removeListItemCache,
+  updateListItemCache,
+} from '@app/lib/query-cache'
 
 export const Route = createFileRoute('/app/$orgSlug/promotions')({
   component: PromotionsPage,
@@ -84,9 +89,19 @@ function PromotionsPage() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => promotionApi.remove(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['promotions', orgSlug] })
+    mutationFn: async (id: string) => {
+      await promotionApi.remove(id)
+      return id
+    },
+    onSuccess: (id) => {
+      removeListItemCache<PromotionItem, 'promotions'>(
+        queryClient,
+        ['promotions', orgSlug],
+        'promotions',
+        id,
+      )
+      // Ticket page uses a separate query for the active promotion dropdown
+      queryClient.invalidateQueries({ queryKey: ['promotions-for-ticket', orgSlug] })
       message.success(t('common.delete'))
     },
   })
@@ -104,8 +119,14 @@ function PromotionsPage() {
         productIds: data.productIds,
         stackable: data.stackable,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['promotions', orgSlug] })
+    onSuccess: (promotion) => {
+      prependListItemCache<PromotionItem, 'promotions'>(
+        queryClient,
+        ['promotions', orgSlug],
+        'promotions',
+        promotion,
+      )
+      queryClient.invalidateQueries({ queryKey: ['promotions-for-ticket', orgSlug] })
       message.success(t('promotions.created'))
       handleCloseModal()
     },
@@ -123,8 +144,14 @@ function PromotionsPage() {
         productIds: data.productIds,
         stackable: data.stackable,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['promotions', orgSlug] })
+    onSuccess: (promotion) => {
+      updateListItemCache<PromotionItem, 'promotions'>(
+        queryClient,
+        ['promotions', orgSlug],
+        'promotions',
+        promotion,
+      )
+      queryClient.invalidateQueries({ queryKey: ['promotions-for-ticket', orgSlug] })
       message.success(t('promotions.updated'))
       handleCloseModal()
     },

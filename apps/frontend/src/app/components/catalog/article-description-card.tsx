@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Descriptions } from 'antd'
 import { StatusTag } from '@app/components/shared/status-tag'
 import { formatPrice } from '@app/lib/format'
+import { resolveCategory } from '@app/lib/product-categories'
 import { CATALOG_STATUS_CONFIG, type CatalogArticle } from '@app/components/whatsapp/mock-data'
 
 interface ArticleDescriptionCardProps {
@@ -12,6 +13,7 @@ interface ArticleDescriptionCardProps {
 
 export function ArticleDescriptionCard({ article, actions }: ArticleDescriptionCardProps) {
   const { t } = useTranslation()
+  const { t: tCat } = useTranslation('categories')
   const statusConfig = CATALOG_STATUS_CONFIG[article.status]
   return (
     <div className="catalog-card">
@@ -36,7 +38,7 @@ export function ArticleDescriptionCard({ article, actions }: ArticleDescriptionC
           <StatusTag label={t(statusConfig.labelKey)} color={statusConfig.color} />
         </Descriptions.Item>
         <Descriptions.Item label={t('catalog.category')}>
-          <span className="text-text-secondary">{article.category}</span>
+          <span className="text-text-secondary">{resolveCategory(article.category, tCat)}</span>
         </Descriptions.Item>
         {article.collection && (
           <Descriptions.Item label={t('catalog.collection')}>
