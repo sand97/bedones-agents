@@ -14,6 +14,7 @@ import { catalogApi, type Catalog } from '@app/lib/api/agent-api'
 
 export interface PickerProduct {
   id: string
+  retailerId?: string
   name: string
   description: string
   imageUrl: string
@@ -70,6 +71,7 @@ export function ProductPickerModal({
     if (!productsQuery.data?.products) return []
     return productsQuery.data.products.map((p) => ({
       id: p.id,
+      retailerId: p.retailerId,
       name: p.name,
       description: p.description || '',
       imageUrl: p.imageUrl || '',
@@ -116,6 +118,7 @@ export function ProductPickerModal({
         .filter((a) => selectedIds.has(a.id))
         .map((a) => ({
           id: a.id,
+          retailerId: 'retailerId' in a ? (a.retailerId as string | undefined) : undefined,
           name: a.name,
           description: a.description,
           imageUrl: a.imageUrl,

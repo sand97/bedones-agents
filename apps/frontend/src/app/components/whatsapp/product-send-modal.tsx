@@ -61,7 +61,7 @@ export function ProductSendModal({ open, onClose, catalog, onSend }: ProductSend
     setSending(true)
     try {
       await onSend({
-        productRetailerIds: selectedProducts.map((p) => p.id),
+        productRetailerIds: selectedProducts.map((p) => p.retailerId || p.id),
         catalogId: catalog.providerId || catalog.id,
         format,
         headerText: format === 'product_list' ? headerText || undefined : undefined,
