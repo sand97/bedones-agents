@@ -21,9 +21,10 @@ export class OcrService {
 
       this.logger.debug(`OCR completed. Extracted ${text.length} characters`)
       return text.trim()
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error('Error during OCR text extraction:', error)
-      throw new Error(`OCR extraction failed: ${error.message}`, { cause: error })
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      throw new Error(`OCR extraction failed: ${message}`, { cause: error })
     }
   }
 }

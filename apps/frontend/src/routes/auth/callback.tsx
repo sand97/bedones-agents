@@ -75,9 +75,12 @@ function AuthCallbackPage() {
         .then(() => {
           clearAuthRedirect()
           if (returnPath) {
-            navigate({ to: returnPath } as any)
+            navigate({ to: returnPath } as never)
           } else {
-            navigate({ to: '/app/$orgSlug/dashboard', params: { orgSlug: redirect.orgId! } } as any)
+            navigate({
+              to: '/app/$orgSlug/dashboard',
+              params: { orgSlug: redirect.orgId! },
+            } as never)
           }
         })
         .catch((err) => {
@@ -93,7 +96,7 @@ function AuthCallbackPage() {
       clearAuthRedirect()
       navigate({
         to: '/create-organisation',
-        search: redirect.step ? { step: redirect.step } : undefined,
+        search: { step: redirect.step },
       })
       return
     }
@@ -107,7 +110,7 @@ function AuthCallbackPage() {
           if (redirect?.intent === 'onboarding') {
             navigate({
               to: '/create-organisation',
-              search: redirect.step ? { step: redirect.step } : undefined,
+              search: { step: redirect.step },
             })
             return
           }
@@ -119,9 +122,9 @@ function AuthCallbackPage() {
               params: { orgSlug: orgWithSocial.id },
             })
           } else if (data.organisations.length > 0) {
-            navigate({ to: '/create-organisation' })
+            navigate({ to: '/create-organisation', search: { step: undefined } })
           } else {
-            navigate({ to: '/create-organisation' })
+            navigate({ to: '/create-organisation', search: { step: undefined } })
           }
         })
         .catch(() => {
@@ -145,7 +148,9 @@ function AuthCallbackPage() {
           extra={
             <Button
               type="primary"
-              onClick={() => navigate(returnTo ? ({ to: returnTo } as any) : { to: '/auth/login' })}
+              onClick={() =>
+                navigate(returnTo ? ({ to: returnTo } as never) : { to: '/auth/login' })
+              }
             >
               {returnTo ? t('common.go_back') : t('auth.back_to_login')}
             </Button>

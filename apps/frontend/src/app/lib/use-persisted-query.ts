@@ -1,7 +1,20 @@
 import { useEffect } from 'react'
-import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
+import {
+  useQuery,
+  type UseQueryResult,
+  type QueryKey,
+  type QueryFunction,
+} from '@tanstack/react-query'
 
 const STORAGE_PREFIX = 'rq_cache:'
+
+interface PersistedQueryOptions<T> {
+  queryKey: QueryKey
+  queryFn: QueryFunction<T>
+  enabled?: boolean
+  staleTime?: number
+  gcTime?: number
+}
 
 /**
  * A useQuery wrapper that persists data in localStorage.
@@ -10,24 +23,27 @@ const STORAGE_PREFIX = 'rq_cache:'
  *
  * This avoids visual glitches on page refresh for data that rarely changes.
  */
-export function usePersistedQuery<T>(options: UseQueryOptions<T>) {
+export function usePersistedQuery<T>(options: PersistedQueryOptions<T>): UseQueryResult<T> {
   const storageKey = `${STORAGE_PREFIX}${JSON.stringify(options.queryKey)}`
 
   // Read cached data from localStorage (sync, before render)
-  let placeholderData: T | undefined
+  let cached: T | undefined
   try {
     const raw = localStorage.getItem(storageKey)
-    if (raw) placeholderData = JSON.parse(raw) as T
+    if (raw) cached = JSON.parse(raw) as T
   } catch {
     // ignore parse errors
   }
 
-  const query = useQuery<T>({
-    ...options,
-    placeholderData: options.placeholderData ?? placeholderData,
+  const query = useQuery({
+    queryKey: options.queryKey,
+    queryFn: options.queryFn,
+    enabled: options.enabled,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    placeholderData: cached as any,
     staleTime: options.staleTime ?? 60_000,
     gcTime: options.gcTime ?? Infinity,
-  })
+  }) as UseQueryResult<T>
 
   // Persist fresh data to localStorage
   useEffect(() => {

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Button, Drawer, Popover, Tag, Tooltip } from 'antd'
 import { ArrowLeft, Eye, Pencil, User, MessageSquare } from 'lucide-react'
 import dayjs from 'dayjs'
-import type { TicketActivity, TicketActivityDiff, TicketItem } from './mock-data'
+import type { TicketActivity, TicketActivityDiff, TicketItem, TicketStatus } from './mock-data'
 import { TICKET_STATUS_CONFIG } from './mock-data'
 import { ArticleListItem } from '@app/components/catalog/article-list-item'
 
@@ -29,12 +29,12 @@ interface TicketMetadata {
   grandTotal?: number
 }
 
-/** Real API ticket shape (activities use createdAt, status is an object) */
-interface RealTicket {
+/** API-compatible ticket shape (activities use createdAt, status can be object or string) */
+export interface RealTicket {
   id: string
   title: string
   description?: string
-  status?: { id: string; name: string; color: string } | null
+  status?: { id: string; name: string; color: string } | string | null
   priority?: string
   contactName?: string
   contactId?: string
@@ -236,13 +236,16 @@ export function TicketDrawer({
   if (!ticket) return null
 
   // Support both real API shape (status object) and mock shape (status string)
-  const statusConfig =
-    typeof ticket.status === 'object' && ticket.status
-      ? { label: ticket.status.name, color: ticket.status.color }
-      : TICKET_STATUS_CONFIG[(ticket as Record<string, unknown>).status as string] || {
-          label: 'N/A',
-          color: '#999',
-        }
+  const statusConfig = (() => {
+    if (typeof ticket.status === 'object' && ticket.status) {
+      return { label: ticket.status.name, color: ticket.status.color }
+    }
+    const statusKey = ticket.status as TicketStatus | undefined
+    if (statusKey && statusKey in TICKET_STATUS_CONFIG) {
+      return TICKET_STATUS_CONFIG[statusKey]
+    }
+    return { label: 'N/A', color: '#999' }
+  })()
 
   // Normalize activities: API uses `createdAt`, mock uses `timestamp`
   const rawActivities = (ticket.activities ||

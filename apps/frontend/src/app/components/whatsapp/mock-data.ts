@@ -861,6 +861,7 @@ export interface Promotion {
   name: string
   type: 'percent' | 'fixed'
   value: number
+  productIds?: string[]
 }
 
 export const MOCK_PROMOTIONS: Promotion[] = [

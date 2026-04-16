@@ -935,6 +935,232 @@ export class MessagingService {
     })
   }
 
+  // ─── WhatsApp Product Message ───
+
+  async sendProductMessage(
+    userId: string,
+    conversationId: string,
+    productRetailerIds: string[],
+    catalogId: string,
+    format: 'product' | 'product_list',
+    headerText?: string,
+    bodyText?: string,
+  ) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        socialAccount: {
+          select: {
+            id: true,
+            provider: true,
+            providerAccountId: true,
+            organisationId: true,
+            scopes: true,
+          },
+        },
+      },
+    })
+    if (!conversation) throw new NotFoundException('Conversation not found')
+    await this.assertMembership(userId, conversation.socialAccount.organisationId)
+    this.assertScope(conversation.socialAccount.scopes, 'messages')
+
+    if (conversation.socialAccount.provider !== 'WHATSAPP') {
+      throw new BadRequestException('Product messages are only supported on WhatsApp')
+    }
+
+    const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
+
+    const platformMsgId = await this.sendWhatsAppProductMessage(
+      conversation.socialAccount.providerAccountId,
+      conversation.participantId,
+      accessToken,
+      productRetailerIds,
+      catalogId,
+      format,
+      headerText,
+      bodyText,
+    )
+
+    const displayText = `[${productRetailerIds.length} product(s)]`
+
+    const savedMessage = await this.prisma.directMessage.create({
+      data: {
+        conversationId,
+        platformMsgId,
+        message: displayText,
+        senderId: conversation.socialAccount.providerAccountId,
+        senderName: 'Page',
+        isFromPage: true,
+        isRead: true,
+        mediaType: 'catalog',
+        deliveryStatus: 'sent',
+        createdTime: new Date(),
+      },
+    })
+
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        lastMessageText: displayText,
+        lastMessageAt: new Date(),
+      },
+    })
+
+    return savedMessage
+  }
+
+  // ─── Send product message as AI agent (no user auth check) ───
+
+  async sendProductMessageAsAgent(
+    conversationId: string,
+    productRetailerIds: string[],
+    catalogId: string,
+    format: 'product' | 'product_list',
+    headerText?: string,
+    bodyText?: string,
+  ): Promise<{ id: string; message: string }> {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        socialAccount: {
+          select: {
+            id: true,
+            provider: true,
+            providerAccountId: true,
+            organisationId: true,
+          },
+        },
+      },
+    })
+    if (!conversation) throw new NotFoundException('Conversation not found')
+
+    if (conversation.socialAccount.provider !== 'WHATSAPP') {
+      throw new BadRequestException('Product messages are only supported on WhatsApp')
+    }
+
+    const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
+
+    const platformMsgId = await this.sendWhatsAppProductMessage(
+      conversation.socialAccount.providerAccountId,
+      conversation.participantId,
+      accessToken,
+      productRetailerIds,
+      catalogId,
+      format,
+      headerText,
+      bodyText,
+    )
+
+    const displayText = `[${productRetailerIds.length} product(s)]`
+
+    const savedMessage = await this.prisma.directMessage.create({
+      data: {
+        conversationId,
+        platformMsgId,
+        message: displayText,
+        senderId: conversation.socialAccount.providerAccountId,
+        senderName: 'AI Agent',
+        isFromPage: true,
+        isRead: true,
+        mediaType: 'catalog',
+        deliveryStatus: 'sent',
+        createdTime: new Date(),
+      },
+    })
+
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        lastMessageText: displayText,
+        lastMessageAt: new Date(),
+      },
+    })
+
+    return { id: savedMessage.id, message: savedMessage.message }
+  }
+
+  private async sendWhatsAppProductMessage(
+    phoneNumberId: string,
+    recipientPhone: string,
+    accessToken: string,
+    productRetailerIds: string[],
+    catalogId: string,
+    format: 'product' | 'product_list',
+    headerText?: string,
+    bodyText?: string,
+  ): Promise<string | null> {
+    const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${phoneNumberId}/messages`
+
+    let interactive: Record<string, unknown>
+
+    if (format === 'product' && productRetailerIds.length === 1) {
+      // Single product message
+      interactive = {
+        type: 'product',
+        body: { text: bodyText || '' },
+        action: {
+          catalog_id: catalogId,
+          product_retailer_id: productRetailerIds[0],
+        },
+      }
+    } else {
+      // Multi-product message (product_list)
+      interactive = {
+        type: 'product_list',
+        header: { type: 'text', text: headerText || 'Products' },
+        body: { text: bodyText || 'Here are the products:' },
+        action: {
+          catalog_id: catalogId,
+          sections: [
+            {
+              title: headerText || 'Products',
+              product_items: productRetailerIds.map((id) => ({
+                product_retailer_id: id,
+              })),
+            },
+          ],
+        },
+      }
+    }
+
+    const body = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipientPhone,
+      type: 'interactive',
+      interactive,
+    }
+
+    this.logger.log(
+      `[WhatsApp] Sending ${format} message (${productRetailerIds.length} products) to ${recipientPhone}`,
+    )
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      this.logger.error(
+        `[WhatsApp] Product send failed (${response.status})\n` +
+          `  Payload: ${JSON.stringify(body)}\n` +
+          `  Response: ${JSON.stringify(data)}`,
+      )
+      throw new BadRequestException(
+        `Failed to send WhatsApp product message: ${JSON.stringify(data?.error?.message || data)}`,
+      )
+    }
+
+    const messages = (data as { messages?: Array<{ id: string }> }).messages
+    return messages?.[0]?.id || null
+  }
+
   // ─── WhatsApp audio conversion ───
 
   /**

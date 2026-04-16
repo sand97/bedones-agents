@@ -124,6 +124,29 @@ export class SendMessageDto {
   replyToId?: string
 }
 
+export class SendProductMessageDto {
+  @ApiProperty()
+  conversationId: string
+
+  @ApiProperty({ description: 'Retailer IDs of products to send', type: [String] })
+  productRetailerIds: string[]
+
+  @ApiProperty({ description: 'Meta catalog ID linked to the WhatsApp number' })
+  catalogId: string
+
+  @ApiProperty({
+    enum: ['product', 'product_list'],
+    description: 'Single product or multi-product list',
+  })
+  format: 'product' | 'product_list'
+
+  @ApiPropertyOptional({ description: 'Header text for product list messages' })
+  headerText?: string
+
+  @ApiPropertyOptional({ description: 'Body text accompanying the products' })
+  bodyText?: string
+}
+
 export class MarkConversationReadDto {
   @ApiProperty()
   conversationId: string

@@ -12,11 +12,12 @@ import { WhatsappConfigModal } from '@app/components/whatsapp/whatsapp-config-mo
 import { CatalogLinkModal } from '@app/components/whatsapp/catalog-link-modal'
 import { AccountSwitcher, type SocialAccount } from '@app/components/social/account-switcher'
 import { ChatLayout } from '@app/components/whatsapp/chat-layout'
+import { ProductSendModal } from '@app/components/whatsapp/product-send-modal'
 import { uploadChatMedia } from '@app/lib/api'
 import { WhatsAppIcon, InstagramIcon, MessengerIcon } from '@app/components/icons/social-icons'
 import { useLayout } from '@app/contexts/layout-context'
 import { $api } from '@app/lib/api/$api'
-import { agentApi, catalogApi } from '@app/lib/api/agent-api'
+import { agentApi, catalogApi, type Agent } from '@app/lib/api/agent-api'
 import {
   setAuthRedirect,
   buildFacebookOAuthUrl,
@@ -208,9 +209,10 @@ function ChatsPage() {
   const [connecting, setConnecting] = useState(false)
   const [whatsappConfigOpen, setWhatsappConfigOpen] = useState(false)
   const [catalogLinkOpen, setCatalogLinkOpen] = useState(false)
+  const [productSendOpen, setProductSendOpen] = useState(false)
 
   // ─── Agents query: check if any agent covers the current provider ───
-  const agentsQuery = usePersistedQuery({
+  const agentsQuery = usePersistedQuery<Agent[]>({
     queryKey: ['agents', orgSlug],
     queryFn: () => agentApi.list(orgSlug),
     staleTime: 60_000,
@@ -246,7 +248,9 @@ function ChatsPage() {
   const currentAccount = accounts.find((a) => a.id === currentAccountId) || accounts[0] || null
 
   // ─── WhatsApp commerce settings query ───
-  const commerceQuery = usePersistedQuery({
+  type CommerceEntry = { is_catalog_visible: boolean; id?: string }
+  type CommerceData = { data: CommerceEntry[] }
+  const commerceQuery = usePersistedQuery<CommerceData>({
     queryKey: ['whatsapp-commerce', currentAccount?.providerAccountId],
     queryFn: () => catalogApi.getWhatsappCommerceSettings(currentAccount?.providerAccountId || ''),
     enabled: id === 'whatsapp' && !!currentAccountId && !!currentAccount,
@@ -266,6 +270,20 @@ function ChatsPage() {
     enabled: id === 'whatsapp' && !!currentAccountId,
     staleTime: 30_000,
   })
+
+  // Find the catalog linked to the current WhatsApp number (for product sending)
+  const linkedCatalog = useMemo(() => {
+    if (id !== 'whatsapp' || !currentAccount) return undefined
+    const catalogs = catalogsQuery.data || []
+    const commerceId = commerceQuery.data?.data?.find((e) => !!e.id)?.id
+    if (commerceId) {
+      // Match by Meta providerId
+      const match = catalogs.find((c) => c.providerId === String(commerceId))
+      if (match) return match
+    }
+    // Fallback: first catalog with a providerId
+    return catalogs.find((c) => !!c.providerId)
+  }, [id, currentAccount, catalogsQuery.data, commerceQuery.data])
 
   // Auto-select first account
   const setAccountInUrl = useCallback(
@@ -301,6 +319,7 @@ function ChatsPage() {
 
   // ─── Send mutation ───
   const sendMutation = $api.useMutation('post', '/messaging/send')
+  const sendProductMutation = $api.useMutation('post', '/messaging/send-products')
   const markReadMutation = $api.useMutation('post', '/messaging/mark-read')
   const syncMutation = $api.useMutation('post', '/messaging/sync/{accountId}')
 
@@ -373,11 +392,12 @@ function ChatsPage() {
 
       const displayText = msg.text || (msg.type !== 'text' ? `[${msg.type}]` : '')
       queryClient.setQueryData(conversationsKey, (old: unknown[] | undefined) =>
-        (old ?? []).map((c: Record<string, unknown>) =>
-          c.id === convId
-            ? { ...c, lastMessageText: displayText, lastMessageAt: new Date().toISOString() }
-            : c,
-        ),
+        (old ?? []).map((c) => {
+          const item = c as Record<string, unknown>
+          return item.id === convId
+            ? { ...item, lastMessageText: displayText, lastMessageAt: new Date().toISOString() }
+            : c
+        }),
       )
     },
     [queryClient, conversationsKey],
@@ -387,16 +407,17 @@ function ChatsPage() {
   const reconcileMessage = useCallback(
     (convId: string, localId: string, savedMsg: Record<string, unknown>) => {
       queryClient.setQueryData(messagesKey(convId), (old: unknown[] | undefined) =>
-        (old ?? []).map((m: Record<string, unknown>) => {
-          if (m._localId !== localId) return m
+        (old ?? []).map((m) => {
+          const msg = m as Record<string, unknown>
+          if (msg._localId !== localId) return m
           // Keep local blob URLs for image/video to avoid re-downloading the same file
           const mediaType = savedMsg.mediaType as string | undefined
           const keepLocal =
-            (mediaType === 'image' || mediaType === 'video') && typeof m.mediaUrl === 'string'
+            (mediaType === 'image' || mediaType === 'video') && typeof msg.mediaUrl === 'string'
           return {
             ...savedMsg,
             _status: undefined,
-            ...(keepLocal ? { mediaUrl: m.mediaUrl } : {}),
+            ...(keepLocal ? { mediaUrl: msg.mediaUrl } : {}),
           }
         }),
       )
@@ -409,9 +430,10 @@ function ChatsPage() {
   const markMessageError = useCallback(
     (convId: string, localId: string) => {
       queryClient.setQueryData(messagesKey(convId), (old: unknown[] | undefined) =>
-        (old ?? []).map((m: Record<string, unknown>) =>
-          m._localId === localId ? { ...m, _status: 'error' } : m,
-        ),
+        (old ?? []).map((m) => {
+          const msg = m as Record<string, unknown>
+          return msg._localId === localId ? { ...msg, _status: 'error' } : m
+        }),
       )
     },
     [queryClient],
@@ -520,7 +542,7 @@ function ChatsPage() {
 
       // Remove the failed message from cache
       queryClient.setQueryData(messagesKey(convId), (old: unknown[] | undefined) =>
-        (old ?? []).filter((m: Record<string, unknown>) => m._localId !== messageId),
+        (old ?? []).filter((m) => (m as Record<string, unknown>)._localId !== messageId),
       )
       pendingMessagesRef.current.delete(messageId)
 
@@ -556,9 +578,10 @@ function ChatsPage() {
 
       markReadMutation.mutate({ body: { conversationId: convId } })
       queryClient.setQueryData(conversationsKey, (old: unknown[] | undefined) =>
-        (old ?? []).map((c: Record<string, unknown>) =>
-          c.id === convId ? { ...c, unreadCount: 0 } : c,
-        ),
+        (old ?? []).map((c) => {
+          const item = c as Record<string, unknown>
+          return item.id === convId ? { ...item, unreadCount: 0 } : c
+        }),
       )
       // Optimistically subtract from sidebar badge count
       queryClient.setQueryData(
@@ -603,6 +626,29 @@ function ChatsPage() {
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [markAsRead])
+
+  const handleSendProducts = async (data: {
+    productRetailerIds: string[]
+    catalogId: string
+    format: 'product' | 'product_list'
+    headerText?: string
+    bodyText?: string
+  }) => {
+    if (!search.conv) return
+    const convId = search.conv
+
+    await sendProductMutation.mutateAsync({
+      body: {
+        conversationId: convId,
+        ...data,
+      },
+    })
+
+    // Invalidate messages to show the new product message
+    queryClient.invalidateQueries({
+      queryKey: messagesKey(convId),
+    })
+  }
 
   const handleConfigureAgent = useCallback(() => {
     navigate({ to: '/app/$orgSlug/agents' as string, params: { orgSlug } })
@@ -786,6 +832,9 @@ function ChatsPage() {
         onConfigureAgent={handleConfigureAgent}
         onConfigureCatalog={() => setCatalogLinkOpen(true)}
         onOpenOptions={() => setWhatsappConfigOpen(true)}
+        socialAccountId={currentAccount?.id}
+        hasCatalogForProducts={!!linkedCatalog}
+        onProductClick={() => setProductSendOpen(true)}
       />
       {id === 'whatsapp' && currentAccount && (
         <>
@@ -798,7 +847,9 @@ function ChatsPage() {
             }
             socialAccountId={currentAccount.id}
             catalogs={catalogsQuery.data || []}
-            commerceData={commerceQuery.data}
+            commerceData={
+              commerceQuery.data as { data: { id: string; name: string }[] } | undefined
+            }
             onOpenCatalogLink={() => {
               setWhatsappConfigOpen(false)
               setCatalogLinkOpen(true)
@@ -813,6 +864,14 @@ function ChatsPage() {
             }
             catalogs={catalogsQuery.data || []}
           />
+          {linkedCatalog && (
+            <ProductSendModal
+              open={productSendOpen}
+              onClose={() => setProductSendOpen(false)}
+              catalog={linkedCatalog}
+              onSend={handleSendProducts}
+            />
+          )}
         </>
       )}
     </div>

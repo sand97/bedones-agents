@@ -22,6 +22,7 @@ import { createLabelTools } from './tools/live/label.tools'
 import { createMessageTools } from './tools/live/message.tools'
 import { createTicketTools } from './tools/live/ticket.tools'
 import { createPromotionTools } from './tools/live/promotion.tools'
+import { createProductMessagingTools } from './tools/live/product-messaging.tools'
 
 @Injectable()
 export class AgentMessageProcessorService {
@@ -41,8 +42,10 @@ export class AgentMessageProcessorService {
   async handleIncomingMessage(event: IncomingMessageEvent): Promise<void> {
     try {
       await this.maybeProcess(event)
-    } catch (error: any) {
-      this.logger.error(`Error processing incoming message: ${error.message}`)
+    } catch (error: unknown) {
+      this.logger.error(
+        `Error processing incoming message: ${error instanceof Error ? error.message : error}`,
+      )
     }
   }
 
@@ -126,17 +129,34 @@ export class AgentMessageProcessorService {
     await this.processMessage(event, agentLink.agent)
   }
 
-  private async processMessage(event: IncomingMessageEvent, agent: any): Promise<void> {
+  private async processMessage(
+    event: IncomingMessageEvent,
+    agent: {
+      id: string
+      context: string | null
+      organisationId: string
+      status: string
+      socialAccounts: {
+        socialAccount: {
+          catalogs: { catalog: { id: string; providerId: string | null } }[]
+        }
+      }[]
+    },
+  ): Promise<void> {
     this.logger.log(
       `Processing message for agent ${agent.id} on ${event.provider} (conversation: ${event.conversationId})`,
     )
 
     // Gather catalog IDs from agent's linked social accounts
     const catalogIds: string[] = []
+    const catalogProviderMap: Record<string, string> = {} // internalId → Meta providerId
     for (const sa of agent.socialAccounts) {
       for (const c of sa.socialAccount.catalogs) {
         if (!catalogIds.includes(c.catalog.id)) {
           catalogIds.push(c.catalog.id)
+          if (c.catalog.providerId) {
+            catalogProviderMap[c.catalog.id] = c.catalog.providerId
+          }
         }
       }
     }
@@ -168,8 +188,10 @@ export class AgentMessageProcessorService {
           messageBody: event.message.text,
         })
         userMessageContent = matchResult.agentPayload.body
-      } catch (error: any) {
-        this.logger.warn(`Image processing failed: ${error.message}`)
+      } catch (error: unknown) {
+        this.logger.warn(
+          `Image processing failed: ${error instanceof Error ? error.message : error}`,
+        )
         userMessageContent = event.message.text || '[Image envoyee par le contact]'
       }
     }
@@ -227,6 +249,13 @@ export class AgentMessageProcessorService {
         prisma: this.prisma,
         organisationId: agent.organisationId,
       }),
+      ...(event.provider === 'WHATSAPP' && Object.keys(catalogProviderMap).length > 0
+        ? createProductMessagingTools({
+            messagingService: this.messagingService,
+            conversationId: event.conversationId,
+            catalogProviderMap,
+          })
+        : []),
     ]
 
     // Create LLM with fallback
@@ -255,8 +284,8 @@ export class AgentMessageProcessorService {
       )
 
       this.logger.log(`Agent ${agent.id} processed message successfully`)
-    } catch (error: any) {
-      this.logger.error(`Agent execution failed: ${error.message}`)
+    } catch (error: unknown) {
+      this.logger.error(`Agent execution failed: ${error instanceof Error ? error.message : error}`)
     }
   }
 

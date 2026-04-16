@@ -258,7 +258,7 @@ export function ProductModal({
               multiple
               accept=".jpg,.jpeg,.png,.webp"
               beforeUpload={(file) => {
-                handleUpload(file)
+                handleAddFile(file)
                 return false
               }}
               customRequest={() => {}}

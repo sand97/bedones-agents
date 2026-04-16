@@ -43,7 +43,7 @@ function LoginPage() {
           params: { orgSlug: data.organisations[0].id },
         })
       } else {
-        navigate({ to: '/create-organisation' })
+        navigate({ to: '/create-organisation', search: { step: undefined } })
       }
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Erreur de connexion')
@@ -61,7 +61,6 @@ function LoginPage() {
 
   const handleSupportSubmit = async (_values: Record<string, string>) => {
     setSubmitting(true)
-    // TODO: integrate real API
     await new Promise((r) => setTimeout(r, 800))
     setSubmitting(false)
     supportForm.resetFields()

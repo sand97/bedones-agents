@@ -147,18 +147,23 @@ export class ProductImageIndexingService {
         try {
           await this.indexSingleProduct(catalogId, product)
           processed += 1
-        } catch (error: any) {
+        } catch (error: unknown) {
           failed += 1
-          const errorDetail = error?.response
-            ? `${error.message} — Response: ${JSON.stringify(error.response).slice(0, 300)}`
-            : error?.cause
-              ? `${error.message} — Cause: ${error.cause?.message || error.cause}`
-              : `${error?.message || error}`
+          const err = error as Record<string, unknown>
+          const errMsg = error instanceof Error ? error.message : String(error)
+          const errorDetail = err?.response
+            ? `${errMsg} — Response: ${JSON.stringify(err.response).slice(0, 300)}`
+            : error instanceof Error && error.cause
+              ? `${errMsg} — Cause: ${error.cause instanceof Error ? error.cause.message : error.cause}`
+              : errMsg
           this.logger.warn(
             `Failed to index product ${product.id} (${product.name}): ${errorDetail}`,
           )
           if (failed <= 3) {
-            this.logger.debug(`Full error for product ${product.id}:`, error?.stack || error)
+            this.logger.debug(
+              `Full error for product ${product.id}:`,
+              error instanceof Error ? error.stack : error,
+            )
           }
         }
 
@@ -197,8 +202,9 @@ export class ProductImageIndexingService {
         failed,
         message,
       }
-    } catch (error: any) {
-      this.logger.error(`Catalog sync failed for ${catalogId}: ${error.message}`)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      this.logger.error(`Catalog sync failed for ${catalogId}: ${message}`)
       await this.prisma.catalog.update({
         where: { id: catalogId },
         data: { analysisStatus: 'FAILED' },
@@ -206,7 +212,7 @@ export class ProductImageIndexingService {
 
       this.gateway.emitToOrg(organisationId, 'catalog:indexing-failed', {
         catalogId,
-        error: error.message,
+        error: message,
       })
 
       return {
@@ -215,7 +221,7 @@ export class ProductImageIndexingService {
         processed: 0,
         skipped: 0,
         failed: 0,
-        message: `Sync failed: ${error.message}`,
+        message: `Sync failed: ${message}`,
       }
     }
   }
@@ -295,14 +301,14 @@ export class ProductImageIndexingService {
           if (textToEmbed.trim()) {
             vectors.text = await this.geminiEmbeddingService.embedText(textToEmbed)
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           this.logger.warn(
-            `Gemini vision failed for product ${product.id}: ${error?.message || error}`,
+            `Gemini vision failed for product ${product.id}: ${error instanceof Error ? error.message : error}`,
           )
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger.warn(
-          `Image processing failed for product ${product.id}: ${error?.message || error}`,
+          `Image processing failed for product ${product.id}: ${error instanceof Error ? error.message : error}`,
         )
       }
     }
@@ -315,9 +321,9 @@ export class ProductImageIndexingService {
       if (textToEmbed.trim()) {
         try {
           vectors.text = await this.geminiEmbeddingService.embedText(textToEmbed)
-        } catch (error: any) {
+        } catch (error: unknown) {
           this.logger.warn(
-            `Text embedding failed for product ${product.id}: ${error?.message || error}`,
+            `Text embedding failed for product ${product.id}: ${error instanceof Error ? error.message : error}`,
           )
         }
       }

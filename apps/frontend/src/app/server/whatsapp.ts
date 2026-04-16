@@ -1,5 +1,10 @@
+// Server-only module — Node.js APIs available at runtime via TanStack Start SSR
+declare const process: { cwd(): string; env: Record<string, string | undefined> }
+
 import { createServerFn } from '@tanstack/react-start'
+// @ts-expect-error — Server-only Node.js module
 import { readFileSync } from 'node:fs'
+// @ts-expect-error — Server-only Node.js module
 import { resolve } from 'node:path'
 
 function loadEnv(): Record<string, string> {

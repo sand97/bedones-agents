@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { Button, Popover, Checkbox } from 'antd'
 import { MessageCircle, Sparkles, ShoppingBag, EllipsisVertical } from 'lucide-react'
 import { ConversationList } from './conversation-list'
@@ -15,8 +16,8 @@ import {
   LabelBadgeIcon,
 } from '@app/components/icons/social-icons'
 import { ConversationListSkeleton, ChatWindowSkeleton } from './chat-skeleton'
+import { labelApi } from '@app/lib/api/agent-api'
 import type { Conversation } from './mock-data'
-import { AVAILABLE_LABELS } from './mock-data'
 
 type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger'
 
@@ -83,15 +84,23 @@ interface ChatLayoutProps {
   onConfigureCatalog?: () => void
   /** Callback when user clicks the Options button */
   onOpenOptions?: () => void
+  /** Social account ID used to fetch labels from the database */
+  socialAccountId?: string
+  /** Whether the current WhatsApp number has a linked catalog for product sending */
+  hasCatalogForProducts?: boolean
+  /** Called when user clicks the "Product" attachment option */
+  onProductClick?: () => void
 }
 
 /* ── Labels filter popover ── */
 
 function LabelsFilterPopover({
+  labels,
   selectedLabelIds,
   onToggle,
   children,
 }: {
+  labels: { id: string; name: string; color: string }[]
   selectedLabelIds: string[]
   onToggle: (labelId: string) => void
   children: React.ReactNode
@@ -106,7 +115,7 @@ function LabelsFilterPopover({
           <div className="px-3 py-2 text-xs font-semibold text-text-muted">
             {t('chat.filter_by_label')}
           </div>
-          {AVAILABLE_LABELS.map((label) => (
+          {labels.map((label) => (
             <Button
               key={label.id}
               type="text"
@@ -172,6 +181,9 @@ export function ChatLayout({
   onConfigureAgent,
   onConfigureCatalog,
   onOpenOptions,
+  socialAccountId,
+  hasCatalogForProducts,
+  onProductClick,
 }: ChatLayoutProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -180,6 +192,13 @@ export function ChatLayout({
   const selectedConvId = search.conv
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
+
+  const labelsQuery = useQuery({
+    queryKey: ['labels', socialAccountId],
+    queryFn: () => labelApi.list(socialAccountId!),
+    enabled: !!socialAccountId,
+  })
+  const dbLabels = labelsQuery.data ?? []
 
   const selectedConversation = conversations.find((c) => c.id === selectedConvId)
 
@@ -331,7 +350,11 @@ export function ChatLayout({
           >
             {t('comments.unread')}
           </Button>
-          <LabelsFilterPopover selectedLabelIds={selectedLabelIds} onToggle={toggleLabel}>
+          <LabelsFilterPopover
+            labels={dbLabels}
+            selectedLabelIds={selectedLabelIds}
+            onToggle={toggleLabel}
+          >
             <Button
               type={selectedLabelIds.length > 0 ? 'primary' : 'default'}
               size="small"
@@ -398,6 +421,8 @@ export function ChatLayout({
             onSend={onSend}
             onUploadAndSend={onUploadAndSend}
             onRetry={onRetry}
+            hasCatalog={hasCatalogForProducts}
+            onProductClick={onProductClick}
           />
         ) : (
           renderDesktopSetup()

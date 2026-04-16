@@ -35,8 +35,8 @@ export function createTicketTools(deps: {
 
         deps.gateway.emitToOrg(deps.organisationId, 'ticket:created', ticket)
         return `Ticket cree avec succes. ID: ${ticket.id}, Titre: "${ticket.title}", Statut: ${ticket.status?.name || 'Par defaut'}`
-      } catch (error: any) {
-        return `Erreur lors de la creation du ticket: ${error.message}`
+      } catch (error: unknown) {
+        return `Erreur lors de la creation du ticket: ${error instanceof Error ? error.message : 'Unknown error'}`
       }
     },
     {
@@ -78,8 +78,8 @@ export function createTicketTools(deps: {
 
         deps.gateway.emitToOrg(ticket.organisationId, 'ticket:updated', ticket)
         return `Ticket mis a jour. ID: ${ticket.id}, Titre: "${ticket.title}"`
-      } catch (error: any) {
-        return `Erreur lors de la mise a jour du ticket: ${error.message}`
+      } catch (error: unknown) {
+        return `Erreur lors de la mise a jour du ticket: ${error instanceof Error ? error.message : 'Unknown error'}`
       }
     },
     {
@@ -128,8 +128,8 @@ export function createTicketTools(deps: {
             `ID: ${t.id} | ${t.title} | Priorite: ${t.priority} | Statut: ${t.status?.name || 'N/A'} | Contact: ${t.contactName || 'N/A'} | Cree le: ${t.createdAt.toISOString().split('T')[0]}`,
         )
         return lines.join('\n')
-      } catch (error: any) {
-        return `Erreur lors de la recuperation des tickets: ${error.message}`
+      } catch (error: unknown) {
+        return `Erreur lors de la recuperation des tickets: ${error instanceof Error ? error.message : 'Unknown error'}`
       }
     },
     {
@@ -157,8 +157,8 @@ export function createTicketTools(deps: {
         return statuses
           .map((s) => `ID: ${s.id} | ${s.name} ${s.isDefault ? '(par defaut)' : ''}`)
           .join('\n')
-      } catch (error: any) {
-        return `Erreur: ${error.message}`
+      } catch (error: unknown) {
+        return `Erreur: ${error instanceof Error ? error.message : 'Unknown error'}`
       }
     },
     {

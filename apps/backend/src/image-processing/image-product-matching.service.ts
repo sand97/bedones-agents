@@ -150,9 +150,9 @@ export class ImageProductMatchingService {
           similarity = deduped[0].score
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       searchMethod = 'error'
-      errorMessage = String(error?.message || error || 'unknown error')
+      errorMessage = error instanceof Error ? error.message : String(error || 'unknown error')
       this.logger.error(`Image pipeline failed: ${errorMessage}`)
     }
 

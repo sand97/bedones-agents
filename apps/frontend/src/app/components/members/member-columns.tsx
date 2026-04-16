@@ -6,7 +6,9 @@ import { MemberCell } from './member-cell'
 import { MemberActions } from './member-actions'
 import { MEMBER_ROLE_CONFIG, type Member, type MemberRole } from './mock-data'
 
-export function useMemberColumns(onDelete: (memberId: string) => void): ColumnsType<Member> {
+export function useMemberColumns(
+  onDelete: (memberId: string) => Promise<void>,
+): ColumnsType<Member> {
   const { t } = useTranslation()
 
   return [

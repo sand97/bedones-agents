@@ -9,26 +9,11 @@ import type { Comment, Post } from './mock-data'
 
 type Provider = 'facebook' | 'instagram' | 'tiktok'
 
-// TODO: réactiver quand le bouton "Voir sur ..." sera de retour
-// function getProfileUrl(provider: Provider, comment: Comment): string | undefined {
-//   if (comment.isPageReply) return undefined
-//   if (provider === 'facebook') return `https://facebook.com/${comment.fromId}`
-//   if (provider === 'instagram') return `https://instagram.com/${comment.fromName}`
-//   return undefined
-// }
-
-// TODO: réactiver quand le bouton "Voir sur ..." sera de retour
-// const PROVIDER_LABEL: Record<Provider, string> = {
-//   facebook: 'Facebook',
-//   instagram: 'Instagram',
-//   tiktok: 'TikTok',
-// }
-
 /* ── User profile popover ── */
 
 function UserProfilePopover({
   comment,
-  _provider,
+  provider: _provider,
   accountId,
   children,
 }: {
@@ -81,23 +66,6 @@ function UserProfilePopover({
           <span className="font-semibold">{data.deletedComments}</span>
         </div>
       </div>
-      {/* TODO: lien vers profil — à activer quand l'URL sera fiable
-      {profileUrl && (
-        <Button
-          type="default"
-          block
-          size="small"
-          icon={<ExternalLink size={13} />}
-          className="mt-3"
-          onClick={() => {
-            window.open(profileUrl, '_blank')
-            setOpen(false)
-          }}
-        >
-          Voir sur {PROVIDER_LABEL[provider]}
-        </Button>
-      )}
-      */}
     </div>
   )
 

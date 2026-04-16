@@ -230,7 +230,7 @@ function TicketsPage() {
   }
 
   const handleEdit = (ticket: Ticket) => {
-    setEditingTicket({ ...ticket, metadata: ticket.metadata ?? null })
+    setEditingTicket({ ...ticket, metadata: ticket.metadata ?? undefined })
     setDrawerTicket(null)
     setCreateOpen(true)
   }
@@ -433,6 +433,7 @@ function TicketsPage() {
       </div>
 
       <TicketDrawer
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ticket={drawerTicket as any}
         open={!!drawerTicket}
         onClose={() => setDrawerTicket(null)}

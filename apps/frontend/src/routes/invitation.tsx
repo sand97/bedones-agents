@@ -52,7 +52,10 @@ function InvitationPage() {
   const handleSendOtp = async () => {
     try {
       await sendOtpMutation.mutateAsync({
-        params: { query: { token } },
+        params: {
+          query: { token },
+          header: { 'accept-language': navigator.language || 'fr' },
+        },
       })
       message.success(t('invitation.otp_sent'))
       setOtpCode('')

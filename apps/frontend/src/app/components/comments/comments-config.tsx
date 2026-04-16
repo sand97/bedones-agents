@@ -213,8 +213,8 @@ export function CommentsConfigModal({
       )
 
       await updatePageSettings(accountId, {
-        undesiredCommentsAction: values.unwantedAction,
-        spamAction: values.spamAction,
+        undesiredCommentsAction: values.unwantedAction as 'hide' | 'delete' | 'none',
+        spamAction: values.spamAction as 'hide' | 'delete' | 'none',
         customInstructions: values.customInstructions || undefined,
         faqRules: faqRules.length > 0 ? faqRules : undefined,
       })

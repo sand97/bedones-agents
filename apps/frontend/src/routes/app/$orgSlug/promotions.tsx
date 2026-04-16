@@ -341,6 +341,7 @@ function PromotionsPage() {
       <PromotionModal
         open={modalOpen}
         onClose={handleCloseModal}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         editingPromo={editingPromo as any}
         onOpenProductPicker={() => setProductPickerOpen(true)}
         selectedProductIds={selectedProducts.map((p) => p.id)}

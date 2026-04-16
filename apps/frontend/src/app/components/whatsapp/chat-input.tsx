@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Input, Popover, message } from 'antd'
-import { Send, Mic, Paperclip, FileText, Video, ImageIcon, X } from 'lucide-react'
+import { Send, Mic, Paperclip, FileText, Video, ImageIcon, X, ShoppingBag } from 'lucide-react'
 import { AudioRecorder } from './audio-recorder'
 import type { Message } from './mock-data'
 
@@ -32,10 +32,14 @@ function AttachmentPopover({
   children,
   onSelectFiles,
   provider,
+  hasCatalog,
+  onProductClick,
 }: {
   children: React.ReactNode
   onSelectFiles: (files: FileList, type: MediaType) => void
   provider?: string
+  hasCatalog?: boolean
+  onProductClick?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const { t } = useTranslation()
@@ -78,6 +82,20 @@ function AttachmentPopover({
         fileInputRef.current?.click()
       },
     },
+    ...(provider === 'whatsapp' && hasCatalog && onProductClick
+      ? [
+          {
+            icon: <ShoppingBag size={18} />,
+            label: t('chat.product'),
+            color: 'text-orange-500',
+            bgColor: 'bg-orange-50',
+            onClick: () => {
+              setOpen(false)
+              onProductClick()
+            },
+          },
+        ]
+      : []),
   ]
 
   return (
@@ -148,6 +166,8 @@ export function ChatInput({
   provider,
   replyTo,
   onCancelReply,
+  hasCatalog,
+  onProductClick,
 }: {
   onSend?: (
     message: string,
@@ -157,6 +177,8 @@ export function ChatInput({
   provider?: string
   replyTo?: Message | null
   onCancelReply?: () => void
+  hasCatalog?: boolean
+  onProductClick?: () => void
 }) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<InputMode>('text')
@@ -237,7 +259,12 @@ export function ChatInput({
         </div>
       )}
       <div className="chat-input-row">
-        <AttachmentPopover onSelectFiles={handleFileSelect} provider={provider}>
+        <AttachmentPopover
+          onSelectFiles={handleFileSelect}
+          provider={provider}
+          hasCatalog={hasCatalog}
+          onProductClick={onProductClick}
+        >
           <Button
             type="text"
             shape="circle"

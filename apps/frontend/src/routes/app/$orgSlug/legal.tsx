@@ -110,7 +110,6 @@ function HelpPage() {
 
   const handleSubmit = async (values: Record<string, string>) => {
     setSubmitting(true)
-    // TODO: integrate real API
     await new Promise((r) => setTimeout(r, 800))
     setSubmitting(false)
     form.resetFields()

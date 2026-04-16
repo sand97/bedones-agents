@@ -36,8 +36,10 @@ export class SmartCropService {
       }
 
       return Buffer.from(base64Image, 'base64')
-    } catch (error: any) {
-      this.logger.warn(`OpenCV crop failed, using original image: ${error?.message || error}`)
+    } catch (error: unknown) {
+      this.logger.warn(
+        `OpenCV crop failed, using original image: ${error instanceof Error ? error.message : error}`,
+      )
       return imageBuffer
     }
   }

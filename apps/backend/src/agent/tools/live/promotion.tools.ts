@@ -41,8 +41,8 @@ export function createPromotionTools(deps: { prisma: PrismaService; organisation
           return `ID: ${p.id} | ${p.name} | Code: ${p.code || 'N/A'} | ${discount} | ${period} | ${products} | Statut: ${p.status} | Cumulable: ${p.stackable ? 'Oui' : 'Non'}`
         })
         return lines.join('\n')
-      } catch (error: any) {
-        return `Erreur: ${error.message}`
+      } catch (error: unknown) {
+        return `Erreur: ${error instanceof Error ? error.message : 'Unknown error'}`
       }
     },
     {
@@ -98,8 +98,8 @@ export function createPromotionTools(deps: { prisma: PrismaService; organisation
         }
 
         return result
-      } catch (error: any) {
-        return `Erreur: ${error.message}`
+      } catch (error: unknown) {
+        return `Erreur: ${error instanceof Error ? error.message : 'Unknown error'}`
       }
     },
     {

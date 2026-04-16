@@ -21,6 +21,7 @@ import { ProductModal } from '@app/components/catalog/product-modal'
 import { CollectionFilterSelect } from '@app/components/catalog/collection-filter-select'
 import { ArticleDescriptionCard } from '@app/components/catalog/article-description-card'
 import { useCatalogColumns } from '@app/components/catalog/catalog-columns'
+import type { CatalogArticle } from '@app/components/whatsapp/mock-data'
 import { AccountSwitcher } from '@app/components/social/account-switcher'
 import { useLayout } from '@app/contexts/layout-context'
 import { catalogApi } from '@app/lib/api/agent-api'
@@ -72,10 +73,11 @@ function CatalogPage() {
   const updateSearch = useCallback(
     (updates: Record<string, string | undefined>) => {
       navigate({
-        search: (prev: Record<string, unknown>) => ({
-          ...prev,
-          ...updates,
-        }),
+        search: (prev: Record<string, unknown>) =>
+          ({
+            ...prev,
+            ...updates,
+          }) as never,
         replace: true,
       })
     },
@@ -314,7 +316,7 @@ function CatalogPage() {
   }
 
   // Map products to the format expected by catalogColumns
-  const tableData = filteredProducts.map((p) => ({
+  const tableData: CatalogArticle[] = filteredProducts.map((p) => ({
     id: p.id,
     contentId: p.retailerId || p.id,
     name: p.name,
@@ -325,6 +327,7 @@ function CatalogPage() {
     category: p.category || t('catalog.uncategorized'),
     stock: typeof p.inventory === 'number' ? p.inventory : 0,
     collection: p.collectionName,
+    createdAt: (p as unknown as { createdAt?: string }).createdAt || new Date().toISOString(),
     status: (p.status === 'approved'
       ? 'published'
       : p.status === 'pending'

@@ -597,6 +597,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/messaging/send-products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MessagingController_sendProductMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/messaging/mark-read": {
         parameters: {
             query?: never;
@@ -1574,6 +1590,22 @@ export interface components {
             fileSize?: number;
             /** @description ID of the message to reply to */
             replyToId?: string;
+        };
+        SendProductMessageDto: {
+            conversationId: string;
+            /** @description Retailer IDs of products to send */
+            productRetailerIds: string[];
+            /** @description Meta catalog ID linked to the WhatsApp number */
+            catalogId: string;
+            /**
+             * @description Single product or multi-product list
+             * @enum {string}
+             */
+            format: "product" | "product_list";
+            /** @description Header text for product list messages */
+            headerText?: string;
+            /** @description Body text accompanying the products */
+            bodyText?: string;
         };
         MarkConversationReadDto: {
             conversationId: string;
@@ -2563,6 +2595,29 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SendMessageDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectMessageResponseDto"];
+                };
+            };
+        };
+    };
+    MessagingController_sendProductMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendProductMessageDto"];
             };
         };
         responses: {

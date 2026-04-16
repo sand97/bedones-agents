@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, Inject } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'

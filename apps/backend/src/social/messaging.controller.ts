@@ -7,6 +7,7 @@ import {
   ConversationResponseDto,
   DirectMessageResponseDto,
   SendMessageDto,
+  SendProductMessageDto,
   MarkConversationReadDto,
 } from './dto/messaging.dto'
 
@@ -53,6 +54,26 @@ export class MessagingController {
       body.fileName,
       body.fileSize,
       body.replyToId,
+    )
+  }
+
+  // ─── Send product message (WhatsApp only) ───
+
+  @Post('send-products')
+  @ApiBody({ type: SendProductMessageDto })
+  @ApiCreatedResponse({ type: DirectMessageResponseDto })
+  async sendProductMessage(
+    @CurrentUser() user: { id: string },
+    @Body() body: SendProductMessageDto,
+  ) {
+    return this.messagingService.sendProductMessage(
+      user.id,
+      body.conversationId,
+      body.productRetailerIds,
+      body.catalogId,
+      body.format,
+      body.headerText,
+      body.bodyText,
     )
   }
 

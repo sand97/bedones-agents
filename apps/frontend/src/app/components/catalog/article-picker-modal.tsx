@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Modal, Input, Button, Select, Spin } from 'antd'
 import { Search, Plus, Minus, ShoppingBag } from 'lucide-react'
-// TODO(mock): Remplacer MOCK_CATALOG_ARTICLES par un appel API réel (catalogApi.getProducts)
 import { MOCK_CATALOG_ARTICLES, type CatalogArticle } from '@app/components/whatsapp/mock-data'
 import { catalogApi, type Catalog } from '@app/lib/api/agent-api'
 
@@ -82,7 +81,7 @@ export function ArticlePickerModal({
 
   const activeArticles = useMemo(() => {
     if (hasCatalogs) return apiArticles
-    return MOCK_CATALOG_ARTICLES.filter((a) => a.status === 'active' || a.status === 'published')
+    return MOCK_CATALOG_ARTICLES.filter((a) => a.status === 'published')
   }, [hasCatalogs, apiArticles])
 
   const filtered = useMemo(() => {

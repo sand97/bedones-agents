@@ -213,8 +213,8 @@ export async function getPostsForAccount(accountId: string): Promise<PostRespons
 export async function updatePageSettings(
   accountId: string,
   settings: {
-    undesiredCommentsAction?: string
-    spamAction?: string
+    undesiredCommentsAction?: 'hide' | 'delete' | 'none'
+    spamAction?: 'hide' | 'delete' | 'none'
     customInstructions?: string
     faqRules?: { question: string; answer: string }[]
   },

@@ -305,8 +305,9 @@ function CommentsPage() {
         { params: { path: { accountId: currentAccountId! } } },
       ]
       queryClient.setQueryData(postsKey, (old: unknown[] | undefined) =>
-        (old ?? []).map((p: Record<string, unknown>) =>
-          p.id === postId
+        (old ?? []).map((item) => {
+          const p = item as Record<string, unknown>
+          return p.id === postId
             ? {
                 ...p,
                 unreadComments: 0,
@@ -315,8 +316,8 @@ function CommentsPage() {
                   isRead: true,
                 })),
               }
-            : p,
-        ),
+            : p
+        }),
       )
       refreshUnread()
     } catch {

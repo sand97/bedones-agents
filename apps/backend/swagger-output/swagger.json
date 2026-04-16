@@ -1129,6 +1129,37 @@
         ]
       }
     },
+    "/messaging/send-products": {
+      "post": {
+        "operationId": "MessagingController_sendProductMessage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendProductMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectMessageResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
     "/messaging/mark-read": {
       "post": {
         "operationId": "MessagingController_markRead",
@@ -3861,6 +3892,47 @@
         },
         "required": [
           "conversationId"
+        ]
+      },
+      "SendProductMessageDto": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "productRetailerIds": {
+            "description": "Retailer IDs of products to send",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "catalogId": {
+            "type": "string",
+            "description": "Meta catalog ID linked to the WhatsApp number"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "product",
+              "product_list"
+            ],
+            "description": "Single product or multi-product list"
+          },
+          "headerText": {
+            "type": "string",
+            "description": "Header text for product list messages"
+          },
+          "bodyText": {
+            "type": "string",
+            "description": "Body text accompanying the products"
+          }
+        },
+        "required": [
+          "conversationId",
+          "productRetailerIds",
+          "catalogId",
+          "format"
         ]
       },
       "MarkConversationReadDto": {

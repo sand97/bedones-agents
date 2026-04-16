@@ -59,9 +59,10 @@ export class CatalogSearchService {
         return { success: false, products: [], error: 'Embeddings service is not available' }
       }
       return await this.searchVector(catalogIds, query, limit, queryEn)
-    } catch (error: any) {
-      this.logger.error(`Search failed: ${error.message}`)
-      return { success: false, products: [], error: error.message }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      this.logger.error(`Search failed: ${message}`)
+      return { success: false, products: [], error: message }
     }
   }
 

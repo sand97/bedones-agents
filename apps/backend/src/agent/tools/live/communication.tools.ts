@@ -11,8 +11,8 @@ export function createCommunicationTools(deps: {
       try {
         await deps.messagingService.sendMessageAsAgent(deps.conversationId, message)
         return `Message sent: "${message.substring(0, 50)}..."`
-      } catch (error: any) {
-        return `Failed to send message: ${error.message}`
+      } catch (error: unknown) {
+        return `Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`
       }
     },
     {

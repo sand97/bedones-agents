@@ -15,9 +15,9 @@ import {
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import dayjs from 'dayjs'
 import { DoubleCheckIcon, SingleCheckIcon, OptionsIcon } from '@app/components/icons/social-icons'
-import type { Conversation, Message, Ticket } from './mock-data'
+import type { Conversation, Message } from './mock-data'
 import { TicketCard } from './ticket-card'
-import { TicketDrawer } from './ticket-drawer'
+import { TicketDrawer, type RealTicket } from './ticket-drawer'
 import { ChatInput } from './chat-input'
 
 type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger'
@@ -36,6 +36,8 @@ interface ChatWindowProps {
     replyToId?: string,
   ) => Promise<void>
   onRetry?: (messageId: string) => void
+  hasCatalog?: boolean
+  onProductClick?: () => void
 }
 
 function formatTime(timestamp: string): string {
@@ -601,6 +603,8 @@ export function ChatWindow({
   onSend,
   onUploadAndSend,
   onRetry,
+  hasCatalog,
+  onProductClick,
 }: ChatWindowProps) {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -621,7 +625,7 @@ export function ChatWindow({
   )
 
   const openTicket = useCallback(
-    (ticket: Ticket) => {
+    (ticket: { id: string }) => {
       navigate({ search: { conv: search.conv, ticket: ticket.id } as never })
     },
     [navigate, search.conv],
@@ -747,12 +751,14 @@ export function ChatWindow({
         provider={provider}
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
+        hasCatalog={hasCatalog}
+        onProductClick={onProductClick}
       />
 
       {/* Ticket drawer */}
       <TicketDrawer
-        ticket={drawerTicket}
-        allTickets={tickets}
+        ticket={drawerTicket as RealTicket | null}
+        allTickets={tickets as unknown as RealTicket[]}
         open={!!drawerTicket}
         onClose={closeTicket}
         onSwitchTicket={openTicket}
