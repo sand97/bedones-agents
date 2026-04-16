@@ -69,6 +69,12 @@ interface ProductModalProps {
   collections?: Collection[]
 }
 
+/** A pending file not yet uploaded, shown as a local preview */
+interface PendingFile {
+  file: File
+  previewUrl: string
+}
+
 export function ProductModal({
   open,
   onClose,
@@ -83,7 +89,8 @@ export function ProductModal({
   const imageUrls = (Form.useWatch('imageUrls', form) as string[] | undefined) || []
   const [uploading, setUploading] = useState(false)
 
-  // fileList no longer needed — we render thumbnails manually
+  // Pending files waiting to be uploaded on submit
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
 
   const initialValues = product
     ? {
@@ -100,23 +107,52 @@ export function ProductModal({
       }
     : { currency: 'XAF', imageUrls: [] }
 
-  const handleUpload = async (file: File) => {
-    setUploading(true)
-    try {
-      const url = await uploadChatMedia(file)
-      const current: string[] = form.getFieldValue('imageUrls') || []
-      form.setFieldValue('imageUrls', [...current, url])
-      form.validateFields(['imageUrls'])
-    } catch {
-      message.error(t('upload.error'))
-    } finally {
-      setUploading(false)
-    }
+  /** Add files to the pending list — no upload yet */
+  const handleAddFile = (file: File) => {
+    const previewUrl = URL.createObjectURL(file)
+    setPendingFiles((prev) => [...prev, { file, previewUrl }])
+    // Mark imageUrls as valid so the form validator passes
+    const current: string[] = form.getFieldValue('imageUrls') || []
+    form.setFieldValue('imageUrls', [...current, previewUrl])
+    form.validateFields(['imageUrls'])
     return false
+  }
+
+  /** Remove a pending file by its preview URL */
+  const removePendingFile = (previewUrl: string) => {
+    setPendingFiles((prev) => {
+      const entry = prev.find((p) => p.previewUrl === previewUrl)
+      if (entry) URL.revokeObjectURL(entry.previewUrl)
+      return prev.filter((p) => p.previewUrl !== previewUrl)
+    })
   }
 
   const handleSubmit = async () => {
     const values = await form.validateFields()
+
+    // Upload pending files to the server (like chat media upload)
+    if (pendingFiles.length > 0) {
+      setUploading(true)
+      try {
+        const uploadedUrls = await Promise.all(pendingFiles.map((pf) => uploadChatMedia(pf.file)))
+        // Combine already-remote URLs (from edit) with freshly uploaded ones
+        const existingRemoteUrls = (values.imageUrls as string[]).filter(
+          (u: string) => !u.startsWith('blob:'),
+        )
+        values.imageUrls = [...existingRemoteUrls, ...uploadedUrls]
+      } catch {
+        message.error(t('upload.error'))
+        setUploading(false)
+        return
+      } finally {
+        setUploading(false)
+      }
+    }
+
+    // Clean up blob URLs
+    pendingFiles.forEach((pf) => URL.revokeObjectURL(pf.previewUrl))
+    setPendingFiles([])
+
     onSubmit(values)
   }
 
@@ -126,6 +162,10 @@ export function ProductModal({
     <Modal
       open={open}
       onCancel={onClose}
+      afterClose={() => {
+        pendingFiles.forEach((pf) => URL.revokeObjectURL(pf.previewUrl))
+        setPendingFiles([])
+      }}
       title={product ? t('catalog.edit_article') : t('catalog.add_article')}
       width={640}
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
@@ -185,6 +225,10 @@ export function ProductModal({
                           'imageUrls',
                           current.filter((u) => u !== url),
                         )
+                        // Also remove from pending files if it's a blob URL
+                        if (url.startsWith('blob:')) {
+                          removePendingFile(url)
+                        }
                         setTimeout(() => form.validateFields(['imageUrls']))
                       }}
                     />
@@ -196,7 +240,7 @@ export function ProductModal({
                 multiple
                 accept=".jpg,.jpeg,.png,.webp"
                 beforeUpload={(file) => {
-                  handleUpload(file)
+                  handleAddFile(file)
                   return false
                 }}
                 customRequest={() => {}}
