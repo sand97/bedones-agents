@@ -143,7 +143,7 @@ export function TicketStatusModal({
         </Button>,
       ]}
       width={480}
-      destroyOnClose
+      destroyOnHidden
     >
       <Text type="secondary" className="text-xs">
         {t('tickets.statuses_desc')}

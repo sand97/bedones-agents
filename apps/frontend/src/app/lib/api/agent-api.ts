@@ -139,6 +139,7 @@ export interface Product {
   name: string
   description?: string
   imageUrl?: string
+  additionalImageUrls?: string[]
   price?: number
   currency?: string
   category?: string
@@ -216,6 +217,7 @@ export const catalogApi = {
       name: string
       description?: string
       imageUrl?: string
+      additionalImageUrls?: string[]
       price?: string
       currency?: string
       category?: string
@@ -238,6 +240,7 @@ export const catalogApi = {
       name?: string
       description?: string
       imageUrl?: string
+      additionalImageUrls?: string[]
       price?: string
       currency?: string
       category?: string

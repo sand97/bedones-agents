@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Modal,
@@ -75,6 +75,11 @@ interface PendingFile {
   previewUrl: string
 }
 
+/**
+ * Outer wrapper — only handles Modal open/close lifecycle.
+ * Content is destroyed/remounted each time via destroyOnHidden,
+ * so internal state always starts fresh.
+ */
 export function ProductModal({
   open,
   onClose,
@@ -84,157 +89,215 @@ export function ProductModal({
   collections,
 }: ProductModalProps) {
   const { t } = useTranslation()
-  const [form] = Form.useForm()
-  const currency = Form.useWatch('currency', form) as string | undefined
-  const imageUrls = (Form.useWatch('imageUrls', form) as string[] | undefined) || []
+  const contentRef = useRef<ProductModalContentHandle>(null)
   const [uploading, setUploading] = useState(false)
-
-  // Pending files waiting to be uploaded on submit
-  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
-
-  const initialValues = product
-    ? {
-        name: product.name,
-        description: product.description,
-        imageUrls: product.imageUrl ? [product.imageUrl] : [],
-        price: product.price,
-        currency: normalizeCurrency(product.currency),
-        category: product.category,
-        url: product.url,
-        availability: product.availability,
-        brand: product.brand,
-        condition: product.condition,
-      }
-    : { currency: 'XAF', imageUrls: [] }
-
-  /** Add files to the pending list — no upload yet */
-  const handleAddFile = (file: File) => {
-    const previewUrl = URL.createObjectURL(file)
-    setPendingFiles((prev) => [...prev, { file, previewUrl }])
-    // Mark imageUrls as valid so the form validator passes
-    const current: string[] = form.getFieldValue('imageUrls') || []
-    form.setFieldValue('imageUrls', [...current, previewUrl])
-    form.validateFields(['imageUrls'])
-    return false
-  }
-
-  /** Remove a pending file by its preview URL */
-  const removePendingFile = (previewUrl: string) => {
-    setPendingFiles((prev) => {
-      const entry = prev.find((p) => p.previewUrl === previewUrl)
-      if (entry) URL.revokeObjectURL(entry.previewUrl)
-      return prev.filter((p) => p.previewUrl !== previewUrl)
-    })
-  }
-
-  const handleSubmit = async () => {
-    const values = await form.validateFields()
-
-    // Upload pending files to the server (like chat media upload)
-    if (pendingFiles.length > 0) {
-      setUploading(true)
-      try {
-        const uploadedUrls = await Promise.all(pendingFiles.map((pf) => uploadChatMedia(pf.file)))
-        // Combine already-remote URLs (from edit) with freshly uploaded ones
-        const existingRemoteUrls = (values.imageUrls as string[]).filter(
-          (u: string) => !u.startsWith('blob:'),
-        )
-        values.imageUrls = [...existingRemoteUrls, ...uploadedUrls]
-      } catch {
-        message.error(t('upload.error'))
-        setUploading(false)
-        return
-      } finally {
-        setUploading(false)
-      }
-    }
-
-    // Clean up blob URLs
-    pendingFiles.forEach((pf) => URL.revokeObjectURL(pf.previewUrl))
-    setPendingFiles([])
-
-    onSubmit(values)
-  }
-
-  const categoryOptions = CATEGORY_SUGGESTIONS.map((c) => ({ value: c }))
-
   return (
     <Modal
       open={open}
       onCancel={onClose}
-      afterClose={() => {
-        pendingFiles.forEach((pf) => URL.revokeObjectURL(pf.previewUrl))
-        setPendingFiles([])
-      }}
       title={product ? t('catalog.edit_article') : t('catalog.add_article')}
       width={640}
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
-      footer={
-        <div className="flex items-center justify-end gap-2">
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button type="primary" onClick={handleSubmit} loading={loading}>
-            {product ? t('common.save') : t('common.create')}
-          </Button>
-        </div>
-      }
-      destroyOnClose
+      destroyOnHidden
+      footer={[
+        <Button key="cancel" onClick={onClose}>
+          {t('common.cancel')}
+        </Button>,
+        <Button
+          key="submit"
+          type="primary"
+          onClick={() => contentRef.current?.submit()}
+          loading={loading || uploading}
+        >
+          {product ? t('common.save') : t('common.create')}
+        </Button>,
+      ]}
     >
-      <Form form={form} layout="vertical" className="pt-2" initialValues={initialValues}>
-        <Form.Item
-          name="name"
-          label={t('catalog.product_name')}
-          rules={[{ required: true, message: t('catalog.product_name_required') }]}
-        >
-          <Input placeholder={t('catalog.product_name_placeholder')} />
-        </Form.Item>
+      <ProductModalContent
+        ref={contentRef}
+        onSubmit={onSubmit}
+        product={product}
+        collections={collections}
+        onUploadingChange={setUploading}
+      />
+    </Modal>
+  )
+}
 
-        <Form.Item name="description" label={t('catalog.product_description')}>
-          <Input.TextArea rows={3} placeholder={t('catalog.product_description_placeholder')} />
-        </Form.Item>
+interface ProductModalContentHandle {
+  submit: () => void
+}
 
-        <Form.Item
-          name="imageUrls"
-          label={t('catalog.product_image')}
-          rules={[
-            {
-              validator: (_, value) =>
-                value && value.length > 0
-                  ? Promise.resolve()
-                  : Promise.reject(new Error(t('catalog.image_required'))),
-            },
-          ]}
-        >
-          {imageUrls.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap gap-2">
-                {imageUrls.map((url, i) => (
-                  <div key={i} className="relative">
-                    <img
-                      src={url}
-                      alt={`image-${i + 1}`}
-                      className="h-20 w-20 rounded-lg object-cover"
-                    />
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<X size={12} />}
-                      className="product-modal-img-remove"
-                      onClick={() => {
-                        const current: string[] = form.getFieldValue('imageUrls') || []
-                        form.setFieldValue(
-                          'imageUrls',
-                          current.filter((u) => u !== url),
-                        )
-                        // Also remove from pending files if it's a blob URL
-                        if (url.startsWith('blob:')) {
-                          removePendingFile(url)
-                        }
-                        setTimeout(() => form.validateFields(['imageUrls']))
-                      }}
-                    />
+interface ProductModalContentProps {
+  onSubmit: ProductModalProps['onSubmit']
+  product?: Product
+  collections?: Collection[]
+  onUploadingChange: (uploading: boolean) => void
+}
+
+const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalContentProps>(
+  function ProductModalContent({ onSubmit, product, collections, onUploadingChange }, ref) {
+    const { t } = useTranslation()
+    const [form] = Form.useForm()
+    const currency = Form.useWatch('currency', form) as string | undefined
+    const [uploading, setUploading] = useState(false)
+    const [imageError, setImageError] = useState<string | null>(null)
+
+    // Notify parent about uploading state changes
+    useEffect(() => {
+      onUploadingChange(uploading)
+    }, [uploading, onUploadingChange])
+
+    // All image URLs currently shown (mix of remote URLs and blob: previews)
+    const [imageUrls, setImageUrls] = useState<string[]>(() => {
+      const initial: string[] = []
+      if (product?.imageUrl) initial.push(product.imageUrl)
+      if (product?.additionalImageUrls?.length) initial.push(...product.additionalImageUrls)
+      return initial
+    })
+
+    // Pending files waiting to be uploaded on submit
+    const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
+
+    const initialValues = product
+      ? {
+          name: product.name,
+          description: product.description,
+          price: product.price,
+          currency: normalizeCurrency(product.currency),
+          category: product.category,
+          url: product.url,
+          availability: product.availability,
+          brand: product.brand,
+          condition: product.condition,
+          collectionId: product.collectionId,
+        }
+      : { currency: 'XAF' }
+
+    /** Add files to the pending list — no upload yet */
+    const handleAddFile = (file: File) => {
+      const previewUrl = URL.createObjectURL(file)
+      setPendingFiles((prev) => [...prev, { file, previewUrl }])
+      setImageUrls((prev) => [...prev, previewUrl])
+      setImageError(null)
+      return false
+    }
+
+    /** Remove a pending file by its preview URL */
+    const removePendingFile = (previewUrl: string) => {
+      setPendingFiles((prev) => {
+        const entry = prev.find((p) => p.previewUrl === previewUrl)
+        if (entry) URL.revokeObjectURL(entry.previewUrl)
+        return prev.filter((p) => p.previewUrl !== previewUrl)
+      })
+    }
+
+    const handleRemoveImage = (url: string) => {
+      setImageUrls((prev) => prev.filter((u) => u !== url))
+      if (url.startsWith('blob:')) {
+        removePendingFile(url)
+      }
+    }
+
+    const handleSubmit = async () => {
+      if (imageUrls.length === 0) {
+        setImageError(t('catalog.image_required'))
+      }
+      let values
+      try {
+        values = await form.validateFields()
+      } catch {
+        return
+      }
+      if (imageUrls.length === 0) return
+
+      let finalImageUrls = imageUrls
+
+      // Upload pending files to the server (like chat media upload)
+      if (pendingFiles.length > 0) {
+        setUploading(true)
+        try {
+          const uploadedUrls = await Promise.all(pendingFiles.map((pf) => uploadChatMedia(pf.file)))
+          const existingRemoteUrls = imageUrls.filter((u) => !u.startsWith('blob:'))
+          finalImageUrls = [...existingRemoteUrls, ...uploadedUrls]
+        } catch {
+          message.error(t('upload.error'))
+          setUploading(false)
+          return
+        } finally {
+          setUploading(false)
+        }
+      }
+
+      // Clean up blob URLs
+      pendingFiles.forEach((pf) => URL.revokeObjectURL(pf.previewUrl))
+      setPendingFiles([])
+
+      onSubmit({ ...values, imageUrls: finalImageUrls })
+    }
+
+    useImperativeHandle(ref, () => ({ submit: handleSubmit }), [handleSubmit])
+
+    const categoryOptions = CATEGORY_SUGGESTIONS.map((c) => ({ value: c }))
+
+    return (
+      <>
+        <Form form={form} layout="vertical" className="pt-2" initialValues={initialValues}>
+          <Form.Item
+            name="name"
+            label={t('catalog.product_name')}
+            rules={[{ required: true, message: t('catalog.product_name_required') }]}
+          >
+            <Input placeholder={t('catalog.product_name_placeholder')} />
+          </Form.Item>
+
+          <Form.Item name="description" label={t('catalog.product_description')}>
+            <Input.TextArea rows={3} placeholder={t('catalog.product_description_placeholder')} />
+          </Form.Item>
+
+          <Form.Item
+            label={t('catalog.product_image')}
+            validateStatus={imageError ? 'error' : undefined}
+            help={imageError ?? undefined}
+          >
+            {imageUrls.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-2">
+                  {imageUrls.map((url, i) => (
+                    <div key={`${url}-${i}`} className="relative">
+                      <img
+                        src={url}
+                        alt={`image-${i + 1}`}
+                        className="h-20 w-20 rounded-lg object-cover"
+                      />
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<X size={12} />}
+                        className="product-modal-img-remove"
+                        onClick={() => handleRemoveImage(url)}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <Upload.Dragger
+                  showUploadList={false}
+                  multiple
+                  accept=".jpg,.jpeg,.png,.webp"
+                  beforeUpload={(file) => {
+                    handleAddFile(file)
+                    return false
+                  }}
+                  customRequest={() => {}}
+                >
+                  <div className="flex flex-col items-center gap-1 py-1">
+                    <span className="text-xs text-text-muted">
+                      {uploading ? t('common.loading') : t('catalog.upload_images_title')}
+                    </span>
                   </div>
-                ))}
+                </Upload.Dragger>
               </div>
+            ) : (
               <Upload.Dragger
                 showUploadList={false}
                 multiple
@@ -245,112 +308,95 @@ export function ProductModal({
                 }}
                 customRequest={() => {}}
               >
-                <div className="flex flex-col items-center gap-1 py-1">
-                  <span className="text-xs text-text-muted">
+                <div className="flex flex-col items-center gap-2 py-2">
+                  <UploadImageIcon />
+                  <span className="text-sm font-medium text-text-primary">
                     {uploading ? t('common.loading') : t('catalog.upload_images_title')}
                   </span>
+                  <span className="text-xs text-text-muted">{t('catalog.upload_images_hint')}</span>
                 </div>
               </Upload.Dragger>
-            </div>
-          ) : (
-            <Upload.Dragger
-              showUploadList={false}
-              multiple
-              accept=".jpg,.jpeg,.png,.webp"
-              beforeUpload={(file) => {
-                handleAddFile(file)
-                return false
-              }}
-              customRequest={() => {}}
-            >
-              <div className="flex flex-col items-center gap-2 py-2">
-                <UploadImageIcon />
-                <span className="text-sm font-medium text-text-primary">
-                  {uploading ? t('common.loading') : t('catalog.upload_images_title')}
-                </span>
-                <span className="text-xs text-text-muted">{t('catalog.upload_images_hint')}</span>
-              </div>
-            </Upload.Dragger>
-          )}
-        </Form.Item>
+            )}
+          </Form.Item>
 
-        {/* Prix : currency select + montant stacked comme la réduction promo */}
-        <Form.Item label={t('catalog.product_price')} className="mb-4">
-          <div className="promo-modal-reduction-row">
-            <Form.Item name="currency" noStyle>
-              <Select options={CURRENCY_OPTIONS} className="promo-modal-type-select" />
+          {/* Prix : currency select + montant stacked comme la réduction promo */}
+          <Form.Item label={t('catalog.product_price')} className="mb-4">
+            <div className="promo-modal-reduction-row">
+              <Form.Item name="currency" noStyle>
+                <Select options={CURRENCY_OPTIONS} className="promo-modal-type-select" />
+              </Form.Item>
+              <Form.Item name="price" noStyle>
+                <InputNumber
+                  min={0}
+                  placeholder="Ex: 25000"
+                  suffix={currency === 'XAF' || currency === 'XOF' ? 'FCFA' : currency}
+                  className="promo-modal-value-input"
+                />
+              </Form.Item>
+            </div>
+          </Form.Item>
+
+          <div className="flex gap-4">
+            <Form.Item name="category" label={t('catalog.category')} className="flex-1">
+              <AutoComplete
+                options={categoryOptions}
+                placeholder={t('catalog.category_placeholder')}
+                filterOption={(input, option) =>
+                  (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+              />
             </Form.Item>
-            <Form.Item name="price" noStyle>
-              <InputNumber
-                min={0}
-                placeholder="Ex: 25000"
-                suffix={currency === 'XAF' || currency === 'XOF' ? 'FCFA' : currency}
-                className="promo-modal-value-input"
+            <Form.Item name="collectionId" label={t('catalog.collection')} className="flex-1">
+              <Select
+                allowClear
+                placeholder={t('catalog.collection')}
+                options={(collections || []).map((c) => ({ label: c.name, value: c.id }))}
               />
             </Form.Item>
           </div>
-        </Form.Item>
 
-        <div className="flex gap-4">
-          <Form.Item name="category" label={t('catalog.category')} className="flex-1">
-            <AutoComplete
-              options={categoryOptions}
-              placeholder={t('catalog.category_placeholder')}
-              filterOption={(input, option) =>
-                (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
-              }
-            />
-          </Form.Item>
-          <Form.Item name="collectionId" label={t('catalog.collection')} className="flex-1">
-            <Select
-              allowClear
-              placeholder={t('catalog.collection')}
-              options={(collections || []).map((c) => ({ label: c.name, value: c.id }))}
-            />
-          </Form.Item>
-        </div>
-
-        <Form.Item name="url" label={t('catalog.product_url')}>
-          <Input type="url" placeholder="https://..." />
-        </Form.Item>
-
-        {/* Disponibilité + État sur la même ligne */}
-        <div className="flex gap-4">
-          <Form.Item
-            name="availability"
-            label={t('catalog.product_availability')}
-            className="flex-1"
-          >
-            <Select
-              allowClear
-              placeholder={t('catalog.product_availability')}
-              options={[
-                { label: t('catalog.in_stock'), value: 'in stock' },
-                { label: t('catalog.out_of_stock'), value: 'out of stock' },
-              ]}
-            />
+          <Form.Item name="url" label={t('catalog.product_url')}>
+            <Input type="url" placeholder="https://..." />
           </Form.Item>
 
-          <Form.Item name="condition" label={t('catalog.product_condition')} className="flex-1">
-            <Select
-              allowClear
-              placeholder={t('catalog.product_condition')}
-              options={[
-                { label: t('catalog.product_condition_new'), value: 'new' },
-                { label: t('catalog.product_condition_refurbished'), value: 'refurbished' },
-                { label: t('catalog.product_condition_used'), value: 'used' },
-              ]}
-            />
-          </Form.Item>
-        </div>
+          {/* Disponibilité + État sur la même ligne */}
+          <div className="flex gap-4">
+            <Form.Item
+              name="availability"
+              label={t('catalog.product_availability')}
+              className="flex-1"
+            >
+              <Select
+                allowClear
+                placeholder={t('catalog.product_availability')}
+                options={[
+                  { label: t('catalog.in_stock'), value: 'in stock' },
+                  { label: t('catalog.out_of_stock'), value: 'out of stock' },
+                ]}
+              />
+            </Form.Item>
 
-        <Form.Item name="brand" label={t('catalog.product_brand')}>
-          <Input placeholder={t('catalog.product_brand_placeholder')} />
-        </Form.Item>
-      </Form>
-    </Modal>
-  )
-}
+            <Form.Item name="condition" label={t('catalog.product_condition')} className="flex-1">
+              <Select
+                allowClear
+                placeholder={t('catalog.product_condition')}
+                options={[
+                  { label: t('catalog.product_condition_new'), value: 'new' },
+                  { label: t('catalog.product_condition_refurbished'), value: 'refurbished' },
+                  { label: t('catalog.product_condition_used'), value: 'used' },
+                ]}
+              />
+            </Form.Item>
+          </div>
+
+          <Form.Item name="brand" label={t('catalog.product_brand')}>
+            <Input placeholder={t('catalog.product_brand_placeholder')} />
+          </Form.Item>
+        </Form>
+      </>
+    )
+  },
+)
 
 /* ─── Icons ─── */
 

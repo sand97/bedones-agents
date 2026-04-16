@@ -50,6 +50,12 @@ export class CreateProductDto {
   @IsOptional()
   imageUrl?: string
 
+  @ApiPropertyOptional({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  additionalImageUrls?: string[]
+
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
@@ -106,6 +112,12 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   imageUrl?: string
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  additionalImageUrls?: string[]
 
   @ApiPropertyOptional()
   @IsString()
@@ -217,6 +229,9 @@ export class ProductResponseDto {
 
   @ApiPropertyOptional()
   imageUrl?: string
+
+  @ApiPropertyOptional({ type: [String] })
+  additionalImageUrls?: string[]
 
   @ApiPropertyOptional()
   price?: number

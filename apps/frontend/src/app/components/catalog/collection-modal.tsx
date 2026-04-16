@@ -45,7 +45,7 @@ export function CollectionModal({
       title={collection ? t('catalog.edit_collection') : t('catalog.add_collection')}
       okText={collection ? t('common.save') : t('common.add')}
       cancelText={t('common.cancel')}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form form={form} layout="vertical">
         <Form.Item

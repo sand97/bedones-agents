@@ -65,9 +65,11 @@ function CatalogPage() {
 
   const currentPage = cursorStack.length + 1
 
-  // Product CRUD state
-  const [createProductOpen, setCreateProductOpen] = useState(false)
-  const [editProduct, setEditProduct] = useState<Product | undefined>(undefined)
+  // Product modal state — single source of truth
+  const [modalProductConfig, setModalProductConfig] = useState<{
+    isOpen: boolean
+    initialProduct?: Product
+  }>({ isOpen: false })
 
   // URL params helpers
   const updateSearch = useCallback(
@@ -158,7 +160,7 @@ function CatalogPage() {
       selectedCatalog ? catalogApi.createProduct(selectedCatalog.id, data) : Promise.reject(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['catalog-products', selectedCatalog?.id] })
-      setCreateProductOpen(false)
+      setModalProductConfig({ isOpen: false })
     },
   })
 
@@ -175,7 +177,7 @@ function CatalogPage() {
         : Promise.reject(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['catalog-products', selectedCatalog?.id] })
-      setEditProduct(undefined)
+      setModalProductConfig({ isOpen: false })
     },
   })
 
@@ -240,9 +242,7 @@ function CatalogPage() {
       okText: t('common.delete'),
       okButtonProps: { danger: true },
       cancelText: t('common.cancel'),
-      onOk: () => {
-        deleteProductMutation.mutate(productId)
-      },
+      onOk: () => deleteProductMutation.mutateAsync(productId),
     })
   }
 
@@ -284,7 +284,8 @@ function CatalogPage() {
                   key: 'edit',
                   label: t('catalog.edit_article'),
                   icon: <Pencil size={14} />,
-                  onClick: () => product && setEditProduct(product),
+                  onClick: () =>
+                    product && setModalProductConfig({ isOpen: true, initialProduct: product }),
                 },
                 {
                   key: 'delete',
@@ -414,7 +415,7 @@ function CatalogPage() {
             </div>
             <div className="flex-1 lg:ml-auto lg:flex-none">
               <Button
-                onClick={() => setCreateProductOpen(true)}
+                onClick={() => setModalProductConfig({ isOpen: true })}
                 icon={<Plus size={14} />}
                 block={!isDesktop}
               >
@@ -490,7 +491,9 @@ function CatalogPage() {
                               key: 'edit',
                               label: t('catalog.edit_article'),
                               icon: <Pencil size={14} />,
-                              onClick: () => product && setEditProduct(product),
+                              onClick: () =>
+                                product &&
+                                setModalProductConfig({ isOpen: true, initialProduct: product }),
                             },
                             {
                               key: 'delete',
@@ -544,16 +547,15 @@ function CatalogPage() {
 
       <ProductModal
         collections={collections}
-        open={createProductOpen || !!editProduct}
-        onClose={() => {
-          setCreateProductOpen(false)
-          setEditProduct(undefined)
-        }}
+        open={modalProductConfig.isOpen}
+        onClose={() => setModalProductConfig({ isOpen: false })}
         onSubmit={(values) => {
+          const [firstImage, ...extraImages] = values.imageUrls ?? []
           const apiData = {
             name: values.name,
             description: values.description,
-            imageUrl: values.imageUrls?.[0],
+            imageUrl: firstImage,
+            additionalImageUrls: extraImages,
             price: values.price != null ? String(values.price) : undefined,
             currency: values.currency,
             category: values.category,
@@ -563,13 +565,14 @@ function CatalogPage() {
             condition: values.condition,
             collectionId: values.collectionId,
           }
-          if (editProduct) {
-            updateProductMutation.mutate({ productId: editProduct.id, data: apiData })
+          const editing = modalProductConfig.initialProduct
+          if (editing) {
+            updateProductMutation.mutate({ productId: editing.id, data: apiData })
           } else {
             createProductMutation.mutate(apiData)
           }
         }}
-        product={editProduct}
+        product={modalProductConfig.initialProduct}
         loading={createProductMutation.isPending || updateProductMutation.isPending}
       />
     </div>

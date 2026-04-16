@@ -246,7 +246,7 @@ export function CommentsConfigModal({
         </Button>,
       ]}
       width={520}
-      destroyOnClose
+      destroyOnHidden
     >
       <ConfigForm form={form} />
     </Modal>

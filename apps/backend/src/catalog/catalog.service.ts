@@ -110,7 +110,7 @@ export class CatalogService {
   // ─── Meta Product Fields ───
 
   private static readonly META_PRODUCT_FIELDS =
-    'id,retailer_id,name,description,image_url,price,currency,category,product_type,url,availability,brand,condition,inventory,review_status,product_sets{id,name}'
+    'id,retailer_id,name,description,image_url,additional_image_urls,price,currency,category,product_type,url,availability,brand,condition,inventory,review_status,product_sets{id,name}'
 
   /**
    * Parse Meta price format like "FCFA10,000" or "1999 XAF" or "$25.99"
@@ -144,6 +144,9 @@ export class CatalogService {
       name: p.name,
       description: p.description,
       imageUrl: p.image_url,
+      additionalImageUrls: Array.isArray(p.additional_image_urls)
+        ? (p.additional_image_urls as string[])
+        : [],
       price: priceInfo?.amount ?? null,
       currency: priceInfo?.currency ?? 'XAF',
       category:
@@ -364,6 +367,7 @@ export class CatalogService {
       name: string
       description?: string
       imageUrl?: string
+      additionalImageUrls?: string[]
       price?: string
       currency?: string
       category?: string
@@ -388,6 +392,9 @@ export class CatalogService {
     }
     if (data.description) body.description = data.description
     if (data.imageUrl) body.image_url = data.imageUrl
+    if (data.additionalImageUrls && data.additionalImageUrls.length > 0) {
+      body.additional_image_urls = data.additionalImageUrls
+    }
     if (data.price) {
       const iso = this.normalizeIsoCurrency(data.currency)
       body.price = Math.round(parseFloat(data.price) * 100)
@@ -442,6 +449,7 @@ export class CatalogService {
       name?: string
       description?: string
       imageUrl?: string
+      additionalImageUrls?: string[]
       price?: string
       currency?: string
       category?: string
@@ -457,6 +465,9 @@ export class CatalogService {
     if (data.name) productData.name = data.name
     if (data.description) productData.description = data.description
     if (data.imageUrl) productData.image_url = data.imageUrl
+    if (data.additionalImageUrls) {
+      productData.additional_image_urls = data.additionalImageUrls
+    }
     if (data.price) {
       const iso = this.normalizeIsoCurrency(data.currency)
       productData.price = Math.round(parseFloat(data.price) * 100)

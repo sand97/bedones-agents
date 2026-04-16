@@ -213,7 +213,7 @@ function LoginPage() {
         onCancel={() => setSupportOpen(false)}
         title="Contacter le support"
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form
           form={supportForm}

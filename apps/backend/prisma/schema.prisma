@@ -238,6 +238,7 @@ model Product {
   name             String
   description      String?
   imageUrl         String?
+  additionalImageUrls String[] @default([])
   price            Float?
   currency         String?  @default("XAF")
   category         String?

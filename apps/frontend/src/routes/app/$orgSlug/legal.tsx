@@ -186,7 +186,7 @@ function HelpPage() {
           onCancel={() => setContactOpen(false)}
           title={t('help.contact_modal_title')}
           footer={null}
-          destroyOnClose
+          destroyOnHidden
         >
           <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
             <Form.Item
