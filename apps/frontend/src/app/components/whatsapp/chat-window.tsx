@@ -445,7 +445,7 @@ function MessageBubble({
                     {item.imageUrl ? (
                       <img
                         src={item.imageUrl}
-                        alt={item.name}
+                        alt={item.name ?? item.retailerId ?? ''}
                         className="h-12 w-12 flex-shrink-0 rounded-control object-cover"
                       />
                     ) : (
@@ -454,9 +454,11 @@ function MessageBubble({
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-text-primary">
-                        {item.name}
-                      </div>
+                      <Tooltip title={item.retailerId} placement="top">
+                        <div className="truncate text-sm font-semibold text-text-primary">
+                          {item.name || item.retailerId}
+                        </div>
+                      </Tooltip>
                       <div className="text-xs text-text-muted">
                         {formatProductPrice(item.price, item.currency)}
                       </div>
@@ -520,7 +522,7 @@ function MessageBubble({
                   {item.imageUrl ? (
                     <img
                       src={item.imageUrl}
-                      alt={item.name}
+                      alt={item.name ?? item.retailerId ?? ''}
                       className="h-12 w-12 flex-shrink-0 rounded-control object-cover"
                     />
                   ) : (
@@ -529,9 +531,11 @@ function MessageBubble({
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold text-text-primary">
-                      {item.name}
-                    </div>
+                    <Tooltip title={item.retailerId} placement="top">
+                      <div className="truncate text-sm font-semibold text-text-primary">
+                        {item.name || item.retailerId}
+                      </div>
+                    </Tooltip>
                     <div className="text-xs text-text-muted">
                       {t('chat.order_qty', { count: item.quantity })} ·{' '}
                       {formatProductPrice(item.itemPrice, item.currency)}

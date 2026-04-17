@@ -31,23 +31,23 @@ export function createProductMessagingTools(deps: {
     {
       name: 'send_products',
       description:
-        'Send product(s) from the catalog to the customer via WhatsApp. Use "product" format for a single product, or "product_list" for multiple products (up to 30). The product IDs must be retailer IDs from the search_products tool results.',
+        'Send product(s) from the catalog to the customer via WhatsApp. Default format by count (unless admin rules override): 1-3 → "product", 4-10 → "carousel", >10 → "product_list". If you request "carousel" with more than 10 products, the service will automatically fall back to "product_list". Product IDs must be retailer IDs from the search_products tool results.',
       schema: z.object({
         productIds: z
           .array(z.string())
           .min(1)
           .max(30)
-          .describe('Array of product retailer IDs to send'),
+          .describe('Array of product retailer IDs to send (max 30)'),
         catalogId: z.string().describe('Internal catalog ID (from search_products context)'),
         format: z
           .enum(['product', 'product_list', 'carousel', 'catalog_message'])
           .describe(
-            'Message format: "product" (single, loops if multiple IDs), "product_list" (sectioned list), "carousel" (swipeable product cards), "catalog_message" (catalog CTA with optional thumbnail)',
+            'Message format. Defaults: "product" for 1-3 items (sent as individual product cards), "carousel" for 4-10 items (swipeable cards, hard cap 10), "product_list" for >10 items (sectioned list, up to 30). "catalog_message" shows a catalog CTA with optional thumbnail.',
           ),
         headerText: z
           .string()
           .optional()
-          .describe('Header text for product_list messages (required for product_list)'),
+          .describe('Header text — required for product_list, ignored by other formats'),
         bodyText: z.string().optional().describe('Body text to accompany the product message'),
       }),
     },

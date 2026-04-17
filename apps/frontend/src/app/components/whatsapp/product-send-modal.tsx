@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Modal, Select, Input, Button, message } from 'antd'
 import {
@@ -12,9 +12,10 @@ type ProductFormat = 'product' | 'product_list' | 'carousel'
 // Per Meta WhatsApp Cloud API spec:
 // - product: body + footer supported (no header)
 // - product_list: header (required) + body (required) + footer (optional)
-// - carousel: body only (no header, no footer)
+// - carousel: body only (no header, no footer), max 10 cards
 const HEADER_FORMATS: ProductFormat[] = ['product_list']
 const FOOTER_FORMATS: ProductFormat[] = ['product', 'product_list']
+const CAROUSEL_MAX = 10
 
 interface ProductSendModalProps {
   open: boolean
@@ -43,15 +44,26 @@ export function ProductSendModal({ open, onClose, catalog, onSend }: ProductSend
   const supportsHeader = HEADER_FORMATS.includes(format)
   const supportsFooter = FOOTER_FORMATS.includes(format)
 
+  // Auto-fallback: carousel caps at 10 cards per Meta spec.
+  useEffect(() => {
+    if (format === 'carousel' && selectedProducts.length > CAROUSEL_MAX) {
+      setFormat('product_list')
+      message.info(t('chat.carousel_max_fallback', { max: CAROUSEL_MAX }))
+    }
+  }, [format, selectedProducts.length, t])
+
   const handlePickerSave = (_ids: string[]) => {
     // We use onSaveProducts instead
   }
 
   const handlePickerSaveProducts = (products: PickerProduct[]) => {
     setSelectedProducts(products)
-    // Auto-select format based on count
-    if (products.length === 1) {
+    // Default format follows the same rules as the agent:
+    // <=3 → product (multi-single), <=10 → carousel, >10 → product_list.
+    if (products.length <= 3) {
       setFormat('product')
+    } else if (products.length <= CAROUSEL_MAX) {
+      setFormat('carousel')
     } else {
       setFormat('product_list')
     }

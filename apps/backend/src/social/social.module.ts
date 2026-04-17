@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { AuthModule } from '../auth/auth.module'
 import { UploadModule } from '../upload/upload.module'
+import { CatalogModule } from '../catalog/catalog.module'
 import { SocialController } from './social.controller'
 import { SocialService } from './social.service'
 import { WebhookController } from './webhook.controller'
@@ -13,7 +14,7 @@ import { LabelController } from './label.controller'
 import { LabelService } from './label.service'
 
 @Module({
-  imports: [AuthModule, UploadModule],
+  imports: [AuthModule, UploadModule, CatalogModule],
   controllers: [
     SocialController,
     WebhookController,

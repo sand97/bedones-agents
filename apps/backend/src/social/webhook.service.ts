@@ -955,20 +955,44 @@ export class WebhookService {
       case 'order': {
         mediaType = 'order'
         const order = msg.order
-        const items = (order?.product_items || []).map((item) => ({
+        const rawItems = (order?.product_items || []).map((item) => ({
           productRetailerId: item.product_retailer_id,
           quantity: Number(item.quantity) || 1,
           itemPrice: Number(item.item_price) || 0,
           currency: item.currency,
         }))
-        const total = items.reduce((sum, it) => sum + it.itemPrice * it.quantity, 0)
+        const total = rawItems.reduce((sum, it) => sum + it.itemPrice * it.quantity, 0)
+
+        // Hydrate name/image from Meta catalog so the UI shows readable products.
+        let enrichedItems = rawItems as Array<
+          (typeof rawItems)[number] & {
+            name: string | null
+            imageUrl: string | null
+          }
+        >
+        if (order?.catalog_id) {
+          const hydrated = await this.messagingService.buildEnrichedItems(
+            order.catalog_id,
+            rawItems.map((i) => i.productRetailerId),
+          )
+          const byId = new Map(hydrated.map((h) => [h.productRetailerId, h]))
+          enrichedItems = rawItems.map((item) => {
+            const h = byId.get(item.productRetailerId)
+            return {
+              ...item,
+              name: h?.name ?? null,
+              imageUrl: h?.imageUrl ?? null,
+            }
+          })
+        }
+
         metadata = {
           kind: 'order',
           catalogId: order?.catalog_id || null,
           text: order?.text || undefined,
-          items,
+          items: enrichedItems,
           total,
-          currency: items[0]?.currency || null,
+          currency: rawItems[0]?.currency || null,
         }
         messageText = order?.text || ''
         break

@@ -145,14 +145,26 @@ ${context}
     agentContext: string
     labels: Array<{ id: string; name: string; color: string }>
     provider: string
+    canSendProducts?: boolean
   }): string {
-    const { agentContext, labels, provider } = input
+    const { agentContext, labels, provider, canSendProducts } = input
     const nowIso = new Date().toISOString()
 
     const labelsContext =
       labels.length > 0
         ? `\n\n## Available Labels\n${labels.map((l, i) => `${i + 1}. ${l.name} (id: ${l.id})`).join('\n')}\n`
         : '\n\n## Available Labels\nNo labels configured.\n'
+
+    const productSendRules = canSendProducts
+      ? `\n## Product Send Rules (WhatsApp)
+You can send products to the customer via the send_products tool. Unless the admin context above overrides these defaults, pick the \`format\` by product count:
+- **1-3 products** → use \`format: "product"\`. Our service will send each product as its own native single-product message (up to 3 in a row). Best when you want to highlight each item individually.
+- **4-10 products** → use \`format: "carousel"\`. Swipeable cards, one per product. Best for a visual selection among a small set.
+- **More than 10 products** → use \`format: "product_list"\`. A single sectioned list (up to 30). \`headerText\` is required for this format.
+
+Always respect any custom product-sending rule defined in the admin context above (it takes precedence over these defaults).
+`
+      : ''
 
     return `${agentContext}
 
@@ -161,7 +173,7 @@ Current datetime (ISO 8601, UTC): ${nowIso}
 
 ## Platform
 This conversation is on: ${provider}
-${labelsContext}
+${labelsContext}${productSendRules}
 
 # Role: AI Business Assistant
 

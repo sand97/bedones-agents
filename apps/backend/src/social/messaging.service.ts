@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
 import { MediaConverterService } from '../upload/media-converter.service'
 import { UploadService } from '../upload/upload.service'
+import { CatalogService } from '../catalog/catalog.service'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
 
 @Injectable()
@@ -15,6 +16,7 @@ export class MessagingService {
     private encryptionService: EncryptionService,
     private mediaConverter: MediaConverterService,
     private uploadService: UploadService,
+    private catalogService: CatalogService,
   ) {}
 
   // ─── Get conversations for a social account ───
@@ -56,8 +58,6 @@ export class MessagingService {
       },
     })
 
-    const enrichedMetadataByMsgId = await this.enrichInteractiveMetadata(messages)
-
     return messages.map((m) => ({
       ...m,
       replyTo: m.replyTo
@@ -68,131 +68,8 @@ export class MessagingService {
           }
         : undefined,
       reactions: (m.reactions as { senderId: string; emoji: string }[]) || [],
-      metadata: enrichedMetadataByMsgId[m.id] ?? m.metadata ?? null,
+      metadata: m.metadata ?? null,
     }))
-  }
-
-  /**
-   * For messages that reference catalog products (mediaType=catalog|catalog_message|order),
-   * fetch the product details once (grouped by catalogId) and return an enriched metadata
-   * object keyed by messageId with product name/image/price attached to each item.
-   */
-  private async enrichInteractiveMetadata(
-    messages: { id: string; mediaType: string | null; metadata: unknown }[],
-  ): Promise<Record<string, Record<string, unknown>>> {
-    const productLookups = new Map<string, Set<string>>()
-
-    for (const m of messages) {
-      const meta = m.metadata as
-        | {
-            catalogId?: string
-            productRetailerIds?: string[]
-            items?: { productRetailerId?: string }[]
-          }
-        | null
-        | undefined
-      if (!meta) continue
-      const catalogId = meta.catalogId
-      if (!catalogId) continue
-      const ids = new Set<string>()
-      for (const id of meta.productRetailerIds || []) if (id) ids.add(id)
-      for (const item of meta.items || [])
-        if (item.productRetailerId) ids.add(item.productRetailerId)
-      if (ids.size === 0) continue
-      const existing = productLookups.get(catalogId) ?? new Set()
-      for (const id of ids) existing.add(id)
-      productLookups.set(catalogId, existing)
-    }
-
-    const productByKey = new Map<
-      string,
-      { name: string; imageUrl: string | null; price: number | null; currency: string | null }
-    >()
-
-    for (const [catalogProviderId, retailerIds] of productLookups) {
-      const catalog = await this.prisma.catalog.findFirst({
-        where: {
-          OR: [{ id: catalogProviderId }, { providerId: catalogProviderId }],
-        },
-        select: { id: true },
-      })
-      if (!catalog) continue
-
-      const products = await this.prisma.product.findMany({
-        where: {
-          catalogId: catalog.id,
-          providerProductId: { in: Array.from(retailerIds) },
-        },
-        select: {
-          providerProductId: true,
-          name: true,
-          imageUrl: true,
-          price: true,
-          currency: true,
-        },
-      })
-      for (const p of products) {
-        if (!p.providerProductId) continue
-        productByKey.set(`${catalogProviderId}::${p.providerProductId}`, {
-          name: p.name,
-          imageUrl: p.imageUrl,
-          price: p.price,
-          currency: p.currency,
-        })
-      }
-    }
-
-    const out: Record<string, Record<string, unknown>> = {}
-    for (const m of messages) {
-      const meta = m.metadata as
-        | {
-            catalogId?: string
-            productRetailerIds?: string[]
-            items?: {
-              productRetailerId?: string
-              quantity?: number
-              itemPrice?: number
-              currency?: string
-            }[]
-            [key: string]: unknown
-          }
-        | null
-        | undefined
-      if (!meta) continue
-      const catalogId = meta.catalogId
-      const enriched: Record<string, unknown> = { ...meta }
-
-      if (catalogId && meta.productRetailerIds?.length) {
-        enriched.items = meta.productRetailerIds.map((retailerId) => {
-          const p = productByKey.get(`${catalogId}::${retailerId}`)
-          return {
-            productRetailerId: retailerId,
-            name: p?.name ?? retailerId,
-            imageUrl: p?.imageUrl ?? null,
-            price: p?.price ?? null,
-            currency: p?.currency ?? null,
-          }
-        })
-      } else if (catalogId && meta.items?.length) {
-        enriched.items = meta.items.map((item) => {
-          const p = item.productRetailerId
-            ? productByKey.get(`${catalogId}::${item.productRetailerId}`)
-            : undefined
-          return {
-            productRetailerId: item.productRetailerId,
-            name: p?.name ?? item.productRetailerId ?? '',
-            imageUrl: p?.imageUrl ?? null,
-            quantity: item.quantity ?? 1,
-            itemPrice: item.itemPrice ?? p?.price ?? 0,
-            currency: item.currency ?? p?.currency ?? null,
-          }
-        })
-      }
-
-      out[m.id] = enriched
-    }
-
-    return out
   }
 
   // ─── Send a message ───
@@ -1099,17 +976,20 @@ export class MessagingService {
 
     const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
 
-    const { platformMsgIds, displayText } = await this.dispatchWhatsAppProductMessage(
-      conversation.socialAccount.providerAccountId,
-      conversation.participantId,
-      accessToken,
-      productRetailerIds,
-      catalogId,
-      format,
-      headerText,
-      bodyText,
-      footerText,
-    )
+    const { platformMsgIds, displayText, effectiveFormat } =
+      await this.dispatchWhatsAppProductMessage(
+        conversation.socialAccount.providerAccountId,
+        conversation.participantId,
+        accessToken,
+        productRetailerIds,
+        catalogId,
+        format,
+        headerText,
+        bodyText,
+        footerText,
+      )
+
+    const enrichedItems = await this.buildEnrichedItems(catalogId, productRetailerIds)
 
     const savedMessage = await this.prisma.directMessage.create({
       data: {
@@ -1120,12 +1000,13 @@ export class MessagingService {
         senderName: 'Page',
         isFromPage: true,
         isRead: true,
-        mediaType: format === 'catalog_message' ? 'catalog_message' : 'catalog',
+        mediaType: effectiveFormat === 'catalog_message' ? 'catalog_message' : 'catalog',
         metadata: {
           kind: 'catalog',
-          format,
+          format: effectiveFormat,
           catalogId,
           productRetailerIds,
+          items: enrichedItems,
           header: headerText?.trim() || null,
           body: bodyText?.trim() || null,
           footer: footerText?.trim() || null,
@@ -1178,17 +1059,20 @@ export class MessagingService {
 
     const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
 
-    const { platformMsgIds, displayText } = await this.dispatchWhatsAppProductMessage(
-      conversation.socialAccount.providerAccountId,
-      conversation.participantId,
-      accessToken,
-      productRetailerIds,
-      catalogId,
-      format,
-      headerText,
-      bodyText,
-      footerText,
-    )
+    const { platformMsgIds, displayText, effectiveFormat } =
+      await this.dispatchWhatsAppProductMessage(
+        conversation.socialAccount.providerAccountId,
+        conversation.participantId,
+        accessToken,
+        productRetailerIds,
+        catalogId,
+        format,
+        headerText,
+        bodyText,
+        footerText,
+      )
+
+    const enrichedItems = await this.buildEnrichedItems(catalogId, productRetailerIds)
 
     const savedMessage = await this.prisma.directMessage.create({
       data: {
@@ -1199,12 +1083,13 @@ export class MessagingService {
         senderName: 'AI Agent',
         isFromPage: true,
         isRead: true,
-        mediaType: format === 'catalog_message' ? 'catalog_message' : 'catalog',
+        mediaType: effectiveFormat === 'catalog_message' ? 'catalog_message' : 'catalog',
         metadata: {
           kind: 'catalog',
-          format,
+          format: effectiveFormat,
           catalogId,
           productRetailerIds,
+          items: enrichedItems,
           header: headerText?.trim() || null,
           body: bodyText?.trim() || null,
           footer: footerText?.trim() || null,
@@ -1229,6 +1114,41 @@ export class MessagingService {
    * Dispatch the product message to WhatsApp. Handles format-specific payload
    * building and the single-product loop (when format=product and N>1).
    */
+  /**
+   * Hydrate product retailer IDs into `items` with name/image/price for storage in
+   * message metadata. Meta is the source of truth; any retailer ID that Meta does
+   * not return is kept with null fields so the UI can fall back to the ID itself.
+   */
+  async buildEnrichedItems(
+    catalogProviderId: string,
+    retailerIds: string[],
+  ): Promise<
+    Array<{
+      productRetailerId: string
+      name: string | null
+      imageUrl: string | null
+      price: number | null
+      currency: string | null
+    }>
+  > {
+    if (retailerIds.length === 0) return []
+    const hydrated = await this.catalogService.hydrateProductsByRetailerIds(
+      catalogProviderId,
+      retailerIds,
+    )
+    const byRetailerId = new Map(hydrated.map((p) => [p.retailerId, p]))
+    return retailerIds.map((retailerId) => {
+      const p = byRetailerId.get(retailerId)
+      return {
+        productRetailerId: retailerId,
+        name: p?.name ?? null,
+        imageUrl: p?.imageUrl ?? null,
+        price: p?.price ?? null,
+        currency: p?.currency ?? null,
+      }
+    })
+  }
+
   private async dispatchWhatsAppProductMessage(
     phoneNumberId: string,
     recipientPhone: string,
@@ -1239,10 +1159,23 @@ export class MessagingService {
     headerText?: string,
     bodyText?: string,
     footerText?: string,
-  ): Promise<{ platformMsgIds: string[]; displayText: string }> {
+  ): Promise<{
+    platformMsgIds: string[]
+    displayText: string
+    effectiveFormat: 'product' | 'product_list' | 'carousel' | 'catalog_message'
+  }> {
     const platformMsgIds: string[] = []
 
-    if (format === 'product') {
+    // Meta WhatsApp carousel supports up to 10 cards. Above that, fall back to product_list.
+    let effectiveFormat = format
+    if (effectiveFormat === 'carousel' && productRetailerIds.length > 10) {
+      this.logger.warn(
+        `Carousel requested with ${productRetailerIds.length} products (>10). Falling back to product_list.`,
+      )
+      effectiveFormat = 'product_list'
+    }
+
+    if (effectiveFormat === 'product') {
       // Single product format: loop through every retailer ID and send each as its own message.
       // Per Meta spec: type=product supports body + footer (no header).
       for (const retailerId of productRetailerIds) {
@@ -1271,10 +1204,11 @@ export class MessagingService {
       return {
         platformMsgIds,
         displayText: count > 1 ? `[${count} products]` : '[product]',
+        effectiveFormat,
       }
     }
 
-    if (format === 'product_list') {
+    if (effectiveFormat === 'product_list') {
       // Per Meta spec: header (required, text), body (required), footer (optional).
       const interactive: Record<string, unknown> = {
         type: 'product_list',
@@ -1301,10 +1235,14 @@ export class MessagingService {
         `product_list (${productRetailerIds.length} items)`,
       )
       if (msgId) platformMsgIds.push(msgId)
-      return { platformMsgIds, displayText: `[${productRetailerIds.length} products]` }
+      return {
+        platformMsgIds,
+        displayText: `[${productRetailerIds.length} products]`,
+        effectiveFormat,
+      }
     }
 
-    if (format === 'carousel') {
+    if (effectiveFormat === 'carousel') {
       const interactive: Record<string, unknown> = {
         type: 'carousel',
         body: { text: bodyText?.trim() || headerText?.trim() || 'Here are the products:' },
@@ -1327,10 +1265,14 @@ export class MessagingService {
         `carousel (${productRetailerIds.length} items)`,
       )
       if (msgId) platformMsgIds.push(msgId)
-      return { platformMsgIds, displayText: `[${productRetailerIds.length} products]` }
+      return {
+        platformMsgIds,
+        displayText: `[${productRetailerIds.length} products]`,
+        effectiveFormat,
+      }
     }
 
-    // format === 'catalog_message'
+    // effectiveFormat === 'catalog_message'
     const action: Record<string, unknown> = { name: 'catalog_message' }
     if (productRetailerIds[0]) {
       action.parameters = { thumbnail_product_retailer_id: productRetailerIds[0] }
@@ -1351,7 +1293,7 @@ export class MessagingService {
       'catalog_message',
     )
     if (msgId) platformMsgIds.push(msgId)
-    return { platformMsgIds, displayText: '[catalog]' }
+    return { platformMsgIds, displayText: '[catalog]', effectiveFormat }
   }
 
   private async sendWhatsAppInteractivePayload(

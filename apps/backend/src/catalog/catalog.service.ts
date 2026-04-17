@@ -167,6 +167,87 @@ export class CatalogService {
     }
   }
 
+  /**
+   * Fetch a subset of catalog products by their retailer IDs, via Meta Graph API.
+   * Resolves the access token from any social account linked to the catalog whose
+   * providerId matches `catalogProviderId` (Meta catalog ID).
+   *
+   * Returns an array of `{ retailerId, name, imageUrl, price, currency }`. Missing
+   * products are simply omitted — callers should fall back to the retailer ID.
+   */
+  async hydrateProductsByRetailerIds(
+    catalogProviderId: string,
+    retailerIds: string[],
+  ): Promise<
+    Array<{
+      retailerId: string
+      name: string | null
+      imageUrl: string | null
+      price: number | null
+      currency: string | null
+    }>
+  > {
+    const ids = Array.from(new Set(retailerIds.filter(Boolean)))
+    if (ids.length === 0) return []
+
+    const catalog = await this.prisma.catalog.findFirst({
+      where: { providerId: catalogProviderId },
+      include: {
+        socialAccounts: {
+          include: { socialAccount: { omit: { accessToken: false } } },
+        },
+      },
+    })
+    if (!catalog) {
+      this.logger.warn(`hydrateProducts: no catalog found for providerId ${catalogProviderId}`)
+      return []
+    }
+    const socialLink = catalog.socialAccounts[0]
+    if (!socialLink) {
+      this.logger.warn(`hydrateProducts: no linked social account for catalog ${catalog.id}`)
+      return []
+    }
+    const accessToken = await this.encryptionService.decrypt(socialLink.socialAccount.accessToken)
+
+    // Meta Graph API supports filtering products by retailer_id via a JSON filter
+    // on the catalog's /products edge. We request only the fields we need for UI.
+    const filter = JSON.stringify({ retailer_id: { is_any: ids } })
+    const query = new URLSearchParams({
+      fields: 'id,retailer_id,name,image_url,price,currency',
+      limit: String(Math.max(ids.length, 50)),
+      filter,
+      access_token: accessToken,
+    })
+    const url = `${this.META_API_BASE}/${catalogProviderId}/products?${query}`
+
+    try {
+      const response = await fetch(url)
+      if (!response.ok) {
+        const errorText = await response.text()
+        this.logger.warn(`hydrateProducts: Meta API error ${response.status}: ${errorText}`)
+        return []
+      }
+      const data = (await response.json()) as {
+        data: Array<Record<string, unknown>>
+      }
+      return (data.data || []).map((p) => {
+        const priceInfo = p.price ? this.parseMetaPrice(String(p.price)) : null
+        return {
+          retailerId: String(p.retailer_id ?? ''),
+          name: (p.name as string) ?? null,
+          imageUrl: (p.image_url as string) ?? null,
+          price: priceInfo?.amount ?? null,
+          currency: (p.currency as string) ?? priceInfo?.currency ?? null,
+        }
+      })
+    } catch (error: unknown) {
+      this.logger.warn(
+        `hydrateProducts: fetch failed: ${error instanceof Error ? error.message : error}`,
+      )
+      return []
+    }
+  }
+
   async findProducts(
     catalogId: string,
     params?: {

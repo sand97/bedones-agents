@@ -202,10 +202,14 @@ export class AgentMessageProcessorService {
       select: { id: true, name: true, color: true },
     })
 
+    const canSendProducts =
+      event.provider === 'WHATSAPP' && Object.keys(catalogProviderMap).length > 0
+
     const systemPrompt = this.prompts.buildLiveAgentSystemPrompt({
       agentContext: agent.context || '',
       labels,
       provider: event.provider,
+      canSendProducts,
     })
 
     // Build conversation history for context

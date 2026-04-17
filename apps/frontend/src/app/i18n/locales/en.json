@@ -248,6 +248,7 @@
     "order_qty": "Qty {{count}}",
     "product_single_limit": "Single product format only supports 1 product",
     "product_max_limit": "Maximum 30 products per message",
+    "carousel_max_fallback": "Carousel is limited to {{max}} products — switching to product list",
     "product_send_error": "Failed to send products",
     "send": "Send",
     "media_duration_limit": "Audio and video files must not exceed 3 minutes",
