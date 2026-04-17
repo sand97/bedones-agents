@@ -31,6 +31,12 @@ interface ProductPickerModalProps {
   catalogs?: Catalog[]
   /** Called with full product objects when user saves — use this instead of onSave to get complete data */
   onSaveProducts?: (products: PickerProduct[]) => void
+  /**
+   * When true, hide the catalog Select even if multiple catalogs are provided.
+   * Use in contexts where the catalog is implicit (e.g. a WhatsApp number is linked
+   * to exactly one catalog, so the user never needs to pick one in the chat send flow).
+   */
+  hideCatalogSelect?: boolean
 }
 
 function formatPrice(price: number, currency: string) {
@@ -44,6 +50,7 @@ export function ProductPickerModal({
   initialSelection = [],
   catalogs,
   onSaveProducts,
+  hideCatalogSelect = false,
 }: ProductPickerModalProps) {
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
@@ -149,7 +156,7 @@ export function ProductPickerModal({
     <Modal
       title={
         <div className="flex flex-col gap-2">
-          {hasCatalogs && (
+          {hasCatalogs && !hideCatalogSelect && (
             <Select
               value={effectiveCatalogId}
               onChange={setSelectedCatalogId}

@@ -976,55 +976,45 @@ export class MessagingService {
 
     const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
 
-    const { platformMsgIds, displayText, effectiveFormat } =
-      await this.dispatchWhatsAppProductMessage(
-        conversation.socialAccount.providerAccountId,
-        conversation.participantId,
-        accessToken,
-        productRetailerIds,
-        catalogId,
-        format,
-        headerText,
-        bodyText,
-        footerText,
-      )
+    const { sends, effectiveFormat } = await this.dispatchWhatsAppProductMessage(
+      conversation.socialAccount.providerAccountId,
+      conversation.participantId,
+      accessToken,
+      productRetailerIds,
+      catalogId,
+      format,
+      headerText,
+      bodyText,
+      footerText,
+    )
 
-    const enrichedItems = await this.buildEnrichedItems(catalogId, productRetailerIds)
+    const savedMessages = await this.persistProductSends(
+      conversationId,
+      conversation.socialAccount.providerAccountId,
+      'Page',
+      sends,
+      effectiveFormat,
+      catalogId,
+      headerText,
+      bodyText,
+      footerText,
+    )
 
-    const savedMessage = await this.prisma.directMessage.create({
-      data: {
-        conversationId,
-        platformMsgId: platformMsgIds[0] || null,
-        message: bodyText?.trim() || displayText,
-        senderId: conversation.socialAccount.providerAccountId,
-        senderName: 'Page',
-        isFromPage: true,
-        isRead: true,
-        mediaType: effectiveFormat === 'catalog_message' ? 'catalog_message' : 'catalog',
-        metadata: {
-          kind: 'catalog',
-          format: effectiveFormat,
-          catalogId,
-          productRetailerIds,
-          items: enrichedItems,
-          header: headerText?.trim() || null,
-          body: bodyText?.trim() || null,
-          footer: footerText?.trim() || null,
-        } satisfies Prisma.InputJsonValue,
-        deliveryStatus: 'sent',
-        createdTime: new Date(),
-      },
-    })
+    const lastSaved = savedMessages[savedMessages.length - 1] ?? null
+    if (lastSaved) {
+      await this.prisma.conversation.update({
+        where: { id: conversationId },
+        data: {
+          lastMessageText: lastSaved.message,
+          lastMessageAt: new Date(),
+        },
+      })
+    }
 
-    await this.prisma.conversation.update({
-      where: { id: conversationId },
-      data: {
-        lastMessageText: bodyText?.trim() || displayText,
-        lastMessageAt: new Date(),
-      },
-    })
-
-    return savedMessage
+    // Contract preserved: return a single message. For single-product format with
+    // multiple products, this is the LAST one saved — the frontend invalidates and
+    // re-fetches the whole thread anyway.
+    return lastSaved ?? savedMessages[0]
   }
 
   // ─── Send product message as AI agent (no user auth check) ───
@@ -1059,55 +1049,97 @@ export class MessagingService {
 
     const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
 
-    const { platformMsgIds, displayText, effectiveFormat } =
-      await this.dispatchWhatsAppProductMessage(
-        conversation.socialAccount.providerAccountId,
-        conversation.participantId,
-        accessToken,
-        productRetailerIds,
-        catalogId,
-        format,
-        headerText,
-        bodyText,
-        footerText,
-      )
+    const { sends, effectiveFormat } = await this.dispatchWhatsAppProductMessage(
+      conversation.socialAccount.providerAccountId,
+      conversation.participantId,
+      accessToken,
+      productRetailerIds,
+      catalogId,
+      format,
+      headerText,
+      bodyText,
+      footerText,
+    )
 
-    const enrichedItems = await this.buildEnrichedItems(catalogId, productRetailerIds)
+    const savedMessages = await this.persistProductSends(
+      conversationId,
+      conversation.socialAccount.providerAccountId,
+      'AI Agent',
+      sends,
+      effectiveFormat,
+      catalogId,
+      headerText,
+      bodyText,
+      footerText,
+    )
 
-    const savedMessage = await this.prisma.directMessage.create({
-      data: {
-        conversationId,
-        platformMsgId: platformMsgIds[0] || null,
-        message: bodyText?.trim() || displayText,
-        senderId: conversation.socialAccount.providerAccountId,
-        senderName: 'AI Agent',
-        isFromPage: true,
-        isRead: true,
-        mediaType: effectiveFormat === 'catalog_message' ? 'catalog_message' : 'catalog',
-        metadata: {
-          kind: 'catalog',
-          format: effectiveFormat,
-          catalogId,
-          productRetailerIds,
-          items: enrichedItems,
-          header: headerText?.trim() || null,
-          body: bodyText?.trim() || null,
-          footer: footerText?.trim() || null,
-        } satisfies Prisma.InputJsonValue,
-        deliveryStatus: 'sent',
-        createdTime: new Date(),
-      },
-    })
+    const lastSaved = savedMessages[savedMessages.length - 1] ?? null
+    if (lastSaved) {
+      await this.prisma.conversation.update({
+        where: { id: conversationId },
+        data: {
+          lastMessageText: lastSaved.message,
+          lastMessageAt: new Date(),
+        },
+      })
+    }
 
-    await this.prisma.conversation.update({
-      where: { id: conversationId },
-      data: {
-        lastMessageText: bodyText?.trim() || displayText,
-        lastMessageAt: new Date(),
-      },
-    })
+    const first = lastSaved ?? savedMessages[0]
+    return { id: first.id, message: first.message }
+  }
 
-    return { id: savedMessage.id, message: savedMessage.message }
+  /**
+   * Persist dispatch results as DirectMessage rows. Creates one row per `send` entry —
+   * so when a customer cites a single product in their reply, WhatsApp's context.id will
+   * map back to a specific row (not a grouped bundle).
+   */
+  private async persistProductSends(
+    conversationId: string,
+    senderId: string,
+    senderName: string,
+    sends: Array<{ platformMsgId: string | null; retailerIds: string[]; displayText: string }>,
+    effectiveFormat: 'product' | 'product_list' | 'carousel' | 'catalog_message',
+    catalogId: string,
+    headerText?: string,
+    bodyText?: string,
+    footerText?: string,
+  ) {
+    const mediaType = effectiveFormat === 'catalog_message' ? 'catalog_message' : 'catalog'
+    const trimmedHeader = headerText?.trim() || null
+    const trimmedBody = bodyText?.trim() || null
+    const trimmedFooter = footerText?.trim() || null
+    const now = new Date()
+
+    const saved = []
+    for (const entry of sends) {
+      const enrichedItems = await this.buildEnrichedItems(catalogId, entry.retailerIds)
+      const row = await this.prisma.directMessage.create({
+        data: {
+          conversationId,
+          platformMsgId: entry.platformMsgId || null,
+          message: trimmedBody || entry.displayText,
+          senderId,
+          senderName,
+          isFromPage: true,
+          isRead: true,
+          mediaType,
+          metadata: {
+            kind: 'catalog',
+            format: effectiveFormat,
+            catalogId,
+            productRetailerIds: entry.retailerIds,
+            items: enrichedItems,
+            header: trimmedHeader,
+            body: trimmedBody,
+            footer: trimmedFooter,
+          } satisfies Prisma.InputJsonValue,
+          deliveryStatus: 'sent',
+          createdTime: now,
+        },
+      })
+      saved.push(row)
+    }
+    return saved
   }
 
   /**
@@ -1160,12 +1192,15 @@ export class MessagingService {
     bodyText?: string,
     footerText?: string,
   ): Promise<{
-    platformMsgIds: string[]
-    displayText: string
+    /**
+     * One entry per WhatsApp message actually sent. `product` format yields N entries
+     * (one per retailer ID) so each can be persisted as its own DirectMessage — that way
+     * a customer quoting a single product in a reply maps to the right row.
+     * Other formats always yield a single entry covering all retailer IDs.
+     */
+    sends: Array<{ platformMsgId: string | null; retailerIds: string[]; displayText: string }>
     effectiveFormat: 'product' | 'product_list' | 'carousel' | 'catalog_message'
   }> {
-    const platformMsgIds: string[] = []
-
     // Meta WhatsApp carousel supports up to 10 cards. Above that, fall back to product_list.
     let effectiveFormat = format
     if (effectiveFormat === 'carousel' && productRetailerIds.length > 10) {
@@ -1176,8 +1211,14 @@ export class MessagingService {
     }
 
     if (effectiveFormat === 'product') {
-      // Single product format: loop through every retailer ID and send each as its own message.
-      // Per Meta spec: type=product supports body + footer (no header).
+      // Single product format: loop through every retailer ID and send each as its own
+      // WhatsApp message. We collect one `send` entry per retailer ID so the caller can
+      // persist one DirectMessage row per product (matches WhatsApp's own behaviour).
+      const sends: Array<{
+        platformMsgId: string | null
+        retailerIds: string[]
+        displayText: string
+      }> = []
       for (const retailerId of productRetailerIds) {
         const interactive: Record<string, unknown> = {
           type: 'product',
@@ -1198,14 +1239,9 @@ export class MessagingService {
           interactive,
           `product (${retailerId})`,
         )
-        if (msgId) platformMsgIds.push(msgId)
+        sends.push({ platformMsgId: msgId, retailerIds: [retailerId], displayText: '[product]' })
       }
-      const count = productRetailerIds.length
-      return {
-        platformMsgIds,
-        displayText: count > 1 ? `[${count} products]` : '[product]',
-        effectiveFormat,
-      }
+      return { sends, effectiveFormat }
     }
 
     if (effectiveFormat === 'product_list') {
@@ -1234,10 +1270,14 @@ export class MessagingService {
         interactive,
         `product_list (${productRetailerIds.length} items)`,
       )
-      if (msgId) platformMsgIds.push(msgId)
       return {
-        platformMsgIds,
-        displayText: `[${productRetailerIds.length} products]`,
+        sends: [
+          {
+            platformMsgId: msgId,
+            retailerIds: productRetailerIds,
+            displayText: `[${productRetailerIds.length} products]`,
+          },
+        ],
         effectiveFormat,
       }
     }
@@ -1264,10 +1304,14 @@ export class MessagingService {
         interactive,
         `carousel (${productRetailerIds.length} items)`,
       )
-      if (msgId) platformMsgIds.push(msgId)
       return {
-        platformMsgIds,
-        displayText: `[${productRetailerIds.length} products]`,
+        sends: [
+          {
+            platformMsgId: msgId,
+            retailerIds: productRetailerIds,
+            displayText: `[${productRetailerIds.length} products]`,
+          },
+        ],
         effectiveFormat,
       }
     }
@@ -1292,8 +1336,10 @@ export class MessagingService {
       interactive,
       'catalog_message',
     )
-    if (msgId) platformMsgIds.push(msgId)
-    return { platformMsgIds, displayText: '[catalog]', effectiveFormat }
+    return {
+      sends: [{ platformMsgId: msgId, retailerIds: productRetailerIds, displayText: '[catalog]' }],
+      effectiveFormat,
+    }
   }
 
   private async sendWhatsAppInteractivePayload(

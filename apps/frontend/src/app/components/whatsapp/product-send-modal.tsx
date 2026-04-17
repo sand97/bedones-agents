@@ -217,6 +217,7 @@ export function ProductSendModal({ open, onClose, catalog, onSend }: ProductSend
         onSaveProducts={handlePickerSaveProducts}
         initialSelection={selectedProducts.map((p) => p.id)}
         catalogs={[catalog]}
+        hideCatalogSelect
       />
     </>
   )
