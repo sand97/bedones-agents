@@ -13,6 +13,7 @@ export type MessageType =
   | 'file'
   | 'catalog'
   | 'catalog_message'
+  | 'order'
   | 'button'
 
 export type MessageStatus = 'sending' | 'sent' | 'error'
@@ -28,6 +29,31 @@ export interface CatalogItem {
   description: string
   price: string
   imageUrl: string
+}
+
+export interface CatalogProductItem {
+  retailerId?: string
+  name: string
+  imageUrl?: string | null
+  price?: number | null
+  currency?: string | null
+}
+
+export interface OrderProductItem {
+  retailerId?: string
+  name: string
+  imageUrl?: string | null
+  quantity: number
+  itemPrice: number
+  currency?: string | null
+}
+
+export interface OrderData {
+  catalogId?: string | null
+  text?: string
+  items: OrderProductItem[]
+  total: number
+  currency?: string | null
 }
 
 export interface MessageButton {
@@ -71,8 +97,17 @@ export interface Message {
   fileName?: string
   fileSize?: number
 
-  // Catalog
+  // Catalog (legacy single item for backward compatibility with existing mocks)
   catalogItem?: CatalogItem
+
+  // Catalog (rich / multi-product payload coming from WhatsApp interactive messages)
+  catalogHeader?: string
+  catalogFooter?: string
+  catalogItems?: CatalogProductItem[]
+  catalogFormat?: 'product' | 'product_list' | 'carousel' | 'catalog_message'
+
+  // Order received from a customer (WhatsApp order webhook)
+  order?: OrderData
 
   // Buttons
   buttons?: MessageButton[]

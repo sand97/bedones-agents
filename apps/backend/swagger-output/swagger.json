@@ -3836,6 +3836,10 @@
               "read"
             ]
           },
+          "metadata": {
+            "type": "object",
+            "description": "Interactive payload metadata. For catalog messages: { kind, format, header, body, footer, catalogId, items[{ productRetailerId, name, imageUrl, price, currency }] }. For order messages: { kind: \"order\", catalogId, text, total, currency, items[{ productRetailerId, name, imageUrl, quantity, itemPrice, currency }] }."
+          },
           "createdTime": {
             "format": "date-time",
             "type": "string"
@@ -3923,15 +3927,15 @@
           },
           "headerText": {
             "type": "string",
-            "description": "Header text for product list messages"
+            "description": "Header text. Supported by \"product_list\" (required, max 60 chars). Not supported by \"product\", \"carousel\" or \"catalog_message\" per Meta spec."
           },
           "bodyText": {
             "type": "string",
-            "description": "Body text accompanying the products"
+            "description": "Body text accompanying the products (max 1024 chars)"
           },
           "footerText": {
             "type": "string",
-            "description": "Footer text (catalog_message only)"
+            "description": "Footer text (max 60 chars). Supported by \"product\", \"product_list\" and \"catalog_message\". Not supported by \"carousel\"."
           }
         },
         "required": [

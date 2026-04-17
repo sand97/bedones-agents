@@ -125,6 +125,7 @@ function mapApiConversation(
     fileSize?: number | null
     replyTo?: { id: string; text: string; from: string } | null
     reactions?: { senderId: string; emoji: string }[] | null
+    metadata?: Record<string, unknown> | null
     createdTime: string
     isRead: boolean
   }>,
@@ -144,6 +145,56 @@ function mapApiConversation(
       const status = raw._status as 'sending' | 'sent' | 'error' | undefined
       const localId = raw._localId as string | undefined
       const deliveryStatus = raw.deliveryStatus as 'sent' | 'delivered' | 'read' | undefined
+      const meta = (m.metadata || undefined) as
+        | {
+            kind?: 'catalog' | 'order'
+            format?: 'product' | 'product_list' | 'carousel' | 'catalog_message'
+            header?: string
+            body?: string
+            footer?: string
+            catalogId?: string
+            text?: string
+            total?: number
+            currency?: string | null
+            items?: Array<{
+              productRetailerId?: string
+              name?: string
+              imageUrl?: string | null
+              price?: number | null
+              quantity?: number
+              itemPrice?: number
+              currency?: string | null
+            }>
+          }
+        | undefined
+      const catalogItems =
+        meta?.kind === 'catalog' && meta.items?.length
+          ? meta.items.map((item) => ({
+              retailerId: item.productRetailerId,
+              name: item.name ?? item.productRetailerId ?? '',
+              imageUrl: item.imageUrl ?? null,
+              price: item.price ?? null,
+              currency: item.currency ?? null,
+            }))
+          : undefined
+      const order =
+        meta?.kind === 'order'
+          ? {
+              catalogId: meta.catalogId ?? null,
+              text: meta.text,
+              items: (meta.items || []).map((item) => ({
+                retailerId: item.productRetailerId,
+                name: item.name ?? item.productRetailerId ?? '',
+                imageUrl: item.imageUrl ?? null,
+                quantity: item.quantity ?? 1,
+                itemPrice: item.itemPrice ?? 0,
+                currency: item.currency ?? null,
+              })),
+              total: meta.total ?? 0,
+              currency: meta.currency ?? null,
+            }
+          : undefined
+      const resolvedBody = meta?.kind === 'catalog' ? meta.body || m.message : m.message
       return {
         id: m.id,
         type:
@@ -154,9 +205,10 @@ function mapApiConversation(
             | 'audio'
             | 'file'
             | 'catalog'
-            | 'catalog_message') || 'text',
+            | 'catalog_message'
+            | 'order') || 'text',
         from: (m.isFromPage ? 'business' : 'customer') as 'business' | 'customer',
-        text: m.message,
+        text: resolvedBody,
         timestamp: m.createdTime,
         isRead: m.isRead,
         deliveryStatus,
@@ -170,6 +222,11 @@ function mapApiConversation(
         fileName: m.fileName ?? undefined,
         fileSize: m.fileSize ?? undefined,
         mediaUrl: m.mediaUrl ?? undefined,
+        catalogItems,
+        catalogHeader: meta?.header,
+        catalogFooter: meta?.footer,
+        catalogFormat: meta?.format,
+        order,
         replyTo: m.replyTo
           ? {
               id: m.replyTo.id,

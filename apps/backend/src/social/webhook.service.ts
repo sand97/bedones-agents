@@ -919,6 +919,7 @@ export class WebhookService {
     let mediaType: string | null = null
     let fileName: string | null = null
     let replyToMid: string | null = null
+    let metadata: Record<string, unknown> | null = null
 
     if (msg.context?.id) {
       replyToMid = msg.context.id
@@ -951,6 +952,27 @@ export class WebhookService {
         mediaType = 'image'
         mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.sticker?.id)
         break
+      case 'order': {
+        mediaType = 'order'
+        const order = msg.order
+        const items = (order?.product_items || []).map((item) => ({
+          productRetailerId: item.product_retailer_id,
+          quantity: Number(item.quantity) || 1,
+          itemPrice: Number(item.item_price) || 0,
+          currency: item.currency,
+        }))
+        const total = items.reduce((sum, it) => sum + it.itemPrice * it.quantity, 0)
+        metadata = {
+          kind: 'order',
+          catalogId: order?.catalog_id || null,
+          text: order?.text || undefined,
+          items,
+          total,
+          currency: items[0]?.currency || null,
+        }
+        messageText = order?.text || ''
+        break
+      }
       default:
         messageText = `[${msg.type}]`
     }
@@ -969,6 +991,7 @@ export class WebhookService {
       fileName,
       null,
       replyToMid,
+      metadata,
     )
 
     this.logger.log(
@@ -1927,6 +1950,16 @@ interface WhatsAppMessage {
   audio?: { id: string; mime_type?: string }
   document?: { id: string; filename?: string; mime_type?: string }
   sticker?: { id: string; mime_type?: string }
+  order?: {
+    catalog_id: string
+    text?: string
+    product_items?: Array<{
+      product_retailer_id: string
+      quantity: number | string
+      item_price: number | string
+      currency: string
+    }>
+  }
   context?: { id?: string; from?: string }
 }
 

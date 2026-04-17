@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common'
+import { Prisma } from 'generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
 import { MediaConverterService } from '../upload/media-converter.service'
@@ -55,7 +56,8 @@ export class MessagingService {
       },
     })
 
-    // Map replyTo relation and reactions
+    const enrichedMetadataByMsgId = await this.enrichInteractiveMetadata(messages)
+
     return messages.map((m) => ({
       ...m,
       replyTo: m.replyTo
@@ -66,7 +68,131 @@ export class MessagingService {
           }
         : undefined,
       reactions: (m.reactions as { senderId: string; emoji: string }[]) || [],
+      metadata: enrichedMetadataByMsgId[m.id] ?? m.metadata ?? null,
     }))
+  }
+
+  /**
+   * For messages that reference catalog products (mediaType=catalog|catalog_message|order),
+   * fetch the product details once (grouped by catalogId) and return an enriched metadata
+   * object keyed by messageId with product name/image/price attached to each item.
+   */
+  private async enrichInteractiveMetadata(
+    messages: { id: string; mediaType: string | null; metadata: unknown }[],
+  ): Promise<Record<string, Record<string, unknown>>> {
+    const productLookups = new Map<string, Set<string>>()
+
+    for (const m of messages) {
+      const meta = m.metadata as
+        | {
+            catalogId?: string
+            productRetailerIds?: string[]
+            items?: { productRetailerId?: string }[]
+          }
+        | null
+        | undefined
+      if (!meta) continue
+      const catalogId = meta.catalogId
+      if (!catalogId) continue
+      const ids = new Set<string>()
+      for (const id of meta.productRetailerIds || []) if (id) ids.add(id)
+      for (const item of meta.items || [])
+        if (item.productRetailerId) ids.add(item.productRetailerId)
+      if (ids.size === 0) continue
+      const existing = productLookups.get(catalogId) ?? new Set()
+      for (const id of ids) existing.add(id)
+      productLookups.set(catalogId, existing)
+    }
+
+    const productByKey = new Map<
+      string,
+      { name: string; imageUrl: string | null; price: number | null; currency: string | null }
+    >()
+
+    for (const [catalogProviderId, retailerIds] of productLookups) {
+      const catalog = await this.prisma.catalog.findFirst({
+        where: {
+          OR: [{ id: catalogProviderId }, { providerId: catalogProviderId }],
+        },
+        select: { id: true },
+      })
+      if (!catalog) continue
+
+      const products = await this.prisma.product.findMany({
+        where: {
+          catalogId: catalog.id,
+          providerProductId: { in: Array.from(retailerIds) },
+        },
+        select: {
+          providerProductId: true,
+          name: true,
+          imageUrl: true,
+          price: true,
+          currency: true,
+        },
+      })
+      for (const p of products) {
+        if (!p.providerProductId) continue
+        productByKey.set(`${catalogProviderId}::${p.providerProductId}`, {
+          name: p.name,
+          imageUrl: p.imageUrl,
+          price: p.price,
+          currency: p.currency,
+        })
+      }
+    }
+
+    const out: Record<string, Record<string, unknown>> = {}
+    for (const m of messages) {
+      const meta = m.metadata as
+        | {
+            catalogId?: string
+            productRetailerIds?: string[]
+            items?: {
+              productRetailerId?: string
+              quantity?: number
+              itemPrice?: number
+              currency?: string
+            }[]
+            [key: string]: unknown
+          }
+        | null
+        | undefined
+      if (!meta) continue
+      const catalogId = meta.catalogId
+      const enriched: Record<string, unknown> = { ...meta }
+
+      if (catalogId && meta.productRetailerIds?.length) {
+        enriched.items = meta.productRetailerIds.map((retailerId) => {
+          const p = productByKey.get(`${catalogId}::${retailerId}`)
+          return {
+            productRetailerId: retailerId,
+            name: p?.name ?? retailerId,
+            imageUrl: p?.imageUrl ?? null,
+            price: p?.price ?? null,
+            currency: p?.currency ?? null,
+          }
+        })
+      } else if (catalogId && meta.items?.length) {
+        enriched.items = meta.items.map((item) => {
+          const p = item.productRetailerId
+            ? productByKey.get(`${catalogId}::${item.productRetailerId}`)
+            : undefined
+          return {
+            productRetailerId: item.productRetailerId,
+            name: p?.name ?? item.productRetailerId ?? '',
+            imageUrl: p?.imageUrl ?? null,
+            quantity: item.quantity ?? 1,
+            itemPrice: item.itemPrice ?? p?.price ?? 0,
+            currency: item.currency ?? p?.currency ?? null,
+          }
+        })
+      }
+
+      out[m.id] = enriched
+    }
+
+    return out
   }
 
   // ─── Send a message ───
@@ -810,6 +936,7 @@ export class MessagingService {
     fileName?: string | null,
     fileSize?: number | null,
     replyToMid?: string | null,
+    metadata?: Record<string, unknown> | null,
   ) {
     // Upsert conversation
     const conversation = await this.prisma.conversation.upsert({
@@ -868,6 +995,7 @@ export class MessagingService {
         fileName: fileName || null,
         fileSize: fileSize || null,
         replyToId,
+        metadata: (metadata as Prisma.InputJsonValue | undefined) ?? Prisma.JsonNull,
         createdTime: timestamp,
       },
     })
@@ -987,12 +1115,21 @@ export class MessagingService {
       data: {
         conversationId,
         platformMsgId: platformMsgIds[0] || null,
-        message: displayText,
+        message: bodyText?.trim() || displayText,
         senderId: conversation.socialAccount.providerAccountId,
         senderName: 'Page',
         isFromPage: true,
         isRead: true,
         mediaType: format === 'catalog_message' ? 'catalog_message' : 'catalog',
+        metadata: {
+          kind: 'catalog',
+          format,
+          catalogId,
+          productRetailerIds,
+          header: headerText?.trim() || null,
+          body: bodyText?.trim() || null,
+          footer: footerText?.trim() || null,
+        } satisfies Prisma.InputJsonValue,
         deliveryStatus: 'sent',
         createdTime: new Date(),
       },
@@ -1001,7 +1138,7 @@ export class MessagingService {
     await this.prisma.conversation.update({
       where: { id: conversationId },
       data: {
-        lastMessageText: displayText,
+        lastMessageText: bodyText?.trim() || displayText,
         lastMessageAt: new Date(),
       },
     })
@@ -1057,12 +1194,21 @@ export class MessagingService {
       data: {
         conversationId,
         platformMsgId: platformMsgIds[0] || null,
-        message: displayText,
+        message: bodyText?.trim() || displayText,
         senderId: conversation.socialAccount.providerAccountId,
         senderName: 'AI Agent',
         isFromPage: true,
         isRead: true,
         mediaType: format === 'catalog_message' ? 'catalog_message' : 'catalog',
+        metadata: {
+          kind: 'catalog',
+          format,
+          catalogId,
+          productRetailerIds,
+          header: headerText?.trim() || null,
+          body: bodyText?.trim() || null,
+          footer: footerText?.trim() || null,
+        } satisfies Prisma.InputJsonValue,
         deliveryStatus: 'sent',
         createdTime: new Date(),
       },
@@ -1071,7 +1217,7 @@ export class MessagingService {
     await this.prisma.conversation.update({
       where: { id: conversationId },
       data: {
-        lastMessageText: displayText,
+        lastMessageText: bodyText?.trim() || displayText,
         lastMessageAt: new Date(),
       },
     })
@@ -1097,7 +1243,8 @@ export class MessagingService {
     const platformMsgIds: string[] = []
 
     if (format === 'product') {
-      // Single product format: loop through every retailer ID and send each as its own message
+      // Single product format: loop through every retailer ID and send each as its own message.
+      // Per Meta spec: type=product supports body + footer (no header).
       for (const retailerId of productRetailerIds) {
         const interactive: Record<string, unknown> = {
           type: 'product',
@@ -1106,9 +1253,10 @@ export class MessagingService {
             product_retailer_id: retailerId,
           },
         }
-        // Only attach body when non-empty — empty text is rejected by WhatsApp (#131009)
         const trimmedBody = bodyText?.trim()
         if (trimmedBody) interactive.body = { text: trimmedBody }
+        const trimmedFooter = footerText?.trim()
+        if (trimmedFooter) interactive.footer = { text: trimmedFooter }
 
         const msgId = await this.sendWhatsAppInteractivePayload(
           phoneNumberId,
@@ -1127,6 +1275,7 @@ export class MessagingService {
     }
 
     if (format === 'product_list') {
+      // Per Meta spec: header (required, text), body (required), footer (optional).
       const interactive: Record<string, unknown> = {
         type: 'product_list',
         header: { type: 'text', text: headerText?.trim() || 'Products' },
@@ -1141,6 +1290,9 @@ export class MessagingService {
           ],
         },
       }
+      const trimmedFooter = footerText?.trim()
+      if (trimmedFooter) interactive.footer = { text: trimmedFooter }
+
       const msgId = await this.sendWhatsAppInteractivePayload(
         phoneNumberId,
         recipientPhone,

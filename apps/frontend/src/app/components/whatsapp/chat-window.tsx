@@ -227,6 +227,16 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
 }
 
+function formatProductPrice(price?: number | null, currency?: string | null): string {
+  if (price == null) return ''
+  const rounded = Math.round(price * 100) / 100
+  const formatted = rounded.toLocaleString('fr-FR', {
+    minimumFractionDigits: rounded % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })
+  return currency ? `${formatted} ${currency}` : formatted
+}
+
 /** Delivery status check marks for WhatsApp outgoing messages */
 function DeliveryCheck({
   deliveryStatus,
@@ -292,7 +302,7 @@ function MessageBubble({
   const hasMedia =
     message.type === 'image' ||
     message.type === 'video' ||
-    (message.type === 'catalog' && !!message.catalogItem)
+    (message.type === 'catalog' && !!message.catalogItem && !message.catalogItems?.length)
 
   const bubbleClasses = [
     'chat-bubble',
@@ -415,16 +425,58 @@ function MessageBubble({
         )
 
       case 'catalog':
+      case 'catalog_message': {
+        const items = message.catalogItems
+        const header = message.catalogHeader
+        const footer = message.catalogFooter
+        const body = message.text
+
+        if (items && items.length > 0) {
+          return (
+            <div className="flex w-[18rem] flex-col gap-2 py-0.5">
+              {header && <div className="text-sm font-semibold text-text-primary">{header}</div>}
+              {body && <p className="m-0 whitespace-pre-wrap text-sm text-text-primary">{body}</p>}
+              <div className="flex flex-col gap-1.5">
+                {items.map((item, idx) => (
+                  <div
+                    key={`${item.retailerId ?? idx}`}
+                    className="flex items-center gap-3 rounded-lg bg-bg-subtle p-2"
+                  >
+                    {item.imageUrl ? (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        className="h-12 w-12 flex-shrink-0 rounded-control object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-control bg-bg-muted text-text-muted">
+                        <ShoppingBag size={18} />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-text-primary">
+                        {item.name}
+                      </div>
+                      <div className="text-xs text-text-muted">
+                        {formatProductPrice(item.price, item.currency)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {footer && <div className="text-xs text-text-muted">{footer}</div>}
+            </div>
+          )
+        }
+
+        // Legacy single-item layout (kept for pre-existing mocks)
         if (message.catalogItem) {
           return (
             <div className="overflow-hidden rounded-lg">
               <img src={message.catalogItem.imageUrl} alt="" className="h-32 w-full object-cover" />
               <div className="p-2 pt-4">
-                <div className="flex items-start gap-2">
-                  <ShoppingBag size={14} className="mt-0.5 flex-shrink-0 text-text-muted" />
-                  <div className="text-sm font-semibold text-text-primary">
-                    {message.catalogItem.title}
-                  </div>
+                <div className="text-sm font-semibold text-text-primary">
+                  {message.catalogItem.title}
                 </div>
                 <div className="mt-0.5 text-xs text-text-muted">
                   {message.catalogItem.description}
@@ -436,29 +488,67 @@ function MessageBubble({
             </div>
           )
         }
-        // No detailed catalogItem → fallback summary bubble for outgoing product sends
-        return (
-          <div className="flex items-center gap-2 py-0.5">
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-orange-50 text-orange-500">
-              <ShoppingBag size={16} />
-            </div>
-            <div className="text-sm font-medium text-text-primary">
-              {message.text || t('chat.products_sent')}
-            </div>
-          </div>
-        )
 
-      case 'catalog_message':
+        // Fallback (no metadata and no legacy item) — show whatever text/body we have
         return (
-          <div className="flex items-center gap-2 py-0.5">
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-pink-50 text-pink-500">
-              <ShoppingBag size={16} />
+          <div className="py-0.5 text-sm text-text-primary">
+            {body ||
+              (message.type === 'catalog_message'
+                ? t('chat.catalog_sent')
+                : t('chat.products_sent'))}
+          </div>
+        )
+      }
+
+      case 'order': {
+        const order = message.order
+        if (!order) {
+          return <p className="m-0 text-sm text-text-primary">{message.text || ''}</p>
+        }
+        return (
+          <div className="flex w-[18rem] flex-col gap-2 py-0.5">
+            <div className="text-sm font-semibold text-text-primary">{t('chat.order_title')}</div>
+            {order.text && (
+              <p className="m-0 whitespace-pre-wrap text-sm text-text-primary">{order.text}</p>
+            )}
+            <div className="flex flex-col gap-1.5">
+              {order.items.map((item, idx) => (
+                <div
+                  key={`${item.retailerId ?? idx}`}
+                  className="flex items-center gap-3 rounded-lg bg-bg-subtle p-2"
+                >
+                  {item.imageUrl ? (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="h-12 w-12 flex-shrink-0 rounded-control object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-control bg-bg-muted text-text-muted">
+                      <ShoppingBag size={18} />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold text-text-primary">
+                      {item.name}
+                    </div>
+                    <div className="text-xs text-text-muted">
+                      {t('chat.order_qty', { count: item.quantity })} ·{' '}
+                      {formatProductPrice(item.itemPrice, item.currency)}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="text-sm font-medium text-text-primary">
-              {message.text || t('chat.catalog_sent')}
+            <div className="flex items-center justify-between border-t border-border-subtle pt-2 text-sm">
+              <span className="text-text-muted">{t('chat.order_total')}</span>
+              <span className="font-semibold text-text-primary">
+                {formatProductPrice(order.total, order.currency)}
+              </span>
             </div>
           </div>
         )
+      }
 
       case 'button':
         return (

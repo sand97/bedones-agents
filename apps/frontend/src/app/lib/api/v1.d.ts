@@ -1573,6 +1573,8 @@ export interface components {
              * @enum {string}
              */
             deliveryStatus?: "sent" | "delivered" | "read";
+            /** @description Interactive payload metadata (catalog products, orders, header/footer, etc.) */
+            metadata?: Record<string, unknown>;
             /** Format: date-time */
             createdTime: string;
             isRead: boolean;
@@ -1602,11 +1604,11 @@ export interface components {
              * @enum {string}
              */
             format: "product" | "product_list" | "carousel" | "catalog_message";
-            /** @description Header text for product list messages */
+            /** @description Header text. Supported by "product_list" (required, max 60 chars). Not supported by "product", "carousel" or "catalog_message" per Meta spec. */
             headerText?: string;
-            /** @description Body text accompanying the products */
+            /** @description Body text accompanying the products (max 1024 chars) */
             bodyText?: string;
-            /** @description Footer text (catalog_message only) */
+            /** @description Footer text (max 60 chars). Supported by "product", "product_list" and "catalog_message". Not supported by "carousel". */
             footerText?: string;
         };
         MarkConversationReadDto: {

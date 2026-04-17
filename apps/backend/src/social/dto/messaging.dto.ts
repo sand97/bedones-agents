@@ -94,6 +94,13 @@ export class DirectMessageResponseDto {
   })
   deliveryStatus?: string
 
+  @ApiPropertyOptional({
+    description:
+      'Interactive payload metadata. For catalog messages: { kind, format, header, body, footer, catalogId, items[{ productRetailerId, name, imageUrl, price, currency }] }. For order messages: { kind: "order", catalogId, text, total, currency, items[{ productRetailerId, name, imageUrl, quantity, itemPrice, currency }] }.',
+    type: Object,
+  })
+  metadata?: Record<string, unknown>
+
   @ApiProperty()
   createdTime: Date
 
@@ -145,13 +152,19 @@ export class SendProductMessageDto {
   })
   format: 'product' | 'product_list' | 'carousel' | 'catalog_message'
 
-  @ApiPropertyOptional({ description: 'Header text for product list messages' })
+  @ApiPropertyOptional({
+    description:
+      'Header text. Supported by "product_list" (required, max 60 chars). Not supported by "product", "carousel" or "catalog_message" per Meta spec.',
+  })
   headerText?: string
 
-  @ApiPropertyOptional({ description: 'Body text accompanying the products' })
+  @ApiPropertyOptional({ description: 'Body text accompanying the products (max 1024 chars)' })
   bodyText?: string
 
-  @ApiPropertyOptional({ description: 'Footer text (catalog_message only)' })
+  @ApiPropertyOptional({
+    description:
+      'Footer text (max 60 chars). Supported by "product", "product_list" and "catalog_message". Not supported by "carousel".',
+  })
   footerText?: string
 }
 

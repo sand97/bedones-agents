@@ -9,6 +9,13 @@ import type { Catalog } from '@app/lib/api/agent-api'
 
 type ProductFormat = 'product' | 'product_list' | 'carousel'
 
+// Per Meta WhatsApp Cloud API spec:
+// - product: body + footer supported (no header)
+// - product_list: header (required) + body (required) + footer (optional)
+// - carousel: body only (no header, no footer)
+const HEADER_FORMATS: ProductFormat[] = ['product_list']
+const FOOTER_FORMATS: ProductFormat[] = ['product', 'product_list']
+
 interface ProductSendModalProps {
   open: boolean
   onClose: () => void
@@ -19,6 +26,7 @@ interface ProductSendModalProps {
     format: ProductFormat
     headerText?: string
     bodyText?: string
+    footerText?: string
   }) => Promise<void>
 }
 
@@ -29,7 +37,11 @@ export function ProductSendModal({ open, onClose, catalog, onSend }: ProductSend
   const [format, setFormat] = useState<ProductFormat>('product_list')
   const [headerText, setHeaderText] = useState('')
   const [bodyText, setBodyText] = useState('')
+  const [footerText, setFooterText] = useState('')
   const [sending, setSending] = useState(false)
+
+  const supportsHeader = HEADER_FORMATS.includes(format)
+  const supportsFooter = FOOTER_FORMATS.includes(format)
 
   const handlePickerSave = (_ids: string[]) => {
     // We use onSaveProducts instead
@@ -59,8 +71,9 @@ export function ProductSendModal({ open, onClose, catalog, onSend }: ProductSend
         productRetailerIds: selectedProducts.map((p) => p.retailerId || p.id),
         catalogId: catalog.providerId || catalog.id,
         format,
-        headerText: format === 'product_list' ? headerText || undefined : undefined,
+        headerText: supportsHeader ? headerText || undefined : undefined,
         bodyText: bodyText || undefined,
+        footerText: supportsFooter ? footerText || undefined : undefined,
       })
       handleClose()
     } catch {
@@ -75,6 +88,7 @@ export function ProductSendModal({ open, onClose, catalog, onSend }: ProductSend
     setFormat('product_list')
     setHeaderText('')
     setBodyText('')
+    setFooterText('')
     onClose()
   }
 
@@ -144,8 +158,8 @@ export function ProductSendModal({ open, onClose, catalog, onSend }: ProductSend
             />
           </div>
 
-          {/* Header text (for product_list) */}
-          {format === 'product_list' && (
+          {/* Header text (supported by product_list only per Meta spec) */}
+          {supportsHeader && (
             <div>
               <div className="mb-1 text-sm text-text-secondary">{t('chat.product_header')}</div>
               <Input
@@ -168,6 +182,19 @@ export function ProductSendModal({ open, onClose, catalog, onSend }: ProductSend
               maxLength={1024}
             />
           </div>
+
+          {/* Footer text (supported by product + product_list per Meta spec) */}
+          {supportsFooter && (
+            <div>
+              <div className="mb-1 text-sm text-text-secondary">{t('chat.product_footer')}</div>
+              <Input
+                value={footerText}
+                onChange={(e) => setFooterText(e.target.value)}
+                placeholder={t('chat.product_footer_placeholder')}
+                maxLength={60}
+              />
+            </div>
+          )}
         </div>
       </Modal>
 
