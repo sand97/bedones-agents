@@ -269,7 +269,24 @@
     "configure_catalog_title": "Associer un catalogue",
     "configure_catalog_desc": "Liez un catalogue de produits à ce numéro pour que vos clients puissent parcourir vos produits sur WhatsApp.",
     "configure_catalog_btn": "Associer un catalogue",
-    "options": "Options"
+    "options": "Options",
+    "reply_tooltip": "Répondre",
+    "improve_tooltip": "Améliorer la réponse avec l'IA"
+  },
+
+  "feedback": {
+    "title": "Améliorer la réponse",
+    "subtitle": "Aidez l'agent à mieux répondre la prochaine fois",
+    "original_response": "Réponse originale",
+    "analyzing_title": "Analyse de votre retour",
+    "analyzing_desc": "L'agent identifie les points à améliorer dans sa réponse…",
+    "success_title": "Merci pour votre retour !",
+    "success_desc": "Votre feedback a bien été pris en compte. L'agent s'en servira pour améliorer ses prochaines réponses.",
+    "close": "Fermer",
+    "send": "Envoyer",
+    "placeholder": "Décrivez ce qui ne va pas dans cette réponse…",
+    "ai_agent": "Agent IA",
+    "you": "Vous"
   },
 
   "catalog_link": {

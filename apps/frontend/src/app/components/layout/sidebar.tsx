@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { logout } from '@app/lib/api'
+import { $api } from '@app/lib/api/$api'
 import { useLayout } from '@app/contexts/layout-context'
 import { useLocale } from '@app/contexts/locale-context'
 import { useUnreadCounts } from '@app/contexts/unread-context'
@@ -191,6 +192,11 @@ export function Sidebar() {
   const location = useLocation()
   const router = useRouter()
   const isProfileActive = location.pathname.includes(`/${orgSlug}/notifications`)
+  const meQuery = $api.useQuery('get', '/auth/me')
+  const currentUser = meQuery.data?.user
+  const userName = currentUser?.name ?? ''
+  const userContact =
+    (currentUser?.email as string | undefined) ?? (currentUser?.phone as string | undefined) ?? ''
 
   const handleLogout = async () => {
     await logout()
@@ -381,9 +387,9 @@ export function Sidebar() {
                 {!(collapsed && isDesktop) && (
                   <div className="flex min-w-0 flex-1 flex-col text-left">
                     <span className="truncate text-sm font-medium text-text-primary">
-                      Konan Achi
+                      {userName}
                     </span>
-                    <span className="truncate text-xs text-text-muted">konan@example.com</span>
+                    <span className="truncate text-xs text-text-muted">{userContact}</span>
                   </div>
                 )}
               </button>

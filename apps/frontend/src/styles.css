@@ -840,6 +840,40 @@ a {
   min-width: 260px;
 }
 
+/* ── Feedback modal bubbles ── */
+.feedback-bubble {
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: var(--radius-bubble);
+  font-size: 14px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.feedback-bubble--whatsapp {
+  background: var(--color-brand-whatsapp);
+  color: #ffffff;
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble);
+}
+
+.feedback-bubble--neutral {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble);
+}
+
+.feedback-bubble--user {
+  background: var(--color-text-primary);
+  color: #ffffff;
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble);
+}
+
+.feedback-bubble--agent {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail);
+}
+
 /* Media container: placeholder bg matches content aspect ratio */
 .chat-media-container {
   position: relative;

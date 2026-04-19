@@ -11,6 +11,7 @@ import {
   FileText,
   RotateCcw,
   Reply,
+  Sparkles,
 } from 'lucide-react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import dayjs from 'dayjs'
@@ -19,6 +20,7 @@ import type { Conversation, Message } from './mock-data'
 import { TicketCard } from './ticket-card'
 import { TicketDrawer, type RealTicket } from './ticket-drawer'
 import { ChatInput } from './chat-input'
+import { FeedbackModal } from './feedback-modal'
 
 type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger'
 
@@ -285,6 +287,7 @@ function MessageBubble({
   onScrollToMessage,
   onRetry,
   onReply,
+  onImprove,
   onMediaLoad,
 }: {
   message: Message
@@ -293,6 +296,7 @@ function MessageBubble({
   onScrollToMessage?: (id: string) => void
   onRetry?: (messageId: string) => void
   onReply?: (message: Message) => void
+  onImprove?: (message: Message) => void
   onMediaLoad?: () => void
 }) {
   const { t } = useTranslation()
@@ -584,16 +588,30 @@ function MessageBubble({
       className={`group flex items-center gap-1 ${isOutgoing ? 'justify-end' : 'justify-start'} chat-message-row`}
       data-from={message.from}
     >
-      {/* Reply button — left of outgoing messages */}
+      {/* Action buttons — left of outgoing messages (AI improve + Reply) */}
+      {isOutgoing && onImprove && !isSending && !isError && (
+        <Tooltip title={t('chat.improve_tooltip')} placement="top">
+          <Button
+            variant="text"
+            size="small"
+            shape="circle"
+            icon={<Sparkles size={14} />}
+            onClick={() => onImprove(message)}
+            className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          />
+        </Tooltip>
+      )}
       {isOutgoing && onReply && !isSending && !isError && (
-        <Button
-          variant="text"
-          size="small"
-          shape="circle"
-          icon={<Reply size={14} />}
-          onClick={() => onReply(message)}
-          className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        />
+        <Tooltip title={t('chat.reply_tooltip')} placement="top">
+          <Button
+            variant="text"
+            size="small"
+            shape="circle"
+            icon={<Reply size={14} />}
+            onClick={() => onReply(message)}
+            className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          />
+        </Tooltip>
       )}
       <div className={bubbleClasses}>
         {message.replyTo && (
@@ -644,14 +662,16 @@ function MessageBubble({
       </div>
       {/* Reply button — right of incoming messages */}
       {!isOutgoing && onReply && !isSending && !isError && (
-        <Button
-          variant="text"
-          size="small"
-          shape="circle"
-          icon={<Reply size={14} />}
-          onClick={() => onReply(message)}
-          className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        />
+        <Tooltip title={t('chat.reply_tooltip')} placement="top">
+          <Button
+            variant="text"
+            size="small"
+            shape="circle"
+            icon={<Reply size={14} />}
+            onClick={() => onReply(message)}
+            className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          />
+        </Tooltip>
       )}
     </div>
   )
@@ -734,10 +754,12 @@ export function ChatWindow({
   const navigate = useNavigate()
   const search = useSearch({ strict: false }) as { conv?: string; ticket?: string }
   const [replyTo, setReplyTo] = useState<Message | null>(null)
+  const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null)
 
   // Clear reply when conversation changes
   useEffect(() => {
     setReplyTo(null)
+    setFeedbackMessage(null)
   }, [conversation.id])
 
   const tickets = conversation.tickets ?? []
@@ -843,6 +865,7 @@ export function ChatWindow({
                   onScrollToMessage={scrollToMessage}
                   onRetry={onRetry}
                   onReply={provider !== 'instagram-dm' ? setReplyTo : undefined}
+                  onImprove={setFeedbackMessage}
                   onMediaLoad={scrollToBottom}
                 />
               )
@@ -886,6 +909,14 @@ export function ChatWindow({
         open={!!drawerTicket}
         onClose={closeTicket}
         onSwitchTicket={openTicket}
+      />
+
+      {/* Feedback / Improve-with-AI modal */}
+      <FeedbackModal
+        open={!!feedbackMessage}
+        onClose={() => setFeedbackMessage(null)}
+        originalMessage={feedbackMessage}
+        provider={provider}
       />
     </div>
   )

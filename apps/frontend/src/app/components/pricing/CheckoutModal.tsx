@@ -76,10 +76,15 @@ export function CheckoutModal({
     >
       <div className="space-y-5">
         {selectedPlan ? (
-          <div className="flex h-40 flex-col justify-between rounded-2xl bg-surface-accent px-5 pb-5 pt-5">
-            <p className="m-0 text-base font-bold leading-4 tracking-[0.02em] text-text-primary">
-              {selectedPlanLabel.toUpperCase()}
-            </p>
+          <div className="flex h-52 flex-col justify-between rounded-2xl bg-surface-accent px-5 pb-5 pt-5">
+            <div className="flex items-center justify-between gap-4">
+              <p className="m-0 text-base font-bold leading-4 tracking-[0.02em] text-text-primary">
+                {selectedPlanLabel.toUpperCase()}
+              </p>
+              <span className="rounded-full bg-bg-surface px-4 py-2 text-sm font-semibold text-text-primary shadow-card sm:hidden">
+                Total {selectedPlanTotal}
+              </span>
+            </div>
 
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -88,12 +93,12 @@ export function CheckoutModal({
                 </span>
                 <span className="ml-2 text-lg font-normal text-text-secondary">par mois</span>
                 {selectedPlanCredits ? (
-                  <p className="mt-3 mb-0 text-sm font-medium leading-6 text-text-secondary">
+                  <p className="mt-3 mb-0 text-lg font-normal text-text-secondary">
                     {selectedPlanCredits} credits inclus sur la periode
                   </p>
                 ) : null}
               </div>
-              <span className="rounded-full bg-bg-surface px-4 py-2 text-sm font-semibold text-text-primary shadow-card">
+              <span className="hidden rounded-full bg-bg-surface px-4 py-2 text-sm font-semibold text-text-primary shadow-card sm:inline-block">
                 Total {selectedPlanTotal}
               </span>
             </div>
