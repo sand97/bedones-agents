@@ -645,6 +645,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/messaging/conversations/{conversationId}/agent-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MessagingController_getAgentStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messaging/conversations/{conversationId}/agent-override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["MessagingController_setAgentOverride"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/labels/account/{socialAccountId}": {
         parameters: {
             query?: never;
@@ -691,134 +723,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["LabelController_update"];
-        trace?: never;
-    };
-    "/organisations/{orgId}/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["MemberController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organisations/{orgId}/members/invite": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["MemberController_invite"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organisations/{orgId}/members/{memberId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["MemberController_remove"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/invitations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["InvitationController_getInvitation"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/invitations/send-otp": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["InvitationController_sendOtp"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/invitations/verify-otp": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["InvitationController_verifyOtp"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/invitations/accept": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["InvitationController_accept"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/invitations/reject": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["InvitationController_reject"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/catalog/org/{organisationId}": {
@@ -1029,6 +933,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organisations/{orgId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MemberController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organisations/{orgId}/members/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MemberController_invite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organisations/{orgId}/members/{memberId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["MemberController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvitationController_getInvitation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/send-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvitationController_sendOtp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/verify-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvitationController_verifyOtp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvitationController_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvitationController_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agent/org/{organisationId}": {
         parameters: {
             query?: never;
@@ -1181,6 +1213,54 @@ export interface paths {
             cookie?: never;
         };
         get: operations["AgentController_getLabels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/feedback/{messageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AgentController_submitFeedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stats/org/{organisationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StatsController_getStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stats/org/{organisationId}/credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StatsController_getCreditUsage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1573,8 +1653,8 @@ export interface components {
              * @enum {string}
              */
             deliveryStatus?: "sent" | "delivered" | "read";
-            /** @description Interactive payload metadata (catalog products, orders, header/footer, etc.) */
-            metadata?: Record<string, unknown>;
+            /** @description Interactive payload metadata. For catalog messages: { kind, format, header, body, footer, catalogId, items[{ productRetailerId, name, imageUrl, price, currency }] }. For order messages: { kind: "order", catalogId, text, total, currency, items[{ productRetailerId, name, imageUrl, quantity, itemPrice, currency }] }. */
+            metadata?: Record<string, never>;
             /** Format: date-time */
             createdTime: string;
             isRead: boolean;
@@ -1614,8 +1694,74 @@ export interface components {
         MarkConversationReadDto: {
             conversationId: string;
         };
+        ConversationAgentSummaryDto: {
+            id: string;
+            name?: string;
+            score: number;
+            /** @enum {string} */
+            status: "DRAFT" | "CONFIGURING" | "READY" | "ACTIVE" | "PAUSED";
+        };
+        ConversationAgentStatusDto: {
+            agent?: components["schemas"]["ConversationAgentSummaryDto"] | null;
+            /** @enum {string|null} */
+            override?: "FORCE_ON" | "FORCE_OFF" | null;
+            /** @description Whether the agent would process a new message on this conversation */
+            isActive: boolean;
+        };
+        SetConversationAgentOverrideDto: {
+            /** @enum {string} */
+            override: "FORCE_ON" | "FORCE_OFF";
+        };
         CreateLabelDto: Record<string, never>;
         UpdateLabelDto: Record<string, never>;
+        CreateCatalogDto: {
+            organisationId: string;
+            name: string;
+            providerId?: string;
+        };
+        UpdateCatalogDto: {
+            name?: string;
+        };
+        LinkSocialAccountsDto: {
+            socialAccountIds: string[];
+        };
+        CreateProductDto: {
+            name: string;
+            description?: string;
+            imageUrl?: string;
+            additionalImageUrls?: string[];
+            price?: string;
+            currency?: string;
+            category?: string;
+            url?: string;
+            availability?: string;
+            brand?: string;
+            condition?: string;
+            collectionId?: string;
+        };
+        UpdateProductDto: {
+            name?: string;
+            description?: string;
+            imageUrl?: string;
+            additionalImageUrls?: string[];
+            price?: string;
+            currency?: string;
+            category?: string;
+            url?: string;
+            availability?: string;
+            brand?: string;
+            condition?: string;
+        };
+        CreateCollectionDto: {
+            name: string;
+            productIds?: string[];
+        };
+        UpdateCollectionDto: {
+            name?: string;
+        };
+        AssociatePhoneDto: {
+            phoneNumberId: string;
+        };
         MemberUserDto: {
             id: string;
             name: string;
@@ -1660,52 +1806,6 @@ export interface components {
             /** @example Diallo */
             lastName?: string;
         };
-        CreateCatalogDto: {
-            organisationId: string;
-            name: string;
-            providerId?: string;
-        };
-        UpdateCatalogDto: {
-            name?: string;
-        };
-        LinkSocialAccountsDto: {
-            socialAccountIds: string[];
-        };
-        CreateProductDto: {
-            name: string;
-            description?: string;
-            imageUrl?: string;
-            price?: string;
-            currency?: string;
-            category?: string;
-            url?: string;
-            availability?: string;
-            brand?: string;
-            condition?: string;
-            collectionId?: string;
-        };
-        UpdateProductDto: {
-            name?: string;
-            description?: string;
-            imageUrl?: string;
-            price?: string;
-            currency?: string;
-            category?: string;
-            url?: string;
-            availability?: string;
-            brand?: string;
-            condition?: string;
-        };
-        CreateCollectionDto: {
-            name: string;
-            productIds?: string[];
-        };
-        UpdateCollectionDto: {
-            name?: string;
-        };
-        AssociatePhoneDto: {
-            phoneNumberId: string;
-        };
         CreateAgentDto: {
             organisationId: string;
             socialAccountIds: string[];
@@ -1721,6 +1821,64 @@ export interface components {
             labelIds?: string[];
             /** @description Per-social-account contacts for CONTACTS mode */
             contacts?: Record<string, never>;
+        };
+        FeedbackTurnDto: {
+            /** @enum {string} */
+            from: "user" | "agent";
+            text: string;
+        };
+        AgentFeedbackRequestDto: {
+            /** @description Full feedback conversation so far (user turns = operator feedback, agent turns = clarifying questions from the supervisor). */
+            conversation: components["schemas"]["FeedbackTurnDto"][];
+        };
+        AgentFeedbackResponseDto: {
+            /**
+             * @description "complete" → agent context was updated and a success message is returned. "clarify" → a clarifying question must be shown to the operator.
+             * @enum {string}
+             */
+            mode: "complete" | "clarify";
+            /** @description Success message shown to the operator when mode = "complete". */
+            successMessage?: string;
+            /** @description Clarifying question shown to the operator when mode = "clarify". */
+            question?: string;
+            /** @description The updated agent context (markdown) that was persisted when mode = "complete". */
+            newContext?: string;
+        };
+        StatChangeDto: {
+            value: number;
+            /** @description Variation en pourcentage par rapport à la période précédente */
+            change: number;
+        };
+        StatsOverviewDto: {
+            comments: components["schemas"]["StatChangeDto"];
+            messages: components["schemas"]["StatChangeDto"];
+            aiResponses: components["schemas"]["StatChangeDto"];
+        };
+        TimeSeriesPointDto: {
+            /** @description Date ISO du début du bucket */
+            date: string;
+            messages: number;
+            commentaires: number;
+            credits: number;
+        };
+        NetworkBreakdownItemDto: {
+            /** @enum {string} */
+            provider: "FACEBOOK" | "INSTAGRAM" | "WHATSAPP" | "TIKTOK";
+            count: number;
+        };
+        StatsResponseDto: {
+            overview: components["schemas"]["StatsOverviewDto"];
+            activity: components["schemas"]["TimeSeriesPointDto"][];
+            messagesByNetwork: components["schemas"]["NetworkBreakdownItemDto"][];
+            commentsByNetwork: components["schemas"]["NetworkBreakdownItemDto"][];
+        };
+        CreditUsageDto: {
+            used: number;
+            total: number;
+            /** @description Date ISO du début de la période de facturation (mois en cours) */
+            periodStart: string;
+            /** @description Date ISO de la fin de la période de facturation */
+            periodEnd: string;
         };
         CreateTicketDto: {
             organisationId: string;
@@ -2677,6 +2835,52 @@ export interface operations {
             };
         };
     };
+    MessagingController_getAgentStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationAgentStatusDto"];
+                };
+            };
+        };
+    };
+    MessagingController_setAgentOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetConversationAgentOverrideDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationAgentStatusDto"];
+                };
+            };
+        };
+    };
     LabelController_findAll: {
         parameters: {
             query?: never;
@@ -2751,183 +2955,6 @@ export interface operations {
             };
         };
         responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    MemberController_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                orgId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MemberResponseDto"][];
-                };
-            };
-        };
-    };
-    MemberController_invite: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                orgId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InviteMemberDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MemberResponseDto"];
-                };
-            };
-        };
-    };
-    MemberController_remove: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                orgId: string;
-                memberId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Membre supprimé */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InvitationController_getInvitation: {
-        parameters: {
-            query: {
-                token: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Invitation details */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InvitationController_sendOtp: {
-        parameters: {
-            query: {
-                token: string;
-            };
-            header: {
-                "accept-language": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OTP sent */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InvitationController_verifyOtp: {
-        parameters: {
-            query: {
-                token: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VerifyInviteOtpDto"];
-            };
-        };
-        responses: {
-            /** @description OTP verified, user authenticated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InvitationController_accept: {
-        parameters: {
-            query: {
-                orgId: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AcceptInvitationDto"];
-            };
-        };
-        responses: {
-            /** @description Invitation accepted */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InvitationController_reject: {
-        parameters: {
-            query: {
-                orgId: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Invitation rejected */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3357,6 +3384,183 @@ export interface operations {
             };
         };
     };
+    MemberController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberResponseDto"][];
+                };
+            };
+        };
+    };
+    MemberController_invite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteMemberDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberResponseDto"];
+                };
+            };
+        };
+    };
+    MemberController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                memberId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Membre supprimé */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvitationController_getInvitation: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvitationController_sendOtp: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header: {
+                "accept-language": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OTP sent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvitationController_verifyOtp: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyInviteOtpDto"];
+            };
+        };
+        responses: {
+            /** @description OTP verified, user authenticated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvitationController_accept: {
+        parameters: {
+            query: {
+                orgId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptInvitationDto"];
+            };
+        };
+        responses: {
+            /** @description Invitation accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvitationController_reject: {
+        parameters: {
+            query: {
+                orgId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation rejected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AgentController_findAll: {
         parameters: {
             query?: never;
@@ -3601,6 +3805,79 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    AgentController_submitFeedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentFeedbackRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentFeedbackResponseDto"];
+                };
+            };
+        };
+    };
+    StatsController_getStats: {
+        parameters: {
+            query: {
+                /** @description Date ISO incluse (gte) */
+                from: string;
+                /** @description Date ISO exclue (lt) */
+                to: string;
+                bucket: "day" | "week" | "month";
+            };
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatsResponseDto"];
+                };
+            };
+        };
+    };
+    StatsController_getCreditUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditUsageDto"];
+                };
             };
         };
     };

@@ -850,16 +850,12 @@ a {
   word-break: break-word;
 }
 
-.feedback-bubble--whatsapp {
-  background: var(--color-brand-whatsapp);
-  color: #ffffff;
-  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble);
-}
-
-.feedback-bubble--neutral {
-  background: var(--color-bg-subtle);
+.feedback-bubble--quoted {
+  background: #ffffff;
   color: var(--color-text-primary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .feedback-bubble--user {
@@ -872,6 +868,13 @@ a {
   background: var(--color-bg-subtle);
   color: var(--color-text-primary);
   border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail);
+}
+
+/* Dotted grid background for the feedback modal scrollable area */
+.feedback-modal-grid {
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: -10px -10px;
 }
 
 /* Media container: placeholder bg matches content aspect ratio */

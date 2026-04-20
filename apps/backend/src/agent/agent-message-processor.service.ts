@@ -1,9 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
 import { ConfigService } from '@nestjs/config'
-import { ChatOpenAI } from '@langchain/openai'
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
 import { HumanMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
+import { LlmFactoryService } from '../common/llm/llm-factory.service'
 import { createRequire } from 'module'
 const _require = createRequire(__filename)
 const { createReactAgent } = _require('@langchain/langgraph/prebuilt')
@@ -39,6 +38,7 @@ export class AgentMessageProcessorService {
     private readonly imageProductMatchingService: ImageProductMatchingService,
     private readonly prompts: AgentPromptsService,
     private readonly creditService: CreditService,
+    private readonly llmFactory: LlmFactoryService,
   ) {}
 
   @OnEvent('message.incoming', { async: true })
@@ -74,9 +74,26 @@ export class AgentMessageProcessorService {
     })
 
     if (!agentLink) return
+
+    // Per-conversation override takes precedence over global agent rules
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: event.conversationId },
+      select: { participantId: true, participantName: true, aiOverride: true },
+    })
+    if (!conversation) return
+
+    if (conversation.aiOverride === 'FORCE_OFF') return
+
+    if (conversation.aiOverride === 'FORCE_ON') {
+      // Require agent to be at least READY (score gate enforced via status transitions)
+      if (agentLink.agent.status === 'DRAFT' || agentLink.agent.status === 'CONFIGURING') return
+      await this.processMessage(event, agentLink.agent)
+      return
+    }
+
+    // No conversation override → fall back to agent's global activation rules
     if (agentLink.agent.status !== 'ACTIVE') return
 
-    // Check activation mode
     const activationMode = agentLink.aiActivationMode
     if (activationMode === 'OFF') return
 
@@ -84,12 +101,6 @@ export class AgentMessageProcessorService {
       // Only respond to whitelisted contacts
       const allowedContacts = agentLink.aiActivationContacts || []
       if (allowedContacts.length > 0) {
-        const conversation = await this.prisma.conversation.findUnique({
-          where: { id: event.conversationId },
-          select: { participantId: true, participantName: true },
-        })
-        if (!conversation) return
-
         // Match by participantId (phone for WhatsApp) or participantName (IG/Messenger)
         const isAllowed = allowedContacts.some(
           (contact) =>
@@ -303,39 +314,13 @@ export class AgentMessageProcessorService {
     }
   }
 
+  /**
+   * Returns the LLM used when the agent replies to an incoming DM/comment.
+   * Uses the "flash" tier: lightweight/fast model for live response generation.
+   * Gemini primary, OpenAI fallback.
+   */
   private createModel() {
-    const primaryModel = this.config.get<string>('AGENT_PRIMARY_MODEL') || 'gpt-4.1'
-    const openaiKey = this.config.get<string>('OPENIA_API_KEY')
-    const geminiKey = this.config.get<string>('GEMINI_API_KEY')
-    const fallbackModel = this.config.get<string>('AGENT_FALLBACK_MODEL') || 'gemini-2.5-flash'
-
-    if (openaiKey && primaryModel.startsWith('gpt')) {
-      return new ChatOpenAI({
-        model: primaryModel,
-        apiKey: openaiKey,
-        temperature: 0.3,
-      }).withFallbacks([
-        new ChatGoogleGenerativeAI({
-          model: fallbackModel,
-          apiKey: geminiKey,
-          temperature: 0.3,
-        }),
-      ])
-    }
-
-    if (geminiKey) {
-      return new ChatGoogleGenerativeAI({
-        model: fallbackModel,
-        apiKey: geminiKey,
-        temperature: 0.3,
-      })
-    }
-
-    return new ChatOpenAI({
-      model: primaryModel,
-      apiKey: openaiKey,
-      temperature: 0.3,
-    })
+    return this.llmFactory.createChatModel('flash')
   }
 
   private async downloadMedia(url: string): Promise<Buffer> {

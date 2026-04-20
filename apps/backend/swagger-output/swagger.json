@@ -1217,6 +1217,76 @@
         ]
       }
     },
+    "/messaging/conversations/{conversationId}/agent-status": {
+      "get": {
+        "operationId": "MessagingController_getAgentStatus",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationAgentStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
+    "/messaging/conversations/{conversationId}/agent-override": {
+      "put": {
+        "operationId": "MessagingController_setAgentOverride",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetConversationAgentOverrideDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationAgentStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
     "/labels/account/{socialAccountId}": {
       "get": {
         "operationId": "LabelController_findAll",
@@ -2499,6 +2569,137 @@
         },
         "tags": [
           "Agent"
+        ]
+      }
+    },
+    "/agent/feedback/{messageId}": {
+      "post": {
+        "operationId": "AgentController_submitFeedback",
+        "parameters": [
+          {
+            "name": "messageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentFeedbackRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentFeedbackResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/stats/org/{organisationId}": {
+      "get": {
+        "operationId": "StatsController_getStats",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Date ISO incluse (gte)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Date ISO exclue (lt)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Stats"
+        ]
+      }
+    },
+    "/stats/org/{organisationId}/credits": {
+      "get": {
+        "operationId": "StatsController_getCreditUsage",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditUsageDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Stats"
         ]
       }
     },
@@ -3956,6 +4157,78 @@
           "conversationId"
         ]
       },
+      "ConversationAgentSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "CONFIGURING",
+              "READY",
+              "ACTIVE",
+              "PAUSED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "score",
+          "status"
+        ]
+      },
+      "ConversationAgentStatusDto": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ConversationAgentSummaryDto"
+              }
+            ]
+          },
+          "override": {
+            "type": "string",
+            "enum": [
+              "FORCE_ON",
+              "FORCE_OFF"
+            ],
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the agent would process a new message on this conversation"
+          }
+        },
+        "required": [
+          "isActive"
+        ]
+      },
+      "SetConversationAgentOverrideDto": {
+        "type": "object",
+        "properties": {
+          "override": {
+            "type": "string",
+            "enum": [
+              "FORCE_ON",
+              "FORCE_OFF"
+            ]
+          }
+        },
+        "required": [
+          "override"
+        ]
+      },
       "CreateLabelDto": {
         "type": "object",
         "properties": {}
@@ -4321,6 +4594,205 @@
         },
         "required": [
           "mode"
+        ]
+      },
+      "FeedbackTurnDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "enum": [
+              "user",
+              "agent"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "text"
+        ]
+      },
+      "AgentFeedbackRequestDto": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "description": "Full feedback conversation so far (user turns = operator feedback, agent turns = clarifying questions from the supervisor).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedbackTurnDto"
+            }
+          }
+        },
+        "required": [
+          "conversation"
+        ]
+      },
+      "AgentFeedbackResponseDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "clarify"
+            ],
+            "description": "\"complete\" → agent context was updated and a success message is returned. \"clarify\" → a clarifying question must be shown to the operator."
+          },
+          "successMessage": {
+            "type": "string",
+            "description": "Success message shown to the operator when mode = \"complete\"."
+          },
+          "question": {
+            "type": "string",
+            "description": "Clarifying question shown to the operator when mode = \"clarify\"."
+          },
+          "newContext": {
+            "type": "string",
+            "description": "The updated agent context (markdown) that was persisted when mode = \"complete\"."
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "StatChangeDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number"
+          },
+          "change": {
+            "type": "number",
+            "description": "Variation en pourcentage par rapport à la période précédente"
+          }
+        },
+        "required": [
+          "value",
+          "change"
+        ]
+      },
+      "StatsOverviewDto": {
+        "type": "object",
+        "properties": {
+          "comments": {
+            "$ref": "#/components/schemas/StatChangeDto"
+          },
+          "messages": {
+            "$ref": "#/components/schemas/StatChangeDto"
+          },
+          "aiResponses": {
+            "$ref": "#/components/schemas/StatChangeDto"
+          }
+        },
+        "required": [
+          "comments",
+          "messages",
+          "aiResponses"
+        ]
+      },
+      "TimeSeriesPointDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Date ISO du début du bucket"
+          },
+          "messages": {
+            "type": "number"
+          },
+          "commentaires": {
+            "type": "number"
+          },
+          "credits": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "messages",
+          "commentaires",
+          "credits"
+        ]
+      },
+      "NetworkBreakdownItemDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "FACEBOOK",
+              "INSTAGRAM",
+              "WHATSAPP",
+              "TIKTOK"
+            ]
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "provider",
+          "count"
+        ]
+      },
+      "StatsResponseDto": {
+        "type": "object",
+        "properties": {
+          "overview": {
+            "$ref": "#/components/schemas/StatsOverviewDto"
+          },
+          "activity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimeSeriesPointDto"
+            }
+          },
+          "messagesByNetwork": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NetworkBreakdownItemDto"
+            }
+          },
+          "commentsByNetwork": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NetworkBreakdownItemDto"
+            }
+          }
+        },
+        "required": [
+          "overview",
+          "activity",
+          "messagesByNetwork",
+          "commentsByNetwork"
+        ]
+      },
+      "CreditUsageDto": {
+        "type": "object",
+        "properties": {
+          "used": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "periodStart": {
+            "type": "string",
+            "description": "Date ISO du début de la période de facturation (mois en cours)"
+          },
+          "periodEnd": {
+            "type": "string",
+            "description": "Date ISO de la fin de la période de facturation"
+          }
+        },
+        "required": [
+          "used",
+          "total",
+          "periodStart",
+          "periodEnd"
         ]
       },
       "CreateTicketDto": {

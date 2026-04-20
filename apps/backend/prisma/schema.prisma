@@ -68,6 +68,11 @@ enum AiActivationMode {
   EXCLUDE_LABELS
 }
 
+enum AiConversationOverride {
+  FORCE_ON
+  FORCE_OFF
+}
+
 enum CatalogAnalysisStatus {
   PENDING
   ANALYZING
@@ -498,6 +503,7 @@ model Conversation {
   lastMessageText   String?
   lastMessageAt     DateTime?
   unreadCount       Int            @default(0)
+  aiOverride        AiConversationOverride? // Per-conversation override of agent activation rules
   messages          DirectMessage[]
   conversationLabels ConversationLabel[]
   createdAt         DateTime       @default(now())

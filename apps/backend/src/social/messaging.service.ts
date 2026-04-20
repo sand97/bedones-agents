@@ -283,6 +283,139 @@ export class MessagingService {
     return { id: savedMessage.id, message: savedMessage.message }
   }
 
+  // ─── Per-conversation agent override ───
+
+  /**
+   * Returns the agent attached to this conversation's social account, whether it
+   * would currently process an incoming message on this conversation, and the
+   * per-conversation override (if any). Used by the chat header to decide between
+   * "Activate" and "Deactivate" buttons.
+   */
+  async getAgentStatusForConversation(userId: string, conversationId: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        socialAccount: {
+          select: {
+            organisationId: true,
+            agentLink: {
+              include: {
+                agent: {
+                  select: { id: true, name: true, score: true, status: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+    if (!conversation) throw new NotFoundException('Conversation not found')
+    await this.assertMembership(userId, conversation.socialAccount.organisationId)
+
+    const agentLink = conversation.socialAccount.agentLink
+    const agent = agentLink?.agent ?? null
+    const override = conversation.aiOverride ?? null
+
+    if (!agent || !agentLink) {
+      return { agent: null, override: null, isActive: false }
+    }
+
+    const isActive = await this.computeConversationActive({
+      conversationId,
+      participantId: conversation.participantId,
+      participantName: conversation.participantName,
+      override,
+      agentStatus: agent.status,
+      mode: agentLink.aiActivationMode,
+      activationContacts: agentLink.aiActivationContacts,
+      activationLabels: agentLink.aiActivationLabels,
+    })
+
+    return { agent, override, isActive }
+  }
+
+  async setConversationAgentOverride(
+    userId: string,
+    conversationId: string,
+    override: 'FORCE_ON' | 'FORCE_OFF',
+  ) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        socialAccount: {
+          select: {
+            organisationId: true,
+            agentLink: {
+              include: { agent: { select: { score: true, status: true } } },
+            },
+          },
+        },
+      },
+    })
+    if (!conversation) throw new NotFoundException('Conversation not found')
+    await this.assertMembership(userId, conversation.socialAccount.organisationId)
+
+    const agent = conversation.socialAccount.agentLink?.agent
+    if (!agent) {
+      throw new BadRequestException('No agent is attached to this social account')
+    }
+    if (agent.score < 80) {
+      throw new BadRequestException(
+        "L'agent n'a pas encore un score suffisant pour être activé sur une conversation.",
+      )
+    }
+
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { aiOverride: override },
+    })
+
+    return this.getAgentStatusForConversation(userId, conversationId)
+  }
+
+  private async computeConversationActive(args: {
+    conversationId: string
+    participantId: string
+    participantName: string
+    override: 'FORCE_ON' | 'FORCE_OFF' | null
+    agentStatus: string
+    mode: string
+    activationContacts: string[]
+    activationLabels: string[]
+  }): Promise<boolean> {
+    if (args.override === 'FORCE_OFF') return false
+    if (args.override === 'FORCE_ON') {
+      return args.agentStatus !== 'DRAFT' && args.agentStatus !== 'CONFIGURING'
+    }
+
+    if (args.agentStatus !== 'ACTIVE') return false
+    if (args.mode === 'OFF') return false
+    if (args.mode === 'ALL') return true
+
+    if (args.mode === 'CONTACTS') {
+      if (args.activationContacts.length === 0) return false
+      return args.activationContacts.some(
+        (contact) =>
+          args.participantId.includes(contact) ||
+          contact.includes(args.participantId) ||
+          (args.participantName &&
+            args.participantName.toLowerCase().includes(contact.toLowerCase())),
+      )
+    }
+
+    if (args.mode === 'LABELS' || args.mode === 'EXCLUDE_LABELS') {
+      if (args.activationLabels.length === 0) return args.mode === 'EXCLUDE_LABELS'
+      const conversationLabels = await this.prisma.conversationLabel.findMany({
+        where: { conversationId: args.conversationId },
+        select: { labelId: true },
+      })
+      const hasMatch = conversationLabels.some((cl) => args.activationLabels.includes(cl.labelId))
+      return args.mode === 'LABELS' ? hasMatch : !hasMatch
+    }
+
+    return false
+  }
+
   // ─── Mark conversation as read ───
 
   async markConversationAsRead(userId: string, conversationId: string) {

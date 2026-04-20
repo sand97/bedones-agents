@@ -18,11 +18,13 @@ import { TicketModule } from './ticket/ticket.module'
 import { PromotionModule } from './promotion/promotion.module'
 import { ImageProcessingModule } from './image-processing/image-processing.module'
 import { StatsModule } from './stats/stats.module'
+import { LlmModule } from './common/llm/llm.module'
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     EventEmitterModule.forRoot(),
+    LlmModule,
     I18nModule.forRoot({
       fallbackLanguage: 'fr',
       loader: I18nJsonLoader,

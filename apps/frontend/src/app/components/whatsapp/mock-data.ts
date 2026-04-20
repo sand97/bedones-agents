@@ -69,6 +69,9 @@ export interface Message {
   timestamp: string
   isRead: boolean
 
+  // True when the message was authored by an AI agent (vs. a human on the business side)
+  isAi?: boolean
+
   // Optimistic messaging
   localId?: string
   status?: MessageStatus

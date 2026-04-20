@@ -172,3 +172,35 @@ export class MarkConversationReadDto {
   @ApiProperty()
   conversationId: string
 }
+
+export class ConversationAgentSummaryDto {
+  @ApiProperty()
+  id: string
+
+  @ApiPropertyOptional()
+  name?: string
+
+  @ApiProperty()
+  score: number
+
+  @ApiProperty({ enum: ['DRAFT', 'CONFIGURING', 'READY', 'ACTIVE', 'PAUSED'] })
+  status: string
+}
+
+export class ConversationAgentStatusDto {
+  @ApiPropertyOptional({ type: ConversationAgentSummaryDto, nullable: true })
+  agent: ConversationAgentSummaryDto | null
+
+  @ApiPropertyOptional({ enum: ['FORCE_ON', 'FORCE_OFF'], nullable: true })
+  override: 'FORCE_ON' | 'FORCE_OFF' | null
+
+  @ApiProperty({
+    description: 'Whether the agent would process a new message on this conversation',
+  })
+  isActive: boolean
+}
+
+export class SetConversationAgentOverrideDto {
+  @ApiProperty({ enum: ['FORCE_ON', 'FORCE_OFF'] })
+  override: 'FORCE_ON' | 'FORCE_OFF'
+}

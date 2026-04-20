@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
-import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
+import { LlmFactoryService } from '../common/llm/llm-factory.service'
 
 export interface AIAnalysisResult {
   action: 'none' | 'hide' | 'delete' | 'reply'
@@ -33,71 +31,33 @@ interface CommentContext {
 @Injectable()
 export class AIService {
   private readonly logger = new Logger(AIService.name)
-  private geminiModel: ChatGoogleGenerativeAI | null = null
-  private openaiModel: ChatOpenAI | null = null
 
-  constructor(private configService: ConfigService) {}
+  constructor(private readonly llmFactory: LlmFactoryService) {}
 
-  private getGeminiModel(): ChatGoogleGenerativeAI | null {
-    const apiKey = this.configService.get<string>('GEMINI_API_KEY')
-    if (!apiKey) return null
-    if (!this.geminiModel) {
-      const model =
-        this.configService.get<string>('GEMINI_COMMENT_MODEL') || 'gemini-3-flash-preview'
-      this.geminiModel = new ChatGoogleGenerativeAI({
-        apiKey,
-        model,
-        temperature: 0.7,
-        maxOutputTokens: 1024,
-      })
-    }
-    return this.geminiModel
-  }
-
-  private getOpenAIModel(): ChatOpenAI | null {
-    const apiKey = this.configService.get<string>('OPENIA_API_KEY')
-    if (!apiKey) return null
-    if (!this.openaiModel) {
-      const model = this.configService.get<string>('OPENAI_COMMENT_MODEL') || 'gpt-5.4-mini'
-      this.openaiModel = new ChatOpenAI({
-        openAIApiKey: apiKey,
-        model,
-        temperature: 0.7,
-        maxTokens: 1024,
-      })
-    }
-    return this.openaiModel
-  }
-
+  /**
+   * Comment moderation / auto-reply uses the "flash" tier (lightweight model).
+   * Gemini primary + OpenAI fallback is handled by the factory via withFallbacks.
+   */
   async analyzeComment(context: CommentContext): Promise<AIAnalysisResult> {
     const systemPrompt = this.buildSystemPrompt(context.pageSettings)
     const userMessage = this.buildUserMessage(context.comment)
     const messages = [new SystemMessage(systemPrompt), new HumanMessage(userMessage)]
 
-    // Try Gemini first
     try {
-      const gemini = this.getGeminiModel()
-      if (gemini) {
-        const response = await gemini.invoke(messages)
-        return this.parseAIResponse(response.content as string)
-      }
+      const model = this.llmFactory.createChatModel('flash', {
+        temperature: 0.7,
+        maxOutputTokens: 1024,
+      })
+      const response = await model.invoke(messages)
+      const content =
+        typeof response === 'object' && response !== null && 'content' in response
+          ? (response as { content: unknown }).content
+          : ''
+      return this.parseAIResponse(typeof content === 'string' ? content : '')
     } catch (error) {
-      this.logger.error('Gemini analysis failed:', error)
+      this.logger.error('Comment analysis failed:', error)
+      return { action: 'none', reason: 'No AI service available' }
     }
-
-    // Fallback to OpenAI
-    try {
-      const openai = this.getOpenAIModel()
-      if (openai) {
-        const response = await openai.invoke(messages)
-        return this.parseAIResponse(response.content as string)
-      }
-    } catch (error) {
-      this.logger.error('OpenAI analysis failed:', error)
-    }
-
-    this.logger.warn('No AI service available, defaulting to no action')
-    return { action: 'none', reason: 'No AI service configured' }
   }
 
   private buildSystemPrompt(pageSettings: CommentContext['pageSettings']): string {

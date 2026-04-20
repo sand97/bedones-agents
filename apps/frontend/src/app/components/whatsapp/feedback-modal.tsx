@@ -5,7 +5,6 @@ import { Sparkles, CheckCircle2, Send } from 'lucide-react'
 import dayjs from 'dayjs'
 import type { Message } from './mock-data'
 
-type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger'
 type FeedbackStep = 'input' | 'analyzing' | 'chat' | 'success'
 
 export interface FeedbackTurn {
@@ -15,20 +14,26 @@ export interface FeedbackTurn {
   timestamp: string
 }
 
+export interface FeedbackSubmitResult {
+  /** When the supervisor LLM needs more info. */
+  question?: string
+  /** When the supervisor LLM has refined the agent context. */
+  successMessage?: string
+}
+
 interface FeedbackModalProps {
   open: boolean
   onClose: () => void
   originalMessage: Message | null
-  provider?: ChatProvider
   /**
-   * Called when the front-end wants to send the accumulated conversation to the backend.
-   * Should resolve with either a clarifying question (keeps the chat open) or `null` when
-   * the backend considers the feedback clear enough (moves to success).
+   * Sends the accumulated feedback conversation to the backend, which runs one
+   * round of the supervisor LLM and returns either a clarifying question
+   * (keeps the chat open) or a success message (moves to success state).
    */
-  onSubmit?: (params: {
+  onSubmit: (params: {
     originalMessage: Message
     conversation: FeedbackTurn[]
-  }) => Promise<{ followUp: string | null }>
+  }) => Promise<FeedbackSubmitResult>
 }
 
 function previewOriginal(message: Message | null, t: (k: string) => string): string {
@@ -57,33 +62,13 @@ function formatTime(iso: string): string {
   return dayjs(iso).format('HH:mm')
 }
 
-/** Mock backend that decides if the feedback is clear enough. */
-async function mockAnalyze(conversation: FeedbackTurn[]): Promise<{ followUp: string | null }> {
-  await new Promise((resolve) => setTimeout(resolve, 1400))
-  const lastUser = [...conversation].reverse().find((m) => m.from === 'user')
-  const userText = lastUser?.text.trim() ?? ''
-  const userTurns = conversation.filter((m) => m.from === 'user').length
-  // Very short feedback on the first turn → ask for clarification.
-  if (userText.length < 25 && userTurns < 2) {
-    return {
-      followUp:
-        "Merci pour ce retour. Pourriez-vous préciser ce qui n'allait pas (ton, information manquante, format) afin que je puisse ajuster la réponse ?",
-    }
-  }
-  return { followUp: null }
-}
-
-export function FeedbackModal({
-  open,
-  onClose,
-  originalMessage,
-  provider = 'whatsapp',
-  onSubmit,
-}: FeedbackModalProps) {
+export function FeedbackModal({ open, onClose, originalMessage, onSubmit }: FeedbackModalProps) {
   const { t } = useTranslation()
   const [step, setStep] = useState<FeedbackStep>('input')
   const [input, setInput] = useState('')
   const [conversation, setConversation] = useState<FeedbackTurn[]>([])
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Reset state when the modal (re)opens
@@ -92,6 +77,8 @@ export function FeedbackModal({
       setStep('input')
       setInput('')
       setConversation([])
+      setSuccessMessage(null)
+      setErrorMessage(null)
     }
   }, [open, originalMessage?.id])
 
@@ -110,9 +97,6 @@ export function FeedbackModal({
     [originalMessage],
   )
 
-  const bubbleClass =
-    provider === 'whatsapp' ? 'feedback-bubble--whatsapp' : 'feedback-bubble--neutral'
-
   const handleSend = async () => {
     const trimmed = input.trim()
     if (!trimmed || !originalMessage) return
@@ -127,24 +111,27 @@ export function FeedbackModal({
     setConversation(nextConversation)
     setInput('')
     setStep('analyzing')
+    setErrorMessage(null)
 
     try {
-      const analyze = onSubmit ?? (() => mockAnalyze(nextConversation))
-      const result = await analyze({ originalMessage, conversation: nextConversation })
-      if (result.followUp) {
+      const result = await onSubmit({ originalMessage, conversation: nextConversation })
+      if (result.question) {
         const agentTurn: FeedbackTurn = {
           id: `fb-ag-${Date.now()}`,
           from: 'agent',
-          text: result.followUp,
+          text: result.question,
           timestamp: new Date().toISOString(),
         }
         setConversation((prev) => [...prev, agentTurn])
         setStep('chat')
       } else {
+        setSuccessMessage(result.successMessage ?? null)
         setStep('success')
       }
-    } catch {
-      setStep('chat')
+    } catch (error) {
+      const fallback = error instanceof Error ? error.message : t('feedback.error_generic')
+      setErrorMessage(fallback)
+      setStep(conversation.length > 0 ? 'chat' : 'input')
     }
   }
 
@@ -168,113 +155,127 @@ export function FeedbackModal({
       styles={{ body: { padding: 0, maxHeight: '70vh', display: 'flex', flexDirection: 'column' } }}
     >
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Scrollable area: original message + conversation */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 pt-4 pb-3">
-          <div className="mb-3 text-xs text-text-muted">{t('feedback.subtitle')}</div>
-
-          {/* Original AI response */}
-          <div className="mb-1 text-xs font-semibold text-text-muted">
-            {t('feedback.original_response')}
-          </div>
-          <div className="mb-5 flex justify-end">
-            <div className={`feedback-bubble ${bubbleClass}`}>
-              <p className="m-0 whitespace-pre-wrap text-sm">{originalPreview}</p>
-              <div className="mt-1 text-right text-[10px] opacity-80">{originalTime}</div>
+        {step === 'success' ? (
+          /* Success takes over the whole body */
+          <div className="feedback-modal-grid flex flex-1 flex-col items-center justify-center gap-3 px-5 py-10 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-brand-whatsapp)_15%,transparent)] text-[color:var(--color-brand-whatsapp)]">
+              <CheckCircle2 size={32} strokeWidth={2} />
+            </div>
+            <div className="text-base font-semibold text-text-primary">
+              {t('feedback.success_title')}
+            </div>
+            <div className="max-w-xs text-sm text-text-muted">
+              {successMessage ?? t('feedback.success_desc')}
             </div>
           </div>
+        ) : (
+          /* Scrollable area: original message + conversation */
+          <div
+            ref={scrollRef}
+            className="feedback-modal-grid flex-1 overflow-y-auto px-5 pt-4 pb-3"
+          >
+            <div className="mb-3 text-xs text-text-muted">{t('feedback.subtitle')}</div>
 
-          {/* Feedback conversation */}
-          {conversation.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {conversation.map((turn) => {
-                const isUser = turn.from === 'user'
-                return (
-                  <div
-                    key={turn.id}
-                    className={`flex items-end gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}
-                  >
-                    {!isUser && (
-                      <Avatar
-                        size={24}
-                        className="flex-shrink-0 bg-black text-white"
-                        icon={<Sparkles size={12} />}
-                      />
-                    )}
-                    <div
-                      className={`feedback-bubble ${
-                        isUser ? 'feedback-bubble--user' : 'feedback-bubble--agent'
-                      }`}
-                    >
-                      <p className="m-0 whitespace-pre-wrap text-sm">{turn.text}</p>
-                      <div className="mt-1 text-right text-[10px] opacity-70">
-                        {formatTime(turn.timestamp)}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+            {/* Original AI response */}
+            <div className="mb-1 text-xs font-semibold text-text-muted">
+              {t('feedback.original_response')}
             </div>
-          )}
-
-          {/* Analysis indicator */}
-          {step === 'analyzing' && (
-            <div className="mt-3 flex items-start gap-2">
-              <Avatar
-                size={24}
-                className="flex-shrink-0 bg-black text-white"
-                icon={<Sparkles size={12} />}
-              />
-              <div className="feedback-bubble feedback-bubble--agent flex items-center gap-3">
-                <Spin size="small" />
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-text-primary">
-                    {t('feedback.analyzing_title')}
-                  </span>
-                  <span className="text-xs text-text-muted">{t('feedback.analyzing_desc')}</span>
+            <div className="mb-5 flex justify-end">
+              <div className="feedback-bubble feedback-bubble--quoted">
+                <p className="m-0 whitespace-pre-wrap text-sm">{originalPreview}</p>
+                <div className="mt-1 text-right text-[10px] text-text-muted">
+                  {originalTime} {t('chat.by_ai')}
                 </div>
               </div>
             </div>
-          )}
 
-          {/* Success state */}
-          {step === 'success' && (
-            <div className="mt-6 flex flex-col items-center gap-3 py-6 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-brand-whatsapp)_15%,transparent)] text-[color:var(--color-brand-whatsapp)]">
-                <CheckCircle2 size={32} strokeWidth={2} />
+            {/* Feedback conversation */}
+            {conversation.length > 0 && (
+              <div className="flex flex-col gap-2">
+                {conversation.map((turn) => {
+                  const isUser = turn.from === 'user'
+                  return (
+                    <div
+                      key={turn.id}
+                      className={`flex items-end gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}
+                    >
+                      {!isUser && (
+                        <Avatar
+                          size={24}
+                          className="flex-shrink-0 bg-black text-white"
+                          icon={<Sparkles size={12} />}
+                        />
+                      )}
+                      <div
+                        className={`feedback-bubble ${
+                          isUser ? 'feedback-bubble--user' : 'feedback-bubble--agent'
+                        }`}
+                      >
+                        <p className="m-0 whitespace-pre-wrap text-sm">{turn.text}</p>
+                        <div className="mt-1 text-right text-[10px] opacity-70">
+                          {formatTime(turn.timestamp)}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              <div className="text-base font-semibold text-text-primary">
-                {t('feedback.success_title')}
+            )}
+
+            {/* Analysis indicator */}
+            {step === 'analyzing' && (
+              <div className="mt-3 flex items-start gap-2">
+                <Avatar
+                  size={24}
+                  className="flex-shrink-0 bg-black text-white"
+                  icon={<Sparkles size={12} />}
+                />
+                <div className="feedback-bubble feedback-bubble--agent flex items-center gap-3">
+                  <Spin size="small" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-text-primary">
+                      {t('feedback.analyzing_title')}
+                    </span>
+                    <span className="text-xs text-text-muted">{t('feedback.analyzing_desc')}</span>
+                  </div>
+                </div>
               </div>
-              <div className="max-w-xs text-sm text-text-muted">{t('feedback.success_desc')}</div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Footer: composer or close */}
         {showComposer ? (
-          <div className="flex items-end gap-2 border-t border-border-subtle px-5 py-3">
-            <Input.TextArea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={t('feedback.placeholder')}
-              autoSize={{ minRows: 1, maxRows: 4 }}
-              disabled={step === 'analyzing'}
-              onPressEnter={(e) => {
-                if (!e.shiftKey) {
-                  e.preventDefault()
-                  handleSend()
-                }
-              }}
-              className="flex-1"
-            />
-            <Button
-              type="primary"
-              shape="circle"
-              icon={<Send size={16} />}
-              onClick={handleSend}
-              disabled={!canSend}
-              loading={step === 'analyzing'}
-            />
+          <div className="flex flex-col gap-2 border-t border-border-subtle px-5 py-3">
+            {errorMessage && (
+              <div className="rounded bg-[color:var(--color-danger-bg,#fef2f2)] px-3 py-2 text-xs text-[color:var(--color-danger,#b91c1c)]">
+                {errorMessage}
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <Input.TextArea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={t('feedback.placeholder')}
+                autoSize={{ minRows: 1, maxRows: 4 }}
+                disabled={step === 'analyzing'}
+                onPressEnter={(e) => {
+                  if (!e.shiftKey) {
+                    e.preventDefault()
+                    handleSend()
+                  }
+                }}
+                className="flex-1"
+              />
+              <Button
+                type="primary"
+                shape="circle"
+                icon={<Send size={16} />}
+                onClick={handleSend}
+                disabled={!canSend}
+                loading={step === 'analyzing'}
+              />
+            </div>
           </div>
         ) : (
           <div className="flex justify-end border-t border-border-subtle px-5 py-3">

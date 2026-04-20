@@ -202,6 +202,13 @@
     "read": "Read",
     "failed": "Failed",
     "copy_phone": "Copy {{phone}}",
+    "activate_agent": "Activate agent",
+    "deactivate_agent": "Deactivate agent",
+    "activate_agent_tooltip": "Activate the agent for this conversation only",
+    "deactivate_agent_tooltip": "Deactivate the agent for this conversation only",
+    "agent_activated": "Agent activated for this conversation",
+    "agent_deactivated": "Agent deactivated for this conversation",
+    "agent_toggle_error": "Could not update agent state",
     "type_message": "Type a message...",
     "search": "Search conversations...",
     "new_messages": "New messages",
@@ -271,7 +278,8 @@
     "configure_catalog_btn": "Associate a catalog",
     "options": "Options",
     "reply_tooltip": "Reply",
-    "improve_tooltip": "Improve the response with AI"
+    "improve_tooltip": "Improve the response with AI",
+    "by_ai": "by AI"
   },
 
   "feedback": {
@@ -286,7 +294,8 @@
     "send": "Send",
     "placeholder": "Describe what's wrong with this response…",
     "ai_agent": "AI Agent",
-    "you": "You"
+    "you": "You",
+    "error_generic": "Something went wrong. Please try again."
   },
 
   "catalog_link": {

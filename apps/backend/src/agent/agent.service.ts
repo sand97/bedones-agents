@@ -6,9 +6,8 @@ import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import { AgentDbToolsService } from './tools/agent-db-tools.service'
-import { ChatOpenAI } from '@langchain/openai'
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
+import { LlmFactoryService } from '../common/llm/llm-factory.service'
 import { CATALOG_INDEXING_QUEUE } from '../queue/queue.module'
 import type { CatalogIndexingJobData } from '../image-processing/catalog-indexing.processor'
 
@@ -22,6 +21,7 @@ export class AgentService {
     private gateway: EventsGateway,
     private prompts: AgentPromptsService,
     private dbTools: AgentDbToolsService,
+    private llmFactory: LlmFactoryService,
     @InjectQueue(CATALOG_INDEXING_QUEUE) private catalogIndexingQueue: Queue,
   ) {}
 
@@ -517,41 +517,13 @@ export class AgentService {
     return Array.from(catalogMap.values())
   }
 
+  /**
+   * Returns the LLM used for agent context processing (onboarding, catalog analysis,
+   * initial evaluation). Uses the "thinking" tier: most capable reasoning model with
+   * extended thinking enabled. Gemini primary, OpenAI fallback.
+   */
   private createModel() {
-    const primaryModel = this.config.get<string>('AGENT_PRIMARY_MODEL') || 'gpt-4.1'
-    const openaiKey = this.config.get<string>('OPENIA_API_KEY')
-    const geminiKey = this.config.get<string>('GEMINI_API_KEY')
-    const fallbackModel = this.config.get<string>('AGENT_FALLBACK_MODEL') || 'gemini-2.5-flash'
-
-    // Try OpenAI first, fallback to Gemini
-    if (openaiKey && primaryModel.startsWith('gpt')) {
-      return new ChatOpenAI({
-        model: primaryModel,
-        apiKey: openaiKey,
-        temperature: 0.3,
-      }).withFallbacks([
-        new ChatGoogleGenerativeAI({
-          model: fallbackModel,
-          apiKey: geminiKey,
-          temperature: 0.3,
-        }),
-      ])
-    }
-
-    if (geminiKey) {
-      return new ChatGoogleGenerativeAI({
-        model: fallbackModel,
-        apiKey: geminiKey,
-        temperature: 0.3,
-      })
-    }
-
-    // Default to OpenAI
-    return new ChatOpenAI({
-      model: primaryModel,
-      apiKey: openaiKey,
-      temperature: 0.3,
-    })
+    return this.llmFactory.createChatModel('thinking')
   }
 
   private parseAgentResponse(text: string): {

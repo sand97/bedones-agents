@@ -1,6 +1,6 @@
 import { useMemo, useRef, useEffect, useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Avatar, Popover, Button, Spin, Tooltip } from 'antd'
+import { Avatar, Popover, Button, Spin, Tooltip, message as antdMessage } from 'antd'
 import {
   Play,
   Pause,
@@ -12,15 +12,18 @@ import {
   RotateCcw,
   Reply,
   Sparkles,
+  BotOff,
 } from 'lucide-react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { DoubleCheckIcon, SingleCheckIcon, OptionsIcon } from '@app/components/icons/social-icons'
+import { $api } from '@app/lib/api/$api'
 import type { Conversation, Message } from './mock-data'
 import { TicketCard } from './ticket-card'
 import { TicketDrawer, type RealTicket } from './ticket-drawer'
 import { ChatInput } from './chat-input'
-import { FeedbackModal } from './feedback-modal'
+import { FeedbackModal, type FeedbackSubmitResult, type FeedbackTurn } from './feedback-modal'
 
 type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger'
 
@@ -85,6 +88,7 @@ function AudioPlayer({
   isSending,
   isError,
   isRead,
+  isAi,
   deliveryStatus,
   provider,
   onRetry,
@@ -95,10 +99,12 @@ function AudioPlayer({
   isSending?: boolean
   isError?: boolean
   isRead?: boolean
+  isAi?: boolean
   deliveryStatus?: 'sent' | 'delivered' | 'read'
   provider?: ChatProvider
   onRetry?: () => void
 }) {
+  const { t } = useTranslation()
   const audioRef = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -177,7 +183,10 @@ function AudioPlayer({
           </Button>
         ) : (
           <span className="flex items-center gap-1">
-            {timestamp}
+            <span>
+              {timestamp}
+              {isOutgoing && isAi && ` ${t('chat.by_ai')}`}
+            </span>
             {isOutgoing && isSending && <Spin size="small" />}
             {isOutgoing && !isSending && (
               <DeliveryCheck
@@ -338,6 +347,7 @@ function MessageBubble({
             isSending={isSending}
             isError={isError}
             isRead={message.isRead}
+            isAi={message.isAi}
             deliveryStatus={message.deliveryStatus}
             provider={provider}
             onRetry={() => onRetry?.(message.localId || message.id)}
@@ -379,7 +389,10 @@ function MessageBubble({
                 </Button>
               ) : (
                 <span className="flex items-center gap-1">
-                  {formatTime(message.timestamp)}
+                  <span>
+                    {formatTime(message.timestamp)}
+                    {isOutgoing && message.isAi && ` ${t('chat.by_ai')}`}
+                  </span>
                   {isOutgoing && isSending && <Spin size="small" />}
                   {isOutgoing && !isSending && (
                     <DeliveryCheck
@@ -589,7 +602,7 @@ function MessageBubble({
       data-from={message.from}
     >
       {/* Action buttons — left of outgoing messages (AI improve + Reply) */}
-      {isOutgoing && onImprove && !isSending && !isError && (
+      {isOutgoing && message.isAi && onImprove && !isSending && !isError && (
         <Tooltip title={t('chat.improve_tooltip')} placement="top">
           <Button
             variant="text"
@@ -646,7 +659,10 @@ function MessageBubble({
               </Button>
             ) : (
               <span className="flex items-center gap-1">
-                {formatTime(message.timestamp)}
+                <span>
+                  {formatTime(message.timestamp)}
+                  {isOutgoing && message.isAi && ` ${t('chat.by_ai')}`}
+                </span>
                 {isOutgoing && isSending && <Spin size="small" className="ml-0.5" />}
                 {isOutgoing && !isSending && (
                   <DeliveryCheck
@@ -681,8 +697,26 @@ function MessageBubble({
 
 function ChatHeader({ conversation }: { conversation: Conversation }) {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  const agentStatusQuery = $api.useQuery(
+    'get',
+    '/messaging/conversations/{conversationId}/agent-status',
+    { params: { path: { conversationId: conversation.id } } },
+  )
+
+  const setOverrideMutation = $api.useMutation(
+    'put',
+    '/messaging/conversations/{conversationId}/agent-override',
+  )
+
+  const agentStatus = agentStatusQuery.data
+  const agent = agentStatus?.agent ?? null
+  const isAgentReady =
+    !!agent && agent.score >= 80 && agent.status !== 'DRAFT' && agent.status !== 'CONFIGURING'
+  const isActive = agentStatus?.isActive === true
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(conversation.contact.phone)
@@ -691,6 +725,29 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
       setCopied(false)
       setOptionsOpen(false)
     }, 1200)
+  }
+
+  const handleToggleAgent = async () => {
+    const next: 'FORCE_ON' | 'FORCE_OFF' = isActive ? 'FORCE_OFF' : 'FORCE_ON'
+    try {
+      const result = await setOverrideMutation.mutateAsync({
+        params: { path: { conversationId: conversation.id } },
+        body: { override: next },
+      })
+      queryClient.setQueryData(
+        [
+          'get',
+          '/messaging/conversations/{conversationId}/agent-status',
+          { params: { path: { conversationId: conversation.id } } },
+        ],
+        result,
+      )
+      antdMessage.success(
+        next === 'FORCE_ON' ? t('chat.agent_activated') : t('chat.agent_deactivated'),
+      )
+    } catch {
+      antdMessage.error(t('chat.agent_toggle_error'))
+    }
   }
 
   return (
@@ -718,6 +775,18 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
                 ? t('common.copied')
                 : t('chat.copy_phone', { phone: conversation.contact.phone })}
             </Button>
+            {isAgentReady && (
+              <Button
+                type="text"
+                block
+                onClick={handleToggleAgent}
+                loading={setOverrideMutation.isPending}
+                icon={isActive ? <BotOff size={14} /> : <Sparkles size={14} />}
+                className="py-2.5!"
+              >
+                {isActive ? t('chat.deactivate_agent') : t('chat.activate_agent')}
+              </Button>
+            )}
           </div>
         }
         trigger="click"
@@ -755,6 +824,27 @@ export function ChatWindow({
   const search = useSearch({ strict: false }) as { conv?: string; ticket?: string }
   const [replyTo, setReplyTo] = useState<Message | null>(null)
   const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null)
+
+  const feedbackMutation = $api.useMutation('post', '/agent/feedback/{messageId}')
+
+  const handleFeedbackSubmit = useCallback(
+    async (params: {
+      originalMessage: Message
+      conversation: FeedbackTurn[]
+    }): Promise<FeedbackSubmitResult> => {
+      const result = await feedbackMutation.mutateAsync({
+        params: { path: { messageId: params.originalMessage.id } },
+        body: {
+          conversation: params.conversation.map((c) => ({ from: c.from, text: c.text })),
+        },
+      })
+      return {
+        question: result.mode === 'clarify' ? result.question : undefined,
+        successMessage: result.mode === 'complete' ? result.successMessage : undefined,
+      }
+    },
+    [feedbackMutation],
+  )
 
   // Clear reply when conversation changes
   useEffect(() => {
@@ -916,7 +1006,7 @@ export function ChatWindow({
         open={!!feedbackMessage}
         onClose={() => setFeedbackMessage(null)}
         originalMessage={feedbackMessage}
-        provider={provider}
+        onSubmit={handleFeedbackSubmit}
       />
     </div>
   )

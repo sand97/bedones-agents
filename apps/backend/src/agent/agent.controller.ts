@@ -1,14 +1,19 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common'
-import { ApiTags } from '@nestjs/swagger'
+import { ApiTags, ApiOkResponse } from '@nestjs/swagger'
 import { AuthGuard } from '../auth/auth.guard'
 import { AgentService } from './agent.service'
+import { AgentFeedbackService } from './feedback.service'
 import { ActivateAgentDto, CreateAgentDto, SendAgentMessageDto } from './dto/agent.dto'
+import { AgentFeedbackRequestDto, AgentFeedbackResponseDto } from './dto/feedback.dto'
 
 @ApiTags('Agent')
 @Controller('agent')
 @UseGuards(AuthGuard)
 export class AgentController {
-  constructor(private agentService: AgentService) {}
+  constructor(
+    private agentService: AgentService,
+    private feedbackService: AgentFeedbackService,
+  ) {}
 
   @Get('org/:organisationId')
   async findAll(@Param('organisationId') organisationId: string) {
@@ -88,5 +93,16 @@ export class AgentController {
   @Get(':id/labels')
   async getLabels(@Param('id') id: string) {
     return this.agentService.getLabelsForAgent(id)
+  }
+
+  // ─── Feedback loop ───
+
+  @Post('feedback/:messageId')
+  @ApiOkResponse({ type: AgentFeedbackResponseDto })
+  async submitFeedback(
+    @Param('messageId') messageId: string,
+    @Body() dto: AgentFeedbackRequestDto,
+  ): Promise<AgentFeedbackResponseDto> {
+    return this.feedbackService.submitFeedback(messageId, dto.conversation)
   }
 }

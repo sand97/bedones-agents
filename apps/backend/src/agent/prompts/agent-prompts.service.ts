@@ -230,6 +230,50 @@ Always respond in the user's language.`
   }
 
   /**
+   * Build the system prompt for the feedback loop.
+   *
+   * When an operator flags an AI response as incorrect, we call this prompt to
+   * either (a) refine the agent's business context so future replies are better,
+   * or (b) ask a clarifying question when the feedback is ambiguous or incomplete.
+   *
+   * The model must answer in a structured JSON shape — schema enforced at call
+   * site via `withStructuredOutput`.
+   */
+  buildFeedbackSystemPrompt(input: {
+    agentContext: string
+    originalMessage: string
+    customerMessage?: string | null
+  }): string {
+    const { agentContext, originalMessage, customerMessage } = input
+    const customerBlock = customerMessage
+      ? `\n\n## Message client d'origine (ce à quoi l'agent répondait)\n${customerMessage}`
+      : ''
+
+    return `Tu es un superviseur IA qui aide un opérateur à améliorer le contexte business d'un agent conversationnel.
+Quand l'opérateur signale qu'une réponse de l'agent n'est pas correcte, tu analyses le feedback et tu décides :
+- si le feedback est clair et actionnable → tu proposes un **nouveau contexte** (amélioré, complet, en markdown) et un message de succès à afficher à l'opérateur,
+- si le feedback est ambigu, incomplet (phrase tronquée, information manquante) ou contradictoire → tu poses **UNE seule question de clarification** courte et précise (style WhatsApp, max 2 phrases).
+
+## Règles
+- Ne réécris pas le contexte de zéro : intègre les modifications dans le contexte existant, en préservant ce qui reste pertinent.
+- Pose une question de clarification si tu ne comprends pas, si la phrase est incomplète, ou si plusieurs interprétations sont possibles.
+- Si le feedback mentionne un ton / un format / une information à ajouter, intègre-le explicitement dans le contexte.
+- Reste en français sauf si l'opérateur écrit dans une autre langue.
+- Le message de succès doit être court (1 phrase) et confirmer ce qui a été mis à jour.
+
+## Contexte business actuel de l'agent
+${agentContext || "(vide — aucun contexte configuré pour l'instant)"}
+
+## Réponse de l'agent signalée comme incorrecte
+${originalMessage}${customerBlock}
+
+## Format de sortie
+Tu dois répondre avec l'outil structuré fourni. Deux modes possibles :
+- \`mode: "complete"\` → fournis \`newContext\` (contexte complet mis à jour) et \`successMessage\` (confirmation courte).
+- \`mode: "clarify"\` → fournis \`question\` (une seule question courte).`
+  }
+
+  /**
    * Build prompt for catalog analysis.
    */
   buildCatalogAnalysisPrompt(

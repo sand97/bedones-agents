@@ -208,6 +208,7 @@ function mapApiConversation(
             | 'catalog_message'
             | 'order') || 'text',
         from: (m.isFromPage ? 'business' : 'customer') as 'business' | 'customer',
+        isAi: m.isFromPage && m.senderName === 'AI Agent',
         text: resolvedBody,
         timestamp: m.createdTime,
         isRead: m.isRead,

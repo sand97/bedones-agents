@@ -1,14 +1,16 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common'
 import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import { AuthGuard } from '../auth/auth.guard'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { MessagingService } from './messaging.service'
 import {
   ConversationResponseDto,
+  ConversationAgentStatusDto,
   DirectMessageResponseDto,
   SendMessageDto,
   SendProductMessageDto,
   MarkConversationReadDto,
+  SetConversationAgentOverrideDto,
 } from './dto/messaging.dto'
 
 @ApiTags('Messaging')
@@ -95,5 +97,31 @@ export class MessagingController {
     @Param('accountId') accountId: string,
   ) {
     return this.messagingService.syncConversations(user.id, accountId)
+  }
+
+  // ─── Per-conversation agent activation ───
+
+  @Get('conversations/:conversationId/agent-status')
+  @ApiOkResponse({ type: ConversationAgentStatusDto })
+  async getAgentStatus(
+    @CurrentUser() user: { id: string },
+    @Param('conversationId') conversationId: string,
+  ) {
+    return this.messagingService.getAgentStatusForConversation(user.id, conversationId)
+  }
+
+  @Put('conversations/:conversationId/agent-override')
+  @ApiBody({ type: SetConversationAgentOverrideDto })
+  @ApiOkResponse({ type: ConversationAgentStatusDto })
+  async setAgentOverride(
+    @CurrentUser() user: { id: string },
+    @Param('conversationId') conversationId: string,
+    @Body() body: SetConversationAgentOverrideDto,
+  ) {
+    return this.messagingService.setConversationAgentOverride(
+      user.id,
+      conversationId,
+      body.override,
+    )
   }
 }
