@@ -10,6 +10,7 @@ import { AgentGateway } from './agent.gateway'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import { AgentDbToolsService } from './tools/agent-db-tools.service'
 import { AgentMessageProcessorService } from './agent-message-processor.service'
+import { AgentFeedbackService } from './feedback.service'
 
 @Module({
   imports: [AuthModule, ImageProcessingModule, QueueModule, SocialModule, StatsModule],
@@ -20,6 +21,7 @@ import { AgentMessageProcessorService } from './agent-message-processor.service'
     AgentPromptsService,
     AgentDbToolsService,
     AgentMessageProcessorService,
+    AgentFeedbackService,
   ],
   exports: [AgentService],
 })
