@@ -95,6 +95,12 @@ enum PromotionDiscountType {
   FIXED_AMOUNT
 }
 
+enum CreditMediaType {
+  TEXT
+  AUDIO
+  IMAGE
+}
+
 // ─── Models ───
 
 model User {
@@ -131,13 +137,14 @@ model Organisation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members        OrganisationMember[]
-  socialAccounts SocialAccount[]
-  catalogs       Catalog[]
-  agents         Agent[]
-  tickets        Ticket[]
-  promotions     Promotion[]
-  ticketStatuses TicketStatus[]
+  members          OrganisationMember[]
+  socialAccounts   SocialAccount[]
+  catalogs         Catalog[]
+  agents           Agent[]
+  tickets          Ticket[]
+  promotions       Promotion[]
+  ticketStatuses   TicketStatus[]
+  creditOperations CreditOperation[]
 }
 
 model OrganisationMember {
@@ -279,9 +286,10 @@ model Agent {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
-  socialAccounts AgentSocialAccount[]
-  messages       AgentMessage[]
-  tickets        Ticket[]
+  socialAccounts   AgentSocialAccount[]
+  messages         AgentMessage[]
+  tickets          Ticket[]
+  creditOperations CreditOperation[]
 
   @@index([organisationId])
 }
@@ -526,6 +534,25 @@ model DirectMessage {
 
   @@index([conversationId])
   @@index([createdTime])
+}
+
+// ─── Credit Operations ───
+
+model CreditOperation {
+  id             String          @id @default(uuid())
+  organisationId String
+  organisation   Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  agentId        String?
+  agent          Agent?          @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  conversationId String?
+  commentId      String?
+  mediaType      CreditMediaType
+  cost           Float
+  createdAt      DateTime        @default(now())
+
+  @@index([organisationId])
+  @@index([organisationId, createdAt])
+  @@index([createdAt])
 }
 
 // ─── Notification Preferences ───

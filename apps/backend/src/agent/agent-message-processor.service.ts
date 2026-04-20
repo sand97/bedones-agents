@@ -15,6 +15,8 @@ import { CatalogSearchService } from '../image-processing/catalog-search.service
 import { ImageProductMatchingService } from '../image-processing/image-product-matching.service'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import type { IncomingMessageEvent } from '../social/webhook.service'
+import { CreditService } from '../stats/credit.service'
+import type { CreditMediaType } from '../../generated/prisma/client'
 
 import { createCommunicationTools } from './tools/live/communication.tools'
 import { createCatalogTools } from './tools/live/catalog.tools'
@@ -36,6 +38,7 @@ export class AgentMessageProcessorService {
     private readonly catalogSearchService: CatalogSearchService,
     private readonly imageProductMatchingService: ImageProductMatchingService,
     private readonly prompts: AgentPromptsService,
+    private readonly creditService: CreditService,
   ) {}
 
   @OnEvent('message.incoming', { async: true })
@@ -146,6 +149,13 @@ export class AgentMessageProcessorService {
     this.logger.log(
       `Processing message for agent ${agent.id} on ${event.provider} (conversation: ${event.conversationId})`,
     )
+
+    await this.creditService.logOperation({
+      organisationId: agent.organisationId,
+      agentId: agent.id,
+      conversationId: event.conversationId,
+      mediaType: resolveMediaType(event.message.mediaType),
+    })
 
     // Gather catalog IDs from agent's linked social accounts
     const catalogIds: string[] = []
@@ -333,4 +343,10 @@ export class AgentMessageProcessorService {
     if (!response.ok) throw new Error(`Media download failed: ${response.status}`)
     return Buffer.from(await response.arrayBuffer())
   }
+}
+
+function resolveMediaType(raw: string | null | undefined): CreditMediaType {
+  if (raw === 'image') return 'IMAGE'
+  if (raw === 'audio') return 'AUDIO'
+  return 'TEXT'
 }

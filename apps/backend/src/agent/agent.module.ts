@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module'
 import { ImageProcessingModule } from '../image-processing/image-processing.module'
 import { QueueModule } from '../queue/queue.module'
 import { SocialModule } from '../social/social.module'
+import { StatsModule } from '../stats/stats.module'
 import { AgentController } from './agent.controller'
 import { AgentService } from './agent.service'
 import { AgentGateway } from './agent.gateway'
@@ -11,7 +12,7 @@ import { AgentDbToolsService } from './tools/agent-db-tools.service'
 import { AgentMessageProcessorService } from './agent-message-processor.service'
 
 @Module({
-  imports: [AuthModule, ImageProcessingModule, QueueModule, SocialModule],
+  imports: [AuthModule, ImageProcessingModule, QueueModule, SocialModule, StatsModule],
   controllers: [AgentController],
   providers: [
     AgentService,

@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { useMemo, useState } from 'react'
+import { createFileRoute, useParams } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { DatePicker } from 'antd'
+import { DatePicker, Skeleton } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import isoWeek from 'dayjs/plugin/isoWeek'
 import 'dayjs/locale/fr'
@@ -11,13 +11,15 @@ import { StatCard } from '@app/components/stats/stat-card'
 import { CreditUsageCard } from '@app/components/stats/credit-usage-card'
 import { ActivityChart } from '@app/components/stats/activity-chart'
 import { NetworkPieChart } from '@app/components/stats/network-pie-chart'
+import { $api } from '@app/lib/api/$api'
 import {
   PERIOD_CONFIG,
-  STATS_BY_PERIOD,
-  TIME_SERIES,
-  MESSAGES_BY_NETWORK,
-  COMMENTS_BY_NETWORK,
+  STAT_CARD_ICONS,
+  STAT_CARD_LABELS,
+  MESSAGE_NETWORK_DISPLAY,
+  COMMENT_NETWORK_DISPLAY,
   type Period,
+  type TimeSeriesPoint,
 } from '@app/components/stats/mock-data'
 
 dayjs.extend(isoWeek)
@@ -38,6 +40,28 @@ function formatPickerValue(value: Dayjs, period: Period) {
   return `${start.format('ddd DD')} - ${end.format('DD MMM')}`
 }
 
+function getDateRange(period: Period, anchor: Dayjs): { from: Dayjs; to: Dayjs } {
+  if (period === 'week') {
+    const from = anchor.startOf('isoWeek').startOf('day')
+    return { from, to: from.add(1, 'week') }
+  }
+  if (period === 'month') {
+    const from = anchor.startOf('month').startOf('day')
+    return { from, to: from.add(1, 'month') }
+  }
+  const from = anchor.startOf('year').startOf('day')
+  return { from, to: from.add(1, 'year') }
+}
+
+function formatBucketLabel(date: string, period: Period): string {
+  const d = dayjs(date)
+  if (period === 'week') return d.format('ddd')
+  if (period === 'year') return d.format('MMM')
+  const monthStart = d.startOf('month')
+  const weekIndex = Math.floor(d.diff(monthStart, 'day') / 7) + 1
+  return `S${weekIndex}`
+}
+
 export const Route = createFileRoute('/app/$orgSlug/stats')({
   component: StatsPage,
 })
@@ -45,14 +69,65 @@ export const Route = createFileRoute('/app/$orgSlug/stats')({
 function StatsPage() {
   const { t } = useTranslation()
   const { isDesktop } = useLayout()
+  const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
   const [period, setPeriod] = useState<Period>('week')
   const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs())
   const [visibleSeries, setVisibleSeries] = useState<Set<string>>(
     new Set(['messages', 'commentaires', 'credits']),
   )
 
-  const stats = STATS_BY_PERIOD[period]
-  const chartData = TIME_SERIES[period]
+  const { from, to } = useMemo(() => getDateRange(period, selectedDate), [period, selectedDate])
+  const bucket = PERIOD_CONFIG[period].bucket
+
+  const statsQuery = $api.useQuery('get', '/stats/org/{organisationId}', {
+    params: {
+      path: { organisationId: orgSlug },
+      query: { from: from.toISOString(), to: to.toISOString(), bucket },
+    },
+  })
+
+  const creditsQuery = $api.useQuery('get', '/stats/org/{organisationId}/credits', {
+    params: { path: { organisationId: orgSlug } },
+  })
+
+  const overviewCards = useMemo(() => {
+    const overview = statsQuery.data?.overview
+    return (['comments', 'messages', 'aiResponses'] as const).map((key) => ({
+      label: STAT_CARD_LABELS[key],
+      value: overview?.[key]?.value ?? 0,
+      change: overview?.[key]?.change ?? 0,
+      icon: STAT_CARD_ICONS[key],
+    }))
+  }, [statsQuery.data])
+
+  const chartData = useMemo<TimeSeriesPoint[]>(() => {
+    return (statsQuery.data?.activity ?? []).map((p) => ({
+      label: formatBucketLabel(p.date, period),
+      messages: p.messages,
+      commentaires: p.commentaires,
+      credits: p.credits,
+    }))
+  }, [statsQuery.data, period])
+
+  const messagesByNetwork = useMemo(() => {
+    return (statsQuery.data?.messagesByNetwork ?? [])
+      .map((row) => {
+        const display = MESSAGE_NETWORK_DISPLAY[row.provider]
+        if (!display) return null
+        return { name: display.name, value: row.count, color: display.color }
+      })
+      .filter((d): d is { name: string; value: number; color: string } => d !== null)
+  }, [statsQuery.data])
+
+  const commentsByNetwork = useMemo(() => {
+    return (statsQuery.data?.commentsByNetwork ?? [])
+      .map((row) => {
+        const display = COMMENT_NETWORK_DISPLAY[row.provider]
+        if (!display) return null
+        return { name: display.name, value: row.count, color: display.color }
+      })
+      .filter((d): d is { name: string; value: number; color: string } => d !== null)
+  }, [statsQuery.data])
 
   const toggleSeries = (key: string) => {
     setVisibleSeries((prev) => {
@@ -66,17 +141,23 @@ function StatsPage() {
     })
   }
 
+  const isLoading = statsQuery.isLoading
+
   return (
     <div className="flex min-h-screen flex-col">
       <DashboardHeader title={t('stats.title')} />
 
       <div className="flex-1 p-4 lg:p-6">
         <div className="mb-4">
-          <CreditUsageCard />
+          <CreditUsageCard
+            used={creditsQuery.data?.used ?? 0}
+            total={creditsQuery.data?.total ?? 0}
+            loading={creditsQuery.isLoading}
+          />
         </div>
 
         <div className="stats-grid mb-4 lg:mb-6">
-          {stats.map((s) => (
+          {overviewCards.map((s) => (
             <StatCard key={s.label} {...s} />
           ))}
         </div>
@@ -109,17 +190,21 @@ function StatsPage() {
             />
           </div>
 
-          <ActivityChart
-            data={chartData}
-            visibleSeries={visibleSeries}
-            onToggleSeries={toggleSeries}
-            height={isDesktop ? 280 : 200}
-          />
+          {isLoading ? (
+            <Skeleton active paragraph={{ rows: isDesktop ? 6 : 4 }} title={false} />
+          ) : (
+            <ActivityChart
+              data={chartData}
+              visibleSeries={visibleSeries}
+              onToggleSeries={toggleSeries}
+              height={isDesktop ? 280 : 200}
+            />
+          )}
         </div>
 
         <div className={`grid gap-4 lg:gap-6 ${isDesktop ? 'grid-cols-2' : 'grid-cols-1'}`}>
-          <NetworkPieChart title={t('stats.messages_by_network')} data={MESSAGES_BY_NETWORK} />
-          <NetworkPieChart title={t('stats.comments_by_network')} data={COMMENTS_BY_NETWORK} />
+          <NetworkPieChart title={t('stats.messages_by_network')} data={messagesByNetwork} />
+          <NetworkPieChart title={t('stats.comments_by_network')} data={commentsByNetwork} />
         </div>
       </div>
     </div>

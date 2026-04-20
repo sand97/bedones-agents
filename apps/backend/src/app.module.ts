@@ -17,6 +17,7 @@ import { AgentModule } from './agent/agent.module'
 import { TicketModule } from './ticket/ticket.module'
 import { PromotionModule } from './promotion/promotion.module'
 import { ImageProcessingModule } from './image-processing/image-processing.module'
+import { StatsModule } from './stats/stats.module'
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { ImageProcessingModule } from './image-processing/image-processing.modul
     TicketModule,
     PromotionModule,
     ImageProcessingModule,
+    StatsModule,
   ],
   controllers: [AppController],
 })

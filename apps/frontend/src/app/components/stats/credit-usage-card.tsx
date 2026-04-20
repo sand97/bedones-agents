@@ -1,9 +1,15 @@
-import { Progress } from 'antd'
+import { Progress, Skeleton } from 'antd'
 import { Zap } from 'lucide-react'
-import { CREDIT_USAGE } from './mock-data'
 
-export function CreditUsageCard() {
-  const creditPercent = Math.round((CREDIT_USAGE.used / CREDIT_USAGE.total) * 100)
+interface CreditUsageCardProps {
+  used: number
+  total: number
+  loading?: boolean
+}
+
+export function CreditUsageCard({ used, total, loading }: CreditUsageCardProps) {
+  const safeTotal = total > 0 ? total : 1
+  const creditPercent = Math.min(100, Math.round((used / safeTotal) * 100))
 
   return (
     <div className="stats-card flex-1">
@@ -16,20 +22,22 @@ export function CreditUsageCard() {
           <div className="text-xs text-text-secondary">Période en cours</div>
         </div>
       </div>
-      <Progress
-        percent={creditPercent}
-        strokeColor="#000000"
-        trailColor="var(--color-bg-subtle)"
-        showInfo={false}
-        size={{ height: 8 }}
-        className="mb-2"
-      />
+      {loading ? (
+        <Skeleton.Input active size="small" block style={{ height: 8, marginBottom: 12 }} />
+      ) : (
+        <Progress
+          percent={creditPercent}
+          strokeColor="#000000"
+          trailColor="var(--color-bg-subtle)"
+          showInfo={false}
+          size={{ height: 8 }}
+          className="mb-2"
+        />
+      )}
       <div className="flex items-center justify-between text-sm">
         <span className="text-text-secondary">
-          <span className="font-semibold text-text-primary">
-            {CREDIT_USAGE.used.toLocaleString('fr-FR')}
-          </span>{' '}
-          / {CREDIT_USAGE.total.toLocaleString('fr-FR')} {CREDIT_USAGE.label}
+          <span className="font-semibold text-text-primary">{used.toLocaleString('fr-FR')}</span> /{' '}
+          {total.toLocaleString('fr-FR')} crédits IA
         </span>
         <span className="font-medium text-text-primary">{creditPercent}%</span>
       </div>
