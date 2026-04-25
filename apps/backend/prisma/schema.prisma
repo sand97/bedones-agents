@@ -190,6 +190,11 @@ model SocialAccount {
   agentLink     AgentSocialAccount?
   labels        Label[]
 
+  loyaltyContacts  LoyaltyContact[]
+  loyaltyBonuses   LoyaltyBonus[]
+  loyaltyTemplates LoyaltyTemplate[]
+  loyaltyCampaigns LoyaltyCampaign[]
+
   @@unique([provider, providerAccountId])
 }
 
@@ -260,6 +265,8 @@ model Product {
   updatedAt        DateTime @updatedAt
 
   promotionProducts PromotionProduct[]
+  loyaltyTriggerLinks LoyaltyBonusTriggerProduct[]
+  loyaltyRewardLinks  LoyaltyBonusRewardProduct[]
 
   @@unique([catalogId, providerProductId])
   @@index([catalogId])
@@ -585,4 +592,164 @@ model NotificationPreference {
   updatedAt DateTime @updatedAt
 
   @@unique([userId])
+}
+
+// ─── Loyalty ───
+
+enum LoyaltyTargetType {
+  SPEND
+  ORDER_COUNT
+  PRODUCTS
+}
+
+enum LoyaltyRewardType {
+  PRODUCTS
+  CREDIT
+  PERCENT
+}
+
+enum LoyaltyBonusStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  EXPIRED
+}
+
+enum LoyaltyCampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  PAUSED
+}
+
+enum LoyaltyCampaignFrequency {
+  ONCE
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model LoyaltyContact {
+  id              String        @id @default(uuid())
+  socialAccountId String
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  name            String
+  phone           String
+  totalSpent      Float         @default(0)
+  orderCount      Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([socialAccountId, phone])
+  @@index([socialAccountId])
+}
+
+model LoyaltyBonus {
+  id              String             @id @default(uuid())
+  socialAccountId String
+  socialAccount   SocialAccount      @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  status          LoyaltyBonusStatus @default(DRAFT)
+  stackable       Boolean            @default(false)
+
+  // Targets (cumulable). Keep optional fields for each criterion.
+  targetSpend         Float?
+  targetOrderCount    Int?
+  targetProductsCount Int?     // number of distinct trigger products required
+
+  // Reward
+  rewardType    LoyaltyRewardType
+  rewardCredit  Float?
+  rewardPercent Float?
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  triggerProducts LoyaltyBonusTriggerProduct[]
+  rewardProducts  LoyaltyBonusRewardProduct[]
+  campaigns       LoyaltyCampaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([socialAccountId])
+  @@index([status])
+}
+
+model LoyaltyBonusTriggerProduct {
+  id        String       @id @default(uuid())
+  bonusId   String
+  bonus     LoyaltyBonus @relation(fields: [bonusId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([bonusId, productId])
+  @@index([bonusId])
+  @@index([productId])
+}
+
+model LoyaltyBonusRewardProduct {
+  id        String       @id @default(uuid())
+  bonusId   String
+  bonus     LoyaltyBonus @relation(fields: [bonusId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([bonusId, productId])
+  @@index([bonusId])
+  @@index([productId])
+}
+
+model LoyaltyTemplate {
+  id              String        @id @default(uuid())
+  socialAccountId String
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  metaTemplateId  String?
+  name            String
+  language        String        @default("fr")
+  category        String        @default("MARKETING")
+  body            String
+  variables       String[]      @default([])
+  status          String        @default("PENDING") // PENDING | APPROVED | REJECTED
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  campaigns LoyaltyCampaign[]
+
+  @@unique([socialAccountId, name])
+  @@index([socialAccountId])
+}
+
+model LoyaltyCampaign {
+  id              String                  @id @default(uuid())
+  socialAccountId String
+  socialAccount   SocialAccount           @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  bonusId         String
+  bonus           LoyaltyBonus            @relation(fields: [bonusId], references: [id], onDelete: Cascade)
+  templateId      String?
+  template        LoyaltyTemplate?        @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  name            String
+  status          LoyaltyCampaignStatus    @default(SCHEDULED)
+  frequency       LoyaltyCampaignFrequency @default(ONCE)
+
+  // Segment criteria captured as JSON to remain flexible across bonus target types
+  segmentCriteria Json?
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  // Counters (delivered / read / replied)
+  deliveredCount Int @default(0)
+  readCount      Int @default(0)
+  repliedCount   Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([socialAccountId])
+  @@index([bonusId])
+  @@index([status])
 }

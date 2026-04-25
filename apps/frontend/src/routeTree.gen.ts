@@ -30,6 +30,7 @@ import { Route as AppOrgSlugTicketsRouteImport } from './routes/app/$orgSlug/tic
 import { Route as AppOrgSlugStatsRouteImport } from './routes/app/$orgSlug/stats'
 import { Route as AppOrgSlugSettingsRouteImport } from './routes/app/$orgSlug/settings'
 import { Route as AppOrgSlugPromotionsRouteImport } from './routes/app/$orgSlug/promotions'
+import { Route as AppOrgSlugLoyaltyRouteImport } from './routes/app/$orgSlug/loyalty'
 import { Route as AppOrgSlugPlanRouteImport } from './routes/app/$orgSlug/plan'
 import { Route as AppOrgSlugNotificationsRouteImport } from './routes/app/$orgSlug/notifications'
 import { Route as AppOrgSlugMembersRouteImport } from './routes/app/$orgSlug/members'
@@ -145,6 +146,11 @@ const AppOrgSlugPromotionsRoute = AppOrgSlugPromotionsRouteImport.update({
   path: '/promotions',
   getParentRoute: () => AppOrgSlugRouteRoute,
 } as any)
+const AppOrgSlugLoyaltyRoute = AppOrgSlugLoyaltyRouteImport.update({
+  id: '/loyalty',
+  path: '/loyalty',
+  getParentRoute: () => AppOrgSlugRouteRoute,
+} as any)
 const AppOrgSlugPlanRoute = AppOrgSlugPlanRouteImport.update({
   id: '/plan',
   path: '/plan',
@@ -211,6 +217,7 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/members': typeof AppOrgSlugMembersRoute
   '/app/$orgSlug/notifications': typeof AppOrgSlugNotificationsRoute
   '/app/$orgSlug/plan': typeof AppOrgSlugPlanRoute
+  '/app/$orgSlug/loyalty': typeof AppOrgSlugLoyaltyRoute
   '/app/$orgSlug/promotions': typeof AppOrgSlugPromotionsRoute
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsRoute
   '/app/$orgSlug/stats': typeof AppOrgSlugStatsRoute
@@ -243,6 +250,7 @@ export interface FileRoutesByTo {
   '/app/$orgSlug/members': typeof AppOrgSlugMembersRoute
   '/app/$orgSlug/notifications': typeof AppOrgSlugNotificationsRoute
   '/app/$orgSlug/plan': typeof AppOrgSlugPlanRoute
+  '/app/$orgSlug/loyalty': typeof AppOrgSlugLoyaltyRoute
   '/app/$orgSlug/promotions': typeof AppOrgSlugPromotionsRoute
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsRoute
   '/app/$orgSlug/stats': typeof AppOrgSlugStatsRoute
@@ -276,6 +284,7 @@ export interface FileRoutesById {
   '/app/$orgSlug/members': typeof AppOrgSlugMembersRoute
   '/app/$orgSlug/notifications': typeof AppOrgSlugNotificationsRoute
   '/app/$orgSlug/plan': typeof AppOrgSlugPlanRoute
+  '/app/$orgSlug/loyalty': typeof AppOrgSlugLoyaltyRoute
   '/app/$orgSlug/promotions': typeof AppOrgSlugPromotionsRoute
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsRoute
   '/app/$orgSlug/stats': typeof AppOrgSlugStatsRoute
@@ -310,6 +319,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/members'
     | '/app/$orgSlug/notifications'
     | '/app/$orgSlug/plan'
+    | '/app/$orgSlug/loyalty'
     | '/app/$orgSlug/promotions'
     | '/app/$orgSlug/settings'
     | '/app/$orgSlug/stats'
@@ -342,6 +352,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/members'
     | '/app/$orgSlug/notifications'
     | '/app/$orgSlug/plan'
+    | '/app/$orgSlug/loyalty'
     | '/app/$orgSlug/promotions'
     | '/app/$orgSlug/settings'
     | '/app/$orgSlug/stats'
@@ -374,6 +385,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/members'
     | '/app/$orgSlug/notifications'
     | '/app/$orgSlug/plan'
+    | '/app/$orgSlug/loyalty'
     | '/app/$orgSlug/promotions'
     | '/app/$orgSlug/settings'
     | '/app/$orgSlug/stats'
@@ -555,6 +567,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugPromotionsRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
+    '/app/$orgSlug/loyalty': {
+      id: '/app/$orgSlug/loyalty'
+      path: '/loyalty'
+      fullPath: '/app/$orgSlug/loyalty'
+      preLoaderRoute: typeof AppOrgSlugLoyaltyRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
     '/app/$orgSlug/plan': {
       id: '/app/$orgSlug/plan'
       path: '/plan'
@@ -629,6 +648,7 @@ interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugMembersRoute: typeof AppOrgSlugMembersRoute
   AppOrgSlugNotificationsRoute: typeof AppOrgSlugNotificationsRoute
   AppOrgSlugPlanRoute: typeof AppOrgSlugPlanRoute
+  AppOrgSlugLoyaltyRoute: typeof AppOrgSlugLoyaltyRoute
   AppOrgSlugPromotionsRoute: typeof AppOrgSlugPromotionsRoute
   AppOrgSlugSettingsRoute: typeof AppOrgSlugSettingsRoute
   AppOrgSlugStatsRoute: typeof AppOrgSlugStatsRoute
@@ -646,6 +666,7 @@ const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugMembersRoute: AppOrgSlugMembersRoute,
   AppOrgSlugNotificationsRoute: AppOrgSlugNotificationsRoute,
   AppOrgSlugPlanRoute: AppOrgSlugPlanRoute,
+  AppOrgSlugLoyaltyRoute: AppOrgSlugLoyaltyRoute,
   AppOrgSlugPromotionsRoute: AppOrgSlugPromotionsRoute,
   AppOrgSlugSettingsRoute: AppOrgSlugSettingsRoute,
   AppOrgSlugStatsRoute: AppOrgSlugStatsRoute,
