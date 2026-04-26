@@ -11,8 +11,10 @@ import {
   type PickerProduct,
 } from '@app/components/promotions/product-picker-modal'
 import { catalogApi } from '@app/lib/api/agent-api'
+import { useLayout } from '@app/contexts/layout-context'
 import { loyaltyApi, type LoyaltyBonus } from '@app/lib/api/loyalty-api'
 import { LoyaltyBonusModal, type LoyaltyBonusSubmitData } from './loyalty-bonus-modal'
+import { LoyaltyBonusDescriptionCard } from './loyalty-bonus-description-card'
 
 interface Props {
   socialAccountId: string
@@ -21,6 +23,7 @@ interface Props {
 
 export function LoyaltyBonusTab({ socialAccountId, orgSlug }: Props) {
   const { t } = useTranslation()
+  const { isDesktop } = useLayout()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
 
@@ -266,16 +269,38 @@ export function LoyaltyBonusTab({ socialAccountId, orgSlug }: Props) {
         />
       </div>
 
-      <Table
-        dataSource={filtered}
-        columns={columns}
-        bordered
-        rowKey="id"
-        pagination={{ pageSize: 10 }}
-        className="tickets-table"
-        size="middle"
-        loading={isLoading}
-      />
+      {isDesktop ? (
+        <Table
+          dataSource={filtered}
+          columns={columns}
+          bordered
+          rowKey="id"
+          pagination={{ pageSize: 10 }}
+          className="tickets-table"
+          size="middle"
+          loading={isLoading}
+        />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {filtered.length === 0 ? (
+            <div className="flex items-center justify-center py-12 text-sm text-text-muted">
+              {isLoading ? t('common.loading') : t('loyalty.no_bonuses')}
+            </div>
+          ) : (
+            filtered.map((bonus) => (
+              <LoyaltyBonusDescriptionCard
+                key={bonus.id}
+                bonus={bonus}
+                onEdit={() => {
+                  setEditing(bonus)
+                  setModalOpen(true)
+                }}
+                onDelete={() => handleDelete(bonus)}
+              />
+            ))
+          )}
+        </div>
+      )}
 
       <LoyaltyBonusModal
         open={modalOpen}

@@ -5,8 +5,10 @@ import { App, Button, Input, Modal, Table } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { formatPrice } from '@app/lib/format'
+import { useLayout } from '@app/contexts/layout-context'
 import { loyaltyApi, type LoyaltyContact } from '@app/lib/api/loyalty-api'
 import { LoyaltyContactModal, type LoyaltyContactSubmitData } from './loyalty-contact-modal'
+import { LoyaltyContactDescriptionCard } from './loyalty-contact-description-card'
 
 interface Props {
   socialAccountId: string
@@ -16,6 +18,7 @@ interface Props {
 
 export function LoyaltyContactsTab({ socialAccountId }: Props) {
   const { t } = useTranslation()
+  const { isDesktop } = useLayout()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
 
@@ -173,16 +176,38 @@ export function LoyaltyContactsTab({ socialAccountId }: Props) {
         />
       </div>
 
-      <Table
-        dataSource={filtered}
-        columns={columns}
-        bordered
-        rowKey="id"
-        pagination={{ pageSize: 10 }}
-        className="tickets-table"
-        size="middle"
-        loading={isLoading}
-      />
+      {isDesktop ? (
+        <Table
+          dataSource={filtered}
+          columns={columns}
+          bordered
+          rowKey="id"
+          pagination={{ pageSize: 10 }}
+          className="tickets-table"
+          size="middle"
+          loading={isLoading}
+        />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {filtered.length === 0 ? (
+            <div className="flex items-center justify-center py-12 text-sm text-text-muted">
+              {isLoading ? t('common.loading') : t('loyalty.no_contacts')}
+            </div>
+          ) : (
+            filtered.map((contact) => (
+              <LoyaltyContactDescriptionCard
+                key={contact.id}
+                contact={contact}
+                onEdit={() => {
+                  setEditing(contact)
+                  setModalOpen(true)
+                }}
+                onDelete={() => handleDelete(contact)}
+              />
+            ))
+          )}
+        </div>
+      )}
 
       <LoyaltyContactModal
         open={modalOpen}
