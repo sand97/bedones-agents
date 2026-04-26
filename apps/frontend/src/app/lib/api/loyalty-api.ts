@@ -222,6 +222,17 @@ export const loyaltyApi = {
   // Campaigns
   listCampaigns: (socialAccountId: string) =>
     fetchJson<LoyaltyCampaign[]>(`/loyalty/campaigns/account/${socialAccountId}`),
+  previewCampaignCount: (
+    socialAccountId: string,
+    criteria: { minSpend?: number; minOrders?: number },
+  ) => {
+    const query = new URLSearchParams()
+    if (typeof criteria.minSpend === 'number') query.set('minSpend', String(criteria.minSpend))
+    if (typeof criteria.minOrders === 'number') query.set('minOrders', String(criteria.minOrders))
+    return fetchJson<{ count: number }>(
+      `/loyalty/campaigns/account/${socialAccountId}/preview-count?${query.toString()}`,
+    )
+  },
   createCampaign: (data: {
     socialAccountId: string
     bonusId: string

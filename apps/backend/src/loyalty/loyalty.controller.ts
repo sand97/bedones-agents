@@ -98,6 +98,18 @@ export class LoyaltyController {
     return this.loyaltyService.listCampaigns(socialAccountId)
   }
 
+  @Get('campaigns/account/:socialAccountId/preview-count')
+  previewCampaignCount(
+    @Param('socialAccountId') socialAccountId: string,
+    @Query('minSpend') minSpend?: string,
+    @Query('minOrders') minOrders?: string,
+  ) {
+    return this.loyaltyService.previewCampaignCount(socialAccountId, {
+      minSpend: minSpend ? Number(minSpend) : undefined,
+      minOrders: minOrders ? Number(minOrders) : undefined,
+    })
+  }
+
   @Post('campaigns')
   createCampaign(@Body() dto: CreateLoyaltyCampaignDto) {
     return this.loyaltyService.createCampaign(dto)
