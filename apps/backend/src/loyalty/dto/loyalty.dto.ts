@@ -123,7 +123,7 @@ export class UpdateLoyaltyBonusDto {
   endDate?: string
 }
 
-// ─── Templates ───
+// ─── Templates (Meta-only — never persisted) ───
 
 export class CreateLoyaltyTemplateDto {
   @ApiProperty()
@@ -135,7 +135,7 @@ export class CreateLoyaltyTemplateDto {
   @ApiPropertyOptional()
   language?: string
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ enum: ['MARKETING', 'UTILITY'] })
   category?: string
 
   @ApiProperty()
@@ -143,26 +143,6 @@ export class CreateLoyaltyTemplateDto {
 
   @ApiPropertyOptional({ type: [String] })
   variables?: string[]
-}
-
-export class UpdateLoyaltyTemplateDto {
-  @ApiPropertyOptional()
-  name?: string
-
-  @ApiPropertyOptional()
-  language?: string
-
-  @ApiPropertyOptional()
-  category?: string
-
-  @ApiPropertyOptional()
-  body?: string
-
-  @ApiPropertyOptional({ type: [String] })
-  variables?: string[]
-
-  @ApiPropertyOptional()
-  status?: string
 }
 
 // ─── Campaigns ───
@@ -174,8 +154,14 @@ export class CreateLoyaltyCampaignDto {
   @ApiProperty()
   bonusId: string
 
-  @ApiPropertyOptional()
-  templateId?: string
+  @ApiPropertyOptional({ description: 'Meta WhatsApp template id' })
+  metaTemplateId?: string
+
+  @ApiPropertyOptional({ description: 'Meta WhatsApp template name' })
+  metaTemplateName?: string
+
+  @ApiPropertyOptional({ description: 'Meta WhatsApp template language' })
+  metaTemplateLanguage?: string
 
   @ApiProperty()
   name: string
@@ -198,7 +184,13 @@ export class UpdateLoyaltyCampaignDto {
   name?: string
 
   @ApiPropertyOptional()
-  templateId?: string
+  metaTemplateId?: string
+
+  @ApiPropertyOptional()
+  metaTemplateName?: string
+
+  @ApiPropertyOptional()
+  metaTemplateLanguage?: string
 
   @ApiPropertyOptional({ enum: ['DRAFT', 'SCHEDULED', 'RUNNING', 'COMPLETED', 'PAUSED'] })
   status?: string

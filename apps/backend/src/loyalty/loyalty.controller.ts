@@ -10,7 +10,6 @@ import {
   UpdateLoyaltyBonusDto,
   UpdateLoyaltyCampaignDto,
   UpdateLoyaltyContactDto,
-  UpdateLoyaltyTemplateDto,
 } from './dto/loyalty.dto'
 
 @ApiTags('Loyalty')
@@ -75,16 +74,11 @@ export class LoyaltyController {
     return this.loyaltyService.removeBonus(id)
   }
 
-  // ─── Templates ───
+  // ─── Templates (live from Meta — never persisted) ───
 
   @Get('templates/account/:socialAccountId')
   listTemplates(@Param('socialAccountId') socialAccountId: string) {
     return this.loyaltyService.listTemplates(socialAccountId)
-  }
-
-  @Post('templates/account/:socialAccountId/sync')
-  syncTemplates(@Param('socialAccountId') socialAccountId: string) {
-    return this.loyaltyService.syncTemplates(socialAccountId)
   }
 
   @Post('templates')
@@ -92,14 +86,9 @@ export class LoyaltyController {
     return this.loyaltyService.createTemplate(dto)
   }
 
-  @Patch('templates/:id')
-  updateTemplate(@Param('id') id: string, @Body() dto: UpdateLoyaltyTemplateDto) {
-    return this.loyaltyService.updateTemplate(id, dto)
-  }
-
-  @Delete('templates/:id')
-  removeTemplate(@Param('id') id: string) {
-    return this.loyaltyService.removeTemplate(id)
+  @Delete('templates/account/:socialAccountId/by-name/:name')
+  removeTemplate(@Param('socialAccountId') socialAccountId: string, @Param('name') name: string) {
+    return this.loyaltyService.removeTemplate(socialAccountId, name)
   }
 
   // ─── Campaigns ───

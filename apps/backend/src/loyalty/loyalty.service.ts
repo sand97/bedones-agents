@@ -9,7 +9,6 @@ import {
   UpdateLoyaltyBonusDto,
   UpdateLoyaltyCampaignDto,
   UpdateLoyaltyContactDto,
-  UpdateLoyaltyTemplateDto,
 } from './dto/loyalty.dto'
 
 const META_API_BASE = 'https://graph.facebook.com/v22.0'
@@ -17,6 +16,7 @@ const META_API_BASE = 'https://graph.facebook.com/v22.0'
 interface MetaTemplateComponent {
   type: string
   text?: string
+  example?: Record<string, unknown>
 }
 
 interface MetaTemplate {
@@ -26,6 +26,21 @@ interface MetaTemplate {
   status: string
   category: string
   components?: MetaTemplateComponent[]
+}
+
+/**
+ * Public template shape returned to the frontend. Templates are NOT persisted
+ * in our DB; they live on Meta and are fetched live on each list call.
+ */
+export interface LoyaltyTemplate {
+  id: string // Meta template id
+  socialAccountId: string
+  name: string
+  language: string
+  category: string
+  body: string
+  variables: string[]
+  status: string
 }
 
 type LoyaltyRewardType = 'PRODUCTS' | 'CREDIT' | 'PERCENT'
@@ -220,38 +235,48 @@ export class LoyaltyService {
     return this.prisma.loyaltyBonus.delete({ where: { id } })
   }
 
-  // ─── Templates (sync from Meta in production; here we expose CRUD) ───
+  // ─── Templates (live from Meta — never persisted) ───
 
-  async listTemplates(socialAccountId: string) {
-    return this.prisma.loyaltyTemplate.findMany({
-      where: { socialAccountId },
-      orderBy: { createdAt: 'desc' },
-    })
-  }
-
-  /**
-   * Fetch the WhatsApp Business message templates from Meta for the given
-   * social account, then upsert them locally so campaigns can reference
-   * them by id. Returns the up-to-date list.
-   */
-  async syncTemplates(socialAccountId: string) {
+  /** Resolve a WhatsApp account or fail loudly. */
+  private async resolveWhatsAppAccount(socialAccountId: string) {
     const account = await this.prisma.socialAccount.findUnique({
       where: { id: socialAccountId },
       omit: { accessToken: false },
     })
     if (!account) throw new NotFoundException('Compte social introuvable')
     if (account.provider !== 'WHATSAPP') {
-      throw new BadRequestException('La synchronisation est réservée aux comptes WhatsApp')
+      throw new BadRequestException('Cette opération est réservée aux comptes WhatsApp')
     }
     if (!account.wabaId) {
       throw new BadRequestException('WABA ID manquant pour ce numéro WhatsApp')
     }
-
     const accessToken = await this.encryptionService.decrypt(account.accessToken)
+    return { account, accessToken, wabaId: account.wabaId }
+  }
+
+  private toLoyaltyTemplate(socialAccountId: string, m: MetaTemplate): LoyaltyTemplate {
+    const bodyComponent = (m.components ?? []).find((c) => c.type === 'BODY')
+    const body = bodyComponent?.text ?? ''
+    const variables = Array.from(body.matchAll(/{{\s*([^}]+?)\s*}}/g), (x) => x[1].trim())
+    return {
+      id: m.id,
+      socialAccountId,
+      name: m.name,
+      language: m.language,
+      category: m.category,
+      body,
+      variables,
+      status: m.status,
+    }
+  }
+
+  /** Fetch the live list of WhatsApp Business message templates from Meta. */
+  async listTemplates(socialAccountId: string): Promise<LoyaltyTemplate[]> {
+    const { accessToken, wabaId } = await this.resolveWhatsAppAccount(socialAccountId)
 
     const fetched: MetaTemplate[] = []
     let nextUrl: string | null =
-      `${META_API_BASE}/${account.wabaId}/message_templates` +
+      `${META_API_BASE}/${wabaId}/message_templates` +
       `?fields=id,name,language,status,category,components&limit=100`
 
     while (nextUrl) {
@@ -271,66 +296,61 @@ export class LoyaltyService {
       nextUrl = json.paging?.next ?? null
     }
 
-    // Normalize each Meta template into our LoyaltyTemplate shape.
-    for (const tmpl of fetched) {
-      const bodyComponent = (tmpl.components ?? []).find((c) => c.type === 'BODY')
-      const body = bodyComponent?.text ?? ''
-      const variables = Array.from(body.matchAll(/{{\s*([^}]+?)\s*}}/g), (m) => m[1].trim())
-
-      await this.prisma.loyaltyTemplate.upsert({
-        where: {
-          socialAccountId_name_language: {
-            socialAccountId,
-            name: tmpl.name,
-            language: tmpl.language,
-          },
-        },
-        create: {
-          socialAccountId,
-          metaTemplateId: tmpl.id,
-          name: tmpl.name,
-          language: tmpl.language,
-          category: tmpl.category,
-          body,
-          variables,
-          status: tmpl.status,
-        },
-        update: {
-          metaTemplateId: tmpl.id,
-          category: tmpl.category,
-          body,
-          variables,
-          status: tmpl.status,
-        },
-      })
-    }
-
-    this.logger.log(
-      `[Loyalty] Synced ${fetched.length} WhatsApp templates for account ${socialAccountId}`,
-    )
-
-    return this.listTemplates(socialAccountId)
+    return fetched.map((m) => this.toLoyaltyTemplate(socialAccountId, m))
   }
 
-  async createTemplate(data: CreateLoyaltyTemplateDto) {
-    return this.prisma.loyaltyTemplate.create({
-      data: {
-        socialAccountId: data.socialAccountId,
+  /** Create a template directly on Meta (it enters Meta's review queue). */
+  async createTemplate(data: CreateLoyaltyTemplateDto): Promise<LoyaltyTemplate> {
+    const { accessToken, wabaId } = await this.resolveWhatsAppAccount(data.socialAccountId)
+
+    const components: MetaTemplateComponent[] = [{ type: 'BODY', text: data.body }]
+
+    const res = await fetch(`${META_API_BASE}/${wabaId}/message_templates`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         name: data.name,
         language: data.language ?? 'fr',
         category: data.category ?? 'MARKETING',
-        body: data.body,
-        variables: data.variables ?? [],
-      },
+        components,
+      }),
     })
+    if (!res.ok) {
+      const text = await res.text()
+      this.logger.error(`Meta template create failed: ${res.status} ${text}`)
+      throw new BadRequestException(`Meta API error: ${text}`)
+    }
+
+    const created = (await res.json()) as { id: string; status: string; category: string }
+    return {
+      id: created.id,
+      socialAccountId: data.socialAccountId,
+      name: data.name,
+      language: data.language ?? 'fr',
+      category: created.category ?? data.category ?? 'MARKETING',
+      body: data.body,
+      variables: data.variables ?? [],
+      status: created.status ?? 'PENDING',
+    }
   }
 
-  async updateTemplate(id: string, data: UpdateLoyaltyTemplateDto) {
-    return this.prisma.loyaltyTemplate.update({ where: { id }, data })
-  }
+  /** Delete a template on Meta by name (Meta deletes all language variants). */
+  async removeTemplate(socialAccountId: string, name: string): Promise<void> {
+    const { accessToken, wabaId } = await this.resolveWhatsAppAccount(socialAccountId)
 
-  async removeTemplate(id: string) {
-    return this.prisma.loyaltyTemplate.delete({ where: { id } })
+    const url = `${META_API_BASE}/${wabaId}/message_templates?name=${encodeURIComponent(name)}`
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      this.logger.error(`Meta template delete failed: ${res.status} ${text}`)
+      throw new BadRequestException(`Meta API error: ${text}`)
+    }
   }
 
   // ─── Campaigns ───
@@ -340,7 +360,6 @@ export class LoyaltyService {
       where: { socialAccountId },
       include: {
         bonus: { select: { id: true, name: true, rewardType: true } },
-        template: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
     })
@@ -351,7 +370,9 @@ export class LoyaltyService {
       data: {
         socialAccountId: data.socialAccountId,
         bonusId: data.bonusId,
-        templateId: data.templateId,
+        metaTemplateId: data.metaTemplateId ?? null,
+        metaTemplateName: data.metaTemplateName ?? null,
+        metaTemplateLanguage: data.metaTemplateLanguage ?? null,
         name: data.name,
         frequency: (data.frequency as LoyaltyCampaignFrequency | undefined) ?? 'ONCE',
         segmentCriteria: (data.segmentCriteria as object | undefined) ?? undefined,
@@ -360,7 +381,6 @@ export class LoyaltyService {
       },
       include: {
         bonus: { select: { id: true, name: true, rewardType: true } },
-        template: { select: { id: true, name: true } },
       },
     })
   }
@@ -370,7 +390,9 @@ export class LoyaltyService {
       where: { id },
       data: {
         name: data.name,
-        templateId: data.templateId,
+        metaTemplateId: data.metaTemplateId,
+        metaTemplateName: data.metaTemplateName,
+        metaTemplateLanguage: data.metaTemplateLanguage,
         status: data.status as LoyaltyCampaignStatus | undefined,
         frequency: data.frequency as LoyaltyCampaignFrequency | undefined,
         segmentCriteria: (data.segmentCriteria as object | undefined) ?? undefined,
@@ -379,7 +401,6 @@ export class LoyaltyService {
       },
       include: {
         bonus: { select: { id: true, name: true, rewardType: true } },
-        template: { select: { id: true, name: true } },
       },
     })
   }

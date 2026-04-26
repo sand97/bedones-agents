@@ -13,7 +13,9 @@ import {
 export interface LoyaltyCampaignSubmitData {
   name: string
   bonusId: string
-  templateId?: string
+  metaTemplateId?: string
+  metaTemplateName?: string
+  metaTemplateLanguage?: string
   frequency: LoyaltyCampaignFrequency
   segmentCriteria: Record<string, unknown>
   startDate?: string
@@ -46,10 +48,13 @@ export function LoyaltyCampaignModal({
     enabled: open && !!socialAccountId,
   })
 
+  // Templates live on Meta — staleTime: Infinity so we don't refetch repeatedly
+  // while the modal stays open or reopens.
   const templatesQuery = useQuery({
     queryKey: ['loyalty-templates', socialAccountId],
     queryFn: () => loyaltyApi.listTemplates(socialAccountId),
     enabled: open && !!socialAccountId,
+    staleTime: Infinity,
   })
 
   const bonuses = useMemo(() => bonusesQuery.data ?? [], [bonusesQuery.data])
@@ -72,7 +77,7 @@ export function LoyaltyCampaignModal({
       form.setFieldsValue({
         name: editingCampaign.name,
         bonusId: editingCampaign.bonusId,
-        templateId: editingCampaign.templateId ?? undefined,
+        metaTemplateId: editingCampaign.metaTemplateId ?? undefined,
         frequency: editingCampaign.frequency,
         endDate: editingCampaign.endDate ? dayjs(editingCampaign.endDate) : undefined,
         minSpend: criteria.minSpend,
@@ -94,10 +99,14 @@ export function LoyaltyCampaignModal({
       if (values.minProducts !== undefined && values.minProducts !== null)
         segmentCriteria.minProducts = values.minProducts
 
+      const tmpl = templates.find((x) => x.id === values.metaTemplateId)
+
       onSubmit({
         name: values.name,
         bonusId: values.bonusId,
-        templateId: values.templateId,
+        metaTemplateId: tmpl?.id,
+        metaTemplateName: tmpl?.name,
+        metaTemplateLanguage: tmpl?.language,
         frequency: values.frequency as LoyaltyCampaignFrequency,
         segmentCriteria,
         startDate: new Date().toISOString(),
@@ -178,12 +187,15 @@ export function LoyaltyCampaignModal({
 
         <Form.Item
           label={t('loyalty.campaign_template')}
-          name="templateId"
+          name="metaTemplateId"
           rules={[{ required: true, message: t('promotions.required') }]}
         >
           <Select
             placeholder={t('loyalty.campaign_select_template')}
-            options={templates.map((tmpl) => ({ value: tmpl.id, label: tmpl.name }))}
+            options={templates.map((tmpl) => ({
+              value: tmpl.id,
+              label: `${tmpl.name} · ${tmpl.language}`,
+            }))}
             loading={templatesQuery.isLoading}
           />
         </Form.Item>

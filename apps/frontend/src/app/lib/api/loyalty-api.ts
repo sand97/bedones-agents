@@ -66,27 +66,29 @@ export interface LoyaltyBonus {
   updatedAt: string
 }
 
+/**
+ * Templates live on Meta — they are NOT persisted in our DB. The id below is
+ * Meta's template id; there are no createdAt/updatedAt fields.
+ */
 export interface LoyaltyTemplate {
   id: string
   socialAccountId: string
-  metaTemplateId?: string | null
   name: string
   language: string
   category: string
   body: string
   variables: string[]
   status: string
-  createdAt: string
-  updatedAt: string
 }
 
 export interface LoyaltyCampaign {
   id: string
   socialAccountId: string
   bonusId: string
-  templateId?: string | null
+  metaTemplateId?: string | null
+  metaTemplateName?: string | null
+  metaTemplateLanguage?: string | null
   bonus?: { id: string; name: string; rewardType: LoyaltyRewardType }
-  template?: { id: string; name: string } | null
   name: string
   status: LoyaltyCampaignStatus
   frequency: LoyaltyCampaignFrequency
@@ -186,13 +188,9 @@ export const loyaltyApi = {
     }),
   removeBonus: (id: string) => fetchJson<void>(`/loyalty/bonuses/${id}`, { method: 'DELETE' }),
 
-  // Templates
+  // Templates — proxied to Meta WhatsApp Business; never persisted on our side.
   listTemplates: (socialAccountId: string) =>
     fetchJson<LoyaltyTemplate[]>(`/loyalty/templates/account/${socialAccountId}`),
-  syncTemplates: (socialAccountId: string) =>
-    fetchJson<LoyaltyTemplate[]>(`/loyalty/templates/account/${socialAccountId}/sync`, {
-      method: 'POST',
-    }),
   createTemplate: (data: {
     socialAccountId: string
     name: string
@@ -205,22 +203,11 @@ export const loyaltyApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  updateTemplate: (
-    id: string,
-    data: Partial<{
-      name: string
-      language: string
-      category: string
-      body: string
-      variables: string[]
-      status: string
-    }>,
-  ) =>
-    fetchJson<LoyaltyTemplate>(`/loyalty/templates/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
-  removeTemplate: (id: string) => fetchJson<void>(`/loyalty/templates/${id}`, { method: 'DELETE' }),
+  removeTemplate: (socialAccountId: string, name: string) =>
+    fetchJson<void>(
+      `/loyalty/templates/account/${socialAccountId}/by-name/${encodeURIComponent(name)}`,
+      { method: 'DELETE' },
+    ),
 
   // Campaigns
   listCampaigns: (socialAccountId: string) =>
@@ -228,7 +215,9 @@ export const loyaltyApi = {
   createCampaign: (data: {
     socialAccountId: string
     bonusId: string
-    templateId?: string
+    metaTemplateId?: string
+    metaTemplateName?: string
+    metaTemplateLanguage?: string
     name: string
     frequency?: LoyaltyCampaignFrequency
     segmentCriteria?: Record<string, unknown>
@@ -243,7 +232,9 @@ export const loyaltyApi = {
     id: string,
     data: Partial<{
       name: string
-      templateId: string
+      metaTemplateId: string
+      metaTemplateName: string
+      metaTemplateLanguage: string
       status: LoyaltyCampaignStatus
       frequency: LoyaltyCampaignFrequency
       segmentCriteria: Record<string, unknown>
