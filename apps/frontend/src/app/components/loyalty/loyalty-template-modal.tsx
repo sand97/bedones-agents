@@ -1,20 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Tag } from 'antd'
+import { App, Button, Modal, Tag } from 'antd'
 import { Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { WhatsAppIcon } from '@app/components/icons/social-icons'
 import { loyaltyApi, type LoyaltyTemplate } from '@app/lib/api/loyalty-api'
-
-const AVAILABLE_VARIABLES = [
-  'customer_name',
-  'amount',
-  'product_name',
-  'order_count',
-  'orders_left',
-  'reward_value',
-] as const
+import { LoyaltyTemplateEditorModal } from './loyalty-template-editor-modal'
 
 interface Props {
   open: boolean
@@ -26,9 +18,9 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) 
   const { t } = useTranslation()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
-  const [form] = Form.useForm()
+
+  const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<LoyaltyTemplate | null>(null)
-  const [creating, setCreating] = useState(false)
 
   const queryKey = useMemo(() => ['loyalty-templates', socialAccountId], [socialAccountId])
 
@@ -46,38 +38,6 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) 
     },
   })
 
-  const createMutation = useMutation({
-    mutationFn: (payload: {
-      name: string
-      body: string
-      variables: string[]
-      language: string
-      category: string
-    }) => loyaltyApi.createTemplate({ socialAccountId, ...payload }),
-    onSuccess: (created) => {
-      queryClient.setQueryData<LoyaltyTemplate[]>(queryKey, (prev) => [created, ...(prev ?? [])])
-      handleResetEditor()
-      message.success(t('loyalty.template_created'))
-    },
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: ({
-      id,
-      payload,
-    }: {
-      id: string
-      payload: { name: string; body: string; variables: string[] }
-    }) => loyaltyApi.updateTemplate(id, payload),
-    onSuccess: (updated) => {
-      queryClient.setQueryData<LoyaltyTemplate[]>(queryKey, (prev) =>
-        (prev ?? []).map((tmpl) => (tmpl.id === updated.id ? updated : tmpl)),
-      )
-      handleResetEditor()
-      message.success(t('loyalty.template_updated'))
-    },
-  })
-
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await loyaltyApi.removeTemplate(id)
@@ -87,236 +47,120 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) 
       queryClient.setQueryData<LoyaltyTemplate[]>(queryKey, (prev) =>
         (prev ?? []).filter((tmpl) => tmpl.id !== id),
       )
-      if (editing?.id === id) handleResetEditor()
       message.success(t('common.delete'))
     },
   })
 
-  useEffect(() => {
-    if (!open) {
-      handleResetEditor()
-      return
-    }
-    if (editing) {
-      form.setFieldsValue({
-        name: editing.name,
-        language: editing.language,
-        category: editing.category,
-        body: editing.body,
-        variables: editing.variables,
-      })
-    }
-  }, [open, editing, form])
-
-  const handleResetEditor = () => {
+  const handleCreate = () => {
     setEditing(null)
-    setCreating(false)
-    form.resetFields()
+    setEditorOpen(true)
   }
 
-  const handleSubmit = () => {
-    form.validateFields().then((values) => {
-      const payload = {
-        name: values.name,
-        body: values.body,
-        variables: values.variables ?? [],
-        language: values.language ?? 'fr',
-        category: values.category ?? 'MARKETING',
-      }
-      if (editing) updateMutation.mutate({ id: editing.id, payload })
-      else createMutation.mutate(payload)
+  const handleEdit = (tmpl: LoyaltyTemplate) => {
+    setEditing(tmpl)
+    setEditorOpen(true)
+  }
+
+  const handleDelete = (tmpl: LoyaltyTemplate) => {
+    Modal.confirm({
+      title: t('loyalty.confirm_delete_template_title'),
+      content: t('loyalty.confirm_delete_template_message', { name: tmpl.name }),
+      okText: t('common.delete'),
+      okButtonProps: { danger: true },
+      cancelText: t('common.cancel'),
+      onOk: () => deleteMutation.mutateAsync(tmpl.id),
     })
   }
 
-  const insertVariable = (variable: string) => {
-    const current = form.getFieldValue('body') as string | undefined
-    const next = `${current ?? ''}{{${variable}}}`
-    form.setFieldValue('body', next)
-  }
-
   const templates = data ?? []
-  const showEmpty = !isLoading && templates.length === 0 && !creating && !editing
+  const showEmpty = !isLoading && templates.length === 0
 
   return (
-    <Modal
-      title={t('loyalty.templates_title')}
-      open={open}
-      onCancel={onClose}
-      width={760}
-      styles={{ body: { padding: 0 } }}
-      footer={null}
-    >
-      {showEmpty ? (
-        <SocialSetup
-          icon={<WhatsAppIcon width={40} height={40} />}
-          color="var(--color-brand-whatsapp)"
-          title={t('loyalty.templates_empty_title')}
-          description={t('loyalty.templates_empty_desc')}
-          buttonLabel={t('loyalty.template_create')}
-          buttonIcon={<Plus size={18} />}
-          onAction={() => setCreating(true)}
-          secondaryButtonLabel={t('loyalty.templates_sync_meta')}
-          secondaryButtonIcon={<RefreshCw size={16} />}
-          secondaryLoading={syncMutation.isPending}
-          onSecondaryAction={() => syncMutation.mutate()}
-        />
-      ) : (
-        <div className="flex" style={{ minHeight: 480 }}>
-          {/* Left: editor */}
-          <div className="flex-1 border-r border-border-subtle p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="m-0 text-sm font-semibold text-text-primary">
-                {editing ? t('loyalty.template_edit') : t('loyalty.template_create')}
-              </h3>
+    <>
+      <Modal
+        title={t('loyalty.templates_title')}
+        open={open}
+        onCancel={onClose}
+        width={560}
+        styles={{ body: { padding: showEmpty ? 0 : 16 } }}
+        footer={
+          showEmpty ? null : (
+            <div className="flex items-center justify-end gap-2">
               <Button
-                size="small"
                 icon={<RefreshCw size={14} />}
                 onClick={() => syncMutation.mutate()}
                 loading={syncMutation.isPending}
               >
                 {t('loyalty.templates_sync')}
               </Button>
+              <Button type="primary" icon={<Plus size={14} />} onClick={handleCreate}>
+                {t('loyalty.template_create')}
+              </Button>
             </div>
-
-            <Form
-              form={form}
-              layout="vertical"
-              initialValues={{ language: 'fr', category: 'MARKETING' }}
-              onFinish={handleSubmit}
-            >
-              <Form.Item
-                label={t('loyalty.template_name')}
-                name="name"
-                rules={[{ required: true, message: t('promotions.required') }]}
+          )
+        }
+      >
+        {showEmpty ? (
+          <SocialSetup
+            icon={<WhatsAppIcon width={40} height={40} />}
+            color="var(--color-brand-whatsapp)"
+            title={t('loyalty.templates_empty_title')}
+            description={t('loyalty.templates_empty_desc')}
+            buttonLabel={t('loyalty.template_create')}
+            buttonIcon={<Plus size={18} />}
+            onAction={handleCreate}
+            secondaryButtonLabel={t('loyalty.templates_sync_meta')}
+            secondaryButtonIcon={<RefreshCw size={16} />}
+            secondaryLoading={syncMutation.isPending}
+            onSecondaryAction={() => syncMutation.mutate()}
+          />
+        ) : (
+          <div className="flex flex-col gap-2" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+            {templates.map((tmpl) => (
+              <div
+                key={tmpl.id}
+                className="flex items-start gap-3 rounded-md border border-border-subtle p-3"
               >
-                <Input placeholder="welcome_loyalty_program" />
-              </Form.Item>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Form.Item label={t('loyalty.template_language')} name="language">
-                  <Select
-                    options={[
-                      { value: 'fr', label: 'Français' },
-                      { value: 'en', label: 'English' },
-                    ]}
-                  />
-                </Form.Item>
-                <Form.Item label={t('loyalty.template_category')} name="category">
-                  <Select
-                    options={[
-                      { value: 'MARKETING', label: 'Marketing' },
-                      { value: 'UTILITY', label: 'Utility' },
-                      { value: 'AUTHENTICATION', label: 'Authentication' },
-                    ]}
-                  />
-                </Form.Item>
-              </div>
-
-              <Form.Item
-                label={t('loyalty.template_body')}
-                name="body"
-                rules={[{ required: true, message: t('promotions.required') }]}
-              >
-                <Input.TextArea rows={5} placeholder={t('loyalty.template_body_placeholder')} />
-              </Form.Item>
-
-              <Form.Item label={t('loyalty.template_variables')} name="variables">
-                <Select
-                  mode="multiple"
-                  placeholder={t('loyalty.template_variables_placeholder')}
-                  options={AVAILABLE_VARIABLES.map((v) => ({ value: v, label: `{{${v}}}` }))}
-                />
-              </Form.Item>
-
-              <div className="mb-3 flex flex-wrap gap-1">
-                {AVAILABLE_VARIABLES.map((v) => (
-                  <Tag
-                    key={v}
-                    bordered={false}
-                    color="processing"
-                    className="cursor-pointer"
-                    onClick={() => insertVariable(v)}
-                  >
-                    + {`{{${v}}}`}
-                  </Tag>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-end gap-2">
-                {(editing || creating) && (
-                  <Button onClick={handleResetEditor}>{t('common.cancel')}</Button>
-                )}
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={createMutation.isPending || updateMutation.isPending}
-                >
-                  {editing ? t('common.save') : t('common.create')}
-                </Button>
-              </div>
-            </Form>
-          </div>
-
-          {/* Right: template list */}
-          <div className="w-72 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="m-0 text-sm font-semibold text-text-primary">
-                {t('loyalty.templates_list')}
-              </h3>
-              <Button
-                size="small"
-                type="text"
-                icon={<Plus size={14} />}
-                onClick={() => {
-                  handleResetEditor()
-                  setCreating(true)
-                }}
-              />
-            </div>
-            <div className="flex flex-col gap-2" style={{ maxHeight: 420, overflowY: 'auto' }}>
-              {templates.length === 0 ? (
-                <div className="text-xs text-text-muted">{t('loyalty.no_templates')}</div>
-              ) : (
-                templates.map((tmpl) => (
-                  <div
-                    key={tmpl.id}
-                    className={`flex items-start gap-2 rounded-md border border-border-subtle p-2 ${
-                      editing?.id === tmpl.id ? 'bg-bg-muted' : ''
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCreating(false)
-                        setEditing(tmpl)
-                      }}
-                      className="min-w-0 flex-1 cursor-pointer text-left"
-                    >
-                      <div className="truncate text-sm font-medium text-text-primary">
-                        {tmpl.name}
-                      </div>
-                      <div className="truncate text-xs text-text-muted">{tmpl.body}</div>
-                      <div className="mt-1 flex items-center gap-1">
-                        <Tag bordered={false} color="default">
-                          {tmpl.language}
-                        </Tag>
-                        <Tag bordered={false}>{tmpl.status}</Tag>
-                      </div>
-                    </button>
-                    <Button
-                      size="small"
-                      type="text"
-                      danger
-                      icon={<Trash2 size={12} />}
-                      onClick={() => deleteMutation.mutate(tmpl.id)}
-                    />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-text-primary">
+                    {tmpl.name}
                   </div>
-                ))
-              )}
-            </div>
+                  <div className="mt-1 line-clamp-2 text-xs text-text-secondary">{tmpl.body}</div>
+                  <div className="mt-2 flex items-center gap-1">
+                    <Tag bordered={false} color="default">
+                      {tmpl.language}
+                    </Tag>
+                    <Tag bordered={false}>{tmpl.category}</Tag>
+                    <Tag bordered={false}>{tmpl.status}</Tag>
+                  </div>
+                </div>
+                <div className="flex flex-shrink-0 items-center gap-1">
+                  <Button size="small" onClick={() => handleEdit(tmpl)}>
+                    {t('common.edit')}
+                  </Button>
+                  <Button
+                    size="small"
+                    type="text"
+                    danger
+                    icon={<Trash2 size={12} />}
+                    onClick={() => handleDelete(tmpl)}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
-      )}
-    </Modal>
+        )}
+      </Modal>
+
+      <LoyaltyTemplateEditorModal
+        open={editorOpen}
+        onClose={() => {
+          setEditorOpen(false)
+          setEditing(null)
+        }}
+        socialAccountId={socialAccountId}
+        editingTemplate={editing}
+      />
+    </>
   )
 }

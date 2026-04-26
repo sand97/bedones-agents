@@ -1,0 +1,99 @@
+/**
+ * Shared variable definitions for WhatsApp loyalty campaign templates.
+ *
+ * The user writes the body with human-readable tokens (e.g. `[Nom du client]`).
+ * Internally, each token maps to a Meta-friendly key (e.g. `customer_name`)
+ * which is what gets substituted at send-time when interpolating against the
+ * customer's data.
+ */
+
+export interface TemplateVariable {
+  /** Stable internal key sent to Meta (snake_case ASCII). */
+  key: string
+  /** Human-readable token shown inside the body, e.g. "Nom du client". */
+  token: string
+  /** Tooltip description. */
+  description: string
+  /** Example value to illustrate the variable. */
+  example: string
+}
+
+export const TEMPLATE_VARIABLES: TemplateVariable[] = [
+  {
+    key: 'customer_name',
+    token: 'Nom du client',
+    description: 'Le prénom ou nom complet enregistré dans la fiche contact.',
+    example: 'Marie Dupont',
+  },
+  {
+    key: 'amount',
+    token: 'Montant dépensé',
+    description: 'Total cumulé dépensé par le client (FCFA).',
+    example: '45 000 FCFA',
+  },
+  {
+    key: 'product_name',
+    token: 'Nom du produit',
+    description: 'Nom du produit gagné en récompense ou rendant éligible au bonus.',
+    example: 'Sac à main cuir noir',
+  },
+  {
+    key: 'order_count',
+    token: 'Nombre de commandes',
+    description: 'Nombre total de commandes passées par le client.',
+    example: '7',
+  },
+  {
+    key: 'orders_left',
+    token: 'Commandes restantes',
+    description: "Nombre de commandes qu'il reste au client pour débloquer le bonus.",
+    example: '2',
+  },
+  {
+    key: 'reward_value',
+    token: 'Valeur du bonus',
+    description: 'Valeur de la récompense (montant en FCFA ou pourcentage).',
+    example: '5 000 FCFA ou 20%',
+  },
+]
+
+const TOKEN_TO_VAR = new Map(TEMPLATE_VARIABLES.map((v) => [v.token, v]))
+
+/** Extract `[...]` tokens from the body. */
+export function extractBodyTokens(body: string): string[] {
+  const matches = body.matchAll(/\[([^[\]]+)\]/g)
+  return Array.from(matches, (m) => m[1].trim())
+}
+
+/** Tokens used in the body that don't match any known variable. */
+export function findUnknownTokens(body: string): string[] {
+  return extractBodyTokens(body).filter((token) => !TOKEN_TO_VAR.has(token))
+}
+
+/** Internal keys (e.g. customer_name) deduced from the tokens used in the body. */
+export function bodyToVariableKeys(body: string): string[] {
+  const tokens = extractBodyTokens(body)
+  const keys = new Set<string>()
+  for (const token of tokens) {
+    const v = TOKEN_TO_VAR.get(token)
+    if (v) keys.add(v.key)
+  }
+  return Array.from(keys)
+}
+
+/**
+ * Normalize a template name to satisfy Meta's constraints:
+ * lowercase ASCII letters, digits and underscores; spaces become underscores;
+ * accents stripped; max 512 chars.
+ */
+export function formatTemplateName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // strip combining marks (accents)
+    .replace(/[^a-z0-9_\s-]/g, '') // drop disallowed chars
+    .trim()
+    .replace(/[\s-]+/g, '_') // spaces/dashes → underscore
+    .replace(/_+/g, '_')
+    .slice(0, 512)
+}
