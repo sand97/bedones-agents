@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { EncryptionService } from '../auth/encryption.service'
 import {
   CreateLoyaltyBonusDto,
   CreateLoyaltyCampaignDto,
@@ -11,6 +12,22 @@ import {
   UpdateLoyaltyTemplateDto,
 } from './dto/loyalty.dto'
 
+const META_API_BASE = 'https://graph.facebook.com/v22.0'
+
+interface MetaTemplateComponent {
+  type: string
+  text?: string
+}
+
+interface MetaTemplate {
+  id: string
+  name: string
+  language: string
+  status: string
+  category: string
+  components?: MetaTemplateComponent[]
+}
+
 type LoyaltyRewardType = 'PRODUCTS' | 'CREDIT' | 'PERCENT'
 type LoyaltyBonusStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'EXPIRED'
 type LoyaltyCampaignStatus = 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'PAUSED'
@@ -18,7 +35,12 @@ type LoyaltyCampaignFrequency = 'ONCE' | 'DAILY' | 'WEEKLY' | 'MONTHLY'
 
 @Injectable()
 export class LoyaltyService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(LoyaltyService.name)
+
+  constructor(
+    private prisma: PrismaService,
+    private encryptionService: EncryptionService,
+  ) {}
 
   // ─── Contacts ───
 
@@ -208,12 +230,85 @@ export class LoyaltyService {
   }
 
   /**
-   * In production this would fetch templates from Meta WhatsApp Business API
-   * and return them. We keep templates synced (stored as cache) so campaigns
-   * can reference them by id.
+   * Fetch the WhatsApp Business message templates from Meta for the given
+   * social account, then upsert them locally so campaigns can reference
+   * them by id. Returns the up-to-date list.
    */
   async syncTemplates(socialAccountId: string) {
-    // TODO: integrate with Meta WhatsApp Business API. For now, return what we have.
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: socialAccountId },
+      omit: { accessToken: false },
+    })
+    if (!account) throw new NotFoundException('Compte social introuvable')
+    if (account.provider !== 'WHATSAPP') {
+      throw new BadRequestException('La synchronisation est réservée aux comptes WhatsApp')
+    }
+    if (!account.wabaId) {
+      throw new BadRequestException('WABA ID manquant pour ce numéro WhatsApp')
+    }
+
+    const accessToken = await this.encryptionService.decrypt(account.accessToken)
+
+    const fetched: MetaTemplate[] = []
+    let nextUrl: string | null =
+      `${META_API_BASE}/${account.wabaId}/message_templates` +
+      `?fields=id,name,language,status,category,components&limit=100`
+
+    while (nextUrl) {
+      const res: Response = await fetch(nextUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        this.logger.error(`Meta message_templates fetch failed: ${res.status} ${text}`)
+        throw new BadRequestException(`Meta API error: ${text}`)
+      }
+      const json = (await res.json()) as {
+        data?: MetaTemplate[]
+        paging?: { next?: string }
+      }
+      if (json.data) fetched.push(...json.data)
+      nextUrl = json.paging?.next ?? null
+    }
+
+    // Normalize each Meta template into our LoyaltyTemplate shape.
+    for (const tmpl of fetched) {
+      const bodyComponent = (tmpl.components ?? []).find((c) => c.type === 'BODY')
+      const body = bodyComponent?.text ?? ''
+      const variables = Array.from(body.matchAll(/{{\s*([^}]+?)\s*}}/g), (m) => m[1].trim())
+
+      await this.prisma.loyaltyTemplate.upsert({
+        where: {
+          socialAccountId_name_language: {
+            socialAccountId,
+            name: tmpl.name,
+            language: tmpl.language,
+          },
+        },
+        create: {
+          socialAccountId,
+          metaTemplateId: tmpl.id,
+          name: tmpl.name,
+          language: tmpl.language,
+          category: tmpl.category,
+          body,
+          variables,
+          status: tmpl.status,
+        },
+        update: {
+          metaTemplateId: tmpl.id,
+          category: tmpl.category,
+          body,
+          variables,
+          status: tmpl.status,
+        },
+      })
+    }
+
+    this.logger.log(
+      `[Loyalty] Synced ${fetched.length} WhatsApp templates for account ${socialAccountId}`,
+    )
+
     return this.listTemplates(socialAccountId)
   }
 

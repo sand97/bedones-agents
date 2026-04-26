@@ -718,7 +718,7 @@ model LoyaltyTemplate {
 
   campaigns LoyaltyCampaign[]
 
-  @@unique([socialAccountId, name])
+  @@unique([socialAccountId, name, language])
   @@index([socialAccountId])
 }
 
