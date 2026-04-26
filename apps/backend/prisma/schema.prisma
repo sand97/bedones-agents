@@ -106,6 +106,17 @@ enum CreditMediaType {
   IMAGE
 }
 
+enum NotificationType {
+  COMMENT_TO_READ
+  COMMENT_AI_SUGGESTION
+  COMMENT_DAILY_SUMMARY
+  MESSAGE_TO_READ
+  MESSAGE_AI_SUGGESTION
+  MESSAGE_TICKET_CREATED
+  MESSAGE_TICKET_CLOSED
+  MESSAGE_DAILY_SUMMARY
+}
+
 // ─── Models ───
 
 model User {
@@ -118,12 +129,16 @@ model User {
   authType       AuthType
   providerUserId String?
   status         UserStatus @default(VERIFIED)
+  // BCP-47 short tag ("fr", "en") used for outbound messages (e.g. WhatsApp
+  // template language) and as the i18n hint until the user changes it.
+  locale         String     @default("fr")
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
   memberships              OrganisationMember[]
   sessions                 Session[]
-  notificationPreference   NotificationPreference?
+  notificationPreferences  NotificationPreference[]
+  whatsappOptInWindows     WhatsAppOptInWindow[]
 }
 
 model Session {
@@ -139,17 +154,22 @@ model Organisation {
   id        String   @id @default(uuid())
   name      String
   logoUrl   String?
+  // IANA timezone (e.g. "Africa/Douala", "Europe/Paris") used by the hourly
+  // opt-in cron to detect when local 08:00 hits for this org. Set at creation
+  // from the browser's Intl.DateTimeFormat().resolvedOptions().timeZone.
+  timezone  String   @default("Africa/Douala")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members          OrganisationMember[]
-  socialAccounts   SocialAccount[]
-  catalogs         Catalog[]
-  agents           Agent[]
-  tickets          Ticket[]
-  promotions       Promotion[]
-  ticketStatuses   TicketStatus[]
-  creditOperations CreditOperation[]
+  members              OrganisationMember[]
+  socialAccounts       SocialAccount[]
+  catalogs             Catalog[]
+  agents               Agent[]
+  tickets              Ticket[]
+  promotions           Promotion[]
+  ticketStatuses       TicketStatus[]
+  creditOperations     CreditOperation[]
+  whatsappOptInWindows WhatsAppOptInWindow[]
 }
 
 model OrganisationMember {
@@ -183,12 +203,13 @@ model SocialAccount {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
-  settings      PageSettings?
-  posts         Post[]
-  conversations Conversation[]
-  catalogs      CatalogSocialAccount[]
-  agentLink     AgentSocialAccount?
-  labels        Label[]
+  settings                PageSettings?
+  posts                   Post[]
+  conversations           Conversation[]
+  catalogs                CatalogSocialAccount[]
+  agentLink               AgentSocialAccount?
+  labels                  Label[]
+  notificationPreferences NotificationPreference[]
 
   loyaltyContacts  LoyaltyContact[]
   loyaltyBonuses   LoyaltyBonus[]
@@ -569,29 +590,48 @@ model CreditOperation {
 }
 
 // ─── Notification Preferences ───
-
+// Absence of a row = enabled (default). A row is only persisted when the user
+// explicitly opts out (or re-enables after opting out). This keeps defaults
+// evolvable without backfilling and makes bulk toggles cheap.
 model NotificationPreference {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String           @id @default(uuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  socialAccountId String
+  socialAccount   SocialAccount    @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  type            NotificationType
+  enabled         Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  // WhatsApp notifications
-  waNewMessage     Boolean @default(true)
-  waNewComment     Boolean @default(false)
-  waTicketAssigned Boolean @default(true)
-  waTicketUrgent   Boolean @default(true)
-  waAgentAlert     Boolean @default(true)
-  waDailySummary   Boolean @default(false)
+  @@unique([userId, socialAccountId, type])
+  @@index([userId])
+  @@index([socialAccountId])
+}
 
-  // Email notifications (features & marketing)
-  emailNewFeatures  Boolean @default(true)
-  emailNewOffers    Boolean @default(true)
-  emailTutorials    Boolean @default(true)
+// ─── WhatsApp Opt-In Window ───
+// One row per (member, org). The template asks the member to opt in for
+// notifications about a specific organisation, so a member who's part of
+// several orgs has separate windows. All sends go through the Bedones CORE
+// WhatsApp number (env CORE_WHATSAPP_NUMBER_ID), but the consent is per-org.
+// The window refreshes to now+24h whenever the member replies — the most
+// recent template sent to them (lastTemplateSentAt) tells us which org their
+// reply belongs to, since Quick Reply payloads on Meta templates are static.
+model WhatsAppOptInWindow {
+  id                 String       @id @default(uuid())
+  userId             String
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organisationId     String
+  organisation       Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  expiresAt          DateTime
+  lastInboundAt      DateTime?
+  lastTemplateSentAt DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId])
+  @@unique([userId, organisationId])
+  @@index([expiresAt])
+  @@index([userId])
 }
 
 // ─── Loyalty ───

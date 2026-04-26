@@ -1,9 +1,11 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   HttpCode,
   Logger,
+  Patch,
   Post,
   Query,
   Req,
@@ -126,6 +128,20 @@ export class AuthController {
   @ApiOkResponse({ type: MeResponseDto })
   async me(@CurrentUser() user: { id: string }) {
     return this.authService.getMe(user.id)
+  }
+
+  // ─── Update current user's locale ───
+
+  @Patch('me/locale')
+  @UseGuards(AuthGuard)
+  @HttpCode(200)
+  @ApiOkResponse({ type: StatusResponseDto })
+  async updateLocale(@CurrentUser() user: { id: string }, @Body() body: { locale: string }) {
+    if (!body?.locale || !/^[a-z]{2}$/i.test(body.locale)) {
+      throw new BadRequestException('Invalid locale (expected 2-letter BCP-47 tag)')
+    }
+    await this.authService.updateLocale(user.id, body.locale.toLowerCase())
+    return { status: 'success' }
   }
 
   // ─── Logout ───

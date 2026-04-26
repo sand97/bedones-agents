@@ -200,6 +200,13 @@ export class AuthService {
 
   // ─── Get current user with organisations ───
 
+  async updateLocale(userId: string, locale: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { locale },
+    })
+  }
+
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -211,6 +218,7 @@ export class AuthService {
         avatar: true,
         authType: true,
         status: true,
+        locale: true,
         memberships: {
           select: {
             role: true,

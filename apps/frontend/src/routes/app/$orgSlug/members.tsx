@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { Table, Input, Button, Modal, message } from 'antd'
-import { Search, ChevronDown, UserPlus, Copy, Check } from 'lucide-react'
+import { Search, ChevronDown, UserPlus, Copy, Check, Bell } from 'lucide-react'
 import { $api } from '@app/lib/api/$api'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { TablePagination } from '@app/components/shared/table-pagination'
@@ -16,8 +16,10 @@ import {
   mapApiMember,
   MEMBER_ROLE_CONFIG,
   ALL_ROLES,
+  type Member,
   type MemberRole,
 } from '@app/components/members/mock-data'
+import { NotificationPreferencesModal } from '@app/components/notifications/notification-preferences-modal'
 
 export const Route = createFileRoute('/app/$orgSlug/members')({
   component: MembersPage,
@@ -47,6 +49,8 @@ function MembersPage() {
     name: string
   }>({ open: false, link: '', name: '' })
   const [copied, setCopied] = useState(false)
+  const [notifPrefsMembers, setNotifPrefsMembers] = useState<Member[]>([])
+  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([])
 
   const membersQuery = $api.useQuery('get', '/organisations/{orgId}/members', {
     params: { path: { orgId: orgSlug } },
@@ -126,7 +130,17 @@ function MembersPage() {
     }
   }
 
-  const columns = useMemberColumns(handleDelete)
+  const columns = useMemberColumns(handleDelete, (member) => setNotifPrefsMembers([member]))
+
+  const selectedMembers = useMemo(
+    () => members.filter((m) => selectedRowKeys.includes(m.id)),
+    [members, selectedRowKeys],
+  )
+
+  const handleOpenBulkNotifPrefs = () => {
+    if (selectedMembers.length === 0) return
+    setNotifPrefsMembers(selectedMembers)
+  }
 
   const toggleRole = (role: string) => {
     setSelectedRoles((prev) =>
@@ -204,6 +218,21 @@ function MembersPage() {
           </FilterPopover>
         </div>
 
+        {selectedRowKeys.length > 0 && (
+          <div className="mb-3 flex items-center gap-3">
+            <span className="text-sm text-text-secondary">
+              {t('members.selected_count', { count: selectedRowKeys.length })}
+            </span>
+            <Button
+              size="small"
+              icon={<Bell size={14} strokeWidth={1.5} />}
+              onClick={handleOpenBulkNotifPrefs}
+            >
+              {t('notifications.table_action_title')}
+            </Button>
+          </div>
+        )}
+
         {isDesktop ? (
           <Table
             dataSource={paginatedMembers}
@@ -214,6 +243,11 @@ function MembersPage() {
             className="tickets-table"
             size="middle"
             loading={membersQuery.isLoading}
+            rowSelection={{
+              selectedRowKeys,
+              onChange: (keys) => setSelectedRowKeys(keys as string[]),
+              preserveSelectedRowKeys: true,
+            }}
           />
         ) : (
           <div className="flex flex-col gap-3">
@@ -245,6 +279,18 @@ function MembersPage() {
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
         onSubmit={handleInvite}
+      />
+
+      <NotificationPreferencesModal
+        open={notifPrefsMembers.length > 0}
+        onClose={() => setNotifPrefsMembers([])}
+        organisationId={orgSlug}
+        members={notifPrefsMembers.map((m) => ({
+          id: m.userId,
+          name: m.name,
+          email: m.email ?? null,
+          avatar: m.avatar ?? null,
+        }))}
       />
 
       {/* Invite link modal */}

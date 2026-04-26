@@ -3,6 +3,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 export class CreateOrganisationDto {
   @ApiProperty({ example: 'Mon entreprise' })
   name: string
+
+  @ApiPropertyOptional({ example: 'Africa/Douala', description: 'IANA timezone' })
+  timezone?: string
 }
 
 export class UpdateOrganisationDto {
@@ -11,6 +14,9 @@ export class UpdateOrganisationDto {
 
   @ApiPropertyOptional({ example: 'https://minio.bedones.local/logos/logo.png' })
   logoUrl?: string
+
+  @ApiPropertyOptional({ example: 'Africa/Douala' })
+  timezone?: string
 }
 
 export class OrgMemberUserDto {

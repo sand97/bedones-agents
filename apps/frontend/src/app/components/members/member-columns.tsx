@@ -8,6 +8,7 @@ import { MEMBER_ROLE_CONFIG, type Member, type MemberRole } from './mock-data'
 
 export function useMemberColumns(
   onDelete: (memberId: string) => Promise<void>,
+  onOpenNotifPrefs?: (member: Member) => void,
 ): ColumnsType<Member> {
   const { t } = useTranslation()
 
@@ -58,8 +59,10 @@ export function useMemberColumns(
     {
       title: '',
       key: 'actions',
-      width: 150,
-      render: (_: unknown, record: Member) => <MemberActions member={record} onDelete={onDelete} />,
+      width: 110,
+      render: (_: unknown, record: Member) => (
+        <MemberActions member={record} onDelete={onDelete} onOpenNotifPrefs={onOpenNotifPrefs} />
+      ),
     },
   ]
 }

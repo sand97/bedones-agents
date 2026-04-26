@@ -55,6 +55,7 @@ async function main() {
         name: 'Testeur Bedones',
         passwordHash,
         authType: 'PASSWORD',
+        locale: 'fr',
       },
     })
 
@@ -69,6 +70,7 @@ async function main() {
       org = await prisma.organisation.create({
         data: {
           name: 'Bedones Test',
+          timezone: 'Africa/Douala',
           members: {
             create: {
               userId: user.id,

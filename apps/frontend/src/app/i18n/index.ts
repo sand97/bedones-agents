@@ -23,6 +23,22 @@ export function persistLocale(locale: AppLocale) {
   if (isClient) localStorage.setItem(STORAGE_KEY, locale)
 }
 
+/**
+ * Best-effort sync of the locale to the authenticated user. Silently swallows
+ * 401s (caller may not be logged in) and network errors. Backend reads
+ * `User.locale` to localise outbound WhatsApp templates etc.
+ */
+export function persistLocaleToServer(locale: AppLocale): void {
+  if (!isClient) return
+  const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+  fetch(`${apiUrl}/auth/me/locale`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ locale }),
+  }).catch(() => {})
+}
+
 export function getStoredLocale(): AppLocale {
   if (!isClient) return 'fr'
 
