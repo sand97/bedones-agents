@@ -2111,7 +2111,9 @@ a {
 }
 
 .ant-input-number-affix-wrapper .ant-input-number-input-wrap,
-.ant-input-number-affix-wrapper .ant-input-number-input {
+.ant-input-number-affix-wrapper .ant-input-number-input,
+.ant-input-number .ant-input-number-input-wrap,
+.ant-input-number .ant-input-number-input {
   height: 100% !important;
   display: flex !important;
   align-items: center !important;

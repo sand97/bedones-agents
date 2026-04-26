@@ -231,7 +231,7 @@ export function LoyaltyBonusModal({
           </div>
 
           {enableProducts && (
-            <div className="ml-10 mt-2">
+            <div className="mt-2">
               <Form.Item
                 label={t('loyalty.target_products_count')}
                 name="targetProductsCount"
@@ -327,7 +327,7 @@ export function LoyaltyBonusModal({
             name="rewardCredit"
             rules={[{ required: true, message: t('promotions.required') }]}
           >
-            <InputNumber min={0} suffix="FCFA" placeholder="5000" className="w-full" />
+            <InputNumber min={0} suffix="FCFA" placeholder="5000" style={{ width: 200 }} />
           </Form.Item>
         )}
 
@@ -337,7 +337,7 @@ export function LoyaltyBonusModal({
             name="rewardPercent"
             rules={[{ required: true, message: t('promotions.required') }]}
           >
-            <InputNumber min={1} max={100} suffix="%" placeholder="20" className="w-full" />
+            <InputNumber min={1} max={100} suffix="%" placeholder="20" style={{ width: 200 }} />
           </Form.Item>
         )}
 
