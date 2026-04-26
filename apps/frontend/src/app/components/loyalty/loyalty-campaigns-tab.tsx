@@ -6,8 +6,10 @@ import type { ColumnsType } from 'antd/es/table'
 import { FileText, Plus, Trash2 } from 'lucide-react'
 import { StatusTag } from '@app/components/shared/status-tag'
 import { formatDate } from '@app/lib/format'
+import { useLayout } from '@app/contexts/layout-context'
 import { loyaltyApi, type LoyaltyCampaign } from '@app/lib/api/loyalty-api'
 import { LoyaltyCampaignModal, type LoyaltyCampaignSubmitData } from './loyalty-campaign-modal'
+import { LoyaltyCampaignDescriptionCard } from './loyalty-campaign-description-card'
 import { LoyaltyTemplateModal } from './loyalty-template-modal'
 
 interface Props {
@@ -24,6 +26,7 @@ export function LoyaltyCampaignsTab({
   onTemplatesOpenChange,
 }: Props) {
   const { t } = useTranslation()
+  const { isDesktop } = useLayout()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
 
@@ -218,16 +221,34 @@ export function LoyaltyCampaignsTab({
         </Button>
       </div>
 
-      <Table
-        dataSource={data ?? []}
-        columns={columns}
-        bordered
-        rowKey="id"
-        pagination={{ pageSize: 10 }}
-        className="tickets-table"
-        size="middle"
-        loading={isLoading}
-      />
+      {isDesktop ? (
+        <Table
+          dataSource={data ?? []}
+          columns={columns}
+          bordered
+          rowKey="id"
+          pagination={{ pageSize: 10 }}
+          className="tickets-table"
+          size="middle"
+          loading={isLoading}
+        />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {(data ?? []).length === 0 ? (
+            <div className="flex items-center justify-center py-12 text-sm text-text-muted">
+              {isLoading ? t('common.loading') : t('loyalty.no_campaigns')}
+            </div>
+          ) : (
+            (data ?? []).map((campaign) => (
+              <LoyaltyCampaignDescriptionCard
+                key={campaign.id}
+                campaign={campaign}
+                onDelete={() => handleDelete(campaign)}
+              />
+            ))
+          )}
+        </div>
+      )}
 
       <LoyaltyCampaignModal
         open={modalOpen}

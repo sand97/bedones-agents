@@ -95,6 +95,79 @@ export function interpolateExamples(body: string): string {
   })
 }
 
+/** Minimal bonus shape needed by the compatibility checker. */
+export interface BonusVariableContext {
+  rewardType: 'PRODUCTS' | 'CREDIT' | 'PERCENT'
+  targetSpend: number | null
+  targetOrderCount: number | null
+  targetProductsCount: number | null
+  triggerProducts: { product: { id: string } }[]
+  rewardProducts: { product: { id: string } }[]
+}
+
+export interface VariableCompatibilityIssue {
+  /** Internal key (e.g. customer_name) */
+  key: string
+  /** Human token (e.g. "Nom du client") */
+  token: string
+  /** Why this variable can't be filled by the chosen bonus. */
+  reason: string
+}
+
+/**
+ * Check that every variable referenced by the template can actually be
+ * resolved with data from the chosen bonus. Returns the list of
+ * incompatible variables; empty list means everything lines up.
+ */
+export function findIncompatibleTemplateVariables(
+  templateVariableKeys: string[],
+  bonus: BonusVariableContext,
+): VariableCompatibilityIssue[] {
+  const issues: VariableCompatibilityIssue[] = []
+
+  const bonusInvolvesProducts =
+    bonus.rewardType === 'PRODUCTS' ||
+    bonus.rewardProducts.length > 0 ||
+    bonus.triggerProducts.length > 0 ||
+    bonus.targetProductsCount !== null
+
+  for (const key of templateVariableKeys) {
+    const v = KEY_TO_VAR.get(key)
+    if (!v) continue // unknown placeholder (e.g. {{1}} from Meta) — skip
+
+    if (key === 'product_name' && !bonusInvolvesProducts) {
+      issues.push({
+        key,
+        token: v.token,
+        reason: "Le bonus n'inclut aucun produit (offert ou déclencheur).",
+      })
+    }
+    if (key === 'reward_value' && bonus.rewardType !== 'CREDIT' && bonus.rewardType !== 'PERCENT') {
+      issues.push({
+        key,
+        token: v.token,
+        reason: 'Le bonus offre des produits, pas une valeur ni un pourcentage.',
+      })
+    }
+    if (key === 'orders_left' && bonus.targetOrderCount === null) {
+      issues.push({
+        key,
+        token: v.token,
+        reason: "Le bonus ne définit pas d'objectif basé sur le nombre de commandes.",
+      })
+    }
+    if (key === 'amount' && bonus.targetSpend === null) {
+      issues.push({
+        key,
+        token: v.token,
+        reason: "Le bonus ne définit pas d'objectif basé sur le montant dépensé.",
+      })
+    }
+  }
+
+  return issues
+}
+
 /** Extract `[...]` tokens from the body. */
 export function extractBodyTokens(body: string): string[] {
   const matches = body.matchAll(/\[([^[\]]+)\]/g)

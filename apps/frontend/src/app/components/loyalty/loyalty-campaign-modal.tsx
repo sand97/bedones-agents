@@ -1,7 +1,18 @@
 import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
-import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, TimePicker } from 'antd'
+import {
+  Alert,
+  Button,
+  DatePicker,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  TimePicker,
+} from 'antd'
+import { Users } from 'lucide-react'
 import dayjs from 'dayjs'
 import {
   loyaltyApi,
@@ -9,6 +20,7 @@ import {
   type LoyaltyCampaign,
   type LoyaltyCampaignFrequency,
 } from '@app/lib/api/loyalty-api'
+import { findIncompatibleTemplateVariables } from './loyalty-template-variables'
 
 export interface LoyaltyCampaignSubmitData {
   name: string
@@ -64,6 +76,38 @@ export function LoyaltyCampaignModal({
 
   const selectedBonusId = Form.useWatch('bonusId', form)
   const selectedBonus: LoyaltyBonus | undefined = bonuses.find((b) => b.id === selectedBonusId)
+
+  const selectedTemplateId = Form.useWatch('metaTemplateId', form)
+  const selectedTemplate = templates.find((tmpl) => tmpl.id === selectedTemplateId)
+
+  // Live segment thresholds — feed the recipient-count query below.
+  const minSpendValue = Form.useWatch('minSpend', form) as number | undefined
+  const minOrdersValue = Form.useWatch('minOrders', form) as number | undefined
+
+  const variableIssues = useMemo(() => {
+    if (!selectedTemplate || !selectedBonus) return []
+    return findIncompatibleTemplateVariables(selectedTemplate.variables, selectedBonus)
+  }, [selectedTemplate, selectedBonus])
+
+  // ─── Recipient count preview ───
+  // Only fire once the user has touched the criteria (or picked a bonus); avoid
+  // hammering the endpoint on every keystroke by relying on react-query's
+  // built-in dedupe and the fact that the inputs only change on commit.
+  const recipientCountQuery = useQuery({
+    queryKey: [
+      'loyalty-campaign-preview-count',
+      socialAccountId,
+      minSpendValue ?? null,
+      minOrdersValue ?? null,
+    ],
+    queryFn: () =>
+      loyaltyApi.previewCampaignCount(socialAccountId, {
+        minSpend: typeof minSpendValue === 'number' ? minSpendValue : undefined,
+        minOrders: typeof minOrdersValue === 'number' ? minOrdersValue : undefined,
+      }),
+    enabled: open && !!socialAccountId && !!selectedBonusId,
+    staleTime: 30_000,
+  })
 
   const FREQUENCY_OPTIONS = [
     { value: 'ONCE', label: t('loyalty.frequency_once') },
@@ -133,11 +177,29 @@ export function LoyaltyCampaignModal({
       onCancel={onClose}
       width={560}
       footer={
-        <div className="flex items-center justify-end gap-2">
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button type="primary" onClick={handleSubmit} loading={submitLoading}>
-            {isEditing ? t('common.save') : t('common.create')}
-          </Button>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs text-text-secondary">
+            {selectedBonusId && (
+              <>
+                <Users size={14} className="text-text-muted" />
+                {recipientCountQuery.isLoading ? (
+                  <span>{t('loyalty.recipient_count_loading')}</span>
+                ) : (
+                  <span>
+                    {t('loyalty.recipient_count', {
+                      count: recipientCountQuery.data?.count ?? 0,
+                    })}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button onClick={onClose}>{t('common.cancel')}</Button>
+            <Button type="primary" onClick={handleSubmit} loading={submitLoading}>
+              {isEditing ? t('common.save') : t('common.create')}
+            </Button>
+          </div>
         </div>
       }
     >
@@ -208,6 +270,24 @@ export function LoyaltyCampaignModal({
             loading={templatesQuery.isLoading}
           />
         </Form.Item>
+
+        {variableIssues.length > 0 && (
+          <Alert
+            type="warning"
+            showIcon
+            className="mb-4"
+            message={t('loyalty.template_variables_incompatible')}
+            description={
+              <ul className="m-0 pl-4">
+                {variableIssues.map((issue) => (
+                  <li key={issue.key}>
+                    <strong>[{issue.token}]</strong> — {issue.reason}
+                  </li>
+                ))}
+              </ul>
+            }
+          />
+        )}
 
         <Form.Item label={t('loyalty.campaign_frequency')} required className="mb-4">
           <div className="loyalty-frequency-row">

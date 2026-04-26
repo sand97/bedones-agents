@@ -405,6 +405,26 @@ export class LoyaltyService {
 
   // ─── Campaigns ───
 
+  /**
+   * Estimate how many contacts match the given segment criteria — used by the
+   * campaign creation modal to give the admin live feedback as they tune the
+   * thresholds.
+   */
+  async previewCampaignCount(
+    socialAccountId: string,
+    criteria: { minSpend?: number; minOrders?: number },
+  ): Promise<{ count: number }> {
+    const where: Record<string, unknown> = { socialAccountId }
+    if (typeof criteria.minSpend === 'number') {
+      where.totalSpent = { gte: criteria.minSpend }
+    }
+    if (typeof criteria.minOrders === 'number') {
+      where.orderCount = { gte: criteria.minOrders }
+    }
+    const count = await this.prisma.loyaltyContact.count({ where })
+    return { count }
+  }
+
   async listCampaigns(socialAccountId: string) {
     return this.prisma.loyaltyCampaign.findMany({
       where: { socialAccountId },

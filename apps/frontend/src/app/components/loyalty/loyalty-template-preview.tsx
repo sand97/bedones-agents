@@ -65,8 +65,10 @@ export function LoyaltyTemplatePreview({
             <div className="loyalty-preview__header-text">{renderedHeader}</div>
           )}
           {renderedBody && <div className="loyalty-preview__body">{renderedBody}</div>}
-          {footerText && <div className="loyalty-preview__footer">{footerText}</div>}
-          <div className="loyalty-preview__time">12:18</div>
+          <div className="loyalty-preview__meta">
+            {footerText && <span className="loyalty-preview__footer">{footerText}</span>}
+            <span className="loyalty-preview__time">12:18</span>
+          </div>
         </div>
 
         {buttons.length > 0 && (
