@@ -125,6 +125,20 @@ export class UpdateLoyaltyBonusDto {
 
 // ─── Templates (Meta-only — never persisted) ───
 
+export class LoyaltyTemplateButtonDto {
+  @ApiProperty({ enum: ['QUICK_REPLY', 'URL', 'PHONE_NUMBER'] })
+  type: string
+
+  @ApiProperty()
+  text: string
+
+  @ApiPropertyOptional()
+  url?: string
+
+  @ApiPropertyOptional()
+  phoneNumber?: string
+}
+
 export class CreateLoyaltyTemplateDto {
   @ApiProperty()
   socialAccountId: string
@@ -143,6 +157,21 @@ export class CreateLoyaltyTemplateDto {
 
   @ApiPropertyOptional({ type: [String] })
   variables?: string[]
+
+  @ApiPropertyOptional({ enum: ['NONE', 'TEXT', 'IMAGE', 'VIDEO'] })
+  headerType?: string
+
+  @ApiPropertyOptional()
+  headerText?: string
+
+  @ApiPropertyOptional()
+  headerMediaUrl?: string
+
+  @ApiPropertyOptional()
+  footerText?: string
+
+  @ApiPropertyOptional({ type: [LoyaltyTemplateButtonDto] })
+  buttons?: LoyaltyTemplateButtonDto[]
 }
 
 // ─── Campaigns ───

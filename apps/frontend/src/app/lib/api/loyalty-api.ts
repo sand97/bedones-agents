@@ -198,6 +198,16 @@ export const loyaltyApi = {
     category?: string
     body: string
     variables?: string[]
+    headerType?: 'NONE' | 'TEXT' | 'IMAGE' | 'VIDEO'
+    headerText?: string
+    headerMediaUrl?: string
+    footerText?: string
+    buttons?: Array<{
+      type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER'
+      text: string
+      url?: string
+      phoneNumber?: string
+    }>
   }) =>
     fetchJson<LoyaltyTemplate>('/loyalty/templates', {
       method: 'POST',

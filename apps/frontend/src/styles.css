@@ -2229,6 +2229,101 @@ a {
   }
 }
 
+/* ═══════════════════════════════════════════
+   Loyalty page — WhatsApp-style template preview
+   ═══════════════════════════════════════════ */
+
+.loyalty-preview {
+  background: #ece5dd;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><circle cx='20' cy='20' r='1' fill='%23d4cdc4'/></svg>");
+  border-radius: 12px;
+  padding: 16px 12px;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 200px;
+}
+
+.loyalty-preview__bubble {
+  background: #ffffff;
+  border-radius: 8px;
+  max-width: 280px;
+  width: 100%;
+  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.loyalty-preview__media {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  background: #f0f0f0;
+}
+
+.loyalty-preview__media--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.loyalty-preview__content {
+  padding: 8px 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.loyalty-preview__header-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.loyalty-preview__body {
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.loyalty-preview__footer {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.loyalty-preview__time {
+  font-size: 0.625rem;
+  color: var(--color-text-muted);
+  align-self: flex-end;
+  margin-top: 2px;
+}
+
+.loyalty-preview__buttons {
+  border-top: 1px solid #e5e5e5;
+  display: flex;
+  flex-direction: column;
+}
+
+.loyalty-preview__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #00a884;
+  border-top: 1px solid #f0f0f0;
+}
+
+.loyalty-preview__button:first-child {
+  border-top: none;
+}
+
 /* ─── Product Modal Image Remove ─── */
 .product-modal-img-remove {
   position: absolute;
