@@ -872,6 +872,7 @@
     "campaign_template": "Template to send",
     "campaign_select_template": "Pick a template",
     "campaign_frequency": "Send frequency",
+    "campaign_send_time_placeholder": "Send time",
     "campaign_end_date": "End date",
     "campaign_created": "Campaign created",
     "campaign_updated": "Campaign updated",

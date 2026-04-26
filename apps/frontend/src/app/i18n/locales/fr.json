@@ -872,6 +872,7 @@
     "campaign_template": "Template à envoyer",
     "campaign_select_template": "Sélectionnez un template",
     "campaign_frequency": "Fréquence d'envoi",
+    "campaign_send_time_placeholder": "Heure d'envoi",
     "campaign_end_date": "Date de fin",
     "campaign_created": "Campagne créée",
     "campaign_updated": "Campagne mise à jour",
