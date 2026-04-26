@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Divider, Form, Input, Modal, Select, Spin, Tag, Tooltip, Upload } from 'antd'
+import { App, Button, Divider, Form, Input, Modal, Select, Tag, Tooltip, Upload } from 'antd'
 import { Image as ImageIcon, Plus, Trash2, Video as VideoIcon } from 'lucide-react'
 import { uploadChatMedia } from '@app/lib/api'
 import { loyaltyApi, type LoyaltyTemplate } from '@app/lib/api/loyalty-api'
@@ -74,7 +74,10 @@ export function LoyaltyTemplateEditorModal({
   const [form] = Form.useForm()
 
   const [headerType, setHeaderType] = useState<HeaderType>('NONE')
-  const [headerMediaUrl, setHeaderMediaUrl] = useState<string>('')
+  // Local-only file kept until the user clicks Create. The preview uses a
+  // blob: URL so we never hit the network until submission.
+  const [headerMediaFile, setHeaderMediaFile] = useState<File | null>(null)
+  const [headerMediaPreviewUrl, setHeaderMediaPreviewUrl] = useState<string>('')
   const [uploading, setUploading] = useState(false)
   const [buttons, setButtons] = useState<ButtonDraft[]>([])
 
@@ -100,46 +103,85 @@ export function LoyaltyTemplateEditorModal({
     },
   })
 
+  // Revoke any blob: URL we created so we don't leak.
+  const clearMediaPreview = () => {
+    setHeaderMediaPreviewUrl((prev) => {
+      if (prev.startsWith('blob:')) URL.revokeObjectURL(prev)
+      return ''
+    })
+    setHeaderMediaFile(null)
+  }
+
   useEffect(() => {
     if (!open) {
       form.resetFields()
       setHeaderType('NONE')
-      setHeaderMediaUrl('')
+      clearMediaPreview()
       setButtons([])
     } else if (defaultFooter) {
       form.setFieldValue('footerText', defaultFooter)
     }
+    // We intentionally don't include clearMediaPreview in deps — its identity
+    // changes every render but it's safe to use the latest closure here.
   }, [open, form, defaultFooter])
+
+  // Cleanup the blob URL when the component unmounts.
+  useEffect(() => {
+    return () => {
+      if (headerMediaPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(headerMediaPreviewUrl)
+      }
+    }
+  }, [headerMediaPreviewUrl])
 
   // Live form values used by the preview pane.
   const liveBody = (Form.useWatch('body', form) as string | undefined) ?? ''
   const liveHeaderText = (Form.useWatch('headerText', form) as string | undefined) ?? ''
   const liveFooter = (Form.useWatch('footerText', form) as string | undefined) ?? ''
 
-  const handleSubmit = () => {
-    form.validateFields().then((values) => {
-      const tokenBody = values.body as string
-      const metaBody = tokensToMetaPlaceholders(tokenBody)
-      const headerText: string | undefined =
-        headerType === 'TEXT' ? tokensToMetaPlaceholders(values.headerText ?? '') : undefined
-      const mediaUrl: string | undefined =
-        headerType === 'IMAGE' || headerType === 'VIDEO' ? headerMediaUrl || undefined : undefined
+  const handleSubmit = async () => {
+    let values
+    try {
+      values = await form.validateFields()
+    } catch {
+      return
+    }
 
-      // Reject button rows the user added but never filled in.
-      const cleanButtons = buttons.filter((b) => b.text.trim().length > 0)
+    const tokenBody = values.body as string
+    const metaBody = tokensToMetaPlaceholders(tokenBody)
+    const headerText: string | undefined =
+      headerType === 'TEXT' ? tokensToMetaPlaceholders(values.headerText ?? '') : undefined
 
-      createMutation.mutate({
-        name: values.name,
-        body: metaBody,
-        variables: bodyToVariableKeys(tokenBody),
-        language: values.language ?? 'fr',
-        category: values.category ?? 'MARKETING',
-        headerType,
-        headerText,
-        headerMediaUrl: mediaUrl,
-        footerText: (values.footerText as string | undefined)?.trim() || undefined,
-        buttons: cleanButtons,
-      })
+    // Upload the media now (deferred until submission to avoid wasting bandwidth
+    // on files the user might still discard).
+    let mediaUrl: string | undefined
+    if ((headerType === 'IMAGE' || headerType === 'VIDEO') && headerMediaFile) {
+      setUploading(true)
+      try {
+        mediaUrl = await uploadChatMedia(headerMediaFile)
+      } catch {
+        message.error(t('upload.error'))
+        setUploading(false)
+        return
+      } finally {
+        setUploading(false)
+      }
+    }
+
+    // Reject button rows the user added but never filled in.
+    const cleanButtons = buttons.filter((b) => b.text.trim().length > 0)
+
+    createMutation.mutate({
+      name: values.name,
+      body: metaBody,
+      variables: bodyToVariableKeys(tokenBody),
+      language: values.language ?? 'fr',
+      category: values.category ?? 'MARKETING',
+      headerType,
+      headerText,
+      headerMediaUrl: mediaUrl,
+      footerText: (values.footerText as string | undefined)?.trim() || undefined,
+      buttons: cleanButtons,
     })
   }
 
@@ -177,7 +219,11 @@ export function LoyaltyTemplateEditorModal({
       footer={
         <div className="flex items-center justify-end gap-2">
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button type="primary" onClick={handleSubmit} loading={createMutation.isPending}>
+          <Button
+            type="primary"
+            onClick={handleSubmit}
+            loading={uploading || createMutation.isPending}
+          >
             {t('common.create')}
           </Button>
         </div>
@@ -227,7 +273,7 @@ export function LoyaltyTemplateEditorModal({
                 value={headerType}
                 onChange={(val) => {
                   setHeaderType(val)
-                  if (val !== 'IMAGE' && val !== 'VIDEO') setHeaderMediaUrl('')
+                  if (val !== 'IMAGE' && val !== 'VIDEO') clearMediaPreview()
                   if (val !== 'TEXT') form.setFieldValue('headerText', undefined)
                 }}
                 options={HEADER_TYPE_OPTIONS}
@@ -254,17 +300,17 @@ export function LoyaltyTemplateEditorModal({
                   headerType === 'IMAGE' ? t('loyalty.header_image') : t('loyalty.header_video')
                 }
               >
-                {headerMediaUrl ? (
+                {headerMediaPreviewUrl ? (
                   <div className="flex items-center gap-3">
                     {headerType === 'IMAGE' ? (
                       <img
-                        src={headerMediaUrl}
+                        src={headerMediaPreviewUrl}
                         alt="header"
                         className="h-20 w-20 rounded-lg object-cover"
                       />
                     ) : (
                       <video
-                        src={headerMediaUrl}
+                        src={headerMediaPreviewUrl}
                         className="h-20 w-32 rounded-lg object-cover"
                         muted
                       />
@@ -273,7 +319,7 @@ export function LoyaltyTemplateEditorModal({
                       size="small"
                       danger
                       icon={<Trash2 size={14} />}
-                      onClick={() => setHeaderMediaUrl('')}
+                      onClick={clearMediaPreview}
                     >
                       {t('common.delete')}
                     </Button>
@@ -282,16 +328,12 @@ export function LoyaltyTemplateEditorModal({
                   <Upload.Dragger
                     showUploadList={false}
                     accept={headerType === 'IMAGE' ? '.jpg,.jpeg,.png,.webp' : '.mp4,.mov'}
-                    beforeUpload={async (file) => {
-                      setUploading(true)
-                      try {
-                        const url = await uploadChatMedia(file)
-                        setHeaderMediaUrl(url)
-                      } catch {
-                        message.error(t('upload.error'))
-                      } finally {
-                        setUploading(false)
-                      }
+                    beforeUpload={(file) => {
+                      // Stage the file locally, no network call yet.
+                      // Actual upload happens on Create.
+                      clearMediaPreview()
+                      setHeaderMediaFile(file)
+                      setHeaderMediaPreviewUrl(URL.createObjectURL(file))
                       return false
                     }}
                     customRequest={() => {}}
@@ -303,11 +345,9 @@ export function LoyaltyTemplateEditorModal({
                         <VideoIcon size={24} className="text-text-muted" />
                       )}
                       <span className="text-sm font-medium text-text-primary">
-                        {uploading
-                          ? t('common.loading')
-                          : headerType === 'IMAGE'
-                            ? t('loyalty.header_upload_image')
-                            : t('loyalty.header_upload_video')}
+                        {headerType === 'IMAGE'
+                          ? t('loyalty.header_upload_image')
+                          : t('loyalty.header_upload_video')}
                       </span>
                     </div>
                   </Upload.Dragger>
@@ -472,20 +512,14 @@ export function LoyaltyTemplateEditorModal({
             {t('loyalty.preview_title')}
           </div>
           <div className="text-xs text-text-muted mb-3">{t('loyalty.preview_hint')}</div>
-          {uploading ? (
-            <div className="flex items-center justify-center py-12">
-              <Spin />
-            </div>
-          ) : (
-            <LoyaltyTemplatePreview
-              headerType={headerType}
-              headerText={liveHeaderText}
-              headerMediaUrl={headerMediaUrl}
-              body={liveBody}
-              footerText={liveFooter}
-              buttons={previewButtons}
-            />
-          )}
+          <LoyaltyTemplatePreview
+            headerType={headerType}
+            headerText={liveHeaderText}
+            headerMediaUrl={headerMediaPreviewUrl}
+            body={liveBody}
+            footerText={liveFooter}
+            buttons={previewButtons}
+          />
         </div>
       </div>
     </Modal>
