@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Modal, Tag } from 'antd'
-import { Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { App, Button, Modal, Spin, Tag } from 'antd'
+import { Plus, Trash2 } from 'lucide-react'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { WhatsAppIcon } from '@app/components/icons/social-icons'
 import { loyaltyApi, type LoyaltyTemplate } from '@app/lib/api/loyalty-api'
 import { LoyaltyTemplateEditorModal } from './loyalty-template-editor-modal'
+import { metaPlaceholdersToTokens } from './loyalty-template-variables'
 
 interface Props {
   open: boolean
@@ -14,13 +15,17 @@ interface Props {
   socialAccountId: string
 }
 
+/**
+ * Templates are fetched live from Meta — never cached in our DB.
+ * We use staleTime: Infinity so we don't hammer Meta on every modal open;
+ * a manual refresh happens after create/delete via setQueryData / invalidate.
+ */
 export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) {
   const { t } = useTranslation()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
 
   const [editorOpen, setEditorOpen] = useState(false)
-  const [editing, setEditing] = useState<LoyaltyTemplate | null>(null)
 
   const queryKey = useMemo(() => ['loyalty-templates', socialAccountId], [socialAccountId])
 
@@ -28,38 +33,21 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) 
     queryKey,
     queryFn: () => loyaltyApi.listTemplates(socialAccountId),
     enabled: open && !!socialAccountId,
-  })
-
-  const syncMutation = useMutation({
-    mutationFn: () => loyaltyApi.syncTemplates(socialAccountId),
-    onSuccess: (templates) => {
-      queryClient.setQueryData<LoyaltyTemplate[]>(queryKey, templates)
-      message.success(t('loyalty.templates_synced'))
-    },
+    staleTime: Infinity,
   })
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await loyaltyApi.removeTemplate(id)
-      return id
+    mutationFn: async ({ name }: { name: string }) => {
+      await loyaltyApi.removeTemplate(socialAccountId, name)
+      return name
     },
-    onSuccess: (id) => {
+    onSuccess: (name) => {
       queryClient.setQueryData<LoyaltyTemplate[]>(queryKey, (prev) =>
-        (prev ?? []).filter((tmpl) => tmpl.id !== id),
+        (prev ?? []).filter((tmpl) => tmpl.name !== name),
       )
       message.success(t('common.delete'))
     },
   })
-
-  const handleCreate = () => {
-    setEditing(null)
-    setEditorOpen(true)
-  }
-
-  const handleEdit = (tmpl: LoyaltyTemplate) => {
-    setEditing(tmpl)
-    setEditorOpen(true)
-  }
 
   const handleDelete = (tmpl: LoyaltyTemplate) => {
     Modal.confirm({
@@ -68,7 +56,7 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) 
       okText: t('common.delete'),
       okButtonProps: { danger: true },
       cancelText: t('common.cancel'),
-      onOk: () => deleteMutation.mutateAsync(tmpl.id),
+      onOk: () => deleteMutation.mutateAsync({ name: tmpl.name }),
     })
   }
 
@@ -86,21 +74,18 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) 
         footer={
           showEmpty ? null : (
             <div className="flex items-center justify-end gap-2">
-              <Button
-                icon={<RefreshCw size={14} />}
-                onClick={() => syncMutation.mutate()}
-                loading={syncMutation.isPending}
-              >
-                {t('loyalty.templates_sync')}
-              </Button>
-              <Button type="primary" icon={<Plus size={14} />} onClick={handleCreate}>
+              <Button type="primary" icon={<Plus size={14} />} onClick={() => setEditorOpen(true)}>
                 {t('loyalty.template_create')}
               </Button>
             </div>
           )
         }
       >
-        {showEmpty ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Spin />
+          </div>
+        ) : showEmpty ? (
           <SocialSetup
             icon={<WhatsAppIcon width={40} height={40} />}
             color="var(--color-brand-whatsapp)"
@@ -108,11 +93,7 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) 
             description={t('loyalty.templates_empty_desc')}
             buttonLabel={t('loyalty.template_create')}
             buttonIcon={<Plus size={18} />}
-            onAction={handleCreate}
-            secondaryButtonLabel={t('loyalty.templates_sync_meta')}
-            secondaryButtonIcon={<RefreshCw size={16} />}
-            secondaryLoading={syncMutation.isPending}
-            onSecondaryAction={() => syncMutation.mutate()}
+            onAction={() => setEditorOpen(true)}
           />
         ) : (
           <div className="flex flex-col gap-2" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
@@ -125,7 +106,9 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) 
                   <div className="truncate text-sm font-semibold text-text-primary">
                     {tmpl.name}
                   </div>
-                  <div className="mt-1 line-clamp-2 text-xs text-text-secondary">{tmpl.body}</div>
+                  <div className="mt-1 line-clamp-2 text-xs text-text-secondary">
+                    {metaPlaceholdersToTokens(tmpl.body)}
+                  </div>
                   <div className="mt-2 flex items-center gap-1">
                     <Tag bordered={false} color="default">
                       {tmpl.language}
@@ -134,18 +117,13 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) 
                     <Tag bordered={false}>{tmpl.status}</Tag>
                   </div>
                 </div>
-                <div className="flex flex-shrink-0 items-center gap-1">
-                  <Button size="small" onClick={() => handleEdit(tmpl)}>
-                    {t('common.edit')}
-                  </Button>
-                  <Button
-                    size="small"
-                    type="text"
-                    danger
-                    icon={<Trash2 size={12} />}
-                    onClick={() => handleDelete(tmpl)}
-                  />
-                </div>
+                <Button
+                  size="small"
+                  type="text"
+                  danger
+                  icon={<Trash2 size={12} />}
+                  onClick={() => handleDelete(tmpl)}
+                />
               </div>
             ))}
           </div>
@@ -154,12 +132,8 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) 
 
       <LoyaltyTemplateEditorModal
         open={editorOpen}
-        onClose={() => {
-          setEditorOpen(false)
-          setEditing(null)
-        }}
+        onClose={() => setEditorOpen(false)}
         socialAccountId={socialAccountId}
-        editingTemplate={editing}
       />
     </>
   )

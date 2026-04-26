@@ -213,7 +213,6 @@ model SocialAccount {
 
   loyaltyContacts  LoyaltyContact[]
   loyaltyBonuses   LoyaltyBonus[]
-  loyaltyTemplates LoyaltyTemplate[]
   loyaltyCampaigns LoyaltyCampaign[]
 
   @@unique([provider, providerAccountId])
@@ -742,34 +741,18 @@ model LoyaltyBonusRewardProduct {
   @@index([productId])
 }
 
-model LoyaltyTemplate {
-  id              String        @id @default(uuid())
-  socialAccountId String
-  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
-  metaTemplateId  String?
-  name            String
-  language        String        @default("fr")
-  category        String        @default("MARKETING")
-  body            String
-  variables       String[]      @default([])
-  status          String        @default("PENDING") // PENDING | APPROVED | REJECTED
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  campaigns LoyaltyCampaign[]
-
-  @@unique([socialAccountId, name, language])
-  @@index([socialAccountId])
-}
-
 model LoyaltyCampaign {
   id              String                  @id @default(uuid())
   socialAccountId String
   socialAccount   SocialAccount           @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
   bonusId         String
   bonus           LoyaltyBonus            @relation(fields: [bonusId], references: [id], onDelete: Cascade)
-  templateId      String?
-  template        LoyaltyTemplate?        @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  // Meta WhatsApp template reference (templates are NOT persisted in our DB —
+  // they live on Meta and we only keep the identifiers needed to send).
+  metaTemplateId       String?
+  metaTemplateName     String?
+  metaTemplateLanguage String?
 
   name            String
   status          LoyaltyCampaignStatus    @default(SCHEDULED)

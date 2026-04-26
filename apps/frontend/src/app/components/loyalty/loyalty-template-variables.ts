@@ -58,6 +58,31 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
 ]
 
 const TOKEN_TO_VAR = new Map(TEMPLATE_VARIABLES.map((v) => [v.token, v]))
+const KEY_TO_VAR = new Map(TEMPLATE_VARIABLES.map((v) => [v.key, v]))
+
+/**
+ * Replace human tokens like `[Nom du client]` with Meta named placeholders
+ * like `{{customer_name}}` (what Meta actually wants in template bodies).
+ * Unknown tokens are left untouched.
+ */
+export function tokensToMetaPlaceholders(body: string): string {
+  return body.replace(/\[([^[\]]+)\]/g, (match, raw) => {
+    const v = TOKEN_TO_VAR.get(String(raw).trim())
+    return v ? `{{${v.key}}}` : match
+  })
+}
+
+/**
+ * Reverse of `tokensToMetaPlaceholders`: turn `{{customer_name}}` back into
+ * `[Nom du client]` so users see human-readable text. Unknown placeholders
+ * are left as-is.
+ */
+export function metaPlaceholdersToTokens(body: string): string {
+  return body.replace(/{{\s*([^}]+?)\s*}}/g, (match, key) => {
+    const v = KEY_TO_VAR.get(String(key).trim())
+    return v ? `[${v.token}]` : match
+  })
+}
 
 /** Extract `[...]` tokens from the body. */
 export function extractBodyTokens(body: string): string[] {

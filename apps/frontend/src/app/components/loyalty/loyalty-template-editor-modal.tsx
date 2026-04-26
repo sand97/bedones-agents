@@ -8,14 +8,13 @@ import {
   bodyToVariableKeys,
   findUnknownTokens,
   formatTemplateName,
+  tokensToMetaPlaceholders,
 } from './loyalty-template-variables'
 
 interface Props {
   open: boolean
   onClose: () => void
   socialAccountId: string
-  /** When provided, the modal opens in edit mode. */
-  editingTemplate?: LoyaltyTemplate | null
 }
 
 const CATEGORY_OPTIONS = [
@@ -28,19 +27,17 @@ const LANGUAGE_OPTIONS = [
   { value: 'en', label: 'English' },
 ]
 
-export function LoyaltyTemplateEditorModal({
-  open,
-  onClose,
-  socialAccountId,
-  editingTemplate,
-}: Props) {
+/**
+ * Create-only modal — templates are submitted to Meta and enter their review
+ * queue. Meta does not support seamless edits, so we don't expose an edit flow.
+ */
+export function LoyaltyTemplateEditorModal({ open, onClose, socialAccountId }: Props) {
   const { t } = useTranslation()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
   const [form] = Form.useForm()
 
   const queryKey = ['loyalty-templates', socialAccountId]
-  const isEditing = !!editingTemplate
 
   const createMutation = useMutation({
     mutationFn: (payload: {
@@ -57,54 +54,23 @@ export function LoyaltyTemplateEditorModal({
     },
   })
 
-  const updateMutation = useMutation({
-    mutationFn: ({
-      id,
-      payload,
-    }: {
-      id: string
-      payload: { name: string; body: string; variables: string[] }
-    }) => loyaltyApi.updateTemplate(id, payload),
-    onSuccess: (updated) => {
-      queryClient.setQueryData<LoyaltyTemplate[]>(queryKey, (prev) =>
-        (prev ?? []).map((tmpl) => (tmpl.id === updated.id ? updated : tmpl)),
-      )
-      message.success(t('loyalty.template_updated'))
-      onClose()
-    },
-  })
-
   useEffect(() => {
-    if (!open) return
-    if (editingTemplate) {
-      form.setFieldsValue({
-        name: editingTemplate.name,
-        language: editingTemplate.language,
-        category: CATEGORY_OPTIONS.some((o) => o.value === editingTemplate.category)
-          ? editingTemplate.category
-          : 'MARKETING',
-        body: editingTemplate.body,
-      })
-    } else {
-      form.resetFields()
-    }
-  }, [open, editingTemplate, form])
+    if (!open) form.resetFields()
+  }, [open, form])
 
   const handleSubmit = () => {
     form.validateFields().then((values) => {
-      const body = values.body as string
-      const payload = {
+      const tokenBody = values.body as string
+      // Convert human tokens ([Nom du client]) to Meta named placeholders ({{customer_name}})
+      // before pushing the template to Meta's API.
+      const metaBody = tokensToMetaPlaceholders(tokenBody)
+      createMutation.mutate({
         name: values.name,
-        body,
-        variables: bodyToVariableKeys(body),
+        body: metaBody,
+        variables: bodyToVariableKeys(tokenBody),
         language: values.language ?? 'fr',
         category: values.category ?? 'MARKETING',
-      }
-      if (isEditing && editingTemplate) {
-        updateMutation.mutate({ id: editingTemplate.id, payload })
-      } else {
-        createMutation.mutate(payload)
-      }
+      })
     })
   }
 
@@ -113,13 +79,12 @@ export function LoyaltyTemplateEditorModal({
     const sep = current.length > 0 && !/\s$/.test(current) ? ' ' : ''
     const next = `${current}${sep}[${token}]`
     form.setFieldValue('body', next)
-    // Re-validate so any "unknown token" error clears immediately.
     form.validateFields(['body']).catch(() => undefined)
   }
 
   return (
     <Modal
-      title={isEditing ? t('loyalty.template_edit') : t('loyalty.template_create')}
+      title={t('loyalty.template_create')}
       open={open}
       onCancel={onClose}
       width={620}
@@ -127,12 +92,8 @@ export function LoyaltyTemplateEditorModal({
       footer={
         <div className="flex items-center justify-end gap-2">
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            type="primary"
-            onClick={handleSubmit}
-            loading={createMutation.isPending || updateMutation.isPending}
-          >
-            {isEditing ? t('common.save') : t('common.create')}
+          <Button type="primary" onClick={handleSubmit} loading={createMutation.isPending}>
+            {t('common.create')}
           </Button>
         </div>
       }
@@ -180,7 +141,7 @@ export function LoyaltyTemplateEditorModal({
                 return Promise.reject(
                   new Error(
                     t('loyalty.template_unknown_variables', {
-                      tokens: unknown.map((t) => `[${t}]`).join(', '),
+                      tokens: unknown.map((tok) => `[${tok}]`).join(', '),
                     }),
                   ),
                 )
