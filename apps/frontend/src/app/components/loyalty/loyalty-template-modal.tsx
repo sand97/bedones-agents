@@ -152,20 +152,14 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) 
           color="var(--color-brand-whatsapp)"
           title={t('loyalty.templates_empty_title')}
           description={t('loyalty.templates_empty_desc')}
-          buttonLabel={t('loyalty.templates_sync_meta')}
-          buttonIcon={<RefreshCw size={16} />}
-          loading={syncMutation.isPending}
-          onAction={() => syncMutation.mutate()}
-        >
-          <Button
-            type="default"
-            onClick={() => setCreating(true)}
-            icon={<Plus size={14} />}
-            className="mb-4"
-          >
-            {t('loyalty.template_create')}
-          </Button>
-        </SocialSetup>
+          buttonLabel={t('loyalty.template_create')}
+          buttonIcon={<Plus size={18} />}
+          onAction={() => setCreating(true)}
+          secondaryButtonLabel={t('loyalty.templates_sync_meta')}
+          secondaryButtonIcon={<RefreshCw size={16} />}
+          secondaryLoading={syncMutation.isPending}
+          onSecondaryAction={() => syncMutation.mutate()}
+        />
       ) : (
         <div className="flex" style={{ minHeight: 480 }}>
           {/* Left: editor */}
