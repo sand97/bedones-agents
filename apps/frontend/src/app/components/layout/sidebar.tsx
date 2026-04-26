@@ -11,7 +11,6 @@ import {
   LifeBuoy,
   User,
   LogOut,
-  Bell,
   Languages,
   LayoutDashboard,
 } from 'lucide-react'
@@ -191,7 +190,7 @@ export function Sidebar() {
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
   const location = useLocation()
   const router = useRouter()
-  const isProfileActive = location.pathname.includes(`/${orgSlug}/notifications`)
+  const isProfileActive = false
   const meQuery = $api.useQuery('get', '/auth/me')
   const currentUser = meQuery.data?.user
   const userName = currentUser?.name ?? ''
@@ -341,19 +340,6 @@ export function Sidebar() {
                     icon={<LayoutDashboard size={16} strokeWidth={1} />}
                   >
                     {t('sidebar.recap')}
-                  </Button>
-                  <Button
-                    type={'text'}
-                    onClick={() => {
-                      if (!isDesktop) setMobileMenuOpen(false)
-                      navigate({
-                        to: '/app/$orgSlug/notifications' as string,
-                        params: { orgSlug },
-                      })
-                    }}
-                    icon={<Bell size={16} strokeWidth={1} />}
-                  >
-                    {t('sidebar.notification_prefs')}
                   </Button>
                   <Button
                     type={'text'}

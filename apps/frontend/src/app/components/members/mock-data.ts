@@ -3,8 +3,11 @@ export type MemberStatus = 'active' | 'invited'
 
 export interface Member {
   id: string
+  userId: string
   name: string
+  email?: string
   phone?: string
+  avatar?: string
   role: MemberRole
   status: MemberStatus
   avatarColor: string
@@ -33,6 +36,7 @@ export function mapApiMember(
     user: {
       id: string
       name: string
+      email?: unknown
       phone?: unknown
       avatar?: unknown
     }
@@ -41,8 +45,11 @@ export function mapApiMember(
 ): Member {
   return {
     id: apiMember.id,
+    userId: apiMember.user.id,
     name: apiMember.user.name,
+    email: (apiMember.user.email as string) || undefined,
     phone: (apiMember.user.phone as string) || undefined,
+    avatar: (apiMember.user.avatar as string) || undefined,
     role: apiMember.role.toLowerCase() as MemberRole,
     status: apiMember.status.toLowerCase() as MemberStatus,
     avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],

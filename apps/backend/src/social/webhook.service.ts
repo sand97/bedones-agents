@@ -866,6 +866,22 @@ export class WebhookService {
 
         const phoneNumberId = value.metadata.phone_number_id
 
+        // Inbound on the CORE Bedones number → not tied to any org's
+        // SocialAccount. These are replies from members on the daily opt-in
+        // template. Emit so WhatsappOptinService can refresh their window.
+        const coreNumberId = process.env.CORE_WHATSAPP_NUMBER_ID
+        if (coreNumberId && phoneNumberId === coreNumberId) {
+          for (const msg of value.messages || []) {
+            const reply = msg.interactive?.button_reply ?? msg.interactive?.list_reply
+            this.eventEmitter.emit('whatsapp.core.inbound', {
+              senderPhone: msg.from,
+              buttonId: reply?.id,
+              buttonTitle: reply?.title,
+            })
+          }
+          continue
+        }
+
         // Find the social account for this phone number
         const socialAccount = await this.prisma.socialAccount.findFirst({
           where: { provider: 'WHATSAPP', providerAccountId: phoneNumberId },
@@ -1983,6 +1999,11 @@ interface WhatsAppMessage {
       item_price: number | string
       currency: string
     }>
+  }
+  interactive?: {
+    type: string
+    button_reply?: { id: string; title: string }
+    list_reply?: { id: string; title: string; description?: string }
   }
   context?: { id?: string; from?: string }
 }

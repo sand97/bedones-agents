@@ -14,10 +14,11 @@ const DEFAULT_TICKET_STATUSES = [
 export class OrganisationService {
   constructor(private prisma: PrismaService) {}
 
-  async create(userId: string, name: string) {
+  async create(userId: string, name: string, timezone?: string) {
     return this.prisma.organisation.create({
       data: {
         name,
+        ...(timezone ? { timezone } : {}),
         members: {
           create: {
             userId,

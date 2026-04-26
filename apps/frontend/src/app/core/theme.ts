@@ -11,6 +11,9 @@ export const antdProviderProps: ConfigProviderProps = {
         "-apple-system, 'SF Pro Display', 'SF Pro Text', 'Geist', ui-sans-serif, system-ui, sans-serif",
       colorText: '#111b21',
       colorTextSecondary: '#494949',
+      colorTextTertiary: '#8c8c8c',
+      colorBorder: '#e5e7eb',
+      colorBorderSecondary: '#f0f0f0',
       colorBgLayout: 'transparent',
     },
     components: {
@@ -39,6 +42,10 @@ export const antdProviderProps: ConfigProviderProps = {
       Card: {
         borderRadiusLG: 16,
         boxShadowTertiary: '0px 0px 1px 0px rgba(0,0,0,0.08)',
+      },
+      Table: {
+        rowSelectedBg: '#f5f5f5',
+        rowSelectedHoverBg: '#e5e5e5',
       },
     },
   },

@@ -1,7 +1,7 @@
 import { createContext, useContext, useCallback, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AppLocale } from '@app/i18n'
-import { persistLocale } from '@app/i18n'
+import { persistLocale, persistLocaleToServer } from '@app/i18n'
 
 interface LocaleContextType {
   locale: AppLocale
@@ -19,6 +19,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     (newLocale: AppLocale) => {
       i18n.changeLanguage(newLocale)
       persistLocale(newLocale)
+      persistLocaleToServer(newLocale)
       if (typeof document !== 'undefined') document.documentElement.lang = newLocale
     },
     [i18n],

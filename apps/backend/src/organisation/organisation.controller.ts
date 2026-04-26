@@ -19,7 +19,7 @@ export class OrganisationController {
   @ApiBody({ type: CreateOrganisationDto })
   @ApiCreatedResponse({ type: OrganisationResponseDto })
   async create(@CurrentUser() user: { id: string }, @Body() body: CreateOrganisationDto) {
-    return this.organisationService.create(user.id, body.name)
+    return this.organisationService.create(user.id, body.name, body.timezone)
   }
 
   @Patch(':id')

@@ -18,6 +18,8 @@ import { TicketModule } from './ticket/ticket.module'
 import { PromotionModule } from './promotion/promotion.module'
 import { ImageProcessingModule } from './image-processing/image-processing.module'
 import { StatsModule } from './stats/stats.module'
+import { NotificationPreferenceModule } from './notification-preference/notification-preference.module'
+import { WhatsappOptinModule } from './whatsapp-optin/whatsapp-optin.module'
 import { LlmModule } from './common/llm/llm.module'
 
 @Module({
@@ -47,6 +49,8 @@ import { LlmModule } from './common/llm/llm.module'
     PromotionModule,
     ImageProcessingModule,
     StatsModule,
+    NotificationPreferenceModule,
+    WhatsappOptinModule,
   ],
   controllers: [AppController],
 })

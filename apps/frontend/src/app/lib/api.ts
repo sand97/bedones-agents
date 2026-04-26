@@ -50,8 +50,14 @@ export async function logout(): Promise<void> {
 }
 
 export async function createOrganisation(name: string): Promise<OrganisationResponse> {
+  // Capture the user's IANA timezone so the backend's hourly opt-in cron can
+  // fire at 8 AM local time for this org. Falls back to a sane default
+  // server-side if absent or invalid.
+  const timezone =
+    typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined
+
   const { data, error } = await apiClient.POST('/organisations', {
-    body: { name },
+    body: { name, ...(timezone ? { timezone } : {}) } as { name: string; timezone?: string },
   })
 
   if (error) {

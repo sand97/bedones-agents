@@ -168,6 +168,27 @@
         ]
       }
     },
+    "/auth/me/locale": {
+      "patch": {
+        "operationId": "AuthController_updateLocale",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
@@ -3106,6 +3127,139 @@
           "Promotion"
         ]
       }
+    },
+    "/notification-preferences/org/{organisationId}": {
+      "get": {
+        "operationId": "NotificationPreferenceController_getForOrg",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userIds",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "NotificationPreference"
+        ]
+      }
+    },
+    "/notification-preferences/org/{organisationId}/bulk": {
+      "post": {
+        "operationId": "NotificationPreferenceController_bulkUpdate",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpdateNotificationPreferenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "NotificationPreference"
+        ]
+      }
+    },
+    "/whatsapp-optin/status": {
+      "get": {
+        "operationId": "WhatsappOptinController_status",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WhatsAppOptIn"
+        ]
+      }
+    },
+    "/whatsapp-optin/template/send": {
+      "post": {
+        "operationId": "WhatsappOptinController_sendTemplate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendTemplateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WhatsAppOptIn"
+        ]
+      }
+    },
+    "/whatsapp-optin/tick": {
+      "post": {
+        "operationId": "WhatsappOptinController_tick",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WhatsAppOptIn"
+        ]
+      }
     }
   },
   "info": {
@@ -3344,6 +3498,11 @@
           "name": {
             "type": "string",
             "example": "Mon entreprise"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Africa/Douala",
+            "description": "IANA timezone"
           }
         },
         "required": [
@@ -3494,6 +3653,10 @@
           "logoUrl": {
             "type": "string",
             "example": "https://minio.bedones.local/logos/logo.png"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Africa/Douala"
           }
         }
       },
@@ -4974,6 +5137,47 @@
             "type": "boolean"
           }
         }
+      },
+      "BulkUpdateNotificationPreferenceDto": {
+        "type": "object",
+        "properties": {
+          "userIds": {
+            "description": "Organisation members user IDs to apply the change to",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "socialAccountId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "COMMENT_TO_READ",
+              "COMMENT_AI_SUGGESTION",
+              "COMMENT_DAILY_SUMMARY",
+              "MESSAGE_TO_READ",
+              "MESSAGE_AI_SUGGESTION",
+              "MESSAGE_TICKET_CREATED",
+              "MESSAGE_TICKET_CLOSED",
+              "MESSAGE_DAILY_SUMMARY"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "userIds",
+          "socialAccountId",
+          "type",
+          "enabled"
+        ]
+      },
+      "SendTemplateBody": {
+        "type": "object",
+        "properties": {}
       }
     }
   }
