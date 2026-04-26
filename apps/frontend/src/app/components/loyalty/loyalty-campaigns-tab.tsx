@@ -12,15 +12,20 @@ import { LoyaltyTemplateModal } from './loyalty-template-modal'
 
 interface Props {
   socialAccountId: string
+  templatesOpen: boolean
+  onTemplatesOpenChange: (open: boolean) => void
 }
 
-export function LoyaltyCampaignsTab({ socialAccountId }: Props) {
+export function LoyaltyCampaignsTab({
+  socialAccountId,
+  templatesOpen,
+  onTemplatesOpenChange,
+}: Props) {
   const { t } = useTranslation()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
 
   const [modalOpen, setModalOpen] = useState(false)
-  const [templatesOpen, setTemplatesOpen] = useState(false)
   const [editing, setEditing] = useState<LoyaltyCampaign | null>(null)
 
   const queryKey = useMemo(() => ['loyalty-campaigns', socialAccountId], [socialAccountId])
@@ -205,7 +210,7 @@ export function LoyaltyCampaignsTab({ socialAccountId }: Props) {
         </Button>
         <Button
           icon={<FileText size={16} strokeWidth={1.5} />}
-          onClick={() => setTemplatesOpen(true)}
+          onClick={() => onTemplatesOpenChange(true)}
         >
           {t('loyalty.templates')}
         </Button>
@@ -236,7 +241,7 @@ export function LoyaltyCampaignsTab({ socialAccountId }: Props) {
 
       <LoyaltyTemplateModal
         open={templatesOpen}
-        onClose={() => setTemplatesOpen(false)}
+        onClose={() => onTemplatesOpenChange(false)}
         socialAccountId={socialAccountId}
       />
     </>

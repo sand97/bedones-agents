@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { createFileRoute, useParams } from '@tanstack/react-router'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { Segmented } from 'antd'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
@@ -13,22 +13,40 @@ import { LoyaltyCampaignsTab } from '@app/components/loyalty/loyalty-campaigns-t
 import { launchWhatsAppSignup } from '@app/lib/facebook-sdk'
 import { useQueryClient } from '@tanstack/react-query'
 
+const VALID_TABS = ['contacts', 'bonus', 'campaigns'] as const
+type LoyaltyTab = (typeof VALID_TABS)[number]
+
 export const Route = createFileRoute('/app/$orgSlug/loyalty')({
   component: LoyaltyPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: VALID_TABS.includes(search.tab as LoyaltyTab) ? (search.tab as LoyaltyTab) : undefined,
+    account: (search.account as string) || undefined,
+    templates: search.templates === '1' || search.templates === 1 ? '1' : undefined,
+  }),
 })
 
 const ICON_SIZE = 40
 
-type LoyaltyTab = 'contacts' | 'bonus' | 'campaigns'
-
 function LoyaltyPage() {
   const { t } = useTranslation()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
+  const search = useSearch({ from: '/app/$orgSlug/loyalty' })
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const [activeTab, setActiveTab] = useState<LoyaltyTab>('contacts')
-  const [currentAccountId, setCurrentAccountId] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
+
+  const updateSearch = useCallback(
+    (updates: Record<string, string | undefined>) => {
+      navigate({
+        search: (prev: Record<string, unknown>) => ({ ...prev, ...updates }) as never,
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const activeTab: LoyaltyTab = search.tab ?? 'contacts'
 
   const accountsQuery = $api.useQuery('get', '/social/accounts/{organisationId}', {
     params: { path: { organisationId: orgSlug } },
@@ -40,7 +58,15 @@ function LoyaltyPage() {
   )
 
   const currentAccount =
-    whatsappAccounts.find((a) => a.id === currentAccountId) || whatsappAccounts[0] || null
+    whatsappAccounts.find((a) => a.id === search.account) || whatsappAccounts[0] || null
+
+  // Sync URL with first available account when none selected (or selected one is gone)
+  useEffect(() => {
+    if (whatsappAccounts.length === 0) return
+    if (!search.account || !whatsappAccounts.some((a) => a.id === search.account)) {
+      updateSearch({ account: whatsappAccounts[0].id })
+    }
+  }, [whatsappAccounts, search.account, updateSearch])
 
   const connectMutation = $api.useMutation('post', '/social/connect/whatsapp')
 
@@ -106,6 +132,8 @@ function LoyaltyPage() {
   const currentSwitcherItem =
     accountSwitcherItems.find((a) => a.id === currentAccount.id) || accountSwitcherItems[0]
 
+  const templatesOpen = search.templates === '1'
+
   return (
     <div className="flex min-h-screen flex-col">
       <DashboardHeader
@@ -116,7 +144,7 @@ function LoyaltyPage() {
             currentAccount={currentSwitcherItem}
             connectLabel={t('loyalty.connect_label')}
             icon={<WhatsAppIcon width={20} height={20} />}
-            onSwitch={(a) => setCurrentAccountId(a.id)}
+            onSwitch={(a) => updateSearch({ account: a.id })}
             onConnect={handleConnect}
           />
         }
@@ -127,7 +155,7 @@ function LoyaltyPage() {
           <Segmented
             className="pricing-billing-toggle"
             value={activeTab}
-            onChange={(val) => setActiveTab(val as LoyaltyTab)}
+            onChange={(val) => updateSearch({ tab: val as LoyaltyTab })}
             options={[
               { label: t('loyalty.tab_contacts'), value: 'contacts' },
               { label: t('loyalty.tab_bonus'), value: 'bonus' },
@@ -142,7 +170,13 @@ function LoyaltyPage() {
         {activeTab === 'bonus' && (
           <LoyaltyBonusTab socialAccountId={currentAccount.id} orgSlug={orgSlug} />
         )}
-        {activeTab === 'campaigns' && <LoyaltyCampaignsTab socialAccountId={currentAccount.id} />}
+        {activeTab === 'campaigns' && (
+          <LoyaltyCampaignsTab
+            socialAccountId={currentAccount.id}
+            templatesOpen={templatesOpen}
+            onTemplatesOpenChange={(open) => updateSearch({ templates: open ? '1' : undefined })}
+          />
+        )}
       </div>
     </div>
   )
