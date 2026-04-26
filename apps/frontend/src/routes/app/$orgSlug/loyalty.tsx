@@ -125,6 +125,7 @@ function LoyaltyPage() {
       <div className="flex-1 p-4 pb-16 lg:p-6 lg:pb-16">
         <div className="mb-4">
           <Segmented
+            className="pricing-billing-toggle"
             value={activeTab}
             onChange={(val) => setActiveTab(val as LoyaltyTab)}
             options={[
