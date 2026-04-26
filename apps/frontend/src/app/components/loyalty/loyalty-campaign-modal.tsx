@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
-import { Button, DatePicker, Form, Input, InputNumber, Modal, Select } from 'antd'
+import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, TimePicker } from 'antd'
 import dayjs from 'dayjs'
 import {
   loyaltyApi,
@@ -17,6 +17,8 @@ export interface LoyaltyCampaignSubmitData {
   metaTemplateName?: string
   metaTemplateLanguage?: string
   frequency: LoyaltyCampaignFrequency
+  /** HH:mm — local hour at which the campaign sends each tick. */
+  sendTime?: string
   segmentCriteria: Record<string, unknown>
   startDate?: string
   endDate?: string
@@ -74,11 +76,13 @@ export function LoyaltyCampaignModal({
     if (!open) return
     if (editingCampaign) {
       const criteria = (editingCampaign.segmentCriteria as Record<string, unknown> | null) ?? {}
+      const persistedSendTime = (criteria.sendTime as string | undefined) ?? undefined
       form.setFieldsValue({
         name: editingCampaign.name,
         bonusId: editingCampaign.bonusId,
         metaTemplateId: editingCampaign.metaTemplateId ?? undefined,
         frequency: editingCampaign.frequency,
+        sendTime: persistedSendTime ? dayjs(persistedSendTime, 'HH:mm') : undefined,
         endDate: editingCampaign.endDate ? dayjs(editingCampaign.endDate) : undefined,
         minSpend: criteria.minSpend,
         minOrders: criteria.minOrders,
@@ -100,6 +104,10 @@ export function LoyaltyCampaignModal({
         segmentCriteria.minProducts = values.minProducts
 
       const tmpl = templates.find((x) => x.id === values.metaTemplateId)
+      const sendTime: string | undefined = values.sendTime
+        ? (values.sendTime as dayjs.Dayjs).format('HH:mm')
+        : undefined
+      if (sendTime) segmentCriteria.sendTime = sendTime
 
       onSubmit({
         name: values.name,
@@ -108,6 +116,7 @@ export function LoyaltyCampaignModal({
         metaTemplateName: tmpl?.name,
         metaTemplateLanguage: tmpl?.language,
         frequency: values.frequency as LoyaltyCampaignFrequency,
+        sendTime,
         segmentCriteria,
         startDate: new Date().toISOString(),
         endDate: values.endDate ? values.endDate.toISOString() : undefined,
@@ -200,12 +209,29 @@ export function LoyaltyCampaignModal({
           />
         </Form.Item>
 
-        <Form.Item
-          label={t('loyalty.campaign_frequency')}
-          name="frequency"
-          rules={[{ required: true, message: t('promotions.required') }]}
-        >
-          <Select options={FREQUENCY_OPTIONS} />
+        <Form.Item label={t('loyalty.campaign_frequency')} required className="mb-4">
+          <div className="loyalty-frequency-row">
+            <Form.Item
+              name="frequency"
+              noStyle
+              rules={[{ required: true, message: t('promotions.required') }]}
+            >
+              <Select options={FREQUENCY_OPTIONS} className="loyalty-frequency-select" />
+            </Form.Item>
+            <Form.Item
+              name="sendTime"
+              noStyle
+              rules={[{ required: true, message: t('promotions.required') }]}
+            >
+              <TimePicker
+                format="HH:mm"
+                minuteStep={5}
+                placeholder={t('loyalty.campaign_send_time_placeholder')}
+                className="loyalty-frequency-time"
+                allowClear={false}
+              />
+            </Form.Item>
+          </div>
         </Form.Item>
 
         <Form.Item label={t('loyalty.campaign_end_date')} name="endDate">

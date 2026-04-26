@@ -16,7 +16,9 @@ const META_API_BASE = 'https://graph.facebook.com/v22.0'
 interface MetaTemplateComponent {
   type: string
   text?: string
+  format?: string
   example?: Record<string, unknown>
+  buttons?: Array<Record<string, unknown>>
 }
 
 interface MetaTemplate {
@@ -299,11 +301,59 @@ export class LoyaltyService {
     return fetched.map((m) => this.toLoyaltyTemplate(socialAccountId, m))
   }
 
+  /** Build Meta's `components` array from our flat DTO. */
+  private buildTemplateComponents(data: CreateLoyaltyTemplateDto): MetaTemplateComponent[] {
+    const components: MetaTemplateComponent[] = []
+
+    // ─── HEADER ───
+    if (data.headerType === 'TEXT' && data.headerText?.trim()) {
+      components.push({ type: 'HEADER', text: data.headerText.trim() })
+    } else if (
+      (data.headerType === 'IMAGE' || data.headerType === 'VIDEO') &&
+      data.headerMediaUrl
+    ) {
+      // NOTE: in production Meta requires a `header_handle` obtained via the
+      // resumable upload API. For now we pass the public URL through `example`
+      // so submission still goes through; switching to header_handle is a
+      // future hardening step.
+      components.push({
+        type: 'HEADER',
+        format: data.headerType,
+        example: { header_url: [data.headerMediaUrl] },
+      } as MetaTemplateComponent)
+    }
+
+    // ─── BODY (always required) ───
+    components.push({ type: 'BODY', text: data.body })
+
+    // ─── FOOTER ───
+    if (data.footerText?.trim()) {
+      components.push({ type: 'FOOTER', text: data.footerText.trim() })
+    }
+
+    // ─── BUTTONS ───
+    if (data.buttons && data.buttons.length > 0) {
+      const buttons = data.buttons
+        .filter((b) => b.text?.trim())
+        .map((b) => {
+          if (b.type === 'URL') return { type: 'URL', text: b.text.trim(), url: b.url ?? '' }
+          if (b.type === 'PHONE_NUMBER')
+            return { type: 'PHONE_NUMBER', text: b.text.trim(), phone_number: b.phoneNumber ?? '' }
+          return { type: 'QUICK_REPLY', text: b.text.trim() }
+        })
+      if (buttons.length > 0) {
+        components.push({ type: 'BUTTONS', buttons } as MetaTemplateComponent)
+      }
+    }
+
+    return components
+  }
+
   /** Create a template directly on Meta (it enters Meta's review queue). */
   async createTemplate(data: CreateLoyaltyTemplateDto): Promise<LoyaltyTemplate> {
     const { accessToken, wabaId } = await this.resolveWhatsAppAccount(data.socialAccountId)
 
-    const components: MetaTemplateComponent[] = [{ type: 'BODY', text: data.body }]
+    const components = this.buildTemplateComponents(data)
 
     const res = await fetch(`${META_API_BASE}/${wabaId}/message_templates`, {
       method: 'POST',

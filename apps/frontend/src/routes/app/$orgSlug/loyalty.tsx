@@ -173,6 +173,9 @@ function LoyaltyPage() {
         {activeTab === 'campaigns' && (
           <LoyaltyCampaignsTab
             socialAccountId={currentAccount.id}
+            defaultFooter={
+              currentAccount.pageName || currentAccount.username || currentAccount.providerAccountId
+            }
             templatesOpen={templatesOpen}
             onTemplatesOpenChange={(open) => updateSearch({ templates: open ? '1' : undefined })}
           />

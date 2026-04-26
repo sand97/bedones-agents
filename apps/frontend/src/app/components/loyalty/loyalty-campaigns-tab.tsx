@@ -12,12 +12,14 @@ import { LoyaltyTemplateModal } from './loyalty-template-modal'
 
 interface Props {
   socialAccountId: string
+  defaultFooter?: string
   templatesOpen: boolean
   onTemplatesOpenChange: (open: boolean) => void
 }
 
 export function LoyaltyCampaignsTab({
   socialAccountId,
+  defaultFooter,
   templatesOpen,
   onTemplatesOpenChange,
 }: Props) {
@@ -243,6 +245,7 @@ export function LoyaltyCampaignsTab({
         open={templatesOpen}
         onClose={() => onTemplatesOpenChange(false)}
         socialAccountId={socialAccountId}
+        defaultFooter={defaultFooter}
       />
     </>
   )

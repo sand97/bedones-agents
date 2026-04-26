@@ -28,7 +28,7 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
   {
     key: 'amount',
     token: 'Montant dépensé',
-    description: 'Total cumulé dépensé par le client (FCFA).',
+    description: 'Total cumulé dépensé par le client sur la période de la promo.',
     example: '45 000 FCFA',
   },
   {
@@ -81,6 +81,17 @@ export function metaPlaceholdersToTokens(body: string): string {
   return body.replace(/{{\s*([^}]+?)\s*}}/g, (match, key) => {
     const v = KEY_TO_VAR.get(String(key).trim())
     return v ? `[${v.token}]` : match
+  })
+}
+
+/**
+ * Replace human tokens in the body with their example value, so a preview
+ * shows what a real customer would receive. Unknown tokens stay as-is.
+ */
+export function interpolateExamples(body: string): string {
+  return body.replace(/\[([^[\]]+)\]/g, (match, raw) => {
+    const v = TOKEN_TO_VAR.get(String(raw).trim())
+    return v ? v.example : match
   })
 }
 

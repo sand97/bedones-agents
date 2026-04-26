@@ -13,6 +13,8 @@ interface Props {
   open: boolean
   onClose: () => void
   socialAccountId: string
+  /** Pre-fills the footer field of the create modal (typically the WhatsApp page name). */
+  defaultFooter?: string
 }
 
 /**
@@ -20,7 +22,7 @@ interface Props {
  * We use staleTime: Infinity so we don't hammer Meta on every modal open;
  * a manual refresh happens after create/delete via setQueryData / invalidate.
  */
-export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) {
+export function LoyaltyTemplateModal({ open, onClose, socialAccountId, defaultFooter }: Props) {
   const { t } = useTranslation()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
@@ -134,6 +136,7 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId }: Props) 
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
         socialAccountId={socialAccountId}
+        defaultFooter={defaultFooter}
       />
     </>
   )
