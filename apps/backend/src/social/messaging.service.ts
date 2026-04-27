@@ -1013,6 +1013,161 @@ export class MessagingService {
     return conversation
   }
 
+  // ─── Backfill conversation history from platform ───
+
+  /**
+   * Fetch the last `limit` messages for this conversation directly from the platform
+   * and persist them locally. Used to give the AI agent enough context the very first
+   * time we receive a message on a thread that already existed before the user
+   * connected the account (or before they enabled the agent).
+   *
+   * - Facebook Messenger / Instagram DM: fetches `/{pageId or me}/conversations` filtered
+   *   by `user_id={participantId}` with `messages.limit(N)` embedded.
+   * - WhatsApp: the Cloud API does not expose a conversation history endpoint, so we
+   *   no-op and log.
+   *
+   * Idempotent: messages are upserted by `platformMsgId`, so re-runs are safe.
+   */
+  async backfillConversationHistory(conversationId: string, limit = 20): Promise<number> {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        socialAccount: {
+          select: {
+            id: true,
+            provider: true,
+            providerAccountId: true,
+            accessToken: true,
+          },
+        },
+      },
+    })
+    if (!conversation) return 0
+
+    const provider = conversation.socialAccount.provider
+
+    if (provider === 'WHATSAPP') {
+      this.logger.log(
+        `[Backfill] WhatsApp does not expose a history API — skipping conversation ${conversationId}`,
+      )
+      return 0
+    }
+
+    if (provider !== 'FACEBOOK' && provider !== 'INSTAGRAM') return 0
+
+    let accessToken: string
+    try {
+      accessToken = await this.encryptionService.decrypt(conversation.socialAccount.accessToken)
+    } catch (error) {
+      this.logger.warn(
+        `[Backfill] Failed to decrypt token for account ${conversation.socialAccount.id}: ${error instanceof Error ? error.message : error}`,
+      )
+      return 0
+    }
+
+    const pageId = conversation.socialAccount.providerAccountId
+    const baseUrl =
+      provider === 'INSTAGRAM'
+        ? `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/me`
+        : `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${pageId}`
+
+    const params = new URLSearchParams({
+      user_id: conversation.participantId,
+      fields: `participants,messages.limit(${limit}){message,from,created_time,attachments{mime_type,name,size,image_data}}`,
+      access_token: accessToken,
+    })
+    if (provider === 'INSTAGRAM') params.set('platform', 'instagram')
+
+    const url = `${baseUrl}/conversations?${params.toString()}`
+
+    let body: {
+      data?: Array<{
+        id: string
+        messages?: {
+          data?: Array<{
+            id: string
+            message?: string
+            from: { id: string; name?: string; username?: string }
+            created_time: string
+            attachments?: {
+              data?: Array<{ mime_type?: string; image_data?: { url?: string } }>
+            }
+          }>
+        }
+      }>
+    }
+
+    try {
+      const response = await fetch(url)
+      if (!response.ok) {
+        this.logger.warn(
+          `[Backfill] ${provider} history fetch failed (${response.status}) for conversation ${conversationId}: ${await response.text()}`,
+        )
+        return 0
+      }
+      body = (await response.json()) as typeof body
+    } catch (error) {
+      this.logger.warn(
+        `[Backfill] ${provider} history fetch threw for conversation ${conversationId}: ${error instanceof Error ? error.message : error}`,
+      )
+      return 0
+    }
+
+    const thread = body.data?.[0]
+    if (!thread) return 0
+
+    if (thread.id && thread.id !== conversation.platformThreadId) {
+      await this.prisma.conversation.update({
+        where: { id: conversationId },
+        data: { platformThreadId: thread.id },
+      })
+    }
+
+    const messages = thread.messages?.data || []
+    let inserted = 0
+
+    for (const msg of messages) {
+      const isFromPage = msg.from.id === pageId
+      let mediaUrl: string | null = null
+      let mediaType: string | null = null
+      const attachment = msg.attachments?.data?.[0]
+      if (attachment?.image_data?.url) {
+        mediaUrl = attachment.image_data.url
+        mediaType = 'image'
+      }
+
+      try {
+        const result = await this.prisma.directMessage.upsert({
+          where: { platformMsgId: msg.id },
+          create: {
+            conversationId,
+            platformMsgId: msg.id,
+            message: msg.message || '',
+            senderId: msg.from.id,
+            senderName: msg.from.username || msg.from.name || (isFromPage ? 'Page' : 'Utilisateur'),
+            isFromPage,
+            mediaUrl,
+            mediaType,
+            createdTime: new Date(msg.created_time),
+            isRead: true, // historical messages — treat as already read
+          },
+          update: {},
+        })
+        if (result.createdAt.getTime() === result.updatedAt.getTime()) inserted++
+      } catch (error) {
+        this.logger.warn(
+          `[Backfill] Failed to upsert message ${msg.id}: ${error instanceof Error ? error.message : error}`,
+        )
+      }
+    }
+
+    this.logger.log(
+      `[Backfill] ${provider} pulled ${messages.length} messages (${inserted} new) for conversation ${conversationId}`,
+    )
+
+    return inserted
+  }
+
   // ─── Handle echo message (sent by page) ───
 
   async handleEchoMessage(

@@ -182,11 +182,27 @@ export class AgentMessageProcessorService {
       }
     }
 
+    // First-message backfill: when this is the very first message we have for the
+    // conversation, pull the last 20 messages from the platform so the agent doesn't
+    // answer blind on a thread that already existed (e.g. previous human handover).
+    const existingMessageCount = await this.prisma.directMessage.count({
+      where: { conversationId: event.conversationId },
+    })
+    if (existingMessageCount <= 1) {
+      try {
+        await this.messagingService.backfillConversationHistory(event.conversationId, 20)
+      } catch (error: unknown) {
+        this.logger.warn(
+          `Conversation history backfill failed for ${event.conversationId}: ${error instanceof Error ? error.message : error}`,
+        )
+      }
+    }
+
     // Get conversation history
     const recentMessages = await this.prisma.directMessage.findMany({
       where: { conversationId: event.conversationId },
       orderBy: { createdTime: 'desc' },
-      take: 15,
+      take: 20,
       select: {
         message: true,
         isFromPage: true,

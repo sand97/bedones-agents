@@ -26,6 +26,21 @@ interface CommentContext {
     customInstructions?: string | null
     faqRules: FAQRule[]
   }
+  /** The post the comment is on (caption / message). */
+  post?: {
+    message: string | null
+    permalinkUrl: string | null
+  }
+  /**
+   * Parent reply chain, ordered from oldest (top-level reply to the post) to
+   * newest (the comment immediately above the one we are analyzing). Empty
+   * when the comment is itself a top-level reply to the post.
+   */
+  thread?: Array<{
+    fromName: string
+    message: string
+    isPageReply: boolean
+  }>
 }
 
 @Injectable()
@@ -40,7 +55,7 @@ export class AIService {
    */
   async analyzeComment(context: CommentContext): Promise<AIAnalysisResult> {
     const systemPrompt = this.buildSystemPrompt(context.pageSettings)
-    const userMessage = this.buildUserMessage(context.comment)
+    const userMessage = this.buildUserMessage(context.comment, context.post, context.thread)
     const messages = [new SystemMessage(systemPrompt), new HumanMessage(userMessage)]
 
     try {
@@ -128,13 +143,35 @@ Guidelines:
 - Negative opinions about the brand, products, or services (e.g. "these look fake", "overpriced", "bad quality") can influence other users' purchasing decisions. By default, HIDE negative opinions to protect the brand image. However, if the page owner's custom instructions explicitly ask to leave negative opinions visible or not moderate them, then take no action on those comments.`
   }
 
-  private buildUserMessage(comment: CommentContext['comment']): string {
-    return `Analyze this social media comment:
+  private buildUserMessage(
+    comment: CommentContext['comment'],
+    post?: CommentContext['post'],
+    thread?: CommentContext['thread'],
+  ): string {
+    const sections: string[] = []
 
-From: ${comment.fromName} (ID: ${comment.fromId})
-Message: "${comment.message}"
+    if (post?.message) {
+      sections.push(`Original post:\n"""\n${post.message}\n"""`)
+    }
 
-Provide your analysis and recommended action.`
+    if (thread && thread.length > 0) {
+      const threadText = thread
+        .map((t) => `- ${t.isPageReply ? 'Page' : t.fromName}: "${t.message}"`)
+        .join('\n')
+      sections.push(
+        `Comment thread leading to this reply (oldest first — use this to avoid repeating yourself and to keep context):\n${threadText}`,
+      )
+    }
+
+    sections.push(
+      `New comment to analyze:\nFrom: ${comment.fromName} (ID: ${comment.fromId})\nMessage: "${comment.message}"`,
+    )
+
+    sections.push(
+      'Provide your analysis and recommended action. If the thread shows the page already answered the same question, do not repeat the same reply — either acknowledge progress, ask a clarifying question, or take no action.',
+    )
+
+    return sections.join('\n\n')
   }
 
   private parseAIResponse(text: string): AIAnalysisResult {

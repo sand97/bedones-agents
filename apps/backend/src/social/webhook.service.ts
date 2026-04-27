@@ -1557,8 +1557,28 @@ export class WebhookService {
         return
       }
 
+      // Resolve access token once — used for the thread fetch and (later) for the action.
+      const account = await this.prisma.socialAccount.findUnique({
+        where: { id: socialAccountId },
+        select: { accessToken: true, providerAccountId: true },
+      })
+      if (!account) throw new NotFoundException('Social account not found')
+      const accessToken = await this.encryptionService.decrypt(account.accessToken)
+
+      // Pull the parent reply chain from the platform so the agent can see what was
+      // already said and avoid repeating the same canned answer.
+      const { post, thread } = await this.fetchCommentThread({
+        commentId,
+        provider,
+        socialAccountId,
+        pageId: account.providerAccountId,
+        accessToken,
+      })
+
       const result = await this.aiService.analyzeComment({
         comment,
+        post,
+        thread,
         pageSettings: {
           undesiredCommentsAction: settings.undesiredCommentsAction,
           spamAction: settings.spamAction,
@@ -1574,14 +1594,6 @@ export class WebhookService {
 
       if (result.action === 'none') return
 
-      // Get access token for API calls
-      const account = await this.prisma.socialAccount.findUnique({
-        where: { id: socialAccountId },
-        select: { accessToken: true },
-      })
-      if (!account) throw new NotFoundException('Social account not found')
-      const accessToken = await this.encryptionService.decrypt(account.accessToken)
-
       await this.executeAIAction(
         commentId,
         provider,
@@ -1594,6 +1606,236 @@ export class WebhookService {
     } catch (error) {
       this.logger.error(`[AI] Failed to analyze/act on comment ${commentId}:`, error)
     }
+  }
+
+  // ─── Comment thread reconstruction ───
+
+  /**
+   * Walk the parent chain of the given comment so the AI can see the full
+   * conversation up to (but not including) the comment being analyzed. The result
+   * is ordered oldest → newest. The post itself is returned separately.
+   *
+   * Tries the platform API first (fresh data, includes parents we may never have
+   * stored locally); falls back to walking local DB rows by `parentId` when the API
+   * call fails.
+   */
+  private async fetchCommentThread(args: {
+    commentId: string
+    provider: 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK'
+    socialAccountId: string
+    pageId: string
+    accessToken: string
+  }): Promise<{
+    post: { message: string | null; permalinkUrl: string | null } | undefined
+    thread: Array<{ fromName: string; message: string; isPageReply: boolean }>
+  }> {
+    // Locate the comment + its post in DB so we always have post context, even if
+    // the platform call fails.
+    const localComment = await this.prisma.comment.findUnique({
+      where: { id: args.commentId },
+      select: {
+        id: true,
+        parentId: true,
+        post: { select: { id: true, message: true, permalinkUrl: true } },
+      },
+    })
+
+    const post = localComment?.post
+      ? { message: localComment.post.message, permalinkUrl: localComment.post.permalinkUrl }
+      : undefined
+
+    // No parent → it's a top-level comment, no thread to surface.
+    if (!localComment?.parentId) {
+      return { post, thread: [] }
+    }
+
+    let thread: Array<{ fromName: string; message: string; isPageReply: boolean }> = []
+
+    try {
+      if (args.provider === 'FACEBOOK' || args.provider === 'INSTAGRAM') {
+        thread = await this.fetchMetaCommentThread(
+          localComment.parentId,
+          args.provider,
+          args.pageId,
+          args.accessToken,
+        )
+      } else if (args.provider === 'TIKTOK') {
+        thread = await this.fetchTikTokCommentThread(
+          localComment.parentId,
+          args.pageId,
+          localComment.post?.id || '',
+          args.accessToken,
+        )
+      }
+    } catch (error) {
+      this.logger.warn(
+        `[AI] Thread fetch failed for ${args.commentId} on ${args.provider}: ${error instanceof Error ? error.message : error}`,
+      )
+    }
+
+    // Fallback to local DB walk when the platform returned nothing usable.
+    if (thread.length === 0) {
+      thread = await this.walkLocalCommentThread(localComment.parentId)
+    }
+
+    return { post, thread }
+  }
+
+  /**
+   * Facebook & Instagram: a single Graph call with nested `parent` selectors retrieves
+   * up to 4 ancestors. Returns ordered oldest → newest.
+   */
+  private async fetchMetaCommentThread(
+    startCommentId: string,
+    provider: 'FACEBOOK' | 'INSTAGRAM',
+    pageId: string,
+    accessToken: string,
+  ): Promise<Array<{ fromName: string; message: string; isPageReply: boolean }>> {
+    const baseUrl =
+      provider === 'INSTAGRAM'
+        ? `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}`
+        : `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}`
+
+    // Nested parent selector: each level adds one ancestor. 4 levels is enough for
+    // virtually every real comment chain we'll encounter.
+    const leaf = 'id,message,from{id,name,username},created_time'
+    const fields = `${leaf},parent{${leaf},parent{${leaf},parent{${leaf}}}}`
+    const url = `${baseUrl}/${startCommentId}?fields=${fields}&access_token=${accessToken}`
+
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`Graph API ${response.status}: ${await response.text()}`)
+    }
+
+    type Node = {
+      id?: string
+      message?: string
+      from?: { id?: string; name?: string; username?: string }
+      created_time?: string
+      parent?: Node
+    }
+    const data = (await response.json()) as Node
+
+    const chain: Node[] = []
+    let cursor: Node | undefined = data
+    while (cursor && cursor.id) {
+      chain.push(cursor)
+      cursor = cursor.parent
+    }
+
+    // chain is currently newest → oldest (current parent first), reverse it.
+    chain.reverse()
+
+    return chain.map((n) => {
+      const fromId = n.from?.id || ''
+      return {
+        fromName: n.from?.username || n.from?.name || (fromId === pageId ? 'Page' : 'User'),
+        message: n.message || '',
+        isPageReply: !!fromId && fromId === pageId,
+      }
+    })
+  }
+
+  /**
+   * TikTok: walks up via `parent_comment_id`, fetching one comment per level via the
+   * business comment list API. Capped at 5 levels to avoid runaway recursion on
+   * pathological threads.
+   */
+  private async fetchTikTokCommentThread(
+    startCommentId: string,
+    openId: string,
+    videoId: string,
+    accessToken: string,
+  ): Promise<Array<{ fromName: string; message: string; isPageReply: boolean }>> {
+    if (!videoId) return []
+
+    const visited = new Set<string>()
+    const chain: Array<{ fromName: string; message: string; isPageReply: boolean }> = []
+    let cursor: string | null = startCommentId
+
+    for (let i = 0; i < 5 && cursor && !visited.has(cursor); i++) {
+      visited.add(cursor)
+
+      const params = new URLSearchParams({
+        business_id: openId,
+        video_id: videoId,
+      })
+      params.append('comment_ids', JSON.stringify([cursor]))
+      const url = `https://business-api.tiktok.com/open_api/v1.3/business/comment/list/?${params}`
+
+      const response = await fetch(url, {
+        headers: { 'Access-Token': accessToken },
+      })
+      if (!response.ok) break
+
+      const raw = await response.text()
+      const body = JSON.parse(raw) as {
+        code: number
+        data?: {
+          comments?: Array<{
+            comment_id: string
+            text: string
+            owner?: boolean
+            display_name?: string
+            username?: string
+          }>
+        }
+      }
+      if (body.code !== 0) break
+      const found = body.data?.comments?.[0]
+      if (!found) break
+
+      chain.push({
+        fromName: found.display_name || found.username || (found.owner ? 'Page' : 'User'),
+        message: found.text || '',
+        isPageReply: found.owner === true,
+      })
+
+      // Extract the parent_comment_id straight from the raw JSON to avoid BigInt
+      // precision loss on big TikTok IDs.
+      const parentMatch = raw.match(/"parent_comment_id"\s*:\s*"?(\d+)"?/)
+      const next = parentMatch?.[1] || null
+      cursor = next && next !== '0' ? next : null
+    }
+
+    chain.reverse()
+    return chain
+  }
+
+  /**
+   * Last-resort fallback that uses whatever we already stored locally. Only useful
+   * for comments we've previously upserted (so it's reliable for self-replies and
+   * recently-active threads where every parent already passed through a webhook).
+   */
+  private async walkLocalCommentThread(
+    startCommentId: string,
+  ): Promise<Array<{ fromName: string; message: string; isPageReply: boolean }>> {
+    const chain: Array<{ fromName: string; message: string; isPageReply: boolean }> = []
+    const visited = new Set<string>()
+    let cursor: string | null = startCommentId
+
+    for (let i = 0; i < 5 && cursor && !visited.has(cursor); i++) {
+      visited.add(cursor)
+      const node: {
+        parentId: string | null
+        message: string
+        fromName: string
+        isPageReply: boolean
+      } | null = await this.prisma.comment.findUnique({
+        where: { id: cursor },
+        select: { parentId: true, message: true, fromName: true, isPageReply: true },
+      })
+      if (!node) break
+      chain.push({
+        fromName: node.fromName,
+        message: node.message,
+        isPageReply: node.isPageReply,
+      })
+      cursor = node.parentId
+    }
+
+    chain.reverse()
+    return chain
   }
 
   private async executeAIAction(
