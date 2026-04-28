@@ -34,6 +34,12 @@ export class UploadService {
       : `${protocol}://${endpoint}:${port}`
   }
 
+  /** True if the URL points to our own MinIO bucket (already stored locally). */
+  isOwnUrl(url: string | null | undefined): boolean {
+    if (!url) return false
+    return url.startsWith(`${this.publicBaseUrl}/${this.bucket}/`)
+  }
+
   async uploadFile(file: Express.Multer.File, folder: string): Promise<string> {
     await this.ensureBucket()
 

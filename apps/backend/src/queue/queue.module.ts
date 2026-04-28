@@ -4,9 +4,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
 
 export const CATALOG_INDEXING_QUEUE = 'catalog-indexing'
 export const WHATSAPP_OPTIN_QUEUE = 'whatsapp-optin'
+export const SOCIAL_AVATAR_SYNC_QUEUE = 'social-avatar-sync'
 
 const catalogQueue = BullModule.registerQueue({ name: CATALOG_INDEXING_QUEUE })
 const whatsappOptinQueue = BullModule.registerQueue({ name: WHATSAPP_OPTIN_QUEUE })
+const socialAvatarSyncQueue = BullModule.registerQueue({ name: SOCIAL_AVATAR_SYNC_QUEUE })
 
 @Module({
   imports: [
@@ -27,7 +29,8 @@ const whatsappOptinQueue = BullModule.registerQueue({ name: WHATSAPP_OPTIN_QUEUE
     }),
     catalogQueue,
     whatsappOptinQueue,
+    socialAvatarSyncQueue,
   ],
-  exports: [catalogQueue, whatsappOptinQueue],
+  exports: [catalogQueue, whatsappOptinQueue, socialAvatarSyncQueue],
 })
 export class QueueModule {}

@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
+import { AvatarSyncService } from './avatar-sync.service'
 
 interface FacebookPage {
   id: string
@@ -25,6 +26,7 @@ export class SocialService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private encryptionService: EncryptionService,
+    private avatarSyncService: AvatarSyncService,
   ) {}
 
   // ─── Connect Facebook Pages ───
@@ -144,6 +146,10 @@ export class SocialService {
 
       // Subscribe page to webhook
       await this.subscribePageToWebhook(page.id, page.access_token)
+
+      // Mirror the (often temporary) Meta avatar URL to our own MinIO bucket
+      // in the background so we don't lose the image when the URL expires.
+      await this.avatarSyncService.enqueue(socialAccount.id)
 
       savedPages.push(socialAccount)
     }
@@ -438,6 +444,8 @@ export class SocialService {
     // No per-account subscription is needed (unlike Facebook Pages).
     this.logger.log(`[Instagram] Webhook subscription is app-level — no per-account call needed`)
 
+    await this.avatarSyncService.enqueue(socialAccount.id)
+
     this.logger.log(
       `[Instagram] ✅ Connected account "${profileRaw.username}" (${socialAccount.id}) for org ${organisationId}`,
     )
@@ -577,6 +585,8 @@ export class SocialService {
       create: { socialAccountId: socialAccount.id },
       update: {},
     })
+
+    await this.avatarSyncService.enqueue(socialAccount.id)
 
     this.logger.log(
       `[TikTok] ✅ Connected account "${displayName}" (${socialAccount.id}) for org ${organisationId}`,
@@ -755,6 +765,8 @@ export class SocialService {
       create: { socialAccountId: socialAccount.id },
       update: {},
     })
+
+    await this.avatarSyncService.enqueue(socialAccount.id)
 
     this.logger.log(
       `[WhatsApp] ✅ Connected "${displayName}" (phone=${phoneId}, waba=${wabaId}) for org ${organisationId}`,
