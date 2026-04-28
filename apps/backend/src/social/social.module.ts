@@ -1,7 +1,12 @@
-import { Module } from '@nestjs/common'
+import { Logger, Module, OnApplicationBootstrap } from '@nestjs/common'
+import { BullModule, InjectQueue } from '@nestjs/bullmq'
+import { Queue } from 'bullmq'
 import { AuthModule } from '../auth/auth.module'
 import { UploadModule } from '../upload/upload.module'
 import { CatalogModule } from '../catalog/catalog.module'
+import { QueueModule, SOCIAL_AVATAR_SYNC_QUEUE } from '../queue/queue.module'
+import { PrismaService } from '../prisma/prisma.service'
+import { UploadService } from '../upload/upload.service'
 import { SocialController } from './social.controller'
 import { SocialService } from './social.service'
 import { WebhookController } from './webhook.controller'
@@ -12,9 +17,21 @@ import { MessagingService } from './messaging.service'
 import { AIService } from './ai.service'
 import { LabelController } from './label.controller'
 import { LabelService } from './label.service'
+import {
+  AvatarSyncService,
+  AVATAR_SYNC_JOB,
+  type AvatarSyncJobData,
+} from './avatar-sync.service'
+import { AvatarSyncProcessor } from './avatar-sync.processor'
 
 @Module({
-  imports: [AuthModule, UploadModule, CatalogModule],
+  imports: [
+    AuthModule,
+    UploadModule,
+    CatalogModule,
+    QueueModule,
+    BullModule.registerQueue({ name: SOCIAL_AVATAR_SYNC_QUEUE }),
+  ],
   controllers: [
     SocialController,
     WebhookController,
@@ -22,7 +39,72 @@ import { LabelService } from './label.service'
     MessagingController,
     LabelController,
   ],
-  providers: [SocialService, WebhookService, MessagingService, AIService, LabelService],
-  exports: [MessagingService, LabelService],
+  providers: [
+    SocialService,
+    WebhookService,
+    MessagingService,
+    AIService,
+    LabelService,
+    AvatarSyncService,
+    AvatarSyncProcessor,
+  ],
+  exports: [MessagingService, LabelService, AvatarSyncService],
 })
-export class SocialModule {}
+export class SocialModule implements OnApplicationBootstrap {
+  private readonly logger = new Logger(SocialModule.name)
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploadService: UploadService,
+    @InjectQueue(SOCIAL_AVATAR_SYNC_QUEUE) private readonly avatarSyncQueue: Queue,
+  ) {}
+
+  /**
+   * Catch-up pass: any social account whose `profilePictureUrl` is set to an
+   * external (non-MinIO) URL gets re-queued at startup, so we eventually
+   * mirror every avatar to our own bucket without losing existing rows.
+   */
+  async onApplicationBootstrap() {
+    try {
+      const accounts = await this.prisma.socialAccount.findMany({
+        where: { profilePictureUrl: { not: null } },
+        select: { id: true, profilePictureUrl: true },
+      })
+
+      const pending = accounts.filter(
+        (a) => !this.uploadService.isOwnUrl(a.profilePictureUrl),
+      )
+      if (pending.length === 0) return
+
+      this.logger.log(
+        `Found ${pending.length} social account(s) with external avatar URLs — queuing for sync`,
+      )
+
+      for (const account of pending) {
+        const jobId = `avatar-sync-${account.id}`
+        const stale = await this.avatarSyncQueue.getJob(jobId)
+        if (stale) {
+          const state = await stale.getState()
+          if (state === 'completed' || state === 'failed') {
+            await stale.remove()
+          } else {
+            continue
+          }
+        }
+        await this.avatarSyncQueue.add(
+          AVATAR_SYNC_JOB,
+          { socialAccountId: account.id } satisfies AvatarSyncJobData,
+          {
+            jobId,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5_000 },
+            removeOnComplete: true,
+            removeOnFail: 50,
+          },
+        )
+      }
+    } catch (error) {
+      this.logger.error('Failed to queue avatar syncs at startup', error)
+    }
+  }
+}
