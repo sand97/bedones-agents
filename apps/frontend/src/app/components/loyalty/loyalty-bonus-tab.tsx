@@ -279,6 +279,7 @@ export function LoyaltyBonusTab({ socialAccountId, orgSlug }: Props) {
           className="tickets-table"
           size="middle"
           loading={isLoading}
+          scroll={{ x: 'max-content' }}
         />
       ) : (
         <div className="flex flex-col gap-3">
