@@ -32,6 +32,7 @@ import { Route as AppOrgSlugSettingsRouteImport } from './routes/app/$orgSlug/se
 import { Route as AppOrgSlugPromotionsRouteImport } from './routes/app/$orgSlug/promotions'
 import { Route as AppOrgSlugPlanRouteImport } from './routes/app/$orgSlug/plan'
 import { Route as AppOrgSlugMembersRouteImport } from './routes/app/$orgSlug/members'
+import { Route as AppOrgSlugLoyaltyRouteImport } from './routes/app/$orgSlug/loyalty'
 import { Route as AppOrgSlugLegalRouteImport } from './routes/app/$orgSlug/legal'
 import { Route as AppOrgSlugDashboardRouteImport } from './routes/app/$orgSlug/dashboard'
 import { Route as AppOrgSlugCatalogRouteImport } from './routes/app/$orgSlug/catalog'
@@ -154,6 +155,11 @@ const AppOrgSlugMembersRoute = AppOrgSlugMembersRouteImport.update({
   path: '/members',
   getParentRoute: () => AppOrgSlugRouteRoute,
 } as any)
+const AppOrgSlugLoyaltyRoute = AppOrgSlugLoyaltyRouteImport.update({
+  id: '/loyalty',
+  path: '/loyalty',
+  getParentRoute: () => AppOrgSlugRouteRoute,
+} as any)
 const AppOrgSlugLegalRoute = AppOrgSlugLegalRouteImport.update({
   id: '/legal',
   path: '/legal',
@@ -202,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
   '/app/$orgSlug/dashboard': typeof AppOrgSlugDashboardRoute
   '/app/$orgSlug/legal': typeof AppOrgSlugLegalRoute
+  '/app/$orgSlug/loyalty': typeof AppOrgSlugLoyaltyRoute
   '/app/$orgSlug/members': typeof AppOrgSlugMembersRoute
   '/app/$orgSlug/plan': typeof AppOrgSlugPlanRoute
   '/app/$orgSlug/promotions': typeof AppOrgSlugPromotionsRoute
@@ -233,6 +240,7 @@ export interface FileRoutesByTo {
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
   '/app/$orgSlug/dashboard': typeof AppOrgSlugDashboardRoute
   '/app/$orgSlug/legal': typeof AppOrgSlugLegalRoute
+  '/app/$orgSlug/loyalty': typeof AppOrgSlugLoyaltyRoute
   '/app/$orgSlug/members': typeof AppOrgSlugMembersRoute
   '/app/$orgSlug/plan': typeof AppOrgSlugPlanRoute
   '/app/$orgSlug/promotions': typeof AppOrgSlugPromotionsRoute
@@ -265,6 +273,7 @@ export interface FileRoutesById {
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
   '/app/$orgSlug/dashboard': typeof AppOrgSlugDashboardRoute
   '/app/$orgSlug/legal': typeof AppOrgSlugLegalRoute
+  '/app/$orgSlug/loyalty': typeof AppOrgSlugLoyaltyRoute
   '/app/$orgSlug/members': typeof AppOrgSlugMembersRoute
   '/app/$orgSlug/plan': typeof AppOrgSlugPlanRoute
   '/app/$orgSlug/promotions': typeof AppOrgSlugPromotionsRoute
@@ -298,6 +307,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/catalog'
     | '/app/$orgSlug/dashboard'
     | '/app/$orgSlug/legal'
+    | '/app/$orgSlug/loyalty'
     | '/app/$orgSlug/members'
     | '/app/$orgSlug/plan'
     | '/app/$orgSlug/promotions'
@@ -329,6 +339,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/catalog'
     | '/app/$orgSlug/dashboard'
     | '/app/$orgSlug/legal'
+    | '/app/$orgSlug/loyalty'
     | '/app/$orgSlug/members'
     | '/app/$orgSlug/plan'
     | '/app/$orgSlug/promotions'
@@ -360,6 +371,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/catalog'
     | '/app/$orgSlug/dashboard'
     | '/app/$orgSlug/legal'
+    | '/app/$orgSlug/loyalty'
     | '/app/$orgSlug/members'
     | '/app/$orgSlug/plan'
     | '/app/$orgSlug/promotions'
@@ -557,6 +569,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugMembersRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
+    '/app/$orgSlug/loyalty': {
+      id: '/app/$orgSlug/loyalty'
+      path: '/loyalty'
+      fullPath: '/app/$orgSlug/loyalty'
+      preLoaderRoute: typeof AppOrgSlugLoyaltyRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
     '/app/$orgSlug/legal': {
       id: '/app/$orgSlug/legal'
       path: '/legal'
@@ -607,6 +626,7 @@ interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugCatalogRoute: typeof AppOrgSlugCatalogRoute
   AppOrgSlugDashboardRoute: typeof AppOrgSlugDashboardRoute
   AppOrgSlugLegalRoute: typeof AppOrgSlugLegalRoute
+  AppOrgSlugLoyaltyRoute: typeof AppOrgSlugLoyaltyRoute
   AppOrgSlugMembersRoute: typeof AppOrgSlugMembersRoute
   AppOrgSlugPlanRoute: typeof AppOrgSlugPlanRoute
   AppOrgSlugPromotionsRoute: typeof AppOrgSlugPromotionsRoute
@@ -623,6 +643,7 @@ const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugCatalogRoute: AppOrgSlugCatalogRoute,
   AppOrgSlugDashboardRoute: AppOrgSlugDashboardRoute,
   AppOrgSlugLegalRoute: AppOrgSlugLegalRoute,
+  AppOrgSlugLoyaltyRoute: AppOrgSlugLoyaltyRoute,
   AppOrgSlugMembersRoute: AppOrgSlugMembersRoute,
   AppOrgSlugPlanRoute: AppOrgSlugPlanRoute,
   AppOrgSlugPromotionsRoute: AppOrgSlugPromotionsRoute,

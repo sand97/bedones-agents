@@ -12,6 +12,12 @@ interface SocialSetupProps {
   buttonIcon?: ReactNode
   onAction?: () => void
   loading?: boolean
+  /** Secondary action — rendered next to the primary button (wraps under it on narrow widths). */
+  secondaryButtonLabel?: string
+  secondaryButtonType?: 'primary' | 'default'
+  secondaryButtonIcon?: ReactNode
+  onSecondaryAction?: () => void
+  secondaryLoading?: boolean
   children?: ReactNode
 }
 
@@ -25,6 +31,11 @@ export function SocialSetup({
   buttonIcon = <Plus size={18} />,
   onAction,
   loading,
+  secondaryButtonLabel,
+  secondaryButtonType = 'default',
+  secondaryButtonIcon,
+  onSecondaryAction,
+  secondaryLoading,
   children,
 }: SocialSetupProps) {
   return (
@@ -41,17 +52,33 @@ export function SocialSetup({
 
         {children}
 
-        {buttonLabel && (
-          <Button
-            type={buttonType}
-            size="large"
-            loading={loading}
-            onClick={onAction}
-            className="h-12 px-8 text-base font-semibold"
-            icon={buttonIcon}
-          >
-            {buttonLabel}
-          </Button>
+        {(buttonLabel || secondaryButtonLabel) && (
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {buttonLabel && (
+              <Button
+                type={buttonType}
+                size="large"
+                loading={loading}
+                onClick={onAction}
+                className="h-12 px-8 text-base font-semibold"
+                icon={buttonIcon}
+              >
+                {buttonLabel}
+              </Button>
+            )}
+            {secondaryButtonLabel && (
+              <Button
+                type={secondaryButtonType}
+                size="large"
+                loading={secondaryLoading}
+                onClick={onSecondaryAction}
+                className="h-12 px-8 text-base font-semibold"
+                icon={secondaryButtonIcon}
+              >
+                {secondaryButtonLabel}
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </div>

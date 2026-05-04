@@ -16,6 +16,7 @@ import { CatalogModule } from './catalog/catalog.module'
 import { AgentModule } from './agent/agent.module'
 import { TicketModule } from './ticket/ticket.module'
 import { PromotionModule } from './promotion/promotion.module'
+import { LoyaltyModule } from './loyalty/loyalty.module'
 import { ImageProcessingModule } from './image-processing/image-processing.module'
 import { StatsModule } from './stats/stats.module'
 import { NotificationPreferenceModule } from './notification-preference/notification-preference.module'
@@ -47,6 +48,7 @@ import { LlmModule } from './common/llm/llm.module'
     AgentModule,
     TicketModule,
     PromotionModule,
+    LoyaltyModule,
     ImageProcessingModule,
     StatsModule,
     NotificationPreferenceModule,
