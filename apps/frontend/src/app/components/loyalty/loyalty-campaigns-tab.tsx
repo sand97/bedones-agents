@@ -259,6 +259,7 @@ export function LoyaltyCampaignsTab({
           setEditing(null)
         }}
         socialAccountId={socialAccountId}
+        defaultFooter={defaultFooter}
         editingCampaign={editing}
         onSubmit={handleSubmit}
         submitLoading={createMutation.isPending || updateMutation.isPending}

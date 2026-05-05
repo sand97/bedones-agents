@@ -12,6 +12,7 @@ interface Props {
   onChange: (template: LoyaltyTemplate) => void
   title?: string
   description?: string
+  defaultFooter?: string
 }
 
 export function TemplateSelectField({
@@ -20,6 +21,7 @@ export function TemplateSelectField({
   onChange,
   title,
   description,
+  defaultFooter,
 }: Props) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -53,6 +55,7 @@ export function TemplateSelectField({
         open={open}
         onClose={() => setOpen(false)}
         socialAccountId={socialAccountId}
+        defaultFooter={defaultFooter}
         selectedTemplateId={value?.id}
         onTemplateSelected={(template) => {
           onChange(template)

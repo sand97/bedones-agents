@@ -1026,7 +1026,9 @@ export class MessagingService {
         ? [
             {
               type: 'body',
-              parameters: variableEntries.map(([, text]) => ({ type: 'text', text: text ?? '' })),
+              parameters: variableEntries.map(([name, text]) =>
+                this.buildTemplateTextParameter(name, text ?? ''),
+              ),
             },
           ]
         : undefined
@@ -1070,6 +1072,14 @@ export class MessagingService {
 
     const messages = (data as { messages?: Array<{ id: string }> }).messages
     return messages?.[0]?.id || null
+  }
+
+  private buildTemplateTextParameter(name: string, text: string) {
+    const parameter: Record<string, string> = { type: 'text', text }
+    if (!/^\d+$/.test(name)) {
+      parameter.parameter_name = name
+    }
+    return parameter
   }
 
   // ─── Handle incoming webhook message ───

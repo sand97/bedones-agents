@@ -258,6 +258,7 @@ function CampaignModal({
   onClose,
   socialAccountId,
   orgSlug,
+  defaultFooter,
   onSubmit,
   loading,
   campaign,
@@ -266,6 +267,7 @@ function CampaignModal({
   onClose: () => void
   socialAccountId: string
   orgSlug: string
+  defaultFooter?: string
   onSubmit: (payload: CampaignFormPayload) => void | Promise<void>
   loading?: boolean
   campaign?: LoyaltyCampaign | null
@@ -723,6 +725,7 @@ function CampaignModal({
                 </div>
                 <TemplateSelectField
                   socialAccountId={socialAccountId}
+                  defaultFooter={defaultFooter}
                   value={block.template}
                   onChange={(template) => handleTemplateChange(block.id, template)}
                 />
@@ -912,6 +915,15 @@ function GeneralCampaignsPage() {
     '/loyalty/campaigns/account/{socialAccountId}',
     campaignsQueryParams,
   )
+  const accountsQuery = $api.useQuery('get', '/social/accounts/{organisationId}', {
+    params: { path: { organisationId: orgSlug } },
+  })
+  const currentAccount = useMemo(
+    () => accountsQuery.data?.find((account) => account.id === socialAccountId),
+    [accountsQuery.data, socialAccountId],
+  )
+  const defaultTemplateFooter =
+    currentAccount?.pageName || currentAccount?.username || currentAccount?.providerAccountId
   const createMutation = $api.useMutation('post', '/loyalty/campaigns')
   const updateMutation = $api.useMutation('patch', '/loyalty/campaigns/{id}')
   const deleteMutation = $api.useMutation('delete', '/loyalty/campaigns/{id}')
@@ -1100,6 +1112,7 @@ function GeneralCampaignsPage() {
         }}
         socialAccountId={socialAccountId}
         orgSlug={orgSlug}
+        defaultFooter={defaultTemplateFooter}
         onSubmit={handleCreateCampaign}
         loading={createMutation.isPending || updateMutation.isPending}
         campaign={editingCampaign}
@@ -1113,6 +1126,7 @@ function GeneralCampaignsPage() {
         open={templatesOpen}
         onClose={() => setTemplatesOpen(false)}
         socialAccountId={socialAccountId}
+        defaultFooter={defaultTemplateFooter}
       />
     </div>
   )

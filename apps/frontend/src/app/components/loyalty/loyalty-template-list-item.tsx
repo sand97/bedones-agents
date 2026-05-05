@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Button, Tag, Tooltip } from 'antd'
 import { AlertCircle, CheckCircle2, Clock3, Pencil, Trash2 } from 'lucide-react'
 import type { LoyaltyTemplate } from '@app/lib/api/loyalty-api'
-import { metaPlaceholdersToTokens } from './loyalty-template-variables'
+import { getTemplateVariables, metaPlaceholdersToTokens } from './loyalty-template-variables'
 
 interface Props {
   template: LoyaltyTemplate
@@ -49,6 +49,7 @@ export function LoyaltyTemplateListItem({
 }: Props) {
   const { t } = useTranslation()
   const status = statusIcon(template, t)
+  const templateVariables = getTemplateVariables(t)
 
   return (
     <div
@@ -64,7 +65,7 @@ export function LoyaltyTemplateListItem({
           <Tooltip title={status.label}>{status.icon}</Tooltip>
         </div>
         <div className="mt-1 line-clamp-2 text-xs text-text-secondary">
-          {metaPlaceholdersToTokens(template.body)}
+          {metaPlaceholdersToTokens(template.body, templateVariables)}
         </div>
         <div className="mt-2 flex items-center justify-between gap-3">
           <Tag bordered={false}>{template.category}</Tag>

@@ -12,6 +12,7 @@ interface Props {
   open: boolean
   onClose: () => void
   socialAccountId: string
+  defaultFooter?: string
   onSend: (data: {
     template: LoyaltyTemplate
     variables: Record<string, string>
@@ -24,7 +25,14 @@ function renderBody(body: string, values: Record<string, string>) {
   return body.replace(/{{\s*([^}]+?)\s*}}/g, (_, key: string) => values[key.trim()] ?? '')
 }
 
-export function TemplateMessageModal({ open, onClose, socialAccountId, onSend, loading }: Props) {
+export function TemplateMessageModal({
+  open,
+  onClose,
+  socialAccountId,
+  defaultFooter,
+  onSend,
+  loading,
+}: Props) {
   const { t } = useTranslation()
   const [template, setTemplate] = useState<LoyaltyTemplate | null>(null)
   const [values, setValues] = useState<Record<string, string>>({})
@@ -74,6 +82,7 @@ export function TemplateMessageModal({ open, onClose, socialAccountId, onSend, l
             <Form.Item label={t('loyalty.templates')}>
               <TemplateSelectField
                 socialAccountId={socialAccountId}
+                defaultFooter={defaultFooter}
                 value={template}
                 onChange={(next) => {
                   setTemplate(next)

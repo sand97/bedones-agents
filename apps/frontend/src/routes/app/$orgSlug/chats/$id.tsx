@@ -972,11 +972,17 @@ function ChatsPage() {
             open={templatesOpen}
             onClose={() => setTemplatesOpen(false)}
             socialAccountId={currentAccount.id}
+            defaultFooter={
+              currentAccount.pageName || currentAccount.username || currentAccount.providerAccountId
+            }
           />
           <TemplateMessageModal
             open={templateMessageOpen}
             onClose={() => setTemplateMessageOpen(false)}
             socialAccountId={currentAccount.id}
+            defaultFooter={
+              currentAccount.pageName || currentAccount.username || currentAccount.providerAccountId
+            }
             onSend={handleSendTemplate}
             loading={sendTemplateMutation.isPending}
           />

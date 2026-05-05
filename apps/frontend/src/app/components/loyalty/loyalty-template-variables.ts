@@ -6,58 +6,104 @@
  * which is what gets substituted at send-time when interpolating against the
  * customer's data.
  */
+import type { TFunction } from 'i18next'
 
 export interface TemplateVariable {
   /** Stable internal key sent to Meta (snake_case ASCII). */
   key: string
   /** Human-readable token shown inside the body, e.g. "Nom du client". */
   token: string
+  /** Other labels that should still be accepted when users edit existing drafts. */
+  aliases?: string[]
   /** Tooltip description. */
   description: string
   /** Example value to illustrate the variable. */
   example: string
 }
 
-export const TEMPLATE_VARIABLES: TemplateVariable[] = [
+interface TemplateVariableDefinition extends TemplateVariable {
+  tokenI18nKey: string
+  descriptionI18nKey: string
+}
+
+const TEMPLATE_VARIABLE_DEFINITIONS: TemplateVariableDefinition[] = [
   {
     key: 'customer_name',
     token: 'Nom du client',
+    aliases: ['Customer name'],
+    tokenI18nKey: 'loyalty.template_variable_customer_name',
+    descriptionI18nKey: 'loyalty.template_variable_customer_name_desc',
     description: 'Le prénom ou nom complet enregistré dans la fiche contact.',
     example: 'Marie Dupont',
   },
   {
     key: 'amount',
     token: 'Montant dépensé',
+    aliases: ['Amount spent'],
+    tokenI18nKey: 'loyalty.template_variable_amount',
+    descriptionI18nKey: 'loyalty.template_variable_amount_desc',
     description: 'Total cumulé dépensé par le client sur la période de la promo.',
     example: '45 000 FCFA',
   },
   {
     key: 'product_name',
     token: 'Nom du produit',
+    aliases: ['Product name'],
+    tokenI18nKey: 'loyalty.template_variable_product_name',
+    descriptionI18nKey: 'loyalty.template_variable_product_name_desc',
     description: 'Nom du produit gagné en récompense ou rendant éligible au bonus.',
     example: 'Sac à main cuir noir',
   },
   {
     key: 'order_count',
     token: 'Nombre de commandes',
+    aliases: ['Number of orders'],
+    tokenI18nKey: 'loyalty.template_variable_order_count',
+    descriptionI18nKey: 'loyalty.template_variable_order_count_desc',
     description: 'Nombre total de commandes passées par le client.',
     example: '7',
   },
   {
     key: 'orders_left',
     token: 'Commandes restantes',
+    aliases: ['Orders left'],
+    tokenI18nKey: 'loyalty.template_variable_orders_left',
+    descriptionI18nKey: 'loyalty.template_variable_orders_left_desc',
     description: "Nombre de commandes qu'il reste au client pour débloquer le bonus.",
     example: '2',
   },
   {
     key: 'reward_value',
     token: 'Valeur du bonus',
+    aliases: ['Reward value'],
+    tokenI18nKey: 'loyalty.template_variable_reward_value',
+    descriptionI18nKey: 'loyalty.template_variable_reward_value_desc',
     description: 'Valeur de la récompense (montant en FCFA ou pourcentage).',
     example: '5 000 FCFA ou 20%',
   },
 ]
 
-const TOKEN_TO_VAR = new Map(TEMPLATE_VARIABLES.map((v) => [v.token, v]))
+export const TEMPLATE_VARIABLES: TemplateVariable[] = TEMPLATE_VARIABLE_DEFINITIONS.map(
+  ({ tokenI18nKey: _tokenI18nKey, descriptionI18nKey: _descriptionI18nKey, ...variable }) =>
+    variable,
+)
+
+export function getTemplateVariables(t: TFunction): TemplateVariable[] {
+  return TEMPLATE_VARIABLE_DEFINITIONS.map((variable) => ({
+    key: variable.key,
+    token: t(variable.tokenI18nKey),
+    aliases: [variable.token, ...(variable.aliases ?? [])],
+    description: t(variable.descriptionI18nKey),
+    example: variable.example,
+  }))
+}
+
+const TOKEN_TO_VAR = new Map<string, TemplateVariable>()
+for (const v of TEMPLATE_VARIABLES) {
+  for (const token of [v.token, ...(v.aliases ?? [])]) {
+    TOKEN_TO_VAR.set(token, v)
+  }
+}
 const KEY_TO_VAR = new Map(TEMPLATE_VARIABLES.map((v) => [v.key, v]))
 
 /**
@@ -77,9 +123,13 @@ export function tokensToMetaPlaceholders(body: string): string {
  * `[Nom du client]` so users see human-readable text. Unknown placeholders
  * are left as-is.
  */
-export function metaPlaceholdersToTokens(body: string): string {
+export function metaPlaceholdersToTokens(
+  body: string,
+  variables: TemplateVariable[] = TEMPLATE_VARIABLES,
+): string {
+  const keyToVariable = new Map(variables.map((v) => [v.key, v]))
   return body.replace(/{{\s*([^}]+?)\s*}}/g, (match, key) => {
-    const v = KEY_TO_VAR.get(String(key).trim())
+    const v = keyToVariable.get(String(key).trim()) ?? KEY_TO_VAR.get(String(key).trim())
     return v ? `[${v.token}]` : match
   })
 }

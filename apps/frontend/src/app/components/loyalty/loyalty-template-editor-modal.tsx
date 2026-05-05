@@ -1,15 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Divider, Form, Input, Modal, Select, Space, Tag, Tooltip, Upload } from 'antd'
+import {
+  Alert,
+  App,
+  Button,
+  Divider,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Tag,
+  Tooltip,
+  Upload,
+} from 'antd'
 import { Image as ImageIcon, Plus, Trash2, Video as VideoIcon } from 'lucide-react'
 import { uploadChatMedia } from '@app/lib/api'
 import { loyaltyApi, type LoyaltyTemplate } from '@app/lib/api/loyalty-api'
 import {
-  TEMPLATE_VARIABLES,
   bodyToVariableKeys,
   findUnknownTokens,
   formatTemplateName,
+  getTemplateVariables,
   metaPlaceholdersToTokens,
   tokensToMetaPlaceholders,
 } from './loyalty-template-variables'
@@ -66,11 +79,14 @@ export function LoyaltyTemplateEditorModal({
   const [headerMediaPreviewUrl, setHeaderMediaPreviewUrl] = useState<string>('')
   const [uploading, setUploading] = useState(false)
   const [buttons, setButtons] = useState<ButtonDraft[]>([])
+  const [footerTouched, setFooterTouched] = useState(false)
 
   const queryKey = ['loyalty-templates', socialAccountId]
   const isEditing = !!editingTemplate
   const liveCategory = (Form.useWatch('category', form) as string | undefined) ?? 'MARKETING'
   const defaultMarketingFooter = t('loyalty.default_marketing_footer')
+  const accountFooter = defaultFooter?.trim() ?? ''
+  const templateVariables = useMemo(() => getTemplateVariables(t), [t])
   const categoryOptions = [
     { value: 'MARKETING', label: t('loyalty.template_category_marketing') },
     { value: 'UTILITY', label: t('loyalty.template_category_utility') },
@@ -155,15 +171,17 @@ export function LoyaltyTemplateEditorModal({
       setHeaderType('NONE')
       clearMediaPreview()
       setButtons([])
+      setFooterTouched(false)
     } else if (editingTemplate) {
       form.setFieldsValue({
         name: editingTemplate.name,
         language: editingTemplate.language,
         category: editingTemplate.category,
-        body: metaPlaceholdersToTokens(editingTemplate.body),
-        headerText: metaPlaceholdersToTokens(editingTemplate.headerText ?? ''),
+        body: metaPlaceholdersToTokens(editingTemplate.body, templateVariables),
+        headerText: metaPlaceholdersToTokens(editingTemplate.headerText ?? '', templateVariables),
         footerText: editingTemplate.footerText,
       })
+      setFooterTouched(true)
       setHeaderType((editingTemplate.headerType as HeaderType | undefined) ?? 'NONE')
       setButtons(
         (editingTemplate.buttons ?? []).map((button) => ({
@@ -174,11 +192,16 @@ export function LoyaltyTemplateEditorModal({
         })),
       )
     } else {
-      form.setFieldValue('footerText', defaultMarketingFooter)
+      form.setFieldsValue({
+        language: 'fr',
+        category: 'MARKETING',
+        footerText: defaultMarketingFooter,
+      })
+      setFooterTouched(false)
     }
     // We intentionally don't include clearMediaPreview in deps — its identity
     // changes every render but it's safe to use the latest closure here.
-  }, [open, form, defaultFooter, editingTemplate, defaultMarketingFooter])
+  }, [open, form, editingTemplate, defaultMarketingFooter, templateVariables])
 
   useEffect(() => {
     if (liveCategory === 'MARKETING') return
@@ -199,6 +222,7 @@ export function LoyaltyTemplateEditorModal({
   const liveHeaderText = (Form.useWatch('headerText', form) as string | undefined) ?? ''
   const liveFooter = (Form.useWatch('footerText', form) as string | undefined) ?? ''
   const hasProductTemplateButton = buttons.some((button) => isProductTemplateButton(button.type))
+  const hasMpmTemplateButton = buttons.some((button) => button.type === 'MPM')
   const hasReachedButtonLimit = buttons.length >= MAX_BUTTONS
   const canAddButton = !hasReachedButtonLimit && !hasProductTemplateButton
   const buttonHelpText = hasProductTemplateButton
@@ -213,6 +237,27 @@ export function LoyaltyTemplateEditorModal({
       values = await form.validateFields()
     } catch {
       return
+    }
+
+    if (hasMpmTemplateButton) {
+      if (headerType === 'NONE') {
+        message.error(t('loyalty.button_mpm_header_required_error'))
+        return
+      }
+      if (headerType === 'TEXT' && !String(values.headerText ?? '').trim()) {
+        form.setFields([
+          { name: 'headerText', errors: [t('loyalty.button_mpm_header_text_required')] },
+        ])
+        return
+      }
+      if (
+        (headerType === 'IMAGE' || headerType === 'VIDEO') &&
+        !headerMediaFile &&
+        !headerMediaPreviewUrl
+      ) {
+        message.error(t('loyalty.button_mpm_header_media_required'))
+        return
+      }
     }
 
     const tokenBody = values.body as string
@@ -372,8 +417,15 @@ export function LoyaltyTemplateEditorModal({
                 <Select
                   options={categoryOptions}
                   onChange={(category) => {
-                    if (category === 'MARKETING' && !form.getFieldValue('footerText')) {
-                      form.setFieldValue('footerText', defaultMarketingFooter)
+                    const previousDefault =
+                      liveCategory === 'MARKETING' ? defaultMarketingFooter : accountFooter
+                    const currentFooter = String(form.getFieldValue('footerText') ?? '')
+                    if (!footerTouched || currentFooter === previousDefault) {
+                      form.setFieldValue(
+                        'footerText',
+                        category === 'MARKETING' ? defaultMarketingFooter : accountFooter,
+                      )
+                      setFooterTouched(false)
                     }
                     form.validateFields(['footerText']).catch(() => undefined)
                   }}
@@ -386,7 +438,7 @@ export function LoyaltyTemplateEditorModal({
               {t('loyalty.section_header')}
             </Divider>
 
-            <Form.Item label={t('loyalty.header_type')}>
+            <Form.Item label={t('loyalty.header_type')} required={hasMpmTemplateButton}>
               <Select
                 value={headerType}
                 onChange={(val) => {
@@ -503,7 +555,7 @@ export function LoyaltyTemplateEditorModal({
             </Form.Item>
 
             <div className="mb-4 flex flex-wrap gap-1">
-              {TEMPLATE_VARIABLES.map((v) => (
+              {templateVariables.map((v) => (
                 <Tooltip
                   key={v.key}
                   title={
@@ -549,6 +601,7 @@ export function LoyaltyTemplateEditorModal({
                 placeholder={t('loyalty.footer_text_placeholder')}
                 maxLength={MAX_FOOTER_TEXT}
                 showCount
+                onChange={() => setFooterTouched(true)}
               />
             </Form.Item>
 
@@ -591,6 +644,14 @@ export function LoyaltyTemplateEditorModal({
                       <div className="text-xs text-text-muted">
                         {t('loyalty.button_fixed_label_hint', { label: fixedLabel })}
                       </div>
+                    )}
+                    {btn.type === 'MPM' && (
+                      <Alert
+                        type="info"
+                        showIcon
+                        message={t('loyalty.button_mpm_header_required_title')}
+                        description={t('loyalty.button_mpm_header_required_desc')}
+                      />
                     )}
                     {btn.type === 'URL' && (
                       <Input

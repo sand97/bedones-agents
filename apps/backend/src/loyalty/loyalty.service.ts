@@ -22,6 +22,15 @@ import {
 
 const META_API_BASE = 'https://graph.facebook.com/v22.0'
 
+const META_NAMED_PARAMETER_EXAMPLES: Record<string, string> = {
+  customer_name: 'Marie Dupont',
+  amount: '45 000 FCFA',
+  product_name: 'Sac a main cuir noir',
+  order_count: '7',
+  orders_left: '2',
+  reward_value: '5 000 FCFA',
+}
+
 interface MetaTemplateComponent {
   type: string
   text?: string
@@ -331,6 +340,43 @@ export class LoyaltyService {
     }
   }
 
+  private extractNamedTemplateParameters(text?: string): string[] {
+    if (!text) return []
+    const names = new Set<string>()
+    for (const match of text.matchAll(/{{\s*([^}]+?)\s*}}/g)) {
+      const name = match[1].trim()
+      if (name && !/^\d+$/.test(name)) names.add(name)
+    }
+    return Array.from(names)
+  }
+
+  private buildNamedParameterExamples(names: string[]) {
+    return names.map((paramName) => ({
+      param_name: paramName,
+      example: META_NAMED_PARAMETER_EXAMPLES[paramName] ?? 'Example',
+    }))
+  }
+
+  private buildTextTemplateComponent(type: 'HEADER' | 'BODY', text: string): MetaTemplateComponent {
+    const namedParameters = this.extractNamedTemplateParameters(text)
+    const component: MetaTemplateComponent = { type, text }
+    if (type === 'HEADER') component.format = 'TEXT'
+    if (namedParameters.length > 0) {
+      component.example = {
+        [type === 'HEADER' ? 'header_text_named_params' : 'body_text_named_params']:
+          this.buildNamedParameterExamples(namedParameters),
+      }
+    }
+    return component
+  }
+
+  private usesNamedTemplateParameters(data: Pick<CreateLoyaltyTemplateDto, 'body' | 'headerText'>) {
+    return (
+      this.extractNamedTemplateParameters(data.body).length > 0 ||
+      this.extractNamedTemplateParameters(data.headerText).length > 0
+    )
+  }
+
   /** Fetch the live list of WhatsApp Business message templates from Meta. */
   async listTemplates(socialAccountId: string): Promise<LoyaltyTemplate[]> {
     const { accessToken, wabaId } = await this.resolveWhatsAppAccount(socialAccountId)
@@ -366,7 +412,7 @@ export class LoyaltyService {
 
     // ─── HEADER ───
     if (data.headerType === 'TEXT' && data.headerText?.trim()) {
-      components.push({ type: 'HEADER', text: data.headerText.trim() })
+      components.push(this.buildTextTemplateComponent('HEADER', data.headerText.trim()))
     } else if (
       (data.headerType === 'IMAGE' || data.headerType === 'VIDEO') &&
       data.headerMediaUrl
@@ -383,7 +429,7 @@ export class LoyaltyService {
     }
 
     // ─── BODY (always required) ───
-    components.push({ type: 'BODY', text: data.body })
+    components.push(this.buildTextTemplateComponent('BODY', data.body))
 
     // ─── FOOTER ───
     if (data.footerText?.trim()) {
@@ -450,13 +496,44 @@ export class LoyaltyService {
     }
   }
 
+  private validateTemplateMpmHeader(data: {
+    buttons?: Array<{ type?: string }>
+    headerType?: string
+    headerText?: string
+    headerMediaUrl?: string
+  }) {
+    const hasMpmButton = (data.buttons ?? []).some((button) => button.type === 'MPM')
+    if (!hasMpmButton) return
+
+    if (!data.headerType || data.headerType === 'NONE') {
+      throw new BadRequestException(
+        'Un entête est requis pour les templates avec un bouton multi-produits',
+      )
+    }
+    if (data.headerType === 'TEXT' && !data.headerText?.trim()) {
+      throw new BadRequestException(
+        "Le texte d'entête est requis pour les templates avec un bouton multi-produits",
+      )
+    }
+    if (
+      (data.headerType === 'IMAGE' || data.headerType === 'VIDEO') &&
+      !data.headerMediaUrl?.trim()
+    ) {
+      throw new BadRequestException(
+        "Le média d'entête est requis pour les templates avec un bouton multi-produits",
+      )
+    }
+  }
+
   /** Create a template directly on Meta (it enters Meta's review queue). */
   async createTemplate(data: CreateLoyaltyTemplateDto): Promise<LoyaltyTemplate> {
     const { accessToken, wabaId } = await this.resolveWhatsAppAccount(data.socialAccountId)
     this.validateTemplateFooter(data)
     this.validateTemplateButtons(data)
+    this.validateTemplateMpmHeader(data)
 
     const components = this.buildTemplateComponents(data)
+    const parameterFormat = this.usesNamedTemplateParameters(data) ? 'NAMED' : undefined
 
     const res = await fetch(`${META_API_BASE}/${wabaId}/message_templates`, {
       method: 'POST',
@@ -468,6 +545,7 @@ export class LoyaltyService {
         name: data.name,
         language: data.language ?? 'fr',
         category: data.category ?? 'MARKETING',
+        ...(parameterFormat ? { parameter_format: parameterFormat } : {}),
         components,
       }),
     })
@@ -500,6 +578,7 @@ export class LoyaltyService {
     if (!data.body) throw new BadRequestException('Le corps du template est requis')
     this.validateTemplateFooter(data)
     this.validateTemplateButtons(data)
+    this.validateTemplateMpmHeader(data)
 
     const components = this.buildTemplateComponents({
       socialAccountId,
@@ -514,6 +593,12 @@ export class LoyaltyService {
       footerText: data.footerText,
       buttons: data.buttons,
     })
+    const parameterFormat = this.usesNamedTemplateParameters({
+      body: data.body,
+      headerText: data.headerText,
+    })
+      ? 'NAMED'
+      : undefined
 
     const res = await fetch(`${META_API_BASE}/${templateId}`, {
       method: 'POST',
@@ -523,6 +608,7 @@ export class LoyaltyService {
       },
       body: JSON.stringify({
         category: data.category ?? 'MARKETING',
+        ...(parameterFormat ? { parameter_format: parameterFormat } : {}),
         components,
       }),
     })
@@ -1273,6 +1359,14 @@ export class LoyaltyService {
     return body.replace(/{{\s*([^}]+?)\s*}}/g, (_, key: string) => variables[key.trim()] ?? '')
   }
 
+  private buildTemplateTextParameter(name: string, text: string) {
+    const parameter: Record<string, string> = { type: 'text', text: text ?? '' }
+    if (!/^\d+$/.test(name)) {
+      parameter.parameter_name = name
+    }
+    return parameter
+  }
+
   private async sendWhatsAppTemplate(
     phoneNumberId: string,
     recipientPhone: string,
@@ -1296,7 +1390,7 @@ export class LoyaltyService {
     if (entries.length > 0) {
       components.push({
         type: 'body',
-        parameters: entries.map(([, text]) => ({ type: 'text', text })),
+        parameters: entries.map(([name, text]) => this.buildTemplateTextParameter(name, text)),
       })
     }
 

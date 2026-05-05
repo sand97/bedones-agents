@@ -43,6 +43,7 @@ interface Props {
   open: boolean
   onClose: () => void
   socialAccountId: string
+  defaultFooter?: string
   editingCampaign?: LoyaltyCampaign | null
   onSubmit: (data: LoyaltyCampaignSubmitData) => void
   submitLoading?: boolean
@@ -52,6 +53,7 @@ export function LoyaltyCampaignModal({
   open,
   onClose,
   socialAccountId,
+  defaultFooter,
   editingCampaign,
   onSubmit,
   submitLoading,
@@ -276,6 +278,7 @@ export function LoyaltyCampaignModal({
         >
           <TemplateSelectField
             socialAccountId={socialAccountId}
+            defaultFooter={defaultFooter}
             value={selectedTemplate}
             onChange={(template) => {
               setSelectedTemplate(template)
