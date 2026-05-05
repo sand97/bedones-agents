@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -19,8 +19,10 @@ import {
   type LoyaltyBonus,
   type LoyaltyCampaign,
   type LoyaltyCampaignFrequency,
+  type LoyaltyTemplate,
 } from '@app/lib/api/loyalty-api'
 import { findIncompatibleTemplateVariables } from './loyalty-template-variables'
+import { TemplateSelectField } from './template-select-field'
 
 export interface LoyaltyCampaignSubmitData {
   name: string
@@ -29,6 +31,7 @@ export interface LoyaltyCampaignSubmitData {
   metaTemplateName?: string
   metaTemplateLanguage?: string
   frequency: LoyaltyCampaignFrequency
+  marketingTopic?: string
   /** HH:mm — local hour at which the campaign sends each tick. */
   sendTime?: string
   segmentCriteria: Record<string, unknown>
@@ -55,6 +58,7 @@ export function LoyaltyCampaignModal({
 }: Props) {
   const { t } = useTranslation()
   const [form] = Form.useForm()
+  const [selectedTemplate, setSelectedTemplate] = useState<LoyaltyTemplate | null>(null)
 
   const bonusesQuery = useQuery({
     queryKey: ['loyalty-bonuses', socialAccountId],
@@ -76,9 +80,6 @@ export function LoyaltyCampaignModal({
 
   const selectedBonusId = Form.useWatch('bonusId', form)
   const selectedBonus: LoyaltyBonus | undefined = bonuses.find((b) => b.id === selectedBonusId)
-
-  const selectedTemplateId = Form.useWatch('metaTemplateId', form)
-  const selectedTemplate = templates.find((tmpl) => tmpl.id === selectedTemplateId)
 
   // Live segment thresholds — feed the recipient-count query below.
   const minSpendValue = Form.useWatch('minSpend', form) as number | undefined
@@ -127,6 +128,7 @@ export function LoyaltyCampaignModal({
         metaTemplateId: editingCampaign.metaTemplateId ?? undefined,
         frequency: editingCampaign.frequency,
         sendTime: persistedSendTime ? dayjs(persistedSendTime, 'HH:mm') : undefined,
+        startDate: editingCampaign.startDate ? dayjs(editingCampaign.startDate) : undefined,
         endDate: editingCampaign.endDate ? dayjs(editingCampaign.endDate) : undefined,
         minSpend: criteria.minSpend,
         minOrders: criteria.minOrders,
@@ -134,8 +136,15 @@ export function LoyaltyCampaignModal({
       })
     } else {
       form.resetFields()
+      setSelectedTemplate(null)
     }
   }, [open, editingCampaign, form])
+
+  useEffect(() => {
+    if (!open || !editingCampaign?.metaTemplateId) return
+    const tmpl = templates.find((x) => x.id === editingCampaign.metaTemplateId)
+    if (tmpl) setSelectedTemplate(tmpl)
+  }, [open, editingCampaign, templates])
 
   const handleSubmit = () => {
     form.validateFields().then((values) => {
@@ -147,7 +156,10 @@ export function LoyaltyCampaignModal({
       if (values.minProducts !== undefined && values.minProducts !== null)
         segmentCriteria.minProducts = values.minProducts
 
-      const tmpl = templates.find((x) => x.id === values.metaTemplateId)
+      if (!selectedTemplate) {
+        form.setFields([{ name: 'templateSelector', errors: [t('promotions.required')] }])
+        return
+      }
       const sendTime: string | undefined = values.sendTime
         ? (values.sendTime as dayjs.Dayjs).format('HH:mm')
         : undefined
@@ -156,13 +168,14 @@ export function LoyaltyCampaignModal({
       onSubmit({
         name: values.name,
         bonusId: values.bonusId,
-        metaTemplateId: tmpl?.id,
-        metaTemplateName: tmpl?.name,
-        metaTemplateLanguage: tmpl?.language,
+        metaTemplateId: selectedTemplate.id,
+        metaTemplateName: selectedTemplate.name,
+        metaTemplateLanguage: selectedTemplate.language,
         frequency: values.frequency as LoyaltyCampaignFrequency,
+        marketingTopic: 'loyalty',
         sendTime,
         segmentCriteria,
-        startDate: new Date().toISOString(),
+        startDate: values.startDate ? values.startDate.toISOString() : new Date().toISOString(),
         endDate: values.endDate ? values.endDate.toISOString() : undefined,
       })
     })
@@ -258,16 +271,18 @@ export function LoyaltyCampaignModal({
 
         <Form.Item
           label={t('loyalty.campaign_template')}
-          name="metaTemplateId"
-          rules={[{ required: true, message: t('promotions.required') }]}
+          name="templateSelector"
+          validateTrigger={[]}
         >
-          <Select
-            placeholder={t('loyalty.campaign_select_template')}
-            options={templates.map((tmpl) => ({
-              value: tmpl.id,
-              label: `${tmpl.name} · ${tmpl.language}`,
-            }))}
-            loading={templatesQuery.isLoading}
+          <TemplateSelectField
+            socialAccountId={socialAccountId}
+            value={selectedTemplate}
+            onChange={(template) => {
+              setSelectedTemplate(template)
+              form.setFields([{ name: 'templateSelector', errors: [] }])
+            }}
+            title={t('loyalty.campaign_select_template')}
+            description={t('loyalty.campaign_select_template_desc')}
           />
         </Form.Item>
 
@@ -312,6 +327,14 @@ export function LoyaltyCampaignModal({
               />
             </Form.Item>
           </div>
+        </Form.Item>
+
+        <Form.Item
+          label={t('loyalty.campaign_start_date')}
+          name="startDate"
+          rules={[{ required: true, message: t('promotions.required') }]}
+        >
+          <DatePicker className="w-full" format="DD/MM/YYYY" />
         </Form.Item>
 
         <Form.Item label={t('loyalty.campaign_end_date')} name="endDate">

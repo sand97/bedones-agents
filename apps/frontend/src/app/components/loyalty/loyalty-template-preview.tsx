@@ -1,9 +1,10 @@
-import { Reply, ExternalLink, Phone } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Reply, ExternalLink, Phone, ShoppingBag } from 'lucide-react'
 import { interpolateExamples } from './loyalty-template-variables'
 
 export type HeaderType = 'NONE' | 'TEXT' | 'IMAGE' | 'VIDEO'
 
-export type ButtonType = 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER'
+export type ButtonType = 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER' | 'CATALOG' | 'MPM'
 
 export interface PreviewButton {
   type: ButtonType
@@ -23,6 +24,12 @@ interface Props {
   buttons: PreviewButton[]
 }
 
+export function getTemplateButtonText(type: ButtonType, text?: string) {
+  if (type === 'CATALOG') return 'View catalog'
+  if (type === 'MPM') return 'View items'
+  return text ?? ''
+}
+
 /**
  * Renders a WhatsApp-style message bubble showing what a real customer
  * would receive. Variable tokens in the body are replaced with their
@@ -36,6 +43,7 @@ export function LoyaltyTemplatePreview({
   footerText,
   buttons,
 }: Props) {
+  const { t } = useTranslation()
   const renderedBody = interpolateExamples(body || '')
   const renderedHeader = headerType === 'TEXT' ? interpolateExamples(headerText || '') : headerText
 
@@ -54,10 +62,14 @@ export function LoyaltyTemplatePreview({
           />
         )}
         {headerType === 'IMAGE' && !headerMediaUrl && (
-          <div className="loyalty-preview__media loyalty-preview__media--placeholder">Image</div>
+          <div className="loyalty-preview__media loyalty-preview__media--placeholder">
+            {t('chat.image')}
+          </div>
         )}
         {headerType === 'VIDEO' && !headerMediaUrl && (
-          <div className="loyalty-preview__media loyalty-preview__media--placeholder">Vidéo</div>
+          <div className="loyalty-preview__media loyalty-preview__media--placeholder">
+            {t('chat.video')}
+          </div>
         )}
 
         <div className="loyalty-preview__content">
@@ -75,11 +87,17 @@ export function LoyaltyTemplatePreview({
           <div className="loyalty-preview__buttons">
             {buttons.map((btn, i) => {
               const Icon =
-                btn.type === 'URL' ? ExternalLink : btn.type === 'PHONE_NUMBER' ? Phone : Reply
+                btn.type === 'URL'
+                  ? ExternalLink
+                  : btn.type === 'PHONE_NUMBER'
+                    ? Phone
+                    : btn.type === 'CATALOG' || btn.type === 'MPM'
+                      ? ShoppingBag
+                      : Reply
               return (
                 <div key={i} className="loyalty-preview__button">
                   <Icon size={14} />
-                  <span>{btn.text || '—'}</span>
+                  <span>{getTemplateButtonText(btn.type, btn.text) || '—'}</span>
                 </div>
               )
             })}

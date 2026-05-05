@@ -1,0 +1,5 @@
+-- RenameIndex
+ALTER INDEX "ContactCommunicationPreference_conversationId_channel_purpose_t" RENAME TO "ContactCommunicationPreference_conversationId_channel_purpo_key";
+
+-- RenameIndex
+ALTER INDEX "ContactCommunicationPreference_socialAccountId_purpose_topic_st" RENAME TO "ContactCommunicationPreference_socialAccountId_purpose_topi_idx";

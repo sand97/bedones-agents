@@ -19,6 +19,8 @@ export function LoyaltyCampaignDescriptionCard({ campaign, onDelete }: Props) {
     RUNNING: { label: t('loyalty.status_running'), color: '#22c55e' },
     COMPLETED: { label: t('loyalty.status_completed'), color: '#64748b' },
     PAUSED: { label: t('promotions.status_paused'), color: '#f59e0b' },
+    FAILED: { label: t('loyalty.status_failed'), color: '#ef4444' },
+    CANCELLED: { label: t('loyalty.status_cancelled'), color: '#6b7280' },
   }
   const statusConfig = STATUS_CONFIG[campaign.status]
 

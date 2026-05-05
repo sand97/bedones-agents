@@ -210,6 +210,81 @@ export class MessagingService {
     }
   }
 
+  async sendTemplateMessage(
+    userId: string,
+    conversationId: string,
+    metaTemplateName: string,
+    metaTemplateLanguage: string,
+    variables?: Record<string, string>,
+    renderedBody?: string,
+    metaTemplateId?: string,
+  ) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        socialAccount: {
+          select: {
+            id: true,
+            provider: true,
+            providerAccountId: true,
+            organisationId: true,
+            scopes: true,
+          },
+        },
+      },
+    })
+    if (!conversation) throw new NotFoundException('Conversation not found')
+    await this.assertMembership(userId, conversation.socialAccount.organisationId)
+    this.assertScope(conversation.socialAccount.scopes, 'messages')
+
+    if (conversation.socialAccount.provider !== 'WHATSAPP') {
+      throw new BadRequestException('Template messages are only supported on WhatsApp')
+    }
+
+    const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
+    const platformMsgId = await this.sendWhatsAppTemplatePayload(
+      conversation.socialAccount.providerAccountId,
+      conversation.participantId,
+      accessToken,
+      metaTemplateName,
+      metaTemplateLanguage,
+      variables,
+    )
+
+    const displayText = renderedBody || `[template:${metaTemplateName}]`
+    const savedMessage = await this.prisma.directMessage.create({
+      data: {
+        conversationId,
+        platformMsgId,
+        message: displayText,
+        senderId: conversation.socialAccount.providerAccountId,
+        senderName: 'Page',
+        isFromPage: true,
+        isRead: true,
+        mediaType: 'template',
+        deliveryStatus: 'sent',
+        metadata: {
+          kind: 'template',
+          templateId: metaTemplateId ?? null,
+          templateName: metaTemplateName,
+          templateLanguage: metaTemplateLanguage,
+          variables: variables ?? {},
+        },
+        createdTime: new Date(),
+      },
+    })
+
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        lastMessageText: displayText,
+        lastMessageAt: new Date(),
+      },
+    })
+
+    return savedMessage
+  }
+
   // ─── Send message as AI agent (no user auth check) ───
 
   async sendMessageAsAgent(
@@ -923,6 +998,73 @@ export class MessagingService {
       )
       throw new BadRequestException(
         `Failed to send WhatsApp message: ${JSON.stringify(data?.error?.message || data)}`,
+      )
+    }
+
+    const messages = (data as { messages?: Array<{ id: string }> }).messages
+    return messages?.[0]?.id || null
+  }
+
+  async sendWhatsAppTemplatePayload(
+    phoneNumberId: string,
+    recipientPhone: string,
+    accessToken: string,
+    templateName: string,
+    languageCode: string,
+    variables?: Record<string, string>,
+  ): Promise<string | null> {
+    const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${phoneNumberId}/messages`
+    const variableEntries = Object.entries(variables ?? {}).sort(([a], [b]) => {
+      const an = Number(a)
+      const bn = Number(b)
+      if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn
+      return a.localeCompare(b)
+    })
+
+    const components =
+      variableEntries.length > 0
+        ? [
+            {
+              type: 'body',
+              parameters: variableEntries.map(([, text]) => ({ type: 'text', text: text ?? '' })),
+            },
+          ]
+        : undefined
+
+    const body = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipientPhone,
+      type: 'template',
+      template: {
+        name: templateName,
+        language: { code: languageCode },
+        ...(components ? { components } : {}),
+      },
+    }
+
+    this.logger.log(
+      `[WhatsApp] Sending template ${templateName}/${languageCode} to ${recipientPhone}`,
+    )
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      this.logger.error(
+        `[WhatsApp] Template send failed (${response.status})\n` +
+          `  Payload: ${JSON.stringify(body)}\n` +
+          `  Response: ${JSON.stringify(data)}`,
+      )
+      throw new BadRequestException(
+        `Failed to send WhatsApp template: ${JSON.stringify(data?.error?.message || data)}`,
       )
     }
 

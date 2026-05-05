@@ -44,6 +44,7 @@ interface ChatWindowProps {
   hasCatalog?: boolean
   onProductClick?: () => void
   onCatalogClick?: () => void
+  onTemplateClick?: () => void
 }
 
 function formatTime(timestamp: string): string {
@@ -817,6 +818,7 @@ export function ChatWindow({
   hasCatalog,
   onProductClick,
   onCatalogClick,
+  onTemplateClick,
 }: ChatWindowProps) {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -924,6 +926,13 @@ export function ChatWindow({
     return active.length > 0 ? active[active.length - 1] : null
   }, [tickets])
 
+  const templateOnly = useMemo(() => {
+    if (provider !== 'whatsapp') return false
+    const lastInbound = [...conversation.messages].reverse().find((msg) => msg.from === 'customer')
+    if (!lastInbound) return false
+    return dayjs().diff(dayjs(lastInbound.timestamp), 'hour', true) > 24
+  }, [conversation.messages, provider])
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <ChatHeader conversation={conversation} />
@@ -990,6 +999,8 @@ export function ChatWindow({
         hasCatalog={hasCatalog}
         onProductClick={onProductClick}
         onCatalogClick={onCatalogClick}
+        onTemplateClick={onTemplateClick}
+        templateOnly={templateOnly}
       />
 
       {/* Ticket drawer */}

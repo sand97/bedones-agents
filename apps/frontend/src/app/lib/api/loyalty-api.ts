@@ -20,8 +20,17 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
 
 export type LoyaltyRewardType = 'PRODUCTS' | 'CREDIT' | 'PERCENT'
 export type LoyaltyBonusStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'EXPIRED'
-export type LoyaltyCampaignStatus = 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'PAUSED'
+export type LoyaltyCampaignStatus =
+  | 'DRAFT'
+  | 'SCHEDULED'
+  | 'RUNNING'
+  | 'COMPLETED'
+  | 'PAUSED'
+  | 'CANCELLED'
+  | 'FAILED'
 export type LoyaltyCampaignFrequency = 'ONCE' | 'DAILY' | 'WEEKLY' | 'MONTHLY'
+export type CampaignOrigin = 'LOYALTY' | 'GENERAL'
+export type CampaignAudienceType = 'RECENT_CONTACTS' | 'PRODUCT_INTEREST' | 'TICKET_STATUS'
 
 export interface LoyaltyContact {
   id: string
@@ -79,12 +88,32 @@ export interface LoyaltyTemplate {
   body: string
   variables: string[]
   status: string
+  headerType?: string
+  headerText?: string
+  footerText?: string
+  buttons?: Array<{ type: string; text: string; url?: string; phoneNumber?: string }>
+  rejectionReason?: string
+}
+
+export interface CampaignTemplateSelection {
+  languageCodes?: string[]
+  allLanguages?: boolean
+  metaTemplateId: string
+  metaTemplateName: string
+  metaTemplateLanguage: string
+  metaTemplateCategory?: string
+  body?: string
+  variableValues?: Record<string, string>
+  mpmProductRetailerIds?: string[]
+  mpmSectionTitle?: string
+  mpmThumbnailProductRetailerId?: string
 }
 
 export interface LoyaltyCampaign {
   id: string
   socialAccountId: string
-  bonusId: string
+  bonusId?: string | null
+  origin: CampaignOrigin
   metaTemplateId?: string | null
   metaTemplateName?: string | null
   metaTemplateLanguage?: string | null
@@ -92,7 +121,13 @@ export interface LoyaltyCampaign {
   name: string
   status: LoyaltyCampaignStatus
   frequency: LoyaltyCampaignFrequency
+  marketingTopic?: string
   segmentCriteria?: Record<string, unknown> | null
+  audienceType?: CampaignAudienceType | null
+  audienceCriteria?: Record<string, unknown> | null
+  audienceLimit?: number | null
+  templateAssignments?: CampaignTemplateSelection[] | null
+  variableValues?: Record<string, string> | null
   startDate?: string | null
   endDate?: string | null
   deliveredCount: number
@@ -203,7 +238,7 @@ export const loyaltyApi = {
     headerMediaUrl?: string
     footerText?: string
     buttons?: Array<{
-      type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER'
+      type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER' | 'CATALOG' | 'MPM'
       text: string
       url?: string
       phoneNumber?: string
@@ -213,6 +248,31 @@ export const loyaltyApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  updateTemplate: (
+    socialAccountId: string,
+    templateId: string,
+    data: Partial<{
+      name: string
+      language: string
+      category: string
+      body: string
+      variables: string[]
+      headerType: 'NONE' | 'TEXT' | 'IMAGE' | 'VIDEO'
+      headerText: string
+      headerMediaUrl: string
+      footerText: string
+      buttons: Array<{
+        type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER' | 'CATALOG' | 'MPM'
+        text: string
+        url?: string
+        phoneNumber?: string
+      }>
+    }>,
+  ) =>
+    fetchJson<LoyaltyTemplate>(`/loyalty/templates/account/${socialAccountId}/${templateId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
   removeTemplate: (socialAccountId: string, name: string) =>
     fetchJson<void>(
       `/loyalty/templates/account/${socialAccountId}/by-name/${encodeURIComponent(name)}`,
@@ -220,8 +280,59 @@ export const loyaltyApi = {
     ),
 
   // Campaigns
-  listCampaigns: (socialAccountId: string) =>
-    fetchJson<LoyaltyCampaign[]>(`/loyalty/campaigns/account/${socialAccountId}`),
+  listCampaigns: (socialAccountId: string, params?: { origin?: CampaignOrigin }) => {
+    const query = new URLSearchParams()
+    if (params?.origin) query.set('origin', params.origin)
+    return fetchJson<LoyaltyCampaign[]>(
+      `/loyalty/campaigns/account/${socialAccountId}?${query.toString()}`,
+    )
+  },
+  previewCampaignAudience: (
+    socialAccountId: string,
+    data: {
+      audienceType: CampaignAudienceType
+      audienceCriteria?: Record<string, unknown>
+      audienceLimit?: number
+      marketingTopic?: string
+    },
+  ) =>
+    fetchJson<{
+      count: number
+      maxEligible: number
+      limitedCount: number
+      languages: Array<{ code: string; count: number }>
+    }>(`/loyalty/campaigns/account/${socialAccountId}/audience-preview`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getCampaignDetails: (
+    id: string,
+    params?: { bucket?: string; page?: number; pageSize?: number },
+  ) => {
+    const query = new URLSearchParams()
+    if (params?.bucket) query.set('bucket', params.bucket)
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize))
+    return fetchJson<{
+      campaign: LoyaltyCampaign
+      stats: Array<{ date: string; delivered: number; read: number; replied: number }>
+      contacts: {
+        data: Array<{
+          id: string
+          contactPhone: string
+          contactName: string
+          languageCode?: string | null
+          status: string
+          deliveredAt?: string | null
+          readAt?: string | null
+          repliedAt?: string | null
+        }>
+        total: number
+        page: number
+        pageSize: number
+      }
+    }>(`/loyalty/campaigns/${id}/details?${query.toString()}`)
+  },
   previewCampaignCount: (
     socialAccountId: string,
     criteria: { minSpend?: number; minOrders?: number },
@@ -235,13 +346,20 @@ export const loyaltyApi = {
   },
   createCampaign: (data: {
     socialAccountId: string
-    bonusId: string
+    bonusId?: string
+    origin?: CampaignOrigin
     metaTemplateId?: string
     metaTemplateName?: string
     metaTemplateLanguage?: string
     name: string
     frequency?: LoyaltyCampaignFrequency
+    marketingTopic?: string
     segmentCriteria?: Record<string, unknown>
+    audienceType?: CampaignAudienceType
+    audienceCriteria?: Record<string, unknown>
+    audienceLimit?: number
+    templateAssignments?: CampaignTemplateSelection[]
+    variableValues?: Record<string, string>
     startDate?: string
     endDate?: string
   }) =>
@@ -258,7 +376,13 @@ export const loyaltyApi = {
       metaTemplateLanguage: string
       status: LoyaltyCampaignStatus
       frequency: LoyaltyCampaignFrequency
+      marketingTopic: string
       segmentCriteria: Record<string, unknown>
+      audienceType: CampaignAudienceType
+      audienceCriteria: Record<string, unknown>
+      audienceLimit: number
+      templateAssignments: CampaignTemplateSelection[]
+      variableValues: Record<string, string>
       startDate: string
       endDate: string
     }>,

@@ -7,6 +7,8 @@ import {
   CreateLoyaltyCampaignDto,
   CreateLoyaltyContactDto,
   CreateLoyaltyTemplateDto,
+  CampaignAudiencePreviewDto,
+  UpdateLoyaltyTemplateDto,
   UpdateLoyaltyBonusDto,
   UpdateLoyaltyCampaignDto,
   UpdateLoyaltyContactDto,
@@ -86,6 +88,15 @@ export class LoyaltyController {
     return this.loyaltyService.createTemplate(dto)
   }
 
+  @Patch('templates/account/:socialAccountId/:templateId')
+  updateTemplate(
+    @Param('socialAccountId') socialAccountId: string,
+    @Param('templateId') templateId: string,
+    @Body() dto: UpdateLoyaltyTemplateDto,
+  ) {
+    return this.loyaltyService.updateTemplate(socialAccountId, templateId, dto)
+  }
+
   @Delete('templates/account/:socialAccountId/by-name/:name')
   removeTemplate(@Param('socialAccountId') socialAccountId: string, @Param('name') name: string) {
     return this.loyaltyService.removeTemplate(socialAccountId, name)
@@ -94,8 +105,11 @@ export class LoyaltyController {
   // ─── Campaigns ───
 
   @Get('campaigns/account/:socialAccountId')
-  listCampaigns(@Param('socialAccountId') socialAccountId: string) {
-    return this.loyaltyService.listCampaigns(socialAccountId)
+  listCampaigns(
+    @Param('socialAccountId') socialAccountId: string,
+    @Query('origin') origin?: string,
+  ) {
+    return this.loyaltyService.listCampaigns(socialAccountId, { origin })
   }
 
   @Get('campaigns/account/:socialAccountId/preview-count')
@@ -107,6 +121,28 @@ export class LoyaltyController {
     return this.loyaltyService.previewCampaignCount(socialAccountId, {
       minSpend: minSpend ? Number(minSpend) : undefined,
       minOrders: minOrders ? Number(minOrders) : undefined,
+    })
+  }
+
+  @Post('campaigns/account/:socialAccountId/audience-preview')
+  previewCampaignAudience(
+    @Param('socialAccountId') socialAccountId: string,
+    @Body() dto: CampaignAudiencePreviewDto,
+  ) {
+    return this.loyaltyService.previewCampaignAudience(socialAccountId, dto)
+  }
+
+  @Get('campaigns/:id/details')
+  getCampaignDetails(
+    @Param('id') id: string,
+    @Query('bucket') bucket?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.loyaltyService.getCampaignDetails(id, {
+      bucket,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
     })
   }
 

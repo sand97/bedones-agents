@@ -1181,6 +1181,37 @@
         ]
       }
     },
+    "/messaging/send-template": {
+      "post": {
+        "operationId": "MessagingController_sendTemplateMessage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendTemplateMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectMessageResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
     "/messaging/mark-read": {
       "post": {
         "operationId": "MessagingController_markRead",
@@ -3422,6 +3453,47 @@
         ]
       }
     },
+    "/loyalty/templates/account/{socialAccountId}/{templateId}": {
+      "patch": {
+        "operationId": "LoyaltyController_updateTemplate",
+        "parameters": [
+          {
+            "name": "socialAccountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "templateId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLoyaltyTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
     "/loyalty/templates/account/{socialAccountId}/by-name/{name}": {
       "delete": {
         "operationId": "LoyaltyController_removeTemplate",
@@ -3464,6 +3536,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "origin",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3498,6 +3578,86 @@
           },
           {
             "name": "minOrders",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/campaigns/account/{socialAccountId}/audience-preview": {
+      "post": {
+        "operationId": "LoyaltyController_previewCampaignAudience",
+        "parameters": [
+          {
+            "name": "socialAccountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignAudiencePreviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/campaigns/{id}/details": {
+      "get": {
+        "operationId": "LoyaltyController_getCampaignDetails",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
             "required": true,
             "in": "query",
             "schema": {
@@ -4552,6 +4712,15 @@
           "participantAvatar": {
             "type": "string"
           },
+          "languageCode": {
+            "type": "string"
+          },
+          "languageSource": {
+            "type": "string"
+          },
+          "languageConfidence": {
+            "type": "number"
+          },
           "lastMessageText": {
             "type": "string"
           },
@@ -4772,6 +4941,35 @@
           "productRetailerIds",
           "catalogId",
           "format"
+        ]
+      },
+      "SendTemplateMessageDto": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "metaTemplateName": {
+            "type": "string"
+          },
+          "metaTemplateLanguage": {
+            "type": "string"
+          },
+          "metaTemplateId": {
+            "type": "string"
+          },
+          "renderedBody": {
+            "type": "string"
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "conversationId",
+          "metaTemplateName",
+          "metaTemplateLanguage"
         ]
       },
       "MarkConversationReadDto": {
@@ -5780,7 +5978,9 @@
             "enum": [
               "QUICK_REPLY",
               "URL",
-              "PHONE_NUMBER"
+              "PHONE_NUMBER",
+              "CATALOG",
+              "MPM"
             ]
           },
           "text": {
@@ -5814,7 +6014,8 @@
             "type": "string",
             "enum": [
               "MARKETING",
-              "UTILITY"
+              "UTILITY",
+              "AUTHENTICATION"
             ]
           },
           "body": {
@@ -5857,6 +6058,137 @@
           "body"
         ]
       },
+      "UpdateLoyaltyTemplateDto": {
+        "type": "object",
+        "properties": {
+          "socialAccountId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "MARKETING",
+              "UTILITY",
+              "AUTHENTICATION"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "variables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "headerType": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "TEXT",
+              "IMAGE",
+              "VIDEO"
+            ]
+          },
+          "headerText": {
+            "type": "string"
+          },
+          "headerMediaUrl": {
+            "type": "string"
+          },
+          "footerText": {
+            "type": "string"
+          },
+          "buttons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LoyaltyTemplateButtonDto"
+            }
+          }
+        }
+      },
+      "CampaignAudiencePreviewDto": {
+        "type": "object",
+        "properties": {
+          "audienceType": {
+            "type": "string",
+            "enum": [
+              "RECENT_CONTACTS",
+              "PRODUCT_INTEREST",
+              "TICKET_STATUS"
+            ]
+          },
+          "audienceCriteria": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "audienceLimit": {
+            "type": "number"
+          },
+          "marketingTopic": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "audienceType"
+        ]
+      },
+      "CampaignTemplateSelectionDto": {
+        "type": "object",
+        "properties": {
+          "languageCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allLanguages": {
+            "type": "boolean"
+          },
+          "metaTemplateId": {
+            "type": "string"
+          },
+          "metaTemplateName": {
+            "type": "string"
+          },
+          "metaTemplateLanguage": {
+            "type": "string"
+          },
+          "metaTemplateCategory": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "variableValues": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "mpmProductRetailerIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mpmSectionTitle": {
+            "type": "string"
+          },
+          "mpmThumbnailProductRetailerId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "metaTemplateId",
+          "metaTemplateName",
+          "metaTemplateLanguage"
+        ]
+      },
       "CreateLoyaltyCampaignDto": {
         "type": "object",
         "properties": {
@@ -5865,6 +6197,13 @@
           },
           "bonusId": {
             "type": "string"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "LOYALTY",
+              "GENERAL"
+            ]
           },
           "metaTemplateId": {
             "type": "string",
@@ -5890,7 +6229,35 @@
               "MONTHLY"
             ]
           },
+          "marketingTopic": {
+            "type": "string"
+          },
           "segmentCriteria": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "audienceType": {
+            "type": "string",
+            "enum": [
+              "RECENT_CONTACTS",
+              "PRODUCT_INTEREST",
+              "TICKET_STATUS"
+            ]
+          },
+          "audienceCriteria": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "audienceLimit": {
+            "type": "number"
+          },
+          "templateAssignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampaignTemplateSelectionDto"
+            }
+          },
+          "variableValues": {
             "type": "object",
             "additionalProperties": true
           },
@@ -5903,7 +6270,6 @@
         },
         "required": [
           "socialAccountId",
-          "bonusId",
           "name"
         ]
       },
@@ -5929,7 +6295,9 @@
               "SCHEDULED",
               "RUNNING",
               "COMPLETED",
-              "PAUSED"
+              "PAUSED",
+              "CANCELLED",
+              "FAILED"
             ]
           },
           "frequency": {
@@ -5941,7 +6309,35 @@
               "MONTHLY"
             ]
           },
+          "marketingTopic": {
+            "type": "string"
+          },
           "segmentCriteria": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "audienceType": {
+            "type": "string",
+            "enum": [
+              "RECENT_CONTACTS",
+              "PRODUCT_INTEREST",
+              "TICKET_STATUS"
+            ]
+          },
+          "audienceCriteria": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "audienceLimit": {
+            "type": "number"
+          },
+          "templateAssignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampaignTemplateSelectionDto"
+            }
+          },
+          "variableValues": {
             "type": "object",
             "additionalProperties": true
           },

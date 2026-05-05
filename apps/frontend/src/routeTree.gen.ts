@@ -39,6 +39,7 @@ import { Route as AppOrgSlugCatalogRouteImport } from './routes/app/$orgSlug/cat
 import { Route as AppOrgSlugAgentsRouteImport } from './routes/app/$orgSlug/agents'
 import { Route as AppOrgSlugCommentsIdRouteImport } from './routes/app/$orgSlug/comments/$id'
 import { Route as AppOrgSlugChatsIdRouteImport } from './routes/app/$orgSlug/chats/$id'
+import { Route as AppOrgSlugSocialAccountIdCampaignsRouteImport } from './routes/app/$orgSlug/$socialAccountId/campaigns'
 
 const OrganisationsRoute = OrganisationsRouteImport.update({
   id: '/organisations',
@@ -190,6 +191,12 @@ const AppOrgSlugChatsIdRoute = AppOrgSlugChatsIdRouteImport.update({
   path: '/chats/$id',
   getParentRoute: () => AppOrgSlugRouteRoute,
 } as any)
+const AppOrgSlugSocialAccountIdCampaignsRoute =
+  AppOrgSlugSocialAccountIdCampaignsRouteImport.update({
+    id: '/$socialAccountId/campaigns',
+    path: '/$socialAccountId/campaigns',
+    getParentRoute: () => AppOrgSlugRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -220,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/legal/en/privacy': typeof LegalEnPrivacyRoute
   '/legal/fr/conditions': typeof LegalFrConditionsRoute
   '/legal/fr/privacy': typeof LegalFrPrivacyRoute
+  '/app/$orgSlug/$socialAccountId/campaigns': typeof AppOrgSlugSocialAccountIdCampaignsRoute
   '/app/$orgSlug/chats/$id': typeof AppOrgSlugChatsIdRoute
   '/app/$orgSlug/comments/$id': typeof AppOrgSlugCommentsIdRoute
 }
@@ -252,6 +260,7 @@ export interface FileRoutesByTo {
   '/legal/en/privacy': typeof LegalEnPrivacyRoute
   '/legal/fr/conditions': typeof LegalFrConditionsRoute
   '/legal/fr/privacy': typeof LegalFrPrivacyRoute
+  '/app/$orgSlug/$socialAccountId/campaigns': typeof AppOrgSlugSocialAccountIdCampaignsRoute
   '/app/$orgSlug/chats/$id': typeof AppOrgSlugChatsIdRoute
   '/app/$orgSlug/comments/$id': typeof AppOrgSlugCommentsIdRoute
 }
@@ -285,6 +294,7 @@ export interface FileRoutesById {
   '/legal/en/privacy': typeof LegalEnPrivacyRoute
   '/legal/fr/conditions': typeof LegalFrConditionsRoute
   '/legal/fr/privacy': typeof LegalFrPrivacyRoute
+  '/app/$orgSlug/$socialAccountId/campaigns': typeof AppOrgSlugSocialAccountIdCampaignsRoute
   '/app/$orgSlug/chats/$id': typeof AppOrgSlugChatsIdRoute
   '/app/$orgSlug/comments/$id': typeof AppOrgSlugCommentsIdRoute
 }
@@ -319,6 +329,7 @@ export interface FileRouteTypes {
     | '/legal/en/privacy'
     | '/legal/fr/conditions'
     | '/legal/fr/privacy'
+    | '/app/$orgSlug/$socialAccountId/campaigns'
     | '/app/$orgSlug/chats/$id'
     | '/app/$orgSlug/comments/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -351,6 +362,7 @@ export interface FileRouteTypes {
     | '/legal/en/privacy'
     | '/legal/fr/conditions'
     | '/legal/fr/privacy'
+    | '/app/$orgSlug/$socialAccountId/campaigns'
     | '/app/$orgSlug/chats/$id'
     | '/app/$orgSlug/comments/$id'
   id:
@@ -383,6 +395,7 @@ export interface FileRouteTypes {
     | '/legal/en/privacy'
     | '/legal/fr/conditions'
     | '/legal/fr/privacy'
+    | '/app/$orgSlug/$socialAccountId/campaigns'
     | '/app/$orgSlug/chats/$id'
     | '/app/$orgSlug/comments/$id'
   fileRoutesById: FileRoutesById
@@ -618,6 +631,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugChatsIdRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
+    '/app/$orgSlug/$socialAccountId/campaigns': {
+      id: '/app/$orgSlug/$socialAccountId/campaigns'
+      path: '/$socialAccountId/campaigns'
+      fullPath: '/app/$orgSlug/$socialAccountId/campaigns'
+      preLoaderRoute: typeof AppOrgSlugSocialAccountIdCampaignsRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
   }
 }
 
@@ -634,6 +654,7 @@ interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugStatsRoute: typeof AppOrgSlugStatsRoute
   AppOrgSlugTicketsRoute: typeof AppOrgSlugTicketsRoute
   AppOrgSlugWebsiteRoute: typeof AppOrgSlugWebsiteRoute
+  AppOrgSlugSocialAccountIdCampaignsRoute: typeof AppOrgSlugSocialAccountIdCampaignsRoute
   AppOrgSlugChatsIdRoute: typeof AppOrgSlugChatsIdRoute
   AppOrgSlugCommentsIdRoute: typeof AppOrgSlugCommentsIdRoute
 }
@@ -651,6 +672,8 @@ const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugStatsRoute: AppOrgSlugStatsRoute,
   AppOrgSlugTicketsRoute: AppOrgSlugTicketsRoute,
   AppOrgSlugWebsiteRoute: AppOrgSlugWebsiteRoute,
+  AppOrgSlugSocialAccountIdCampaignsRoute:
+    AppOrgSlugSocialAccountIdCampaignsRoute,
   AppOrgSlugChatsIdRoute: AppOrgSlugChatsIdRoute,
   AppOrgSlugCommentsIdRoute: AppOrgSlugCommentsIdRoute,
 }

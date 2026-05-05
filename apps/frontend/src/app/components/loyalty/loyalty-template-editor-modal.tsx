@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Divider, Form, Input, Modal, Select, Tag, Tooltip, Upload } from 'antd'
+import { App, Button, Divider, Form, Input, Modal, Select, Space, Tag, Tooltip, Upload } from 'antd'
 import { Image as ImageIcon, Plus, Trash2, Video as VideoIcon } from 'lucide-react'
 import { uploadChatMedia } from '@app/lib/api'
 import { loyaltyApi, type LoyaltyTemplate } from '@app/lib/api/loyalty-api'
@@ -10,9 +10,11 @@ import {
   bodyToVariableKeys,
   findUnknownTokens,
   formatTemplateName,
+  metaPlaceholdersToTokens,
   tokensToMetaPlaceholders,
 } from './loyalty-template-variables'
 import {
+  getTemplateButtonText,
   LoyaltyTemplatePreview,
   type ButtonType,
   type HeaderType,
@@ -25,35 +27,14 @@ interface Props {
   socialAccountId: string
   /** Used as the default footer text when none is provided. */
   defaultFooter?: string
+  editingTemplate?: LoyaltyTemplate | null
 }
-
-const CATEGORY_OPTIONS = [
-  { value: 'MARKETING', label: 'Marketing' },
-  { value: 'UTILITY', label: 'Utility' },
-]
-
-const LANGUAGE_OPTIONS = [
-  { value: 'fr', label: 'Français' },
-  { value: 'en', label: 'English' },
-]
-
-const HEADER_TYPE_OPTIONS: { value: HeaderType; label: string }[] = [
-  { value: 'NONE', label: 'Aucun' },
-  { value: 'TEXT', label: 'Texte' },
-  { value: 'IMAGE', label: 'Photo' },
-  { value: 'VIDEO', label: 'Vidéo' },
-]
-
-const BUTTON_TYPE_OPTIONS: { value: ButtonType; label: string }[] = [
-  { value: 'QUICK_REPLY', label: 'Réponse rapide' },
-  { value: 'URL', label: 'Lien (URL)' },
-  { value: 'PHONE_NUMBER', label: 'Appel téléphonique' },
-]
 
 const MAX_BUTTONS = 10
 const MAX_BUTTON_TEXT = 25
 const MAX_HEADER_TEXT = 60
 const MAX_FOOTER_TEXT = 60
+const PRODUCT_TEMPLATE_BUTTON_TYPES: ButtonType[] = ['CATALOG', 'MPM']
 
 interface ButtonDraft {
   type: ButtonType
@@ -62,11 +43,16 @@ interface ButtonDraft {
   phoneNumber?: string
 }
 
+function isProductTemplateButton(type: ButtonType) {
+  return PRODUCT_TEMPLATE_BUTTON_TYPES.includes(type)
+}
+
 export function LoyaltyTemplateEditorModal({
   open,
   onClose,
   socialAccountId,
   defaultFooter,
+  editingTemplate,
 }: Props) {
   const { t } = useTranslation()
   const { message } = App.useApp()
@@ -82,6 +68,35 @@ export function LoyaltyTemplateEditorModal({
   const [buttons, setButtons] = useState<ButtonDraft[]>([])
 
   const queryKey = ['loyalty-templates', socialAccountId]
+  const isEditing = !!editingTemplate
+  const liveCategory = (Form.useWatch('category', form) as string | undefined) ?? 'MARKETING'
+  const defaultMarketingFooter = t('loyalty.default_marketing_footer')
+  const categoryOptions = [
+    { value: 'MARKETING', label: t('loyalty.template_category_marketing') },
+    { value: 'UTILITY', label: t('loyalty.template_category_utility') },
+    { value: 'AUTHENTICATION', label: t('loyalty.template_category_authentication') },
+  ]
+  const languageOptions = [
+    { value: 'fr', label: t('loyalty.template_language_fr') },
+    { value: 'en', label: t('loyalty.template_language_en') },
+  ]
+  const headerTypeOptions: { value: HeaderType; label: string }[] = [
+    { value: 'NONE', label: t('loyalty.header_type_none') },
+    { value: 'TEXT', label: t('loyalty.header_type_text') },
+    { value: 'IMAGE', label: t('loyalty.header_type_image') },
+    { value: 'VIDEO', label: t('loyalty.header_type_video') },
+  ]
+  const buttonTypeOptions: { value: ButtonType; label: string }[] = [
+    { value: 'QUICK_REPLY', label: t('loyalty.button_type_quick_reply') },
+    { value: 'URL', label: t('loyalty.button_type_url') },
+    { value: 'PHONE_NUMBER', label: t('loyalty.button_type_phone') },
+    ...(liveCategory === 'MARKETING'
+      ? [
+          { value: 'CATALOG' as const, label: t('loyalty.button_type_catalog') },
+          { value: 'MPM' as const, label: t('loyalty.button_type_mpm') },
+        ]
+      : []),
+  ]
 
   const createMutation = useMutation({
     mutationFn: (payload: {
@@ -103,6 +118,28 @@ export function LoyaltyTemplateEditorModal({
     },
   })
 
+  const updateMutation = useMutation({
+    mutationFn: (payload: {
+      name: string
+      body: string
+      variables: string[]
+      language: string
+      category: string
+      headerType: HeaderType
+      headerText?: string
+      headerMediaUrl?: string
+      footerText?: string
+      buttons: ButtonDraft[]
+    }) => loyaltyApi.updateTemplate(socialAccountId, editingTemplate!.id, payload),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<LoyaltyTemplate[]>(queryKey, (prev) =>
+        (prev ?? []).map((tmpl) => (tmpl.id === updated.id ? { ...tmpl, ...updated } : tmpl)),
+      )
+      message.success(t('loyalty.template_updated'))
+      onClose()
+    },
+  })
+
   // Revoke any blob: URL we created so we don't leak.
   const clearMediaPreview = () => {
     setHeaderMediaPreviewUrl((prev) => {
@@ -118,12 +155,35 @@ export function LoyaltyTemplateEditorModal({
       setHeaderType('NONE')
       clearMediaPreview()
       setButtons([])
-    } else if (defaultFooter) {
-      form.setFieldValue('footerText', defaultFooter)
+    } else if (editingTemplate) {
+      form.setFieldsValue({
+        name: editingTemplate.name,
+        language: editingTemplate.language,
+        category: editingTemplate.category,
+        body: metaPlaceholdersToTokens(editingTemplate.body),
+        headerText: metaPlaceholdersToTokens(editingTemplate.headerText ?? ''),
+        footerText: editingTemplate.footerText,
+      })
+      setHeaderType((editingTemplate.headerType as HeaderType | undefined) ?? 'NONE')
+      setButtons(
+        (editingTemplate.buttons ?? []).map((button) => ({
+          type: button.type as ButtonType,
+          text: button.text,
+          url: button.url,
+          phoneNumber: button.phoneNumber,
+        })),
+      )
+    } else {
+      form.setFieldValue('footerText', defaultMarketingFooter)
     }
     // We intentionally don't include clearMediaPreview in deps — its identity
     // changes every render but it's safe to use the latest closure here.
-  }, [open, form, defaultFooter])
+  }, [open, form, defaultFooter, editingTemplate, defaultMarketingFooter])
+
+  useEffect(() => {
+    if (liveCategory === 'MARKETING') return
+    setButtons((prev) => prev.filter((button) => !isProductTemplateButton(button.type)))
+  }, [liveCategory])
 
   // Cleanup the blob URL when the component unmounts.
   useEffect(() => {
@@ -138,6 +198,14 @@ export function LoyaltyTemplateEditorModal({
   const liveBody = (Form.useWatch('body', form) as string | undefined) ?? ''
   const liveHeaderText = (Form.useWatch('headerText', form) as string | undefined) ?? ''
   const liveFooter = (Form.useWatch('footerText', form) as string | undefined) ?? ''
+  const hasProductTemplateButton = buttons.some((button) => isProductTemplateButton(button.type))
+  const hasReachedButtonLimit = buttons.length >= MAX_BUTTONS
+  const canAddButton = !hasReachedButtonLimit && !hasProductTemplateButton
+  const buttonHelpText = hasProductTemplateButton
+    ? t('loyalty.buttons_product_locked_hint')
+    : hasReachedButtonLimit
+      ? t('loyalty.buttons_limit_reached', { max: MAX_BUTTONS })
+      : t('loyalty.buttons_hint', { max: MAX_BUTTONS })
 
   const handleSubmit = async () => {
     let values
@@ -169,9 +237,14 @@ export function LoyaltyTemplateEditorModal({
     }
 
     // Reject button rows the user added but never filled in.
-    const cleanButtons = buttons.filter((b) => b.text.trim().length > 0)
+    const cleanButtons = buttons
+      .map((button) => ({
+        ...button,
+        text: getTemplateButtonText(button.type, button.text).trim(),
+      }))
+      .filter((button) => button.text.length > 0)
 
-    createMutation.mutate({
+    const payload = {
       name: values.name,
       body: metaBody,
       variables: bodyToVariableKeys(tokenBody),
@@ -182,7 +255,10 @@ export function LoyaltyTemplateEditorModal({
       headerMediaUrl: mediaUrl,
       footerText: (values.footerText as string | undefined)?.trim() || undefined,
       buttons: cleanButtons,
-    })
+    }
+
+    if (isEditing) updateMutation.mutate(payload)
+    else createMutation.mutate(payload)
   }
 
   const insertToken = (token: string) => {
@@ -193,12 +269,26 @@ export function LoyaltyTemplateEditorModal({
   }
 
   const handleAddButton = () => {
-    if (buttons.length >= MAX_BUTTONS) return
+    if (!canAddButton) return
     setButtons((prev) => [...prev, { type: 'QUICK_REPLY', text: '' }])
   }
 
   const updateButton = (index: number, patch: Partial<ButtonDraft>) => {
-    setButtons((prev) => prev.map((b, i) => (i === index ? { ...b, ...patch } : b)))
+    setButtons((prev) => {
+      const nextButton = { ...prev[index], ...patch }
+      if (patch.type && isProductTemplateButton(patch.type)) {
+        return [
+          {
+            type: patch.type,
+            text: getTemplateButtonText(patch.type),
+          },
+        ]
+      }
+      if (patch.type && !isProductTemplateButton(patch.type)) {
+        nextButton.text = isProductTemplateButton(prev[index]?.type) ? '' : (nextButton.text ?? '')
+      }
+      return prev.map((b, i) => (i === index ? nextButton : b))
+    })
   }
 
   const removeButton = (index: number) => {
@@ -206,25 +296,44 @@ export function LoyaltyTemplateEditorModal({
   }
 
   const previewButtons: PreviewButton[] = buttons
-    .filter((b) => b.text.trim().length > 0)
-    .map((b) => ({ ...b }))
+    .map((button) => ({
+      ...button,
+      text: getTemplateButtonText(button.type, button.text).trim(),
+    }))
+    .filter((button) => button.text.length > 0)
 
   return (
     <Modal
-      title={t('loyalty.template_create')}
+      title={isEditing ? t('loyalty.template_edit') : t('loyalty.template_create')}
       open={open}
       onCancel={onClose}
       width={960}
-      styles={{ body: { maxHeight: '78vh', overflowY: 'auto' } }}
+      wrapClassName="campaign-modal-wrap"
+      className="campaign-modal"
+      style={{ top: 24 }}
+      styles={{
+        content: {
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: 'calc(100dvh - 48px)',
+        },
+        body: {
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+        },
+        header: { flex: '0 0 auto' },
+        footer: { flex: '0 0 auto' },
+      }}
       footer={
         <div className="flex items-center justify-end gap-2">
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             type="primary"
             onClick={handleSubmit}
-            loading={uploading || createMutation.isPending}
+            loading={uploading || createMutation.isPending || updateMutation.isPending}
           >
-            {t('common.create')}
+            {isEditing ? t('common.save') : t('common.create')}
           </Button>
         </div>
       }
@@ -247,6 +356,7 @@ export function LoyaltyTemplateEditorModal({
             >
               <Input
                 placeholder="welcome_loyalty_program"
+                disabled={isEditing}
                 onBlur={(e) => {
                   const formatted = formatTemplateName(e.target.value)
                   if (formatted !== e.target.value) form.setFieldValue('name', formatted)
@@ -256,10 +366,18 @@ export function LoyaltyTemplateEditorModal({
 
             <div className="grid grid-cols-2 gap-3">
               <Form.Item label={t('loyalty.template_language')} name="language">
-                <Select options={LANGUAGE_OPTIONS} />
+                <Select options={languageOptions} disabled={isEditing} />
               </Form.Item>
               <Form.Item label={t('loyalty.template_category')} name="category">
-                <Select options={CATEGORY_OPTIONS} />
+                <Select
+                  options={categoryOptions}
+                  onChange={(category) => {
+                    if (category === 'MARKETING' && !form.getFieldValue('footerText')) {
+                      form.setFieldValue('footerText', defaultMarketingFooter)
+                    }
+                    form.validateFields(['footerText']).catch(() => undefined)
+                  }}
+                />
               </Form.Item>
             </div>
 
@@ -276,7 +394,7 @@ export function LoyaltyTemplateEditorModal({
                   if (val !== 'IMAGE' && val !== 'VIDEO') clearMediaPreview()
                   if (val !== 'TEXT') form.setFieldValue('headerText', undefined)
                 }}
-                options={HEADER_TYPE_OPTIONS}
+                options={headerTypeOptions}
               />
             </Form.Item>
 
@@ -412,7 +530,19 @@ export function LoyaltyTemplateEditorModal({
             <Form.Item
               label={t('loyalty.footer_text')}
               name="footerText"
-              rules={[{ max: MAX_FOOTER_TEXT }]}
+              rules={[
+                { max: MAX_FOOTER_TEXT },
+                {
+                  validator: (_, value: string | undefined) => {
+                    if (liveCategory !== 'MARKETING') return Promise.resolve()
+                    const footer = value?.trim() ?? ''
+                    if (!footer.includes('STOP')) {
+                      return Promise.reject(new Error(t('loyalty.footer_stop_required')))
+                    }
+                    return Promise.resolve()
+                  },
+                },
+              ]}
               extra={t('loyalty.footer_text_hint')}
             >
               <Input
@@ -428,80 +558,72 @@ export function LoyaltyTemplateEditorModal({
             </Divider>
 
             <div className="flex flex-col gap-2">
-              {buttons.map((btn, i) => (
-                <div
-                  key={i}
-                  className="flex items-end gap-2 rounded-md border border-border-subtle p-2"
-                >
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <div>
-                      <div className="mb-1 text-xs font-medium text-text-primary">
-                        {t('loyalty.button_type')}
-                      </div>
+              {buttons.map((btn, i) => {
+                const hasFixedLabel = isProductTemplateButton(btn.type)
+                const fixedLabel = getTemplateButtonText(btn.type)
+
+                return (
+                  <div key={i} className="flex flex-col gap-2">
+                    <Space.Compact block>
                       <Select
                         value={btn.type}
-                        onChange={(val) => updateButton(i, { type: val })}
-                        options={BUTTON_TYPE_OPTIONS}
-                        className="w-full"
+                        onChange={(val: ButtonType) => updateButton(i, { type: val })}
+                        options={buttonTypeOptions}
+                        style={{ width: hasFixedLabel ? 'calc(100% - var(--height-input))' : 220 }}
                       />
-                    </div>
-                    <div>
-                      <div className="mb-1 text-xs font-medium text-text-primary">
-                        {t('loyalty.button_text')}
-                      </div>
-                      <Input
-                        value={btn.text}
-                        onChange={(e) => updateButton(i, { text: e.target.value })}
-                        maxLength={MAX_BUTTON_TEXT}
-                        showCount
-                        placeholder={t('loyalty.button_text_placeholder')}
-                      />
-                    </div>
-                    {btn.type === 'URL' && (
-                      <div className="col-span-2">
-                        <div className="mb-1 text-xs font-medium text-text-primary">
-                          {t('loyalty.button_url')}
-                        </div>
+                      {!hasFixedLabel && (
                         <Input
-                          value={btn.url ?? ''}
-                          onChange={(e) => updateButton(i, { url: e.target.value })}
-                          placeholder="https://"
+                          value={btn.text}
+                          onChange={(e) => updateButton(i, { text: e.target.value })}
+                          maxLength={MAX_BUTTON_TEXT}
+                          showCount
+                          placeholder={t('loyalty.button_text_placeholder')}
                         />
+                      )}
+                      <Button
+                        danger
+                        icon={<Trash2 size={14} />}
+                        onClick={() => removeButton(i)}
+                        className="loyalty-template-button-delete"
+                      />
+                    </Space.Compact>
+                    {hasFixedLabel && (
+                      <div className="text-xs text-text-muted">
+                        {t('loyalty.button_fixed_label_hint', { label: fixedLabel })}
                       </div>
+                    )}
+                    {btn.type === 'URL' && (
+                      <Input
+                        addonBefore={t('loyalty.button_url')}
+                        value={btn.url ?? ''}
+                        onChange={(e) => updateButton(i, { url: e.target.value })}
+                        placeholder="https://"
+                      />
                     )}
                     {btn.type === 'PHONE_NUMBER' && (
-                      <div className="col-span-2">
-                        <div className="mb-1 text-xs font-medium text-text-primary">
-                          {t('loyalty.button_phone')}
-                        </div>
-                        <Input
-                          value={btn.phoneNumber ?? ''}
-                          onChange={(e) => updateButton(i, { phoneNumber: e.target.value })}
-                          placeholder="+237 6XX XXX XXX"
-                        />
-                      </div>
+                      <Input
+                        addonBefore={t('loyalty.button_phone')}
+                        value={btn.phoneNumber ?? ''}
+                        onChange={(e) => updateButton(i, { phoneNumber: e.target.value })}
+                        placeholder="+237 6XX XXX XXX"
+                      />
                     )}
                   </div>
-                  <Button
-                    type="text"
-                    danger
-                    icon={<Trash2 size={14} />}
-                    onClick={() => removeButton(i)}
-                  />
-                </div>
-              ))}
+                )
+              })}
 
               <Button
                 onClick={handleAddButton}
                 icon={<Plus size={14} />}
-                disabled={buttons.length >= MAX_BUTTONS}
+                disabled={!canAddButton}
                 className="self-start"
               >
                 {t('loyalty.add_button')}
               </Button>
-              <div className="text-xs text-text-muted">
-                {t('loyalty.buttons_hint', { max: MAX_BUTTONS })}
-              </div>
+              <div className="text-xs text-text-muted">{buttonHelpText}</div>
+              {liveCategory === 'MARKETING' && !hasProductTemplateButton && (
+                <div className="text-xs text-text-muted">{t('loyalty.product_buttons_hint')}</div>
+              )}
             </div>
           </Form>
         </div>

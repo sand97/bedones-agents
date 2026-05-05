@@ -12,12 +12,13 @@ interface SocialSetupProps {
   buttonIcon?: ReactNode
   onAction?: () => void
   loading?: boolean
-  /** Secondary action — rendered next to the primary button (wraps under it on narrow widths). */
+  /** Secondary action — rendered next to the primary button by default. */
   secondaryButtonLabel?: string
   secondaryButtonType?: 'primary' | 'default'
   secondaryButtonIcon?: ReactNode
   onSecondaryAction?: () => void
   secondaryLoading?: boolean
+  actionsLayout?: 'row' | 'stack'
   children?: ReactNode
 }
 
@@ -36,8 +37,14 @@ export function SocialSetup({
   secondaryButtonIcon,
   onSecondaryAction,
   secondaryLoading,
+  actionsLayout = 'row',
   children,
 }: SocialSetupProps) {
+  const actionsClassName =
+    actionsLayout === 'stack'
+      ? 'flex flex-col items-center justify-center gap-3'
+      : 'flex flex-wrap items-center justify-center gap-3'
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-24">
       <div className="flex max-w-md flex-col items-center text-center">
@@ -53,7 +60,7 @@ export function SocialSetup({
         {children}
 
         {(buttonLabel || secondaryButtonLabel) && (
-          <div className="flex flex-wrap items-center justify-center gap-3">
+          <div className={actionsClassName}>
             {buttonLabel && (
               <Button
                 type={buttonType}

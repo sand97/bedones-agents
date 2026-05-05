@@ -126,7 +126,7 @@ export class UpdateLoyaltyBonusDto {
 // ─── Templates (Meta-only — never persisted) ───
 
 export class LoyaltyTemplateButtonDto {
-  @ApiProperty({ enum: ['QUICK_REPLY', 'URL', 'PHONE_NUMBER'] })
+  @ApiProperty({ enum: ['QUICK_REPLY', 'URL', 'PHONE_NUMBER', 'CATALOG', 'MPM'] })
   type: string
 
   @ApiProperty()
@@ -149,7 +149,7 @@ export class CreateLoyaltyTemplateDto {
   @ApiPropertyOptional()
   language?: string
 
-  @ApiPropertyOptional({ enum: ['MARKETING', 'UTILITY'] })
+  @ApiPropertyOptional({ enum: ['MARKETING', 'UTILITY', 'AUTHENTICATION'] })
   category?: string
 
   @ApiProperty()
@@ -174,14 +174,101 @@ export class CreateLoyaltyTemplateDto {
   buttons?: LoyaltyTemplateButtonDto[]
 }
 
+export class UpdateLoyaltyTemplateDto {
+  @ApiPropertyOptional()
+  socialAccountId?: string
+
+  @ApiPropertyOptional()
+  name?: string
+
+  @ApiPropertyOptional()
+  language?: string
+
+  @ApiPropertyOptional({ enum: ['MARKETING', 'UTILITY', 'AUTHENTICATION'] })
+  category?: string
+
+  @ApiPropertyOptional()
+  body?: string
+
+  @ApiPropertyOptional({ type: [String] })
+  variables?: string[]
+
+  @ApiPropertyOptional({ enum: ['NONE', 'TEXT', 'IMAGE', 'VIDEO'] })
+  headerType?: string
+
+  @ApiPropertyOptional()
+  headerText?: string
+
+  @ApiPropertyOptional()
+  headerMediaUrl?: string
+
+  @ApiPropertyOptional()
+  footerText?: string
+
+  @ApiPropertyOptional({ type: [LoyaltyTemplateButtonDto] })
+  buttons?: LoyaltyTemplateButtonDto[]
+}
+
 // ─── Campaigns ───
+
+export class CampaignTemplateSelectionDto {
+  @ApiPropertyOptional({ type: [String] })
+  languageCodes?: string[]
+
+  @ApiPropertyOptional()
+  allLanguages?: boolean
+
+  @ApiProperty()
+  metaTemplateId: string
+
+  @ApiProperty()
+  metaTemplateName: string
+
+  @ApiProperty()
+  metaTemplateLanguage: string
+
+  @ApiPropertyOptional()
+  metaTemplateCategory?: string
+
+  @ApiPropertyOptional()
+  body?: string
+
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  variableValues?: Record<string, string>
+
+  @ApiPropertyOptional({ type: [String] })
+  mpmProductRetailerIds?: string[]
+
+  @ApiPropertyOptional()
+  mpmSectionTitle?: string
+
+  @ApiPropertyOptional()
+  mpmThumbnailProductRetailerId?: string
+}
+
+export class CampaignAudiencePreviewDto {
+  @ApiProperty({ enum: ['RECENT_CONTACTS', 'PRODUCT_INTEREST', 'TICKET_STATUS'] })
+  audienceType: string
+
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  audienceCriteria?: Record<string, unknown>
+
+  @ApiPropertyOptional()
+  audienceLimit?: number
+
+  @ApiPropertyOptional()
+  marketingTopic?: string
+}
 
 export class CreateLoyaltyCampaignDto {
   @ApiProperty()
   socialAccountId: string
 
-  @ApiProperty()
-  bonusId: string
+  @ApiPropertyOptional()
+  bonusId?: string
+
+  @ApiPropertyOptional({ enum: ['LOYALTY', 'GENERAL'] })
+  origin?: string
 
   @ApiPropertyOptional({ description: 'Meta WhatsApp template id' })
   metaTemplateId?: string
@@ -198,8 +285,26 @@ export class CreateLoyaltyCampaignDto {
   @ApiPropertyOptional({ enum: ['ONCE', 'DAILY', 'WEEKLY', 'MONTHLY'] })
   frequency?: string
 
+  @ApiPropertyOptional()
+  marketingTopic?: string
+
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   segmentCriteria?: Record<string, unknown>
+
+  @ApiPropertyOptional({ enum: ['RECENT_CONTACTS', 'PRODUCT_INTEREST', 'TICKET_STATUS'] })
+  audienceType?: string
+
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  audienceCriteria?: Record<string, unknown>
+
+  @ApiPropertyOptional()
+  audienceLimit?: number
+
+  @ApiPropertyOptional({ type: [CampaignTemplateSelectionDto] })
+  templateAssignments?: CampaignTemplateSelectionDto[]
+
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  variableValues?: Record<string, string>
 
   @ApiPropertyOptional()
   startDate?: string
@@ -221,14 +326,34 @@ export class UpdateLoyaltyCampaignDto {
   @ApiPropertyOptional()
   metaTemplateLanguage?: string
 
-  @ApiPropertyOptional({ enum: ['DRAFT', 'SCHEDULED', 'RUNNING', 'COMPLETED', 'PAUSED'] })
+  @ApiPropertyOptional({
+    enum: ['DRAFT', 'SCHEDULED', 'RUNNING', 'COMPLETED', 'PAUSED', 'CANCELLED', 'FAILED'],
+  })
   status?: string
 
   @ApiPropertyOptional({ enum: ['ONCE', 'DAILY', 'WEEKLY', 'MONTHLY'] })
   frequency?: string
 
+  @ApiPropertyOptional()
+  marketingTopic?: string
+
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   segmentCriteria?: Record<string, unknown>
+
+  @ApiPropertyOptional({ enum: ['RECENT_CONTACTS', 'PRODUCT_INTEREST', 'TICKET_STATUS'] })
+  audienceType?: string
+
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  audienceCriteria?: Record<string, unknown>
+
+  @ApiPropertyOptional()
+  audienceLimit?: number
+
+  @ApiPropertyOptional({ type: [CampaignTemplateSelectionDto] })
+  templateAssignments?: CampaignTemplateSelectionDto[]
+
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  variableValues?: Record<string, string>
 
   @ApiPropertyOptional()
   startDate?: string

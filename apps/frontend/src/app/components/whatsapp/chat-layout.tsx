@@ -4,7 +4,15 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Button, Popover, Checkbox } from 'antd'
-import { MessageCircle, Sparkles, ShoppingBag, EllipsisVertical } from 'lucide-react'
+import {
+  FileText,
+  Megaphone,
+  MessageCircle,
+  Sparkles,
+  ShoppingBag,
+  Tag,
+  Wrench,
+} from 'lucide-react'
 import { ConversationList } from './conversation-list'
 import { ChatWindow } from './chat-window'
 import { SocialSetup } from '@app/components/social/social-setup'
@@ -84,6 +92,8 @@ interface ChatLayoutProps {
   onConfigureCatalog?: () => void
   /** Callback when user clicks the Options button */
   onOpenOptions?: () => void
+  onOpenTemplates?: () => void
+  onOpenCampaigns?: () => void
   /** Social account ID used to fetch labels from the database */
   socialAccountId?: string
   /** Whether the current WhatsApp number has a linked catalog for product sending */
@@ -92,6 +102,7 @@ interface ChatLayoutProps {
   onProductClick?: () => void
   /** Called when user clicks the "Send catalog" attachment option */
   onCatalogClick?: () => void
+  onTemplateClick?: () => void
 }
 
 /* ── Labels filter popover ── */
@@ -167,6 +178,87 @@ function useSetupState(
   return null
 }
 
+function WhatsAppToolsPopover({
+  onOpenOptions,
+  onOpenTemplates,
+  onOpenCampaigns,
+  children,
+}: {
+  onOpenOptions?: () => void
+  onOpenTemplates?: () => void
+  onOpenCampaigns?: () => void
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const { t } = useTranslation()
+  const items = [
+    {
+      label: t('chat.tools_catalog'),
+      icon: <ShoppingBag size={18} />,
+      color: 'text-green-500',
+      bgColor: 'bg-green-50',
+      onClick: onOpenOptions,
+    },
+    {
+      label: t('chat.tools_labels'),
+      icon: <Tag size={18} />,
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-50',
+      onClick: onOpenOptions,
+    },
+    {
+      label: t('chat.tools_templates'),
+      icon: <FileText size={18} />,
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-50',
+      onClick: onOpenTemplates,
+    },
+    {
+      label: t('chat.tools_campaigns'),
+      icon: <Megaphone size={18} />,
+      color: 'text-orange-500',
+      bgColor: 'bg-orange-50',
+      onClick: onOpenCampaigns,
+    },
+  ]
+
+  return (
+    <Popover
+      content={
+        <div className="flex w-48 flex-col gap-0.5">
+          {items.map((item) => (
+            <Button
+              key={item.label}
+              type="text"
+              block
+              onClick={() => {
+                setOpen(false)
+                item.onClick?.()
+              }}
+              className="py-2.5!"
+            >
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${item.bgColor} ${item.color}`}
+              >
+                {item.icon}
+              </div>
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      }
+      trigger="click"
+      open={open}
+      onOpenChange={setOpen}
+      placement="bottomRight"
+      overlayClassName="org-switcher-popover"
+      arrow={false}
+    >
+      {children}
+    </Popover>
+  )
+}
+
 export function ChatLayout({
   conversations,
   loading = false,
@@ -183,10 +275,13 @@ export function ChatLayout({
   onConfigureAgent,
   onConfigureCatalog,
   onOpenOptions,
+  onOpenTemplates,
+  onOpenCampaigns,
   socialAccountId,
   hasCatalogForProducts,
   onProductClick,
   onCatalogClick,
+  onTemplateClick,
 }: ChatLayoutProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -363,17 +458,21 @@ export function ChatLayout({
               size="small"
               className="comments-filter-btn"
             >
-              Labels{selectedLabelIds.length > 0 ? ` (${selectedLabelIds.length})` : ''}
+              {t('chat.tools_labels')}
+              {selectedLabelIds.length > 0 ? ` (${selectedLabelIds.length})` : ''}
             </Button>
           </LabelsFilterPopover>
           {provider === 'whatsapp' && (
             <div className="ml-auto">
-              <Button
-                type="text"
-                size="small"
-                icon={<EllipsisVertical size={16} />}
-                onClick={onOpenOptions}
-              />
+              <WhatsAppToolsPopover
+                onOpenOptions={onOpenOptions}
+                onOpenTemplates={onOpenTemplates}
+                onOpenCampaigns={onOpenCampaigns}
+              >
+                <Button type="text" size="small" icon={<Wrench size={16} />}>
+                  {t('chat.tools')}
+                </Button>
+              </WhatsAppToolsPopover>
             </div>
           )}
         </div>
@@ -427,6 +526,7 @@ export function ChatLayout({
             hasCatalog={hasCatalogForProducts}
             onProductClick={onProductClick}
             onCatalogClick={onCatalogClick}
+            onTemplateClick={onTemplateClick}
           />
         ) : (
           renderDesktopSetup()

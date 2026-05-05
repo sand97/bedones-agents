@@ -9,6 +9,7 @@ import {
   DirectMessageResponseDto,
   SendMessageDto,
   SendProductMessageDto,
+  SendTemplateMessageDto,
   MarkConversationReadDto,
   SetConversationAgentOverrideDto,
 } from './dto/messaging.dto'
@@ -77,6 +78,24 @@ export class MessagingController {
       body.headerText,
       body.bodyText,
       body.footerText,
+    )
+  }
+
+  @Post('send-template')
+  @ApiBody({ type: SendTemplateMessageDto })
+  @ApiCreatedResponse({ type: DirectMessageResponseDto })
+  async sendTemplateMessage(
+    @CurrentUser() user: { id: string },
+    @Body() body: SendTemplateMessageDto,
+  ) {
+    return this.messagingService.sendTemplateMessage(
+      user.id,
+      body.conversationId,
+      body.metaTemplateName,
+      body.metaTemplateLanguage,
+      body.variables,
+      body.renderedBody,
+      body.metaTemplateId,
     )
   }
 

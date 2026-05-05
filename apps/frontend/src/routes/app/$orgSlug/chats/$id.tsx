@@ -14,6 +14,8 @@ import { AccountSwitcher, type SocialAccount } from '@app/components/social/acco
 import { ChatLayout } from '@app/components/whatsapp/chat-layout'
 import { ProductSendModal } from '@app/components/whatsapp/product-send-modal'
 import { CatalogSendModal } from '@app/components/whatsapp/catalog-send-modal'
+import { TemplateMessageModal } from '@app/components/whatsapp/template-message-modal'
+import { LoyaltyTemplateModal } from '@app/components/loyalty/loyalty-template-modal'
 import { uploadChatMedia } from '@app/lib/api'
 import { WhatsAppIcon, InstagramIcon, MessengerIcon } from '@app/components/icons/social-icons'
 import { useLayout } from '@app/contexts/layout-context'
@@ -278,6 +280,8 @@ function ChatsPage() {
   const [catalogLinkOpen, setCatalogLinkOpen] = useState(false)
   const [productSendOpen, setProductSendOpen] = useState(false)
   const [catalogSendOpen, setCatalogSendOpen] = useState(false)
+  const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [templateMessageOpen, setTemplateMessageOpen] = useState(false)
 
   // ─── Agents query: check if any agent covers the current provider ───
   const agentsQuery = usePersistedQuery<Agent[]>({
@@ -387,6 +391,7 @@ function ChatsPage() {
 
   // ─── Send mutation ───
   const sendMutation = $api.useMutation('post', '/messaging/send')
+  const sendTemplateMutation = $api.useMutation('post', '/messaging/send-template')
   const sendProductMutation = $api.useMutation('post', '/messaging/send-products')
   const markReadMutation = $api.useMutation('post', '/messaging/mark-read')
   const syncMutation = $api.useMutation('post', '/messaging/sync/{accountId}')
@@ -719,6 +724,26 @@ function ChatsPage() {
     })
   }
 
+  const handleSendTemplate = async (data: {
+    template: { id: string; name: string; language: string }
+    variables: Record<string, string>
+    renderedBody: string
+  }) => {
+    if (!search.conv) return
+    const convId = search.conv
+    await sendTemplateMutation.mutateAsync({
+      body: {
+        conversationId: convId,
+        metaTemplateId: data.template.id,
+        metaTemplateName: data.template.name,
+        metaTemplateLanguage: data.template.language,
+        variables: data.variables,
+        renderedBody: data.renderedBody,
+      },
+    })
+    queryClient.invalidateQueries({ queryKey: messagesKey(convId) })
+  }
+
   const handleConfigureAgent = useCallback(() => {
     navigate({ to: '/app/$orgSlug/agents' as string, params: { orgSlug } })
   }, [navigate, orgSlug])
@@ -901,10 +926,19 @@ function ChatsPage() {
         onConfigureAgent={handleConfigureAgent}
         onConfigureCatalog={() => setCatalogLinkOpen(true)}
         onOpenOptions={() => setWhatsappConfigOpen(true)}
+        onOpenTemplates={() => setTemplatesOpen(true)}
+        onOpenCampaigns={() => {
+          if (!currentAccount?.id) return
+          navigate({
+            to: '/app/$orgSlug/$socialAccountId/campaigns' as string,
+            params: { orgSlug, socialAccountId: currentAccount.id },
+          })
+        }}
         socialAccountId={currentAccount?.id}
         hasCatalogForProducts={!!linkedCatalog}
         onProductClick={() => setProductSendOpen(true)}
         onCatalogClick={() => setCatalogSendOpen(true)}
+        onTemplateClick={() => setTemplateMessageOpen(true)}
       />
       {id === 'whatsapp' && currentAccount && (
         <>
@@ -933,6 +967,18 @@ function ChatsPage() {
               currentAccount.pageName || currentAccount.username || currentAccount.providerAccountId
             }
             catalogs={catalogsQuery.data || []}
+          />
+          <LoyaltyTemplateModal
+            open={templatesOpen}
+            onClose={() => setTemplatesOpen(false)}
+            socialAccountId={currentAccount.id}
+          />
+          <TemplateMessageModal
+            open={templateMessageOpen}
+            onClose={() => setTemplateMessageOpen(false)}
+            socialAccountId={currentAccount.id}
+            onSend={handleSendTemplate}
+            loading={sendTemplateMutation.isPending}
           />
           {linkedCatalog && (
             <>

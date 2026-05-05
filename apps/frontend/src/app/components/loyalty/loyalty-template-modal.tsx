@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Modal, Spin, Tag } from 'antd'
-import { Plus, Trash2 } from 'lucide-react'
+import { App, Button, Modal, Spin } from 'antd'
+import { Plus } from 'lucide-react'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { WhatsAppIcon } from '@app/components/icons/social-icons'
 import { loyaltyApi, type LoyaltyTemplate } from '@app/lib/api/loyalty-api'
 import { LoyaltyTemplateEditorModal } from './loyalty-template-editor-modal'
-import { metaPlaceholdersToTokens } from './loyalty-template-variables'
+import { LoyaltyTemplateListItem } from './loyalty-template-list-item'
 
 interface Props {
   open: boolean
@@ -15,6 +15,8 @@ interface Props {
   socialAccountId: string
   /** Pre-fills the footer field of the create modal (typically the WhatsApp page name). */
   defaultFooter?: string
+  onTemplateSelected?: (template: LoyaltyTemplate) => void
+  selectedTemplateId?: string
 }
 
 /**
@@ -22,12 +24,20 @@ interface Props {
  * We use staleTime: Infinity so we don't hammer Meta on every modal open;
  * a manual refresh happens after create/delete via setQueryData / invalidate.
  */
-export function LoyaltyTemplateModal({ open, onClose, socialAccountId, defaultFooter }: Props) {
+export function LoyaltyTemplateModal({
+  open,
+  onClose,
+  socialAccountId,
+  defaultFooter,
+  onTemplateSelected,
+  selectedTemplateId,
+}: Props) {
   const { t } = useTranslation()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
 
   const [editorOpen, setEditorOpen] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<LoyaltyTemplate | null>(null)
 
   const queryKey = useMemo(() => ['loyalty-templates', socialAccountId], [socialAccountId])
 
@@ -62,6 +72,25 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId, defaultFo
     })
   }
 
+  const handleEdit = (tmpl: LoyaltyTemplate) => {
+    setEditingTemplate(tmpl)
+    setEditorOpen(true)
+  }
+
+  const handleCreate = () => {
+    setEditingTemplate(null)
+    setEditorOpen(true)
+  }
+
+  const handleSelect = (tmpl: LoyaltyTemplate) => {
+    if (tmpl.status?.toUpperCase() !== 'APPROVED') {
+      message.warning(t('loyalty.template_select_approved_only'))
+      return
+    }
+    onTemplateSelected?.(tmpl)
+    onClose()
+  }
+
   const templates = data ?? []
   const showEmpty = !isLoading && templates.length === 0
 
@@ -76,7 +105,7 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId, defaultFo
         footer={
           showEmpty ? null : (
             <div className="flex items-center justify-end gap-2">
-              <Button type="primary" icon={<Plus size={14} />} onClick={() => setEditorOpen(true)}>
+              <Button type="primary" icon={<Plus size={14} />} onClick={handleCreate}>
                 {t('loyalty.template_create')}
               </Button>
             </div>
@@ -95,38 +124,20 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId, defaultFo
             description={t('loyalty.templates_empty_desc')}
             buttonLabel={t('loyalty.template_create')}
             buttonIcon={<Plus size={18} />}
-            onAction={() => setEditorOpen(true)}
+            onAction={handleCreate}
           />
         ) : (
           <div className="flex flex-col gap-2" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
             {templates.map((tmpl) => (
-              <div
+              <LoyaltyTemplateListItem
                 key={tmpl.id}
-                className="flex items-start gap-3 rounded-md border border-border-subtle p-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-text-primary">
-                    {tmpl.name}
-                  </div>
-                  <div className="mt-1 line-clamp-2 text-xs text-text-secondary">
-                    {metaPlaceholdersToTokens(tmpl.body)}
-                  </div>
-                  <div className="mt-2 flex items-center gap-1">
-                    <Tag bordered={false} color="default">
-                      {tmpl.language}
-                    </Tag>
-                    <Tag bordered={false}>{tmpl.category}</Tag>
-                    <Tag bordered={false}>{tmpl.status}</Tag>
-                  </div>
-                </div>
-                <Button
-                  size="small"
-                  type="text"
-                  danger
-                  icon={<Trash2 size={12} />}
-                  onClick={() => handleDelete(tmpl)}
-                />
-              </div>
+                template={tmpl}
+                selected={selectedTemplateId === tmpl.id}
+                selectionMode={!!onTemplateSelected}
+                onSelect={handleSelect}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
             ))}
           </div>
         )}
@@ -134,9 +145,13 @@ export function LoyaltyTemplateModal({ open, onClose, socialAccountId, defaultFo
 
       <LoyaltyTemplateEditorModal
         open={editorOpen}
-        onClose={() => setEditorOpen(false)}
+        onClose={() => {
+          setEditorOpen(false)
+          setEditingTemplate(null)
+        }}
         socialAccountId={socialAccountId}
         defaultFooter={defaultFooter}
+        editingTemplate={editingTemplate}
       />
     </>
   )

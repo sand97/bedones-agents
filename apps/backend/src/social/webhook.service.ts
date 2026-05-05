@@ -1088,6 +1088,11 @@ export class WebhookService {
       platformMsgId: status.id,
       deliveryStatus: status.status,
     })
+
+    this.eventEmitter.emit('campaign.whatsapp.status', {
+      platformMsgId: status.id,
+      status: status.status,
+    })
   }
 
   private async downloadWhatsAppMedia(

@@ -135,10 +135,10 @@ model User {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  memberships              OrganisationMember[]
-  sessions                 Session[]
-  notificationPreferences  NotificationPreference[]
-  whatsappOptInWindows     WhatsAppOptInWindow[]
+  memberships             OrganisationMember[]
+  sessions                Session[]
+  notificationPreferences NotificationPreference[]
+  whatsappOptInWindows    WhatsAppOptInWindow[]
 }
 
 model Session {
@@ -191,7 +191,7 @@ model SocialAccount {
   organisation      Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   provider          SocialProvider
   providerAccountId String
-  wabaId            String?        // WhatsApp Business Account ID (for WHATSAPP provider)
+  wabaId            String? // WhatsApp Business Account ID (for WHATSAPP provider)
   pageName          String?
   pageAbout         String?
   username          String?
@@ -211,9 +211,11 @@ model SocialAccount {
   labels                  Label[]
   notificationPreferences NotificationPreference[]
 
-  loyaltyContacts  LoyaltyContact[]
-  loyaltyBonuses   LoyaltyBonus[]
-  loyaltyCampaigns LoyaltyCampaign[]
+  loyaltyContacts                 LoyaltyContact[]
+  loyaltyBonuses                  LoyaltyBonus[]
+  loyaltyCampaigns                LoyaltyCampaign[]
+  contactCommunicationPreferences ContactCommunicationPreference[]
+  contactConsentEvents            ContactConsentEvent[]
 
   @@unique([provider, providerAccountId])
 }
@@ -253,38 +255,38 @@ model Catalog {
   organisationId String
   organisation   Organisation          @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   name           String
-  providerId     String?               // External catalog ID (e.g. Facebook catalog ID)
-  description    String?               // AI-generated description of catalog contents
+  providerId     String? // External catalog ID (e.g. Facebook catalog ID)
+  description    String? // AI-generated description of catalog contents
   analysisStatus CatalogAnalysisStatus @default(PENDING)
   productCount   Int                   @default(0)
   indexedCount   Int                   @default(0)
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
-  products      Product[]
+  products       Product[]
   socialAccounts CatalogSocialAccount[]
 
   @@index([organisationId])
 }
 
 model Product {
-  id               String   @id @default(uuid())
-  catalogId        String
-  catalog          Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
-  providerProductId String? // External product ID
-  name             String
-  description      String?
-  imageUrl         String?
+  id                  String   @id @default(uuid())
+  catalogId           String
+  catalog             Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  providerProductId   String? // External product ID
+  name                String
+  description         String?
+  imageUrl            String?
   additionalImageUrls String[] @default([])
-  price            Float?
-  currency         String?  @default("XAF")
-  category         String?
-  status           String   @default("published") // published, draft, archived
-  needsIndexing    Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  price               Float?
+  currency            String?  @default("XAF")
+  category            String?
+  status              String   @default("published") // published, draft, archived
+  needsIndexing       Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  promotionProducts PromotionProduct[]
+  promotionProducts   PromotionProduct[]
   loyaltyTriggerLinks LoyaltyBonusTriggerProduct[]
   loyaltyRewardLinks  LoyaltyBonusRewardProduct[]
 
@@ -308,15 +310,15 @@ model CatalogSocialAccount {
 // ─── Agent ───
 
 model Agent {
-  id             String      @id @default(uuid())
+  id             String       @id @default(uuid())
   organisationId String
   organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   name           String?
-  status         AgentStatus @default(DRAFT)
-  score          Int         @default(0)
-  context        String?     // AI-generated business context (markdown)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  status         AgentStatus  @default(DRAFT)
+  score          Int          @default(0)
+  context        String? // AI-generated business context (markdown)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   socialAccounts   AgentSocialAccount[]
   messages         AgentMessage[]
@@ -327,15 +329,15 @@ model Agent {
 }
 
 model AgentSocialAccount {
-  id                  String           @id @default(uuid())
-  agentId             String
-  agent               Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  socialAccountId     String           @unique // A social account can only be in ONE agent
-  socialAccount       SocialAccount    @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
-  aiActivationMode      AiActivationMode @default(OFF)
-  aiActivationLabels    String[]         // Label IDs for LABELS / EXCLUDE_LABELS modes
-  aiActivationContacts  String[]         // Phone numbers (WhatsApp) or profile names (IG/Messenger)
-  createdAt             DateTime         @default(now())
+  id                   String           @id @default(uuid())
+  agentId              String
+  agent                Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  socialAccountId      String           @unique // A social account can only be in ONE agent
+  socialAccount        SocialAccount    @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  aiActivationMode     AiActivationMode @default(OFF)
+  aiActivationLabels   String[] // Label IDs for LABELS / EXCLUDE_LABELS modes
+  aiActivationContacts String[] // Phone numbers (WhatsApp) or profile names (IG/Messenger)
+  createdAt            DateTime         @default(now())
 
   @@unique([agentId, socialAccountId])
   @@index([agentId])
@@ -345,10 +347,10 @@ model AgentMessage {
   id        String   @id @default(uuid())
   agentId   String
   agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  role      String   // 'user' | 'agent' | 'system' | 'tool'
+  role      String // 'user' | 'agent' | 'system' | 'tool'
   content   String
   type      String   @default("text") // 'text' | 'mcq' | 'scq' | 'tool_status'
-  metadata  Json?    // Options for MCQ/SCQ, tool info, etc.
+  metadata  Json? // Options for MCQ/SCQ, tool info, etc.
   createdAt DateTime @default(now())
 
   @@index([agentId])
@@ -372,25 +374,25 @@ model TicketStatus {
 }
 
 model Ticket {
-  id              String         @id @default(uuid())
-  organisationId  String
-  organisation    Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  agentId         String?
-  agent           Agent?         @relation(fields: [agentId], references: [id], onDelete: SetNull)
-  statusId        String?
-  status          TicketStatus?  @relation(fields: [statusId], references: [id], onDelete: SetNull)
-  title           String
-  description     String?
-  priority        TicketPriority @default(MEDIUM)
-  contactName     String?
-  contactId       String?        // Platform user ID
-  provider        SocialProvider?
-  conversationId  String?        // Link to Conversation
-  assignedTo      String?        // OrganisationMember ID
-  metadata        Json?          // Extra data (order details, etc.)
-  resolvedAt      DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id             String          @id @default(uuid())
+  organisationId String
+  organisation   Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  agentId        String?
+  agent          Agent?          @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  statusId       String?
+  status         TicketStatus?   @relation(fields: [statusId], references: [id], onDelete: SetNull)
+  title          String
+  description    String?
+  priority       TicketPriority  @default(MEDIUM)
+  contactName    String?
+  contactId      String? // Platform user ID
+  provider       SocialProvider?
+  conversationId String? // Link to Conversation
+  assignedTo     String? // OrganisationMember ID
+  metadata       Json? // Extra data (order details, etc.)
+  resolvedAt     DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   activities TicketActivity[]
 
@@ -404,11 +406,11 @@ model TicketActivity {
   id         String   @id @default(uuid())
   ticketId   String
   ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  type       String   // 'created' | 'status_change' | 'description_change'
-  author     String   // e.g. 'System', user name
-  fromStatus String?  // Previous status name (for status_change)
-  toStatus   String?  // New status name (for status_change)
-  diff       Json?    // { field, before, after } (for description_change)
+  type       String // 'created' | 'status_change' | 'description_change'
+  author     String // e.g. 'System', user name
+  fromStatus String? // Previous status name (for status_change)
+  toStatus   String? // New status name (for status_change)
+  diff       Json? // { field, before, after } (for description_change)
   createdAt  DateTime @default(now())
 
   @@index([ticketId])
@@ -424,7 +426,7 @@ model Promotion {
   description    String?
   discountType   PromotionDiscountType @default(PERCENTAGE)
   discountValue  Float                 @default(0)
-  code           String?               // Promo code
+  code           String? // Promo code
   startDate      DateTime?
   endDate        DateTime?
   status         PromotionStatus       @default(DRAFT)
@@ -453,15 +455,15 @@ model PromotionProduct {
 // ─── Page Settings & Comments ───
 
 model PageSettings {
-  id                       String    @id @default(uuid())
-  socialAccountId          String    @unique
-  socialAccount            SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
-  isConfigured             Boolean   @default(false)
-  undesiredCommentsAction  String    @default("hide")
-  spamAction               String    @default("delete")
-  customInstructions       String?
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
+  id                      String        @id @default(uuid())
+  socialAccountId         String        @unique
+  socialAccount           SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  isConfigured            Boolean       @default(false)
+  undesiredCommentsAction String        @default("hide")
+  spamAction              String        @default("delete")
+  customInstructions      String?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
 
   faqRules FAQRule[]
 }
@@ -493,24 +495,24 @@ model Post {
 }
 
 model Comment {
-  id            String        @id // Facebook/Instagram Comment ID
-  postId        String
-  post          Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
-  parentId      String?
-  message       String
-  fromId        String
-  fromName      String
-  fromAvatar    String?
-  createdTime   DateTime
-  isRead        Boolean       @default(false)
-  isPageReply   Boolean       @default(false)
-  status        CommentStatus @default(VISIBLE)
-  action        CommentAction @default(NONE)
-  actionReason  String?
-  replyMessage  String?
-  permalinkUrl  String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id           String        @id // Facebook/Instagram Comment ID
+  postId       String
+  post         Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parentId     String?
+  message      String
+  fromId       String
+  fromName     String
+  fromAvatar   String?
+  createdTime  DateTime
+  isRead       Boolean       @default(false)
+  isPageReply  Boolean       @default(false)
+  status       CommentStatus @default(VISIBLE)
+  action       CommentAction @default(NONE)
+  actionReason String?
+  replyMessage String?
+  permalinkUrl String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   @@index([postId])
   @@index([fromId])
@@ -520,21 +522,28 @@ model Comment {
 // ─── Messaging (Messenger, Instagram DM, WhatsApp) ───
 
 model Conversation {
-  id                String         @id @default(uuid())
-  socialAccountId   String
-  socialAccount     SocialAccount  @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
-  platformThreadId  String?        // Platform-specific thread/conversation ID
-  participantId     String         // Platform user ID of the other party
-  participantName   String
-  participantAvatar String?
-  lastMessageText   String?
-  lastMessageAt     DateTime?
-  unreadCount       Int            @default(0)
-  aiOverride        AiConversationOverride? // Per-conversation override of agent activation rules
-  messages          DirectMessage[]
-  conversationLabels ConversationLabel[]
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id                       String                           @id @default(uuid())
+  socialAccountId          String
+  socialAccount            SocialAccount                    @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  platformThreadId         String? // Platform-specific thread/conversation ID
+  participantId            String // Platform user ID of the other party
+  participantName          String
+  participantAvatar        String?
+  languageCode             String?
+  languageSource           ContactLanguageSource            @default(UNKNOWN)
+  languageConfidence       Float?
+  languageDetectedAt       DateTime?
+  lastMessageText          String?
+  lastMessageAt            DateTime?
+  unreadCount              Int                              @default(0)
+  aiOverride               AiConversationOverride? // Per-conversation override of agent activation rules
+  messages                 DirectMessage[]
+  conversationLabels       ConversationLabel[]
+  campaignContacts         LoyaltyCampaignContact[]
+  communicationPreferences ContactCommunicationPreference[]
+  consentEvents            ContactConsentEvent[]
+  createdAt                DateTime                         @default(now())
+  updatedAt                DateTime                         @updatedAt
 
   @@unique([socialAccountId, participantId])
   @@index([socialAccountId])
@@ -542,28 +551,29 @@ model Conversation {
 }
 
 model DirectMessage {
-  id             String       @id @default(uuid())
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  platformMsgId  String?      @unique // Platform-specific message ID
-  message        String
-  senderId       String
-  senderName     String
-  isFromPage     Boolean      @default(false)
-  mediaUrl       String?
-  mediaType      String?      // text, image, video, audio, file, sticker
-  fileName       String?      // Original file name for file attachments
-  fileSize       Int?         // File size in bytes
-  replyToId      String?      // ID of the message being replied to
-  replyTo        DirectMessage?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
-  replies        DirectMessage[] @relation("MessageReplies")
-  reactions      Json?        // Array of { senderId, emoji } reactions on this message
-  metadata       Json?        // Interactive payload metadata: catalog products, order items, header/footer, etc.
-  deliveryStatus String?      // WhatsApp delivery: 'sent' | 'delivered' | 'read'
-  createdTime    DateTime
-  isRead         Boolean      @default(false)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id              String                  @id @default(uuid())
+  conversationId  String
+  conversation    Conversation            @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  platformMsgId   String?                 @unique // Platform-specific message ID
+  message         String
+  senderId        String
+  senderName      String
+  isFromPage      Boolean                 @default(false)
+  mediaUrl        String?
+  mediaType       String? // text, image, video, audio, file, sticker
+  fileName        String? // Original file name for file attachments
+  fileSize        Int? // File size in bytes
+  replyToId       String? // ID of the message being replied to
+  replyTo         DirectMessage?          @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies         DirectMessage[]         @relation("MessageReplies")
+  reactions       Json? // Array of { senderId, emoji } reactions on this message
+  metadata        Json? // Interactive payload metadata: catalog products, order items, header/footer, etc.
+  deliveryStatus  String? // WhatsApp delivery: 'sent' | 'delivered' | 'read'
+  createdTime     DateTime
+  isRead          Boolean                 @default(false)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  campaignContact LoyaltyCampaignContact?
 
   @@index([conversationId])
   @@index([createdTime])
@@ -660,6 +670,8 @@ enum LoyaltyCampaignStatus {
   RUNNING
   COMPLETED
   PAUSED
+  CANCELLED
+  FAILED
 }
 
 enum LoyaltyCampaignFrequency {
@@ -667,6 +679,49 @@ enum LoyaltyCampaignFrequency {
   DAILY
   WEEKLY
   MONTHLY
+}
+
+enum CampaignOrigin {
+  LOYALTY
+  GENERAL
+}
+
+enum CampaignAudienceType {
+  RECENT_CONTACTS
+  PRODUCT_INTEREST
+  TICKET_STATUS
+}
+
+enum CampaignContactDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  REPLIED
+  FAILED
+}
+
+enum ContactLanguageSource {
+  UNKNOWN
+  AI
+  MANUAL
+  IMPORT
+  META
+}
+
+enum CommunicationChannel {
+  WHATSAPP
+}
+
+enum CommunicationPurpose {
+  MARKETING
+  UTILITY
+  LOYALTY
+}
+
+enum CommunicationPreferenceStatus {
+  OPTED_IN
+  OPTED_OUT
 }
 
 model LoyaltyContact {
@@ -696,7 +751,7 @@ model LoyaltyBonus {
   // Targets (cumulable). Keep optional fields for each criterion.
   targetSpend         Float?
   targetOrderCount    Int?
-  targetProductsCount Int?     // number of distinct trigger products required
+  targetProductsCount Int? // number of distinct trigger products required
 
   // Reward
   rewardType    LoyaltyRewardType
@@ -742,11 +797,12 @@ model LoyaltyBonusRewardProduct {
 }
 
 model LoyaltyCampaign {
-  id              String                  @id @default(uuid())
+  id              String         @id @default(uuid())
   socialAccountId String
-  socialAccount   SocialAccount           @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
-  bonusId         String
-  bonus           LoyaltyBonus            @relation(fields: [bonusId], references: [id], onDelete: Cascade)
+  socialAccount   SocialAccount  @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  bonusId         String?
+  bonus           LoyaltyBonus?  @relation(fields: [bonusId], references: [id], onDelete: SetNull)
+  origin          CampaignOrigin @default(LOYALTY)
 
   // Meta WhatsApp template reference (templates are NOT persisted in our DB —
   // they live on Meta and we only keep the identifiers needed to send).
@@ -754,12 +810,18 @@ model LoyaltyCampaign {
   metaTemplateName     String?
   metaTemplateLanguage String?
 
-  name            String
-  status          LoyaltyCampaignStatus    @default(SCHEDULED)
-  frequency       LoyaltyCampaignFrequency @default(ONCE)
+  name           String
+  status         LoyaltyCampaignStatus    @default(SCHEDULED)
+  frequency      LoyaltyCampaignFrequency @default(ONCE)
+  marketingTopic String                   @default("general")
 
   // Segment criteria captured as JSON to remain flexible across bonus target types
-  segmentCriteria Json?
+  segmentCriteria     Json?
+  audienceType        CampaignAudienceType?
+  audienceCriteria    Json?
+  audienceLimit       Int?
+  templateAssignments Json?
+  variableValues      Json?
 
   startDate DateTime?
   endDate   DateTime?
@@ -769,10 +831,90 @@ model LoyaltyCampaign {
   readCount      Int @default(0)
   repliedCount   Int @default(0)
 
+  contacts      LoyaltyCampaignContact[]
+  consentEvents ContactConsentEvent[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([socialAccountId])
   @@index([bonusId])
+  @@index([origin])
   @@index([status])
+}
+
+model LoyaltyCampaignContact {
+  id              String          @id @default(uuid())
+  campaignId      String
+  campaign        LoyaltyCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  conversationId  String
+  conversation    Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  directMessageId String?         @unique
+  directMessage   DirectMessage?  @relation(fields: [directMessageId], references: [id], onDelete: SetNull)
+
+  contactPhone     String
+  contactName      String
+  languageCode     String?
+  templateId       String?
+  templateName     String?
+  templateLanguage String?
+  platformMsgId    String?                       @unique
+  status           CampaignContactDeliveryStatus @default(PENDING)
+  sentAt           DateTime?
+  deliveredAt      DateTime?
+  readAt           DateTime?
+  repliedAt        DateTime?
+  failedAt         DateTime?
+  error            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([campaignId, conversationId])
+  @@index([campaignId])
+  @@index([campaignId, status])
+  @@index([conversationId])
+  @@index([platformMsgId])
+}
+
+model ContactCommunicationPreference {
+  id              String                        @id @default(uuid())
+  conversationId  String
+  conversation    Conversation                  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  socialAccountId String
+  socialAccount   SocialAccount                 @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  channel         CommunicationChannel          @default(WHATSAPP)
+  purpose         CommunicationPurpose
+  topic           String                        @default("general")
+  status          CommunicationPreferenceStatus
+  source          String?
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+
+  @@unique([conversationId, channel, purpose, topic])
+  @@index([socialAccountId])
+  @@index([socialAccountId, purpose, topic, status])
+}
+
+model ContactConsentEvent {
+  id              String               @id @default(uuid())
+  conversationId  String?
+  conversation    Conversation?        @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  socialAccountId String
+  socialAccount   SocialAccount        @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  campaignId      String?
+  campaign        LoyaltyCampaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  channel         CommunicationChannel @default(WHATSAPP)
+  purpose         CommunicationPurpose
+  topic           String               @default("general")
+  action          String
+  source          String?
+  rawText         String?
+  metadata        Json?
+  createdAt       DateTime             @default(now())
+
+  @@index([conversationId])
+  @@index([socialAccountId])
+  @@index([campaignId])
+  @@index([purpose, topic])
 }

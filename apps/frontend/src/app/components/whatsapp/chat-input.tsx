@@ -11,6 +11,7 @@ import {
   X,
   ShoppingBag,
   Store,
+  MessageSquareText,
 } from 'lucide-react'
 import { AudioRecorder } from './audio-recorder'
 import type { Message } from './mock-data'
@@ -45,6 +46,7 @@ function AttachmentPopover({
   hasCatalog,
   onProductClick,
   onCatalogClick,
+  onTemplateClick,
 }: {
   children: React.ReactNode
   onSelectFiles: (files: FileList, type: MediaType) => void
@@ -52,6 +54,7 @@ function AttachmentPopover({
   hasCatalog?: boolean
   onProductClick?: () => void
   onCatalogClick?: () => void
+  onTemplateClick?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const { t } = useTranslation()
@@ -118,6 +121,20 @@ function AttachmentPopover({
             onClick: () => {
               setOpen(false)
               onCatalogClick()
+            },
+          },
+        ]
+      : []),
+    ...(provider === 'whatsapp' && onTemplateClick
+      ? [
+          {
+            icon: <MessageSquareText size={18} />,
+            label: t('chat.template'),
+            color: 'text-blue-500',
+            bgColor: 'bg-blue-50',
+            onClick: () => {
+              setOpen(false)
+              onTemplateClick()
             },
           },
         ]
@@ -195,6 +212,8 @@ export function ChatInput({
   hasCatalog,
   onProductClick,
   onCatalogClick,
+  onTemplateClick,
+  templateOnly,
 }: {
   onSend?: (
     message: string,
@@ -207,6 +226,8 @@ export function ChatInput({
   hasCatalog?: boolean
   onProductClick?: () => void
   onCatalogClick?: () => void
+  onTemplateClick?: () => void
+  templateOnly?: boolean
 }) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<InputMode>('text')
@@ -224,6 +245,7 @@ export function ChatInput({
   }, [replyTo])
 
   const handleSend = () => {
+    if (templateOnly) return
     if (!inputValue.trim()) return
     const msg = inputValue.trim()
     setInputValue('')
@@ -293,12 +315,14 @@ export function ChatInput({
           hasCatalog={hasCatalog}
           onProductClick={onProductClick}
           onCatalogClick={onCatalogClick}
+          onTemplateClick={onTemplateClick}
         >
           <Button
             type="text"
             shape="circle"
             icon={<Paperclip size={18} />}
             className="flex-shrink-0"
+            disabled={templateOnly}
           />
         </AttachmentPopover>
 
@@ -306,7 +330,10 @@ export function ChatInput({
           <AudioRecorder onSend={handleAudioSend} onCancel={() => setMode('text')} />
         ) : (
           <Input.TextArea
-            placeholder={t('chat.type_message')}
+            disabled={templateOnly}
+            placeholder={
+              templateOnly ? t('chat.template_only_placeholder') : t('chat.type_message')
+            }
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -316,7 +343,15 @@ export function ChatInput({
         )}
 
         {mode === 'text' &&
-          (inputValue.trim() ? (
+          (templateOnly ? (
+            <Button
+              type="text"
+              shape="circle"
+              onClick={onTemplateClick}
+              icon={<MessageSquareText size={18} />}
+              className="flex-shrink-0"
+            />
+          ) : inputValue.trim() ? (
             <Button
               type="text"
               shape="circle"

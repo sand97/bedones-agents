@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
   --color-bg-page: #fafafa;
@@ -81,7 +81,8 @@ body,
 body {
   margin: 0;
   color: var(--color-text-primary);
-  font-family: -apple-system, 'SF Pro Display', 'SF Pro Text', 'Geist', ui-sans-serif, system-ui, sans-serif;
+  font-family:
+    -apple-system, 'SF Pro Display', 'SF Pro Text', 'Geist', ui-sans-serif, system-ui, sans-serif;
   background: var(--color-bg-page);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
@@ -90,8 +91,7 @@ body {
 
 /* Onboarding grid background — Cloudflare-inspired */
 .onboarding-grid-bg {
-  background-image:
-    radial-gradient(circle, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
@@ -143,7 +143,6 @@ body {
 .ant-steps .ant-steps-item-finish .ant-steps-item-icon .ant-steps-icon {
   color: #fff !important;
 }
-
 
 a {
   color: inherit;
@@ -232,7 +231,9 @@ a {
 
 /* Ant Design DatePicker calendar overrides */
 .ant-picker-cell-in-view.ant-picker-cell-in-range::before,
-.ant-picker-cell-in-view.ant-picker-cell-range-start:not(.ant-picker-cell-range-start-single)::before,
+.ant-picker-cell-in-view.ant-picker-cell-range-start:not(
+    .ant-picker-cell-range-start-single
+  )::before,
 .ant-picker-cell-in-view.ant-picker-cell-range-end:not(.ant-picker-cell-range-end-single)::before {
   background: var(--color-bg-subtle) !important;
 }
@@ -248,7 +249,10 @@ a {
   border-color: var(--color-text-primary) !important;
 }
 
-.ant-picker-cell:hover:not(.ant-picker-cell-selected):not(.ant-picker-cell-range-start):not(.ant-picker-cell-range-end) .ant-picker-cell-inner {
+.ant-picker-cell:hover:not(.ant-picker-cell-selected):not(.ant-picker-cell-range-start):not(
+    .ant-picker-cell-range-end
+  )
+  .ant-picker-cell-inner {
   background: var(--color-bg-subtle) !important;
   color: var(--color-text-primary) !important;
 }
@@ -298,7 +302,10 @@ a {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
   border: none;
   background: transparent;
   width: calc(100% - 16px);
@@ -703,13 +710,13 @@ a {
   padding: 2px 16px;
 }
 
-.chat-message-row + .chat-message-row[data-from]:not([data-from=""]) {
+.chat-message-row + .chat-message-row[data-from]:not([data-from='']) {
   /* default: same sender, tight spacing */
 }
 
 /* Different sender → double spacing */
-.chat-message-row[data-from="customer"] + .chat-message-row[data-from="business"],
-.chat-message-row[data-from="business"] + .chat-message-row[data-from="customer"] {
+.chat-message-row[data-from='customer'] + .chat-message-row[data-from='business'],
+.chat-message-row[data-from='business'] + .chat-message-row[data-from='customer'] {
   margin-top: 8px;
 }
 
@@ -719,8 +726,13 @@ a {
 }
 
 @keyframes msg-highlight {
-  0%, 20% { background: var(--color-bg-subtle); }
-  100% { background: transparent; }
+  0%,
+  20% {
+    background: var(--color-bg-subtle);
+  }
+  100% {
+    background: transparent;
+  }
 }
 
 /* Reply context inside bubble */
@@ -803,41 +815,49 @@ a {
 .chat-bubble--incoming {
   background: var(--color-bg-surface);
   color: var(--color-text-primary);
-  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail);
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble)
+    var(--radius-bubble-tail);
   box-shadow: var(--shadow-card);
 }
 
 .chat-bubble--outgoing {
   background: var(--color-bg-subtle);
   color: var(--color-text-primary);
-  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble);
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail)
+    var(--radius-bubble);
 }
 
 /* ── Stacked bubble radius ── */
 /* Incoming: left side gets small radius when stacked */
 .chat-bubble--incoming-first {
-  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail);
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble)
+    var(--radius-bubble-tail);
 }
 
 .chat-bubble--incoming-middle {
-  border-radius: var(--radius-bubble-tail) var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail);
+  border-radius: var(--radius-bubble-tail) var(--radius-bubble) var(--radius-bubble)
+    var(--radius-bubble-tail);
 }
 
 .chat-bubble--incoming-last {
-  border-radius: var(--radius-bubble-tail) var(--radius-bubble) var(--radius-bubble) var(--radius-bubble);
+  border-radius: var(--radius-bubble-tail) var(--radius-bubble) var(--radius-bubble)
+    var(--radius-bubble);
 }
 
 /* Outgoing: right side gets small radius when stacked */
 .chat-bubble--outgoing-first {
-  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble);
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail)
+    var(--radius-bubble);
 }
 
 .chat-bubble--outgoing-middle {
-  border-radius: var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble-tail) var(--radius-bubble);
+  border-radius: var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble-tail)
+    var(--radius-bubble);
 }
 
 .chat-bubble--outgoing-last {
-  border-radius: var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble) var(--radius-bubble);
+  border-radius: var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble)
+    var(--radius-bubble);
 }
 
 /* Single messages keep default radius (set by incoming/outgoing base) */
@@ -861,20 +881,23 @@ a {
   background: #ffffff;
   color: var(--color-text-primary);
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble);
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail)
+    var(--radius-bubble);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .feedback-bubble--user {
   background: var(--color-text-primary);
   color: #ffffff;
-  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble);
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail)
+    var(--radius-bubble);
 }
 
 .feedback-bubble--agent {
   background: var(--color-bg-subtle);
   color: var(--color-text-primary);
-  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail);
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble)
+    var(--radius-bubble-tail);
 }
 
 /* Dotted grid background for the feedback modal scrollable area */
@@ -1319,7 +1342,9 @@ a {
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .tickets-status-trigger:hover {
@@ -1624,7 +1649,9 @@ a {
   border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-surface);
   text-decoration: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .legal-card:hover {
@@ -1798,7 +1825,9 @@ a {
   background: var(--color-bg-surface);
   text-decoration: none;
   overflow: hidden;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .blog-card:hover {
@@ -2067,9 +2096,7 @@ a {
   box-shadow: none !important;
 }
 
-.pricing-billing-toggle.ant-segmented
-  .ant-segmented-item-selected
-  .ant-segmented-item-label {
+.pricing-billing-toggle.ant-segmented .ant-segmented-item-selected .ant-segmented-item-label {
   color: #ffffff !important;
 }
 
@@ -2083,12 +2110,18 @@ a {
   }
 }
 
+.campaign-modal-wrap {
+  overflow: hidden;
+}
+
 /* ═══════════════════════════════════════════
    Global: consistent form field height
    ═══════════════════════════════════════════ */
 
 /* Standalone inputs — NOT those nested inside wrappers, NOT textareas */
-.ant-input:not(.ant-input-affix-wrapper .ant-input):not(.ant-input-number-affix-wrapper .ant-input):not(.ant-input-number .ant-input):not(textarea),
+.ant-input:not(.ant-input-affix-wrapper .ant-input):not(
+    .ant-input-number-affix-wrapper .ant-input
+  ):not(.ant-input-number .ant-input):not(textarea),
 .ant-select-selector,
 .ant-picker,
 .ant-input-number,
@@ -2117,6 +2150,17 @@ a {
   height: 100% !important;
   display: flex !important;
   align-items: center !important;
+}
+
+.loyalty-template-button-delete.ant-btn {
+  width: var(--height-input);
+  min-width: var(--height-input);
+  height: var(--height-input) !important;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 /* ═══════════════════════════════════════════
@@ -2362,13 +2406,14 @@ a {
 .product-modal-img-remove:hover {
   background: rgba(0, 0, 0, 0.8) !important;
 }
-
+.ant-btn-icon {
+  @apply flex;
+}
 /* ─── OTP Input ─── */
 .ant-otp-input {
   width: 40px !important;
   height: 40px !important;
 }
-
 
 .ant-card .ant-card-body {
   @apply p-4 md:p-6;
@@ -2441,7 +2486,9 @@ a {
   color: var(--color-text-primary);
   font-weight: 600;
   font-size: 13px;
-  transition: background 150ms, border-color 150ms;
+  transition:
+    background 150ms,
+    border-color 150ms;
 }
 
 .notif-modal__users-trigger:hover,
@@ -2652,7 +2699,9 @@ a {
   font-weight: 400;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: background 150ms, border-color 150ms;
+  transition:
+    background 150ms,
+    border-color 150ms;
 }
 
 .notif-modal__mixedpill:hover {
@@ -2686,7 +2735,10 @@ a {
   border: 1px solid var(--color-border-default);
   color: var(--color-text-primary);
   cursor: pointer;
-  transition: background 150ms, border-color 150ms, color 150ms;
+  transition:
+    background 150ms,
+    border-color 150ms,
+    color 150ms;
 }
 
 .notif-modal__actionbtn:hover {

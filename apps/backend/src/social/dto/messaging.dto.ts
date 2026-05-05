@@ -20,6 +20,15 @@ export class ConversationResponseDto {
   participantAvatar?: string
 
   @ApiPropertyOptional()
+  languageCode?: string
+
+  @ApiPropertyOptional()
+  languageSource?: string
+
+  @ApiPropertyOptional()
+  languageConfidence?: number
+
+  @ApiPropertyOptional()
   lastMessageText?: string
 
   @ApiPropertyOptional()
@@ -166,6 +175,26 @@ export class SendProductMessageDto {
       'Footer text (max 60 chars). Supported by "product", "product_list" and "catalog_message". Not supported by "carousel".',
   })
   footerText?: string
+}
+
+export class SendTemplateMessageDto {
+  @ApiProperty()
+  conversationId: string
+
+  @ApiProperty()
+  metaTemplateName: string
+
+  @ApiProperty()
+  metaTemplateLanguage: string
+
+  @ApiPropertyOptional()
+  metaTemplateId?: string
+
+  @ApiPropertyOptional()
+  renderedBody?: string
+
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  variables?: Record<string, string>
 }
 
 export class MarkConversationReadDto {
