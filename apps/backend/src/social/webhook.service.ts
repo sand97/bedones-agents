@@ -872,7 +872,7 @@ export class WebhookService {
         const coreNumberId = process.env.CORE_WHATSAPP_NUMBER_ID
         if (coreNumberId && phoneNumberId === coreNumberId) {
           for (const msg of value.messages || []) {
-            const reply = msg.interactive?.button_reply ?? msg.interactive?.list_reply
+            const reply = this.extractWhatsAppButtonReply(msg)
             this.eventEmitter.emit('whatsapp.core.inbound', {
               senderPhone: msg.from,
               buttonId: reply?.id,
@@ -987,7 +987,8 @@ export class WebhookService {
           }
         >
         if (order?.catalog_id) {
-          const hydrated = await this.messagingService.buildEnrichedItems(
+          const hydrated = await this.messagingService.buildEnrichedItemsForSocialAccount(
+            socialAccountId,
             order.catalog_id,
             rawItems.map((i) => i.productRetailerId),
           )
@@ -1011,6 +1012,35 @@ export class WebhookService {
           currency: rawItems[0]?.currency || null,
         }
         messageText = order?.text || ''
+        break
+      }
+      case 'interactive': {
+        const reply = this.extractWhatsAppButtonReply(msg)
+        if (reply) {
+          messageText = reply.title
+          metadata = {
+            kind: reply.kind,
+            replyId: reply.id,
+            replyTitle: reply.title,
+            ...(reply.description ? { replyDescription: reply.description } : {}),
+          }
+        } else {
+          messageText = '[interactive]'
+        }
+        break
+      }
+      case 'button': {
+        const reply = this.extractWhatsAppButtonReply(msg)
+        if (reply) {
+          messageText = reply.title
+          metadata = {
+            kind: reply.kind,
+            replyId: reply.id,
+            replyTitle: reply.title,
+          }
+        } else {
+          messageText = '[button]'
+        }
         break
       }
       default:
@@ -1051,6 +1081,44 @@ export class WebhookService {
       orgId,
       message: { text: messageText, mediaUrl, mediaType, senderId, senderName },
     } satisfies IncomingMessageEvent)
+  }
+
+  private extractWhatsAppButtonReply(msg: WhatsAppMessage): {
+    id: string
+    title: string
+    description?: string
+    kind: 'whatsapp_button_reply' | 'whatsapp_list_reply' | 'whatsapp_template_button_reply'
+  } | null {
+    if (msg.interactive?.button_reply) {
+      const reply = msg.interactive.button_reply
+      return {
+        id: reply.id,
+        title: reply.title,
+        kind: 'whatsapp_button_reply',
+      }
+    }
+
+    if (msg.interactive?.list_reply) {
+      const reply = msg.interactive.list_reply
+      return {
+        id: reply.id,
+        title: reply.title,
+        description: reply.description,
+        kind: 'whatsapp_list_reply',
+      }
+    }
+
+    if (msg.button) {
+      const title = msg.button.text || msg.button.payload || ''
+      if (!title) return null
+      return {
+        id: msg.button.payload || title,
+        title,
+        kind: 'whatsapp_template_button_reply',
+      }
+    }
+
+    return null
   }
 
   private async handleWhatsAppStatus(
@@ -2010,6 +2078,7 @@ interface WhatsAppMessage {
     button_reply?: { id: string; title: string }
     list_reply?: { id: string; title: string; description?: string }
   }
+  button?: { payload?: string; text?: string }
   context?: { id?: string; from?: string }
 }
 

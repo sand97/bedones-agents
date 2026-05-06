@@ -4,7 +4,11 @@ import { Queue } from 'bullmq'
 import { AuthModule } from '../auth/auth.module'
 import { UploadModule } from '../upload/upload.module'
 import { CatalogModule } from '../catalog/catalog.module'
-import { QueueModule, SOCIAL_AVATAR_SYNC_QUEUE } from '../queue/queue.module'
+import {
+  QueueModule,
+  SOCIAL_AVATAR_SYNC_QUEUE,
+  WHATSAPP_PRODUCT_IMAGE_SYNC_QUEUE,
+} from '../queue/queue.module'
 import { PrismaService } from '../prisma/prisma.service'
 import { UploadService } from '../upload/upload.service'
 import { SocialController } from './social.controller'
@@ -17,12 +21,10 @@ import { MessagingService } from './messaging.service'
 import { AIService } from './ai.service'
 import { LabelController } from './label.controller'
 import { LabelService } from './label.service'
-import {
-  AvatarSyncService,
-  AVATAR_SYNC_JOB,
-  type AvatarSyncJobData,
-} from './avatar-sync.service'
+import { AvatarSyncService, AVATAR_SYNC_JOB, type AvatarSyncJobData } from './avatar-sync.service'
 import { AvatarSyncProcessor } from './avatar-sync.processor'
+import { ProductImageSyncService } from './product-image-sync.service'
+import { ProductImageSyncProcessor } from './product-image-sync.processor'
 
 @Module({
   imports: [
@@ -31,6 +33,7 @@ import { AvatarSyncProcessor } from './avatar-sync.processor'
     CatalogModule,
     QueueModule,
     BullModule.registerQueue({ name: SOCIAL_AVATAR_SYNC_QUEUE }),
+    BullModule.registerQueue({ name: WHATSAPP_PRODUCT_IMAGE_SYNC_QUEUE }),
   ],
   controllers: [
     SocialController,
@@ -47,8 +50,10 @@ import { AvatarSyncProcessor } from './avatar-sync.processor'
     LabelService,
     AvatarSyncService,
     AvatarSyncProcessor,
+    ProductImageSyncService,
+    ProductImageSyncProcessor,
   ],
-  exports: [MessagingService, LabelService, AvatarSyncService],
+  exports: [MessagingService, LabelService, AvatarSyncService, ProductImageSyncService],
 })
 export class SocialModule implements OnApplicationBootstrap {
   private readonly logger = new Logger(SocialModule.name)
@@ -71,9 +76,7 @@ export class SocialModule implements OnApplicationBootstrap {
         select: { id: true, profilePictureUrl: true },
       })
 
-      const pending = accounts.filter(
-        (a) => !this.uploadService.isOwnUrl(a.profilePictureUrl),
-      )
+      const pending = accounts.filter((a) => !this.uploadService.isOwnUrl(a.profilePictureUrl))
       if (pending.length === 0) return
 
       this.logger.log(

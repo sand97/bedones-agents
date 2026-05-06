@@ -208,7 +208,24 @@ export class CatalogService {
       return []
     }
     const accessToken = await this.encryptionService.decrypt(socialLink.socialAccount.accessToken)
+    return this.hydrateProductsByRetailerIdsWithAccessToken(catalogProviderId, ids, accessToken)
+  }
 
+  async hydrateProductsByRetailerIdsWithAccessToken(
+    catalogProviderId: string,
+    retailerIds: string[],
+    accessToken: string,
+  ): Promise<
+    Array<{
+      retailerId: string
+      name: string | null
+      imageUrl: string | null
+      price: number | null
+      currency: string | null
+    }>
+  > {
+    const ids = Array.from(new Set(retailerIds.filter(Boolean)))
+    if (ids.length === 0) return []
     // Meta Graph API supports filtering products by retailer_id via a JSON filter
     // on the catalog's /products edge. We request only the fields we need for UI.
     const filter = JSON.stringify({ retailer_id: { is_any: ids } })

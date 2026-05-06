@@ -6,6 +6,7 @@ import { MediaConverterService } from '../upload/media-converter.service'
 import { UploadService } from '../upload/upload.service'
 import { CatalogService } from '../catalog/catalog.service'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
+import { ProductImageSyncService } from './product-image-sync.service'
 
 @Injectable()
 export class MessagingService {
@@ -17,6 +18,7 @@ export class MessagingService {
     private mediaConverter: MediaConverterService,
     private uploadService: UploadService,
     private catalogService: CatalogService,
+    private productImageSyncService: ProductImageSyncService,
   ) {}
 
   // ─── Get conversations for a social account ───
@@ -1144,7 +1146,7 @@ export class MessagingService {
       replyToId = repliedMsg?.id || null
     }
 
-    await this.prisma.directMessage.create({
+    const savedMessage = await this.prisma.directMessage.create({
       data: {
         conversationId: conversation.id,
         platformMsgId,
@@ -1161,6 +1163,7 @@ export class MessagingService {
         createdTime: timestamp,
       },
     })
+    await this.productImageSyncService.enqueueIfProductMessage(savedMessage.id, metadata)
 
     return conversation
   }
@@ -1422,6 +1425,10 @@ export class MessagingService {
           createdTime: now,
         },
       })
+      await this.productImageSyncService.enqueueIfProductMessage(
+        row.id,
+        row.metadata as Record<string, unknown> | null,
+      )
       saved.push(row)
     }
     return saved
@@ -1452,6 +1459,39 @@ export class MessagingService {
     const hydrated = await this.catalogService.hydrateProductsByRetailerIds(
       catalogProviderId,
       retailerIds,
+    )
+    const byRetailerId = new Map(hydrated.map((p) => [p.retailerId, p]))
+    return retailerIds.map((retailerId) => {
+      const p = byRetailerId.get(retailerId)
+      return {
+        productRetailerId: retailerId,
+        name: p?.name ?? null,
+        imageUrl: p?.imageUrl ?? null,
+        price: p?.price ?? null,
+        currency: p?.currency ?? null,
+      }
+    })
+  }
+
+  async buildEnrichedItemsForSocialAccount(
+    socialAccountId: string,
+    catalogProviderId: string,
+    retailerIds: string[],
+  ): Promise<
+    Array<{
+      productRetailerId: string
+      name: string | null
+      imageUrl: string | null
+      price: number | null
+      currency: string | null
+    }>
+  > {
+    if (retailerIds.length === 0) return []
+    const accessToken = await this.getDecryptedToken(socialAccountId)
+    const hydrated = await this.catalogService.hydrateProductsByRetailerIdsWithAccessToken(
+      catalogProviderId,
+      retailerIds,
+      accessToken,
     )
     const byRetailerId = new Map(hydrated.map((p) => [p.retailerId, p]))
     return retailerIds.map((retailerId) => {
