@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
+import { UploadService } from '../upload/upload.service'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
 import { AvatarSyncService } from './avatar-sync.service'
 
@@ -27,6 +28,7 @@ export class SocialService {
     private configService: ConfigService,
     private encryptionService: EncryptionService,
     private avatarSyncService: AvatarSyncService,
+    private uploadService: UploadService,
   ) {}
 
   // ─── Connect Facebook Pages ───
@@ -469,7 +471,7 @@ export class SocialService {
     const clientKey = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
     const clientSecret = this.configService.getOrThrow<string>('TIKTOK_CLIENT_SECRET')
 
-    // Exchange code for access token
+    // Exchange code for access token via Login Kit
     this.logger.log(`[TikTok] Exchanging code for access token...`)
     const tokenResponse = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
       method: 'POST',
@@ -491,15 +493,77 @@ export class SocialService {
       throw new BadRequestException('tiktok_token_exchange_failed')
     }
 
-    const tokenData = JSON.parse(tokenBody) as {
-      access_token: string
+    this.logger.log(`[TikTok] Token exchange raw response: ${tokenBody}`)
+
+    const tokenPayload = JSON.parse(tokenBody) as {
+      access_token?: string
       refresh_token?: string
-      open_id: string
-      expires_in: number
+      open_id?: string
+      expires_in?: number
+      data?: {
+        access_token?: string
+        refresh_token?: string
+        open_id?: string
+        expires_in?: number
+      }
     }
+    // Handle both flat and nested (data-wrapped) response formats
+    const tokenData = {
+      access_token: tokenPayload.access_token ?? tokenPayload.data?.access_token ?? '',
+      refresh_token: tokenPayload.refresh_token ?? tokenPayload.data?.refresh_token,
+      open_id: tokenPayload.open_id ?? tokenPayload.data?.open_id ?? '',
+      expires_in: tokenPayload.expires_in ?? tokenPayload.data?.expires_in ?? 86400,
+    }
+
+    if (!tokenData.access_token || !tokenData.open_id) {
+      this.logger.error(`[TikTok] Token exchange missing access_token or open_id`)
+      throw new BadRequestException('tiktok_token_exchange_failed')
+    }
+
     this.logger.log(`[TikTok] Token exchange OK — open_id=${tokenData.open_id}`)
 
-    // Fetch user info
+    // Fetch the business_id from the Business API — this is the ID used by
+    // webhooks (user_openid) and all /business/* endpoints. It differs from
+    // the Login Kit open_id.
+    let businessId = tokenData.open_id
+    const tokenInfoRes = await fetch(
+      'https://business-api.tiktok.com/open_api/v1.3/tt_user/token_info/get/',
+      {
+        method: 'POST',
+        headers: {
+          'Access-Token': tokenData.access_token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      },
+    )
+    if (tokenInfoRes.ok) {
+      const tokenInfoBody = await tokenInfoRes.text()
+      this.logger.log(`[TikTok] Token info raw response: ${tokenInfoBody}`)
+      const tokenInfo = JSON.parse(tokenInfoBody) as {
+        code?: number
+        data?: { business_id?: string; open_id?: string; creator_id?: string }
+      }
+      const bid =
+        tokenInfo.data?.business_id ?? tokenInfo.data?.open_id ?? tokenInfo.data?.creator_id
+      if (tokenInfo.code === 0 && bid) {
+        businessId = bid
+        this.logger.log(`[TikTok] Resolved business_id=${businessId}`)
+      }
+    } else {
+      const errBody = await tokenInfoRes.text()
+      this.logger.warn(`[TikTok] token_info/get failed (HTTP ${tokenInfoRes.status}): ${errBody}`)
+
+      // Fallback: try /business/get/ with Login Kit open_id as business_id
+      const bizRes = await fetch(
+        `https://business-api.tiktok.com/open_api/v1.3/business/get/?business_id=${encodeURIComponent(tokenData.open_id)}&fields=${encodeURIComponent(JSON.stringify(['username', 'display_name']))}`,
+        { headers: { 'Access-Token': tokenData.access_token } },
+      )
+      const bizBody = await bizRes.text()
+      this.logger.log(`[TikTok] business/get fallback response: ${bizBody}`)
+    }
+
+    // Fetch user info via Login Kit
     const userRes = await fetch(
       'https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url,username',
       {
@@ -507,7 +571,7 @@ export class SocialService {
       },
     )
 
-    let displayName = tokenData.open_id
+    let displayName = businessId
     let username: string | undefined
     let avatarUrl: string | null = null
 
@@ -535,14 +599,14 @@ export class SocialService {
     const encryptedRefresh = tokenData.refresh_token
       ? await this.encryptionService.encrypt(tokenData.refresh_token)
       : null
-    const newScopes = scopes ?? ['comments']
+    const newScopes = [...new Set([...(scopes ?? ['comments']), 'video.list'])]
 
     // Fetch existing scopes to merge
     const existingTk = await this.prisma.socialAccount.findUnique({
       where: {
         provider_providerAccountId: {
           provider: 'TIKTOK',
-          providerAccountId: tokenData.open_id,
+          providerAccountId: businessId,
         },
       },
       select: { scopes: true },
@@ -553,13 +617,13 @@ export class SocialService {
       where: {
         provider_providerAccountId: {
           provider: 'TIKTOK',
-          providerAccountId: tokenData.open_id,
+          providerAccountId: businessId,
         },
       },
       create: {
         organisationId,
         provider: 'TIKTOK',
-        providerAccountId: tokenData.open_id,
+        providerAccountId: businessId,
         pageName: displayName,
         username,
         profilePictureUrl: avatarUrl,
@@ -808,6 +872,7 @@ export class SocialService {
     })
 
     if (!response.ok) {
+      this.logger.error(`[TikTok] Token refresh failed: ${await response.text()}`)
       throw new BadRequestException('Failed to refresh TikTok token')
     }
 
@@ -839,7 +904,12 @@ export class SocialService {
   async syncTikTokVideos(userId: string, accountId: string) {
     const account = await this.prisma.socialAccount.findUnique({
       where: { id: accountId },
-      select: { id: true, provider: true, organisationId: true },
+      select: {
+        id: true,
+        provider: true,
+        username: true,
+        organisationId: true,
+      },
     })
     if (!account) throw new NotFoundException('Social account not found')
     if (account.provider !== 'TIKTOK') {
@@ -847,63 +917,64 @@ export class SocialService {
     }
     await this.assertMembership(userId, account.organisationId)
 
-    const accessToken = await this.refreshTikTokToken(accountId)
+    // Sync existing posts thumbnails via oEmbed (public API, no scope required)
+    return this.syncTikTokVideosViaOEmbed(accountId, account.username)
+  }
 
-    // Fetch videos
-    const response = await fetch(
-      'https://open.tiktokapis.com/v2/video/list/?fields=id,title,cover_image_url,share_url,create_time,comment_count',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ max_count: 50 }),
-      },
-    )
+  /**
+   * Update thumbnails for existing TikTok posts via oEmbed
+   * (public API, no scope required). Only processes posts already in DB
+   * that are missing a cover image.
+   */
+  private async syncTikTokVideosViaOEmbed(
+    accountId: string,
+    username?: string | null,
+  ): Promise<{ synced: number }> {
+    const posts = await this.prisma.post.findMany({
+      where: { socialAccountId: accountId },
+      select: { id: true, imageUrl: true, message: true, permalinkUrl: true },
+    })
 
-    if (!response.ok) {
-      const error = await response.text()
-      this.logger.error(`[TikTok] Fetch videos failed: ${error}`)
-      throw new BadRequestException('Failed to fetch TikTok videos')
-    }
+    const needsUpdate = posts.filter((p) => !p.imageUrl || !this.uploadService.isOwnUrl(p.imageUrl))
+    if (needsUpdate.length === 0) return { synced: 0 }
 
-    const body = (await response.json()) as {
-      data: {
-        videos: Array<{
-          id: string
+    const handle = username ? `@${username}` : '@_'
+    let synced = 0
+
+    for (const post of needsUpdate) {
+      try {
+        const videoUrl = `https://www.tiktok.com/${handle}/video/${post.id}`
+        const res = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`)
+        if (!res.ok) continue
+
+        const data = (await res.json()) as {
           title?: string
-          cover_image_url?: string
-          share_url?: string
-          create_time?: number
-          comment_count?: number
-        }>
+          thumbnail_url?: string
+        }
+        if (!data.thumbnail_url) continue
+
+        const uploaded =
+          (await this.uploadService.uploadFromUrl(data.thumbnail_url, 'posts')) ||
+          data.thumbnail_url
+
+        await this.prisma.post.update({
+          where: { id: post.id },
+          data: {
+            imageUrl: uploaded,
+            message: post.message || data.title || undefined,
+            permalinkUrl: post.permalinkUrl || `https://www.tiktok.com/${handle}/video/${post.id}`,
+          },
+        })
+        synced++
+      } catch {
+        this.logger.warn(`[TikTok] oEmbed fallback failed for video ${post.id}`)
       }
     }
 
-    // Upsert videos as posts
-    for (const video of body.data.videos || []) {
-      await this.prisma.post.upsert({
-        where: { id: video.id },
-        create: {
-          id: video.id,
-          socialAccountId: accountId,
-          message: video.title || null,
-          imageUrl: video.cover_image_url || null,
-          permalinkUrl: video.share_url || null,
-        },
-        update: {
-          message: video.title || undefined,
-          imageUrl: video.cover_image_url || undefined,
-          permalinkUrl: video.share_url || undefined,
-        },
-      })
-    }
-
     this.logger.log(
-      `[TikTok] Synced ${body.data.videos?.length || 0} videos for account ${accountId}`,
+      `[TikTok] Synced ${synced} video thumbnails via oEmbed for account ${accountId}`,
     )
-    return { synced: body.data.videos?.length || 0 }
+    return { synced }
   }
 
   // ─── TikTok: Fetch comments for a video ───
@@ -911,7 +982,7 @@ export class SocialService {
   async syncTikTokComments(userId: string, accountId: string, videoId: string) {
     const account = await this.prisma.socialAccount.findUnique({
       where: { id: accountId },
-      select: { id: true, provider: true, organisationId: true },
+      select: { id: true, provider: true, providerAccountId: true, organisationId: true },
     })
     if (!account) throw new NotFoundException('Social account not found')
     if (account.provider !== 'TIKTOK') {
@@ -921,17 +992,14 @@ export class SocialService {
 
     const accessToken = await this.refreshTikTokToken(accountId)
 
-    const response = await fetch(
-      'https://open.tiktokapis.com/v2/comment/list/?fields=id,text,create_time,user,like_count,reply_count,parent_comment_id',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ video_id: videoId, max_count: 100 }),
-      },
-    )
+    const url = new URL('https://business-api.tiktok.com/open_api/v1.3/business/comment/list/')
+    url.searchParams.set('business_id', account.providerAccountId)
+    url.searchParams.set('video_id', videoId)
+    url.searchParams.set('max_count', '100')
+
+    const response = await fetch(url.toString(), {
+      headers: { 'Access-Token': accessToken },
+    })
 
     if (!response.ok) {
       const error = await response.text()
@@ -940,32 +1008,44 @@ export class SocialService {
     }
 
     const body = (await response.json()) as {
-      data: {
+      code?: number
+      message?: string
+      data?: {
         comments: Array<{
-          id: string
+          comment_id: string
           text: string
-          create_time: number
-          user?: { open_id: string; display_name: string; avatar_url?: string }
+          create_time?: number
+          owner?: boolean
+          user_id?: string
+          username?: string
+          display_name?: string
+          profile_image?: string
           parent_comment_id?: string
         }>
       }
     }
 
+    if (body.code !== undefined && body.code !== 0) {
+      this.logger.error(`[TikTok] Fetch business comments failed: ${body.code} — ${body.message}`)
+      throw new BadRequestException('Failed to fetch TikTok comments')
+    }
+
     // Upsert comments
-    for (const comment of body.data.comments || []) {
-      const existing = await this.prisma.comment.findUnique({ where: { id: comment.id } })
+    for (const comment of body.data?.comments || []) {
+      const commentId = String(comment.comment_id)
+      const existing = await this.prisma.comment.findUnique({ where: { id: commentId } })
 
       await this.prisma.comment.upsert({
-        where: { id: comment.id },
+        where: { id: commentId },
         create: {
-          id: comment.id,
+          id: commentId,
           postId: videoId,
           parentId: comment.parent_comment_id || null,
           message: comment.text,
-          fromId: comment.user?.open_id || 'unknown',
-          fromName: comment.user?.display_name || 'Utilisateur TikTok',
-          fromAvatar: comment.user?.avatar_url || null,
-          createdTime: new Date(comment.create_time * 1000),
+          fromId: comment.user_id || 'unknown',
+          fromName: comment.display_name || comment.username || 'Utilisateur TikTok',
+          fromAvatar: comment.profile_image || null,
+          createdTime: new Date((comment.create_time || Math.floor(Date.now() / 1000)) * 1000),
           isRead: !!existing,
         },
         update: {
@@ -975,9 +1055,9 @@ export class SocialService {
     }
 
     this.logger.log(
-      `[TikTok] Synced ${body.data.comments?.length || 0} comments for video ${videoId}`,
+      `[TikTok] Synced ${body.data?.comments?.length || 0} comments for video ${videoId}`,
     )
-    return { synced: body.data.comments?.length || 0 }
+    return { synced: body.data?.comments?.length || 0 }
   }
 
   // ─── TikTok: Reply to a comment ───

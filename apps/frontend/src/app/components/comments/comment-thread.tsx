@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Avatar, Button, Input, Popover, Spin, Tooltip, App } from 'antd'
-import { MessageSquare, Send, Eye, EyeOff, Trash2, ExternalLink, Settings } from 'lucide-react'
+import { MessageSquare, Send, Eye, EyeOff, Trash2, ExternalLink } from 'lucide-react'
 import dayjs from 'dayjs'
 import { ImagePlaceholderIcon, OptionsIcon } from '@app/components/icons/social-icons'
 import { $api } from '@app/lib/api/$api'
@@ -399,7 +399,7 @@ function ThreadBlock({
   thread,
   provider,
   accountId,
-  isConfigured,
+  isConfigured: _isConfigured,
   onReplyClick,
   onHide,
   onUnhide,
@@ -437,16 +437,14 @@ function ThreadBlock({
 
       {!isRootDeleted && (
         <div className="mt-2 ml-10 flex items-center gap-1">
-          {isConfigured && (
-            <Button
-              type="text"
-              size="small"
-              onClick={() => onReplyClick(thread.root)}
-              icon={<MessageSquare size={12} />}
-            >
-              {t('comments.reply')}
-            </Button>
-          )}
+          <Button
+            type="text"
+            size="small"
+            onClick={() => onReplyClick(thread.root)}
+            icon={<MessageSquare size={12} />}
+          >
+            {t('comments.reply')}
+          </Button>
           <CommentOptionsMenu
             comment={thread.root}
             onHide={onHide}
@@ -504,6 +502,7 @@ export function CommentThread({
   const [inputValue, setInputValue] = useState('')
   const [sending, setSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const { message: messageApi } = App.useApp()
   const { t } = useTranslation()
 
@@ -518,6 +517,7 @@ export function CommentThread({
 
   const handleReplyClick = (comment: Comment) => {
     setReplyTo(comment)
+    setTimeout(() => inputRef.current?.focus(), 0)
   }
 
   const clearReply = () => {
@@ -590,50 +590,37 @@ export function CommentThread({
 
       {/* Fixed input at bottom */}
       <div className="flex-shrink-0 border-t border-border-subtle px-4 pt-3 pb-6">
-        {!isConfigured ? (
-          <div className="flex items-center gap-2 rounded-lg bg-bg-subtle px-3 py-2.5 text-sm text-text-muted">
-            <Settings size={16} className="flex-shrink-0" />
-            <span>{t('comments.configure_replies')}</span>
+        {replyTo && (
+          <div className="mb-2 flex items-center gap-2 rounded-lg bg-bg-subtle px-3 py-2 text-xs text-text-secondary">
+            <span className="min-w-0 flex-1 truncate">
+              {t('comments.reply_to')}{' '}
+              <strong>{replyTo.fromName || t('comments.a_comment')}</strong> : {replyTo.message}
+            </span>
+            <Button type="text" size="small" onClick={clearReply} className="flex-shrink-0 p-0!">
+              ✕
+            </Button>
           </div>
-        ) : (
-          <>
-            {replyTo && (
-              <div className="mb-2 flex items-center gap-2 rounded-lg bg-bg-subtle px-3 py-2 text-xs text-text-secondary">
-                <span className="min-w-0 flex-1 truncate">
-                  {t('comments.reply_to')}{' '}
-                  <strong>{replyTo.fromName || t('comments.a_comment')}</strong> : {replyTo.message}
-                </span>
-                <Button
-                  type="text"
-                  size="small"
-                  onClick={clearReply}
-                  className="flex-shrink-0 p-0!"
-                >
-                  ✕
-                </Button>
-              </div>
-            )}
-            <div className="chat-input-row">
-              <Input.TextArea
-                placeholder={placeholder}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                autoSize={{ minRows: 1, maxRows: 3 }}
-                className="rounded-2xl!"
-              />
-              <Button
-                type="text"
-                shape="circle"
-                onClick={handleSend}
-                disabled={!inputValue.trim()}
-                loading={sending}
-                icon={<Send strokeWidth={1.5} size={18} />}
-                className="flex-shrink-0"
-              />
-            </div>
-          </>
         )}
+        <div className="chat-input-row">
+          <Input.TextArea
+            ref={inputRef}
+            placeholder={placeholder}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            autoSize={{ minRows: 1, maxRows: 3 }}
+            className="rounded-2xl!"
+          />
+          <Button
+            type="text"
+            shape="circle"
+            onClick={handleSend}
+            disabled={!inputValue.trim()}
+            loading={sending}
+            icon={<Send strokeWidth={1.5} size={18} />}
+            className="flex-shrink-0"
+          />
+        </div>
       </div>
     </div>
   )

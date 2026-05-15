@@ -332,7 +332,7 @@ function CommentsPage() {
       intent: 'connect_pages',
       orgId: orgSlug,
       provider: id as 'facebook' | 'instagram' | 'tiktok',
-      scopes: ['comments'],
+      scopes: id === 'tiktok' ? ['comments', 'video.list'] : ['comments'],
     })
 
     if (id === 'facebook') {
@@ -420,8 +420,8 @@ function CommentsPage() {
     />
   )
 
-  // ─── Account connected but no settings configured → Config prompt ───
-  if (!isConfigured || configJustConnected) {
+  // ─── Just connected → show config prompt (one-time) ───
+  if (configJustConnected) {
     return (
       <div className="flex min-h-screen flex-col">
         <DashboardHeader

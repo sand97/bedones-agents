@@ -160,10 +160,12 @@
     "reply_to_comment": "Reply to this comment…",
     "select_post_desc": "Choose a post from the list to view its comments",
     "edit_config": "Edit configuration",
-    "no_comments_desc": "Comments on your {{provider}} posts will appear here"
+    "no_comments_desc": "Comments on your {{provider}} posts will appear here",
+    "view_comments": "View comments"
   },
 
   "comments_config": {
+    "title_short": "Configuration",
     "title": "Comments configuration",
     "undesired_action": "Action on undesired comments",
     "spam_action": "Action on spam",

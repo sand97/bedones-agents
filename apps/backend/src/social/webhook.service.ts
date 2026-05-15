@@ -1212,6 +1212,15 @@ export class WebhookService {
   async processTikTokWebhook(payload: TikTokWebhookPayload) {
     const { event } = payload
 
+    // Ignore webhooks from other apps (e.g. old app still sending events)
+    const expectedClientKey = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
+    if (payload.client_key && payload.client_key !== expectedClientKey) {
+      this.logger.log(
+        `[TikTok Webhook] Ignoring event from unknown client_key ${payload.client_key}`,
+      )
+      return
+    }
+
     if (event !== 'comment.update') {
       this.logger.log(`[TikTok Webhook] Ignoring event type: ${event}`)
       return
@@ -1247,6 +1256,7 @@ export class WebhookService {
       select: {
         id: true,
         organisationId: true,
+        username: true,
         accessToken: true,
         refreshToken: true,
         tokenExpiresAt: true,
@@ -1274,28 +1284,29 @@ export class WebhookService {
 
     const commentData = await this.fetchTikTokComment(accessToken, openId, videoId, commentId)
 
-    // Fetch video details if we don't have them yet
+    // Fetch video details if we don't have them yet, or if the stored cover is
+    // still a temporary TikTok URL that must be mirrored to our own storage.
     const existingPost = await this.prisma.post.findUnique({ where: { id: videoId } })
-    const needsVideoFetch = !existingPost || !existingPost.imageUrl
+    const hasStoredCover = this.uploadService.isOwnUrl(existingPost?.imageUrl)
+    const needsVideoFetch =
+      !existingPost || !existingPost.message || !existingPost.imageUrl || !hasStoredCover
 
     let postMessage = existingPost?.message || null
     let postImageUrl = existingPost?.imageUrl || null
     let postPermalinkUrl = existingPost?.permalinkUrl || null
 
     if (needsVideoFetch) {
-      const videoData = await this.fetchTikTokVideo(accessToken, openId, videoId)
+      const videoData = await this.fetchTikTokVideo(videoId, socialAccount.username)
       if (videoData) {
-        postMessage = videoData.title || postMessage
-        postImageUrl = videoData.cover_image_url || postImageUrl
+        postMessage = videoData.video_description || postMessage
         postPermalinkUrl = videoData.share_url || postPermalinkUrl
 
-        // Upload cover image to our storage
-        if (videoData.cover_image_url && !existingPost?.imageUrl) {
+        if (videoData.cover_image_url && !this.uploadService.isOwnUrl(postImageUrl)) {
           const uploaded = await this.uploadService.uploadFromUrl(
             videoData.cover_image_url,
             'posts',
           )
-          if (uploaded) postImageUrl = uploaded
+          postImageUrl = uploaded || videoData.cover_image_url
         }
       }
     }
@@ -1543,68 +1554,43 @@ export class WebhookService {
   }
 
   private async fetchTikTokVideo(
-    accessToken: string,
-    _openId: string,
     videoId: string,
+    username?: string | null,
   ): Promise<{
-    title?: string
+    video_description?: string
     cover_image_url?: string
     share_url?: string
   } | null> {
     try {
-      const url =
-        'https://open.tiktokapis.com/v2/video/query/?fields=id,title,cover_image_url,share_url,video_description'
+      const handle = username ? `@${username}` : '@_'
+      const videoUrl = `https://www.tiktok.com/${handle}/video/${videoId}`
+      const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filters: { video_ids: [videoId] },
-        }),
-      })
+      this.logger.log(`[TikTok Webhook] Fetching video via oEmbed: ${oembedUrl}`)
+      const response = await fetch(oembedUrl)
 
       if (!response.ok) {
-        this.logger.error(`[TikTok Webhook] Fetch video failed: ${await response.text()}`)
+        this.logger.error(`[TikTok Webhook] oEmbed failed (HTTP ${response.status})`)
         return null
       }
 
-      const body = (await response.json()) as {
-        data: {
-          videos: Array<{
-            id: string
-            title?: string
-            video_description?: string
-            cover_image_url?: string
-            share_url?: string
-          }>
-        }
-        error: { code: string; message: string }
+      const data = (await response.json()) as {
+        title?: string
+        thumbnail_url?: string
+        author_unique_id?: string
       }
 
-      if (body.error?.code !== 'ok') {
-        this.logger.error(
-          `[TikTok Webhook] Fetch video error: ${body.error?.code} — ${body.error?.message}`,
-        )
-        return null
-      }
+      this.logger.log(
+        `[TikTok Webhook] oEmbed result: title=${data.title}, thumbnail=${data.thumbnail_url ? 'yes' : 'no'}`,
+      )
 
-      const found = body.data?.videos?.[0]
-      if (!found) {
-        this.logger.warn(`[TikTok Webhook] Video ${videoId} not found`)
-        return null
-      }
-
-      this.logger.log(`[TikTok Webhook] Fetched video: ${JSON.stringify(found)}`)
       return {
-        title: found.title || found.video_description,
-        cover_image_url: found.cover_image_url,
-        share_url: found.share_url,
+        video_description: data.title,
+        cover_image_url: data.thumbnail_url,
+        share_url: `https://www.tiktok.com/${handle}/video/${videoId}`,
       }
     } catch (error) {
-      this.logger.error(`[TikTok Webhook] Error fetching video: ${error}`)
+      this.logger.error(`[TikTok Webhook] oEmbed fetch error: ${error}`)
       return null
     }
   }
@@ -1627,6 +1613,11 @@ export class WebhookService {
 
       if (!settings) {
         this.logger.warn(`[AI] No settings found for account ${socialAccountId}, skipping AI`)
+        return
+      }
+
+      if (!settings.isConfigured) {
+        this.logger.log(`[AI] AI not configured for account ${socialAccountId}, skipping`)
         return
       }
 
