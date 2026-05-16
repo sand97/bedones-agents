@@ -49,7 +49,6 @@ export function CookieConsentModal({ open, onClose }: CookieConsentModalProps) {
         <div className="flex w-full flex-col gap-2 pt-2">
           <Button
             type="primary"
-            size="large"
             block
             loading={consentMutation.isPending}
             onClick={() => handleConsent('all')}
@@ -57,7 +56,6 @@ export function CookieConsentModal({ open, onClose }: CookieConsentModalProps) {
             Accepter tous les cookies
           </Button>
           <Button
-            size="large"
             block
             loading={consentMutation.isPending}
             onClick={() => handleConsent('essential')}

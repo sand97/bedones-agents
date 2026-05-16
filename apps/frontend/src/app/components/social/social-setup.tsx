@@ -64,7 +64,6 @@ export function SocialSetup({
             {buttonLabel && (
               <Button
                 type={buttonType}
-                size="large"
                 loading={loading}
                 onClick={onAction}
                 className="h-12 px-8 text-base font-semibold"
@@ -76,7 +75,6 @@ export function SocialSetup({
             {secondaryButtonLabel && (
               <Button
                 type={secondaryButtonType}
-                size="large"
                 loading={secondaryLoading}
                 onClick={onSecondaryAction}
                 className="h-12 px-8 text-base font-semibold"
