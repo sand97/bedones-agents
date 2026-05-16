@@ -104,6 +104,12 @@ export const agentApi = {
 
   deactivate: (id: string) => fetchJson<Agent>(`/agent/${id}/deactivate`, { method: 'PUT' }),
 
+  updateSocialAccounts: (id: string, socialAccountIds: string[]) =>
+    fetchJson<Agent>(`/agent/${id}/social-accounts`, {
+      method: 'PUT',
+      body: JSON.stringify({ socialAccountIds }),
+    }),
+
   getLabels: (id: string) => fetchJson<LabelItem[]>(`/agent/${id}/labels`),
 }
 

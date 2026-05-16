@@ -647,7 +647,15 @@
     "exclude_labels_title": "Labels à exclure",
     "exclude_labels_desc": "L'agent répondra à tous les contacts SAUF ceux ayant l'un de ces labels.",
     "select_exclude_labels_placeholder": "Sélectionner des labels à exclure",
-    "no_labels_found": "Aucun label trouvé. Créez des labels dans vos pages de messagerie."
+    "no_labels_found": "Aucun label trouvé. Créez des labels dans vos pages de messagerie.",
+    "connected_resources": "Ressources connectées",
+    "deactivate_agent": "Désactiver",
+    "delete_agent": "Supprimer",
+    "delete_confirm_title": "Supprimer l'agent",
+    "delete_confirm_desc": "Êtes-vous sûr de vouloir supprimer cet agent ? Cette action est irréversible.",
+    "other_actions": "Autres actions",
+    "edit_resources_modal_title": "Ressources connectées",
+    "edit_resources_modal_ok": "Enregistrer"
   },
 
   "stats": {

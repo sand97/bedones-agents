@@ -16,6 +16,11 @@ export class SendAgentMessageDto {
   content: string
 }
 
+export class UpdateAgentSocialAccountsDto {
+  @ApiProperty({ type: [String] })
+  socialAccountIds: string[]
+}
+
 export class ActivateAgentDto {
   @ApiProperty({ enum: ['CONTACTS', 'LABELS', 'EXCLUDE_LABELS'] })
   mode: 'CONTACTS' | 'LABELS' | 'EXCLUDE_LABELS'

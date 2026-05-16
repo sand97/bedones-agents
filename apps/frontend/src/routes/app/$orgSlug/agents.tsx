@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { createFileRoute, useParams } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, Empty, Spin } from 'antd'
-import { Plus, Sparkles, Bot, Zap } from 'lucide-react'
+import { Button, Spin } from 'antd'
+import { Plus, Sparkles, Bot, Zap, MoreHorizontal } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
@@ -10,6 +10,7 @@ import { AgentChat } from '@app/components/agent/agent-chat'
 import { AgentCreateModal } from '@app/components/agent/agent-create-modal'
 import { AgentActivateModal } from '@app/components/agent/agent-activate-modal'
 import { AgentListItem } from '@app/components/agent/agent-list-item'
+import { AgentActionsPopover } from '@app/components/agent/agent-actions-popover'
 import { AgentScoreBadge } from '@app/components/agent/agent-score-badge'
 import { HeaderHelper } from '@app/components/shared/header-helper'
 import { SocialSetup } from '@app/components/social/social-setup'
@@ -52,6 +53,7 @@ function AgentsPage() {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [activateOpen, setActivateOpen] = useState(false)
+  const [editAgent, setEditAgent] = useState<import('@app/lib/api/agent-api').Agent | null>(null)
   const [messages, setMessages] = useState<AgentMessage[]>([])
   const [pendingQuestion, setPendingQuestion] = useState<AgentMessage | null>(null)
   const [isThinking, setIsThinking] = useState(false)
@@ -194,6 +196,30 @@ function AgentsPage() {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: (agentId: string) => agentApi.remove(agentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents', orgSlug] })
+      if (selectedAgentId) setSelectedAgentId(null)
+    },
+  })
+
+  const deactivateMutation = useMutation({
+    mutationFn: (agentId: string) => agentApi.deactivate(agentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents', orgSlug] })
+    },
+  })
+
+  const updateSocialAccountsMutation = useMutation({
+    mutationFn: ({ agentId, socialAccountIds }: { agentId: string; socialAccountIds: string[] }) =>
+      agentApi.updateSocialAccounts(agentId, socialAccountIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents', orgSlug] })
+      setEditAgent(null)
+    },
+  })
+
   // ─── Handlers ───
 
   const handleSendMessage = useCallback(
@@ -243,6 +269,24 @@ function AgentsPage() {
     setSelectedAgentId(agentId)
     if (!isDesktop) setShowList(false)
   }
+
+  const handleEditResources = useCallback((agent: import('@app/lib/api/agent-api').Agent) => {
+    setEditAgent(agent)
+  }, [])
+
+  const handleDeactivate = useCallback(
+    (agentId: string) => {
+      deactivateMutation.mutate(agentId)
+    },
+    [deactivateMutation],
+  )
+
+  const handleDelete = useCallback(
+    (agentId: string) => {
+      deleteMutation.mutate(agentId)
+    },
+    [deleteMutation],
+  )
 
   // ─── Render ───
 
@@ -296,27 +340,39 @@ function AgentsPage() {
     // DRAFT: agent just created, no messages yet
     if (selectedAgent.status === 'DRAFT' && messages.length === 0) {
       return (
-        <div className="flex flex-1 items-center justify-center">
-          <Empty
-            image={<Sparkles size={48} strokeWidth={1.5} className="text-text-muted" />}
-            description={
-              <div className="mt-2">
-                <div className="text-sm font-medium text-text-primary">
-                  {t('agent.draft_title')}
-                </div>
-                <div className="mt-1 text-xs text-text-muted">{t('agent.draft_desc')}</div>
-                <Button
-                  type="primary"
-                  className="mt-4"
-                  loading={isThinking}
-                  onClick={handleStartConfig}
-                >
-                  {t('agent.start_config')}
-                </Button>
-              </div>
-            }
-          />
-        </div>
+        <SocialSetup
+          icon={<Sparkles size={48} strokeWidth={1.5} />}
+          color="var(--ant-color-text-secondary)"
+          title={t('agent.draft_title')}
+          description={t('agent.draft_desc')}
+        >
+          <div className="flex flex-col items-center gap-3">
+            <Button
+              type="primary"
+              size="large"
+              icon={<Sparkles size={18} />}
+              loading={isThinking}
+              onClick={handleStartConfig}
+              className="h-12 px-8 text-base font-semibold"
+            >
+              {t('agent.start_config')}
+            </Button>
+            <AgentActionsPopover
+              agent={selectedAgent}
+              onEditResources={() => handleEditResources(selectedAgent)}
+              onDeactivate={() => handleDeactivate(selectedAgent.id)}
+              onDelete={() => handleDelete(selectedAgent.id)}
+            >
+              <Button
+                size="large"
+                icon={<MoreHorizontal size={18} />}
+                className="h-12 px-8 text-base font-semibold"
+              >
+                {t('agent.other_actions')}
+              </Button>
+            </AgentActionsPopover>
+          </div>
+        </SocialSetup>
       )
     }
 
@@ -396,6 +452,9 @@ function AgentsPage() {
                     agent={agent}
                     isActive={agent.id === selectedAgentId}
                     onClick={() => handleSelectAgent(agent.id)}
+                    onEditResources={() => handleEditResources(agent)}
+                    onDeactivate={() => handleDeactivate(agent.id)}
+                    onDelete={() => handleDelete(agent.id)}
                   />
                 ))
               )}
@@ -414,16 +473,24 @@ function AgentsPage() {
       </div>
 
       <AgentCreateModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onSubmit={(name, ids) =>
-          createMutation.mutate({ name: name || undefined, socialAccountIds: ids })
-        }
+        open={createOpen || !!editAgent}
+        onClose={() => {
+          setCreateOpen(false)
+          setEditAgent(null)
+        }}
+        onSubmit={(name, ids) => {
+          if (editAgent) {
+            updateSocialAccountsMutation.mutate({ agentId: editAgent.id, socialAccountIds: ids })
+          } else {
+            createMutation.mutate({ name: name || undefined, socialAccountIds: ids })
+          }
+        }}
         socialAccounts={socialAccounts}
         existingAgents={agents}
         catalogs={catalogs}
-        loading={createMutation.isPending}
+        loading={editAgent ? updateSocialAccountsMutation.isPending : createMutation.isPending}
         orgSlug={orgSlug}
+        editAgent={editAgent}
       />
 
       {selectedAgent && (

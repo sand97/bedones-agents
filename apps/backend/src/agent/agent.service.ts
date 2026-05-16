@@ -142,6 +142,20 @@ export class AgentService {
     return this.prisma.agent.delete({ where: { id } })
   }
 
+  async updateSocialAccounts(agentId: string, socialAccountIds: string[]) {
+    const agent = await this.findById(agentId)
+    if (!agent) throw new NotFoundException('Agent introuvable')
+
+    await this.prisma.$transaction([
+      this.prisma.agentSocialAccount.deleteMany({ where: { agentId } }),
+      this.prisma.agentSocialAccount.createMany({
+        data: socialAccountIds.map((socialAccountId) => ({ agentId, socialAccountId })),
+      }),
+    ])
+
+    return this.findById(agentId)
+  }
+
   // ─── Messages ───
 
   async getMessages(agentId: string, limit = 50, before?: string) {
@@ -293,7 +307,10 @@ export class AgentService {
     })
 
     const model = this.createModel()
-    const result = await model.invoke([new SystemMessage(prompt)])
+    const result = await model.invoke([
+      new SystemMessage(prompt),
+      new HumanMessage("Effectue l'évaluation initiale de cet agent avec les données fournies."),
+    ])
 
     const responseText = typeof result.content === 'string' ? result.content : ''
     const parsed = this.parseAgentResponse(responseText)

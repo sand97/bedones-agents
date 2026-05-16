@@ -3,7 +3,12 @@ import { ApiTags, ApiOkResponse } from '@nestjs/swagger'
 import { AuthGuard } from '../auth/auth.guard'
 import { AgentService } from './agent.service'
 import { AgentFeedbackService } from './feedback.service'
-import { ActivateAgentDto, CreateAgentDto, SendAgentMessageDto } from './dto/agent.dto'
+import {
+  ActivateAgentDto,
+  CreateAgentDto,
+  SendAgentMessageDto,
+  UpdateAgentSocialAccountsDto,
+} from './dto/agent.dto'
 import { AgentFeedbackRequestDto, AgentFeedbackResponseDto } from './dto/feedback.dto'
 
 @ApiTags('Agent')
@@ -33,6 +38,11 @@ export class AgentController {
   @Delete(':id')
   async remove(@Param('id') id: string) {
     return this.agentService.remove(id)
+  }
+
+  @Put(':id/social-accounts')
+  async updateSocialAccounts(@Param('id') id: string, @Body() dto: UpdateAgentSocialAccountsDto) {
+    return this.agentService.updateSocialAccounts(id, dto.socialAccountIds)
   }
 
   // ─── Messages ───
