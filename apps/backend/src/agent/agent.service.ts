@@ -281,6 +281,36 @@ export class AgentService {
     }
   }
 
+  // ─── Setup (single async entry point) ───
+
+  async startSetup(agentId: string, organisationId: string) {
+    try {
+      // Phase 1: Catalog analysis
+      this.gateway.emitToOrg(organisationId, 'agent:setup-progress', {
+        agentId,
+        phase: 'analyzing-catalogs',
+      })
+
+      await this.analyzeCatalogs(agentId, organisationId)
+
+      // Phase 2: Initial evaluation
+      this.gateway.emitToOrg(organisationId, 'agent:setup-progress', {
+        agentId,
+        phase: 'initializing',
+      })
+
+      await this.performInitialEvaluation(agentId, organisationId)
+
+      // Done — agent:message is emitted by performInitialEvaluation
+    } catch (error) {
+      this.logger.error(`Agent setup failed for ${agentId}: ${error}`)
+      this.gateway.emitToOrg(organisationId, 'agent:setup-error', {
+        agentId,
+        message: 'Une erreur est survenue lors de la configuration. Réessayez.',
+      })
+    }
+  }
+
   // ─── Initial Evaluation (called after catalog analysis) ───
 
   async performInitialEvaluation(agentId: string, organisationId: string) {

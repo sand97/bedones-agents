@@ -86,6 +86,11 @@ export const agentApi = {
       method: 'POST',
     }),
 
+  startSetup: (id: string, organisationId: string) =>
+    fetchJson<{ status: string }>(`/agent/${id}/start-setup?organisationId=${organisationId}`, {
+      method: 'POST',
+    }),
+
   areCatalogsAnalyzed: (id: string) =>
     fetchJson<{ analyzed: boolean }>(`/agent/${id}/catalogs-analyzed`),
 

@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { createFileRoute, useParams } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, Spin } from 'antd'
-import { Plus, Sparkles, Bot, Zap, MoreHorizontal } from 'lucide-react'
+import { Plus, Sparkles, Bot, Zap, MoreHorizontal, Loader2 } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
@@ -58,6 +58,13 @@ function AgentsPage() {
   const [pendingQuestion, setPendingQuestion] = useState<AgentMessage | null>(null)
   const [isThinking, setIsThinking] = useState(false)
   const [showList, setShowList] = useState(true)
+  const [setupPhase, setSetupPhase] = useState<
+    'analyzing-catalogs' | 'initializing' | 'error' | null
+  >(null)
+  const [indexingProgress, setIndexingProgress] = useState<{
+    processed: number
+    total: number
+  } | null>(null)
 
   // ─── Queries ───
 
@@ -129,6 +136,8 @@ function AgentsPage() {
       const mapped = mapApiMessage(data.message)
       setMessages((prev) => [...prev, mapped])
       setIsThinking(false)
+      setSetupPhase(null)
+      setIndexingProgress(null)
 
       if (mapped.type === 'mcq' || mapped.type === 'scq') {
         setPendingQuestion(mapped)
@@ -157,11 +166,36 @@ function AgentsPage() {
       queryClient.invalidateQueries({ queryKey: ['agents', orgSlug] })
     }
 
+    const handleSetupProgress = (data: { agentId: string; phase: string }) => {
+      if (data.agentId === selectedAgentId) {
+        setSetupPhase(data.phase as 'analyzing-catalogs' | 'initializing')
+      }
+    }
+
+    const handleSetupError = (data: { agentId: string }) => {
+      if (data.agentId === selectedAgentId) {
+        setSetupPhase('error')
+        setIsThinking(false)
+      }
+    }
+
+    const handleIndexingProgress = (data: {
+      catalogId: string
+      processed: number
+      total: number
+      percentage: number
+    }) => {
+      setIndexingProgress({ processed: data.processed, total: data.total })
+    }
+
     socket.on('agent:message', handleAgentMessage)
     socket.on('agent:thinking', handleThinking)
     socket.on('agent:error', handleError)
     socket.on('catalog:analyzed', handleCatalogAnalyzed)
     socket.on('catalog:analyzing', handleCatalogAnalyzed)
+    socket.on('agent:setup-progress', handleSetupProgress)
+    socket.on('agent:setup-error', handleSetupError)
+    socket.on('catalog:indexing-progress', handleIndexingProgress)
 
     return () => {
       socket.off('agent:message', handleAgentMessage)
@@ -169,6 +203,9 @@ function AgentsPage() {
       socket.off('agent:error', handleError)
       socket.off('catalog:analyzed', handleCatalogAnalyzed)
       socket.off('catalog:analyzing', handleCatalogAnalyzed)
+      socket.off('agent:setup-progress', handleSetupProgress)
+      socket.off('agent:setup-error', handleSetupError)
+      socket.off('catalog:indexing-progress', handleIndexingProgress)
     }
   }, [orgSlug, selectedAgentId, queryClient])
 
@@ -252,16 +289,13 @@ function AgentsPage() {
 
   const handleStartConfig = useCallback(async () => {
     if (!selectedAgentId) return
-    setIsThinking(true)
+    setSetupPhase('analyzing-catalogs')
+    setIndexingProgress(null)
 
     try {
-      // First analyze catalogs
-      await agentApi.analyzeCatalogs(selectedAgentId, orgSlug)
-
-      // Then start initial evaluation
-      await agentApi.initialEvaluation(selectedAgentId, orgSlug)
+      await agentApi.startSetup(selectedAgentId, orgSlug)
     } catch {
-      setIsThinking(false)
+      setSetupPhase('error')
     }
   }, [selectedAgentId, orgSlug])
 
@@ -339,6 +373,51 @@ function AgentsPage() {
 
     // DRAFT: agent just created, no messages yet
     if (selectedAgent.status === 'DRAFT' && messages.length === 0) {
+      // Setup in progress — show phases
+      if (setupPhase === 'analyzing-catalogs' || setupPhase === 'initializing') {
+        const progressLabel =
+          indexingProgress && indexingProgress.total > 0
+            ? t('agent.setup_indexing_progress', {
+                processed: indexingProgress.processed,
+                total: indexingProgress.total,
+              })
+            : null
+
+        return (
+          <SocialSetup
+            icon={<Loader2 size={48} strokeWidth={1.5} className="animate-spin" />}
+            color="var(--ant-color-primary)"
+            title={
+              setupPhase === 'analyzing-catalogs'
+                ? t('agent.setup_phase_catalogs')
+                : t('agent.setup_phase_initializing')
+            }
+            description={
+              progressLabel ||
+              (setupPhase === 'analyzing-catalogs'
+                ? t('agent.setup_phase_catalogs_desc')
+                : t('agent.setup_phase_initializing_desc'))
+            }
+          />
+        )
+      }
+
+      // Setup error — show retry
+      if (setupPhase === 'error') {
+        return (
+          <SocialSetup
+            icon={<Sparkles size={48} strokeWidth={1.5} />}
+            color="var(--ant-color-error)"
+            title={t('agent.setup_error_title')}
+            description={t('agent.setup_error_desc')}
+            buttonLabel={t('agent.setup_retry')}
+            buttonIcon={<Sparkles size={18} />}
+            onAction={handleStartConfig}
+          />
+        )
+      }
+
+      // Default DRAFT state — ready to start
       return (
         <SocialSetup
           icon={<Sparkles size={48} strokeWidth={1.5} />}
@@ -349,8 +428,8 @@ function AgentsPage() {
           <div className="flex flex-col items-center gap-3">
             <Button
               type="primary"
+              size="large"
               icon={<Sparkles size={18} />}
-              loading={isThinking}
               onClick={handleStartConfig}
               className="h-12 px-8 text-base font-semibold"
             >
@@ -363,6 +442,7 @@ function AgentsPage() {
               onDelete={() => handleDelete(selectedAgent.id)}
             >
               <Button
+                size="large"
                 icon={<MoreHorizontal size={18} />}
                 className="h-12 px-8 text-base font-semibold"
               >

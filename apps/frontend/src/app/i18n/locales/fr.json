@@ -655,7 +655,15 @@
     "delete_confirm_desc": "Êtes-vous sûr de vouloir supprimer cet agent ? Cette action est irréversible.",
     "other_actions": "Autres actions",
     "edit_resources_modal_title": "Ressources connectées",
-    "edit_resources_modal_ok": "Enregistrer"
+    "edit_resources_modal_ok": "Enregistrer",
+    "setup_phase_catalogs": "Analyse de vos catalogues...",
+    "setup_phase_catalogs_desc": "Nos IA analysent vos produits et services pour mieux répondre à vos clients.",
+    "setup_indexing_progress": "{{processed}} / {{total}} articles analysés",
+    "setup_phase_initializing": "Initialisation de l'agent...",
+    "setup_phase_initializing_desc": "L'agent prépare ses premières questions en fonction de vos données.",
+    "setup_error_title": "Erreur de configuration",
+    "setup_error_desc": "Une erreur est survenue lors de la configuration de votre agent. Veuillez réessayer.",
+    "setup_retry": "Réessayer"
   },
 
   "stats": {

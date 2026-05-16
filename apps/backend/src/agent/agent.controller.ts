@@ -67,6 +67,13 @@ export class AgentController {
 
   // ─── Onboarding ───
 
+  @Post(':id/start-setup')
+  async startSetup(@Param('id') id: string, @Query('organisationId') organisationId: string) {
+    // Fire and forget — progress comes via WebSocket
+    this.agentService.startSetup(id, organisationId)
+    return { status: 'setup-started' }
+  }
+
   @Post(':id/analyze-catalogs')
   async analyzeCatalogs(@Param('id') id: string, @Query('organisationId') organisationId: string) {
     // Fire and forget - results come via WebSocket
