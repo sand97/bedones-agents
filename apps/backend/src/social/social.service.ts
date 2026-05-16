@@ -909,6 +909,10 @@ export class SocialService {
         provider: true,
         username: true,
         organisationId: true,
+        accessToken: true,
+        refreshToken: true,
+        tokenExpiresAt: true,
+        providerAccountId: true,
       },
     })
     if (!account) throw new NotFoundException('Social account not found')
@@ -917,8 +921,161 @@ export class SocialService {
     }
     await this.assertMembership(userId, account.organisationId)
 
-    // Sync existing posts thumbnails via oEmbed (public API, no scope required)
-    return this.syncTikTokVideosViaOEmbed(accountId, account.username)
+    // Try Business API first, fallback to oEmbed
+    const synced = await this.syncTikTokVideosViaBusinessApi(account)
+    if (synced !== null) {
+      this.logger.log(`[TikTok] ✓ Sync completed via Business API — ${synced.synced} videos`)
+      return synced
+    }
+    const oembedResult = await this.syncTikTokVideosViaOEmbed(accountId, account.username)
+    this.logger.log(`[TikTok] ✓ Sync completed via oEmbed fallback — ${oembedResult.synced} videos`)
+    return oembedResult
+  }
+
+  /**
+   * Sync TikTok video list and thumbnails via Business API
+   */
+  private async syncTikTokVideosViaBusinessApi(account: {
+    id: string
+    accessToken: string
+    refreshToken: string | null
+    tokenExpiresAt: Date | null
+    providerAccountId: string
+    username: string | null
+  }): Promise<{ synced: number } | null> {
+    try {
+      const accessToken = await this.getTikTokAccessToken(account)
+      const businessId = account.providerAccountId
+
+      const params = new URLSearchParams({ business_id: businessId })
+      const url = `https://business-api.tiktok.com/open_api/v1.3/business/video/list/?${params}`
+
+      this.logger.log(`[TikTok] Fetching videos via Business API: ${url}`)
+      const response = await fetch(url, {
+        headers: { 'Access-Token': accessToken },
+      })
+
+      const body = (await response.json()) as {
+        code: number
+        message: string
+        data?: {
+          videos?: Array<{
+            video_id: string
+            item_title?: string
+            cover_image_url?: string
+            share_url?: string
+          }>
+        }
+      }
+
+      if (body.code !== 0) {
+        this.logger.warn(
+          `[TikTok] Business API video list failed (code=${body.code}): ${body.message}`,
+        )
+        return null
+      }
+
+      const videos = body.data?.videos || []
+      if (videos.length === 0) return { synced: 0 }
+
+      let synced = 0
+      for (const video of videos) {
+        const existingPost = await this.prisma.post.findUnique({
+          where: { id: video.video_id },
+          select: { imageUrl: true },
+        })
+
+        const hasStoredCover = this.uploadService.isOwnUrl(existingPost?.imageUrl)
+        if (existingPost && hasStoredCover) continue
+
+        let imageUrl: string | null = null
+        if (video.cover_image_url) {
+          imageUrl =
+            (await this.uploadService.uploadFromUrl(video.cover_image_url, 'posts')) ||
+            video.cover_image_url
+        }
+
+        await this.prisma.post.upsert({
+          where: { id: video.video_id },
+          create: {
+            id: video.video_id,
+            socialAccountId: account.id,
+            message: video.item_title || null,
+            imageUrl,
+            permalinkUrl: video.share_url || null,
+          },
+          update: {
+            message: video.item_title || undefined,
+            imageUrl: imageUrl || undefined,
+            permalinkUrl: video.share_url || undefined,
+          },
+        })
+        synced++
+      }
+
+      this.logger.log(`[TikTok] Synced ${synced} videos via Business API for account ${account.id}`)
+      return { synced }
+    } catch (error) {
+      this.logger.warn(`[TikTok] Business API sync error: ${error}, falling back to oEmbed`)
+      return null
+    }
+  }
+
+  private async getTikTokAccessToken(account: {
+    id: string
+    accessToken: string
+    refreshToken: string | null
+    tokenExpiresAt: Date | null
+  }): Promise<string> {
+    if (account.tokenExpiresAt && account.tokenExpiresAt > new Date()) {
+      return this.encryptionService.decrypt(account.accessToken)
+    }
+
+    if (!account.refreshToken) {
+      return this.encryptionService.decrypt(account.accessToken)
+    }
+
+    const clientKey = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
+    const clientSecret = this.configService.getOrThrow<string>('TIKTOK_CLIENT_SECRET')
+    const refreshToken = await this.encryptionService.decrypt(account.refreshToken)
+
+    const response = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_key: clientKey,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    })
+
+    if (!response.ok) {
+      this.logger.error(`[TikTok] Token refresh failed: ${await response.text()}`)
+      return this.encryptionService.decrypt(account.accessToken)
+    }
+
+    const data = (await response.json()) as {
+      access_token: string
+      refresh_token?: string
+      expires_in: number
+    }
+
+    const encryptedToken = await this.encryptionService.encrypt(data.access_token)
+    const encryptedRefresh = data.refresh_token
+      ? await this.encryptionService.encrypt(data.refresh_token)
+      : account.refreshToken
+
+    await this.prisma.socialAccount.update({
+      where: { id: account.id },
+      data: {
+        accessToken: encryptedToken,
+        refreshToken: encryptedRefresh,
+        tokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
+      },
+    })
+
+    return data.access_token
   }
 
   /**

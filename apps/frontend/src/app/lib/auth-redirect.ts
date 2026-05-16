@@ -102,7 +102,7 @@ export function buildTikTokOAuthUrl(): string {
   url.searchParams.set('response_type', 'code')
   url.searchParams.set(
     'scope',
-    'user.info.basic,user.info.username,user.account.type,comment.list,comment.list.manage',
+    'user.info.basic,user.info.username,user.account.type,comment.list,comment.list.manage,video.list',
   )
 
   return url.toString()

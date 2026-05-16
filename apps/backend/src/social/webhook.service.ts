@@ -1296,7 +1296,12 @@ export class WebhookService {
     let postPermalinkUrl = existingPost?.permalinkUrl || null
 
     if (needsVideoFetch) {
-      const videoData = await this.fetchTikTokVideo(videoId, socialAccount.username)
+      const videoData = await this.fetchTikTokVideo(
+        videoId,
+        accessToken,
+        openId,
+        socialAccount.username,
+      )
       if (videoData) {
         postMessage = videoData.video_description || postMessage
         postPermalinkUrl = videoData.share_url || postPermalinkUrl
@@ -1555,18 +1560,68 @@ export class WebhookService {
 
   private async fetchTikTokVideo(
     videoId: string,
+    accessToken: string,
+    businessId: string,
     username?: string | null,
   ): Promise<{
     video_description?: string
     cover_image_url?: string
     share_url?: string
+    strategy: 'business_api' | 'oembed'
   } | null> {
+    // Try Business API first
+    try {
+      const params = new URLSearchParams({
+        business_id: businessId,
+        filters: JSON.stringify({ video_ids: [videoId] }),
+      })
+      const url = `https://business-api.tiktok.com/open_api/v1.3/business/video/list/?${params}`
+
+      this.logger.log(`[TikTok Webhook] Fetching video via Business API`)
+      const response = await fetch(url, {
+        headers: { 'Access-Token': accessToken },
+      })
+
+      const body = (await response.json()) as {
+        code: number
+        message: string
+        data?: {
+          videos?: Array<{
+            video_id: string
+            item_title?: string
+            cover_image_url?: string
+            share_url?: string
+          }>
+        }
+      }
+
+      if (body.code === 0 && body.data?.videos?.[0]) {
+        const video = body.data.videos[0]
+        this.logger.log(
+          `[TikTok Webhook] ✓ Video fetched via Business API — title="${video.item_title}", cover=${video.cover_image_url ? 'yes' : 'no'}`,
+        )
+        return {
+          video_description: video.item_title,
+          cover_image_url: video.cover_image_url,
+          share_url: video.share_url,
+          strategy: 'business_api',
+        }
+      }
+
+      this.logger.warn(
+        `[TikTok Webhook] Business API failed (code=${body.code}): ${body.message}, falling back to oEmbed`,
+      )
+    } catch (error) {
+      this.logger.warn(`[TikTok Webhook] Business API error: ${error}, falling back to oEmbed`)
+    }
+
+    // Fallback to oEmbed
     try {
       const handle = username ? `@${username}` : '@_'
       const videoUrl = `https://www.tiktok.com/${handle}/video/${videoId}`
       const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`
 
-      this.logger.log(`[TikTok Webhook] Fetching video via oEmbed: ${oembedUrl}`)
+      this.logger.log(`[TikTok Webhook] Trying oEmbed fallback`)
       const response = await fetch(oembedUrl)
 
       if (!response.ok) {
@@ -1577,17 +1632,17 @@ export class WebhookService {
       const data = (await response.json()) as {
         title?: string
         thumbnail_url?: string
-        author_unique_id?: string
       }
 
       this.logger.log(
-        `[TikTok Webhook] oEmbed result: title=${data.title}, thumbnail=${data.thumbnail_url ? 'yes' : 'no'}`,
+        `[TikTok Webhook] ✓ Video fetched via oEmbed — title="${data.title}", thumbnail=${data.thumbnail_url ? 'yes' : 'no'}`,
       )
 
       return {
         video_description: data.title,
         cover_image_url: data.thumbnail_url,
         share_url: `https://www.tiktok.com/${handle}/video/${videoId}`,
+        strategy: 'oembed',
       }
     } catch (error) {
       this.logger.error(`[TikTok Webhook] oEmbed fetch error: ${error}`)
