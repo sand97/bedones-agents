@@ -4,6 +4,7 @@ interface CatalogInfo {
   name: string
   description?: string | null
   productCount: number
+  products?: Array<{ name: string; description?: string | null }>
 }
 
 interface SocialAccountInfo {
@@ -32,7 +33,11 @@ export class AgentPromptsService {
     const catalogDescriptions = catalogs
       .map((c) => {
         const desc = c.description ? `\nDescription: ${c.description}` : ''
-        return `- ${c.name} (${c.productCount} produits)${desc}`
+        const productList =
+          c.products && c.products.length > 0
+            ? `\nExemples de produits:\n${c.products.map((p) => `  • ${p.name}${p.description ? ` — ${p.description}` : ''}`).join('\n')}`
+            : ''
+        return `- ${c.name} (${c.productCount} produits)${desc}${productList}`
       })
       .join('\n')
 

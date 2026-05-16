@@ -319,13 +319,26 @@ export class AgentService {
     const catalogsData = await this.getAgentCatalogs(agentId)
     const socialAccountsData = agent.socialAccounts.map((sa) => sa.socialAccount)
 
+    // Fetch product samples for each catalog (max 20 per catalog)
+    const catalogsWithProducts = await Promise.all(
+      catalogsData.map(async (c) => {
+        const products = await this.prisma.product.findMany({
+          where: { catalogId: c.id },
+          select: { name: true, description: true },
+          take: 20,
+        })
+        return {
+          name: c.name,
+          description: c.description,
+          productCount: c.productCount,
+          products,
+        }
+      }),
+    )
+
     // Build initial prompt
     const prompt = this.prompts.buildInitialEvaluationPrompt({
-      catalogs: catalogsData.map((c) => ({
-        name: c.name,
-        description: c.description,
-        productCount: c.productCount,
-      })),
+      catalogs: catalogsWithProducts,
       socialAccounts: socialAccountsData.map((sa) => ({
         provider: sa.provider,
         pageName: sa.pageName,
