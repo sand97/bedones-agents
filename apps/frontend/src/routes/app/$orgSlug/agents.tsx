@@ -349,7 +349,6 @@ function AgentsPage() {
           <div className="flex flex-col items-center gap-3">
             <Button
               type="primary"
-              size="large"
               icon={<Sparkles size={18} />}
               loading={isThinking}
               onClick={handleStartConfig}
@@ -364,7 +363,6 @@ function AgentsPage() {
               onDelete={() => handleDelete(selectedAgent.id)}
             >
               <Button
-                size="large"
                 icon={<MoreHorizontal size={18} />}
                 className="h-12 px-8 text-base font-semibold"
               >
