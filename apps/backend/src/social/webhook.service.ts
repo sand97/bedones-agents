@@ -1238,6 +1238,20 @@ export class WebhookService {
 
     const commentAction = actionMatch?.[1] || ''
 
+    // Handle comment deletion
+    if (commentAction === 'delete') {
+      const deletedCommentId = commentIdMatch?.[1] || ''
+      if (deletedCommentId) {
+        const deleted = await this.prisma.comment.deleteMany({
+          where: { id: deletedCommentId },
+        })
+        if (deleted.count > 0) {
+          this.logger.log(`[TikTok Webhook] Deleted comment ${deletedCommentId} from DB`)
+        }
+      }
+      return
+    }
+
     // Only process new comments becoming public
     if (commentAction !== 'set_to_public') {
       this.logger.log(`[TikTok Webhook] Ignoring comment action: ${commentAction}`)
@@ -1863,13 +1877,52 @@ export class WebhookService {
   ) {
     const provider = 'TIKTOK' as const
 
-    // TikTok: hide is not supported via API, mark locally only
+    // TikTok: hide via Business API
     if (result.action === 'hide') {
+      const comment = await this.prisma.comment.findUnique({
+        where: { id: commentId },
+        select: { postId: true },
+      })
+      if (!comment) return
+
+      const account = await this.prisma.socialAccount.findUnique({
+        where: { id: socialAccountId },
+        select: { providerAccountId: true },
+      })
+      if (!account) return
+
+      try {
+        const hideResponse = await fetch(
+          'https://business-api.tiktok.com/open_api/v1.3/business/comment/hide/',
+          {
+            method: 'POST',
+            headers: {
+              'Access-Token': accessToken,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              business_id: account.providerAccountId,
+              video_id: comment.postId,
+              comment_id: commentId,
+              action: 'HIDE',
+            }),
+          },
+        )
+        const hideBody = (await hideResponse.json()) as { code: number; message: string }
+        if (hideBody.code !== 0) {
+          this.logger.error(
+            `[AI] TikTok hide failed: ${hideBody.code} — ${hideBody.message}`,
+          )
+        }
+      } catch (error) {
+        this.logger.error(`[AI] TikTok hide error: ${error}`)
+      }
+
       await this.prisma.comment.update({
         where: { id: commentId },
         data: { status: 'HIDDEN', action: 'HIDE', actionReason: result.reason, isRead: true },
       })
-      this.logger.log(`[AI] Marked TikTok comment ${commentId} as hidden (local only)`)
+      this.logger.log(`[AI] Hidden TikTok comment ${commentId}`)
       this.eventsGateway.emitToOrg(orgId, 'comment:updated', {
         commentId,
         socialAccountId,
@@ -1878,13 +1931,44 @@ export class WebhookService {
       })
     }
 
-    // TikTok: delete is not supported for comments via API, mark locally only
+    // TikTok: delete via Business API
     if (result.action === 'delete') {
-      await this.prisma.comment.update({
-        where: { id: commentId },
-        data: { status: 'DELETED', action: 'DELETE', actionReason: result.reason, isRead: true },
+      const account = await this.prisma.socialAccount.findUnique({
+        where: { id: socialAccountId },
+        select: { providerAccountId: true },
       })
-      this.logger.log(`[AI] Marked TikTok comment ${commentId} as deleted (local only)`)
+
+      if (account) {
+        try {
+          const deleteResponse = await fetch(
+            'https://business-api.tiktok.com/open_api/v1.3/business/comment/delete/',
+            {
+              method: 'POST',
+              headers: {
+                'Access-Token': accessToken,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                business_id: account.providerAccountId,
+                comment_id: commentId,
+              }),
+            },
+          )
+          const deleteBody = (await deleteResponse.json()) as { code: number; message: string }
+          if (deleteBody.code !== 0) {
+            this.logger.error(
+              `[AI] TikTok delete failed: ${deleteBody.code} — ${deleteBody.message}`,
+            )
+          }
+        } catch (error) {
+          this.logger.error(`[AI] TikTok delete error: ${error}`)
+        }
+      }
+
+      await this.prisma.comment.delete({
+        where: { id: commentId },
+      })
+      this.logger.log(`[AI] Deleted TikTok comment ${commentId}`)
       this.eventsGateway.emitToOrg(orgId, 'comment:updated', {
         commentId,
         socialAccountId,

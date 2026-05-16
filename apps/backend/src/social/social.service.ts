@@ -1686,6 +1686,14 @@ export class SocialService {
       await this.facebookHideComment(commentId, accessToken)
     } else if (provider === 'INSTAGRAM') {
       await this.instagramHideComment(commentId, accessToken)
+    } else if (provider === 'TIKTOK') {
+      await this.tiktokHideComment(
+        comment.post.socialAccount.id,
+        comment.postId,
+        commentId,
+        accessToken,
+        'HIDE',
+      )
     }
 
     return this.prisma.comment.update({
@@ -1718,6 +1726,14 @@ export class SocialService {
       await this.facebookUnhideComment(commentId, accessToken)
     } else if (provider === 'INSTAGRAM') {
       await this.instagramUnhideComment(commentId, accessToken)
+    } else if (provider === 'TIKTOK') {
+      await this.tiktokHideComment(
+        comment.post.socialAccount.id,
+        comment.postId,
+        commentId,
+        accessToken,
+        'UNHIDE',
+      )
     }
 
     return this.prisma.comment.update({
@@ -1750,11 +1766,12 @@ export class SocialService {
       await this.facebookDeleteComment(commentId, accessToken)
     } else if (provider === 'INSTAGRAM') {
       await this.instagramDeleteComment(commentId, accessToken)
+    } else if (provider === 'TIKTOK') {
+      await this.tiktokDeleteComment(comment.post.socialAccount.id, commentId, accessToken)
     }
 
-    return this.prisma.comment.update({
+    return this.prisma.comment.delete({
       where: { id: commentId },
-      data: { status: 'DELETED', action: 'DELETE' },
     })
   }
 
@@ -1864,6 +1881,84 @@ export class SocialService {
       this.logger.error(`[Instagram] Delete failed: ${await response.text()}`)
       throw new BadRequestException('Failed to delete comment')
     }
+  }
+
+  private async tiktokDeleteComment(
+    socialAccountId: string,
+    commentId: string,
+    accessToken: string,
+  ) {
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: socialAccountId },
+      select: { providerAccountId: true },
+    })
+    if (!account) throw new NotFoundException('Social account not found')
+
+    const response = await fetch(
+      'https://business-api.tiktok.com/open_api/v1.3/business/comment/delete/',
+      {
+        method: 'POST',
+        headers: {
+          'Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          business_id: account.providerAccountId,
+          comment_id: commentId,
+        }),
+      },
+    )
+
+    const body = (await response.json()) as { code: number; message: string }
+    if (body.code !== 0) {
+      this.logger.error(`[TikTok] Delete comment failed: ${body.code} — ${body.message}`)
+      throw new BadRequestException(`Failed to delete TikTok comment: ${body.message}`)
+    }
+
+    this.logger.log(`[TikTok] Deleted comment ${commentId} on TikTok`)
+  }
+
+  private async tiktokHideComment(
+    socialAccountId: string,
+    videoId: string,
+    commentId: string,
+    accessToken: string,
+    action: 'HIDE' | 'UNHIDE',
+  ) {
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: socialAccountId },
+      select: { providerAccountId: true },
+    })
+    if (!account) throw new NotFoundException('Social account not found')
+
+    const response = await fetch(
+      'https://business-api.tiktok.com/open_api/v1.3/business/comment/hide/',
+      {
+        method: 'POST',
+        headers: {
+          'Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          business_id: account.providerAccountId,
+          video_id: videoId,
+          comment_id: commentId,
+          action,
+        }),
+      },
+    )
+
+    const body = (await response.json()) as { code: number; message: string }
+    if (body.code !== 0) {
+      this.logger.error(
+        `[TikTok] ${action} comment failed: ${body.code} — ${body.message}`,
+      )
+      throw new BadRequestException(
+        `Failed to ${action.toLowerCase()} TikTok comment: ${body.message}`,
+      )
+    }
+
+    this.logger.log(`[TikTok] ${action} comment ${commentId} on TikTok`)
   }
 
   // ─── Unread counts per provider (comments + messaging) ───
