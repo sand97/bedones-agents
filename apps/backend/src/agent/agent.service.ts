@@ -8,6 +8,7 @@ import { AgentPromptsService } from './prompts/agent-prompts.service'
 import { AgentDbToolsService } from './tools/agent-db-tools.service'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { LlmFactoryService } from '../common/llm/llm-factory.service'
+import { ProductImageIndexingService } from '../image-processing/product-image-indexing.service'
 import { CATALOG_INDEXING_QUEUE } from '../queue/queue.module'
 import type { CatalogIndexingJobData } from '../image-processing/catalog-indexing.processor'
 
@@ -22,6 +23,7 @@ export class AgentService {
     private prompts: AgentPromptsService,
     private dbTools: AgentDbToolsService,
     private llmFactory: LlmFactoryService,
+    private productIndexing: ProductImageIndexingService,
     @InjectQueue(CATALOG_INDEXING_QUEUE) private catalogIndexingQueue: Queue,
   ) {}
 
@@ -319,19 +321,28 @@ export class AgentService {
     const catalogsData = await this.getAgentCatalogs(agentId)
     const socialAccountsData = agent.socialAccounts.map((sa) => sa.socialAccount)
 
-    // Fetch product samples for each catalog (max 20 per catalog)
+    // Fetch product samples for each catalog (max 20 per catalog) from Meta API
     const catalogsWithProducts = await Promise.all(
       catalogsData.map(async (c) => {
-        const products = await this.prisma.product.findMany({
-          where: { catalogId: c.id },
-          select: { name: true, description: true },
-          take: 20,
-        })
-        return {
-          name: c.name,
-          description: c.description,
-          productCount: c.productCount,
-          products,
+        try {
+          const metaProducts = await this.productIndexing.fetchAllProducts(c.id)
+          return {
+            name: c.name,
+            description: c.description,
+            productCount: c.productCount || metaProducts.length,
+            products: metaProducts.slice(0, 20).map((p) => ({
+              name: p.name || 'Sans nom',
+              description: p.description,
+            })),
+          }
+        } catch (error) {
+          this.logger.warn(`Failed to fetch products for catalog ${c.id}: ${error}`)
+          return {
+            name: c.name,
+            description: c.description,
+            productCount: c.productCount,
+            products: [],
+          }
         }
       }),
     )
@@ -408,11 +419,16 @@ export class AgentService {
       })
 
       try {
-        const products = await this.prisma.product.findMany({
-          where: { catalogId: catalog.id },
-          select: { name: true, description: true },
-          take: 50,
-        })
+        let products: Array<{ name: string; description?: string | null }>
+        try {
+          const metaProducts = await this.productIndexing.fetchAllProducts(catalog.id)
+          products = metaProducts.map((p) => ({
+            name: p.name || 'Sans nom',
+            description: p.description,
+          }))
+        } catch {
+          products = []
+        }
 
         if (products.length === 0) {
           await this.prisma.catalog.update({
@@ -422,7 +438,7 @@ export class AgentService {
           continue
         }
 
-        const prompt = this.prompts.buildCatalogAnalysisPrompt(products)
+        const prompt = this.prompts.buildCatalogAnalysisPrompt(products.slice(0, 50))
         const model = this.createModel()
         const result = await model.invoke([new HumanMessage(prompt)])
         const description = typeof result.content === 'string' ? result.content : ''
