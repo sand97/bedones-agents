@@ -1574,6 +1574,7 @@ export class WebhookService {
       const params = new URLSearchParams({
         business_id: businessId,
         filters: JSON.stringify({ video_ids: [videoId] }),
+        fields: JSON.stringify(['item_id', 'caption', 'thumbnail_url', 'share_url']),
       })
       const url = `https://business-api.tiktok.com/open_api/v1.3/business/video/list/?${params}`
 
@@ -1587,9 +1588,9 @@ export class WebhookService {
         message: string
         data?: {
           videos?: Array<{
-            video_id: string
-            item_title?: string
-            cover_image_url?: string
+            item_id: string
+            caption?: string
+            thumbnail_url?: string
             share_url?: string
           }>
         }
@@ -1598,11 +1599,11 @@ export class WebhookService {
       if (body.code === 0 && body.data?.videos?.[0]) {
         const video = body.data.videos[0]
         this.logger.log(
-          `[TikTok Webhook] ✓ Video fetched via Business API — title="${video.item_title}", cover=${video.cover_image_url ? 'yes' : 'no'}`,
+          `[TikTok Webhook] ✓ Video fetched via Business API — title="${video.caption}", cover=${video.thumbnail_url ? 'yes' : 'no'}`,
         )
         return {
-          video_description: video.item_title,
-          cover_image_url: video.cover_image_url,
+          video_description: video.caption,
+          cover_image_url: video.thumbnail_url,
           share_url: video.share_url,
           strategy: 'business_api',
         }

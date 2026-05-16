@@ -947,10 +947,13 @@ export class SocialService {
       const accessToken = await this.getTikTokAccessToken(account)
       const businessId = account.providerAccountId
 
-      const params = new URLSearchParams({ business_id: businessId })
+      const params = new URLSearchParams({
+        business_id: businessId,
+        fields: JSON.stringify(['item_id', 'caption', 'thumbnail_url', 'share_url']),
+      })
       const url = `https://business-api.tiktok.com/open_api/v1.3/business/video/list/?${params}`
 
-      this.logger.log(`[TikTok] Fetching videos via Business API: ${url}`)
+      this.logger.log(`[TikTok] Fetching videos via Business API`)
       const response = await fetch(url, {
         headers: { 'Access-Token': accessToken },
       })
@@ -960,9 +963,9 @@ export class SocialService {
         message: string
         data?: {
           videos?: Array<{
-            video_id: string
-            item_title?: string
-            cover_image_url?: string
+            item_id: string
+            caption?: string
+            thumbnail_url?: string
             share_url?: string
           }>
         }
@@ -981,7 +984,7 @@ export class SocialService {
       let synced = 0
       for (const video of videos) {
         const existingPost = await this.prisma.post.findUnique({
-          where: { id: video.video_id },
+          where: { id: video.item_id },
           select: { imageUrl: true },
         })
 
@@ -989,23 +992,23 @@ export class SocialService {
         if (existingPost && hasStoredCover) continue
 
         let imageUrl: string | null = null
-        if (video.cover_image_url) {
+        if (video.thumbnail_url) {
           imageUrl =
-            (await this.uploadService.uploadFromUrl(video.cover_image_url, 'posts')) ||
-            video.cover_image_url
+            (await this.uploadService.uploadFromUrl(video.thumbnail_url, 'posts')) ||
+            video.thumbnail_url
         }
 
         await this.prisma.post.upsert({
-          where: { id: video.video_id },
+          where: { id: video.item_id },
           create: {
-            id: video.video_id,
+            id: video.item_id,
             socialAccountId: account.id,
-            message: video.item_title || null,
+            message: video.caption || null,
             imageUrl,
             permalinkUrl: video.share_url || null,
           },
           update: {
-            message: video.item_title || undefined,
+            message: video.caption || undefined,
             imageUrl: imageUrl || undefined,
             permalinkUrl: video.share_url || undefined,
           },
