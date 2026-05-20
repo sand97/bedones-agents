@@ -459,7 +459,6 @@ function ChatsPage() {
   const sendTemplateMutation = $api.useMutation('post', '/messaging/send-template')
   const sendProductMutation = $api.useMutation('post', '/messaging/send-products')
   const markReadMutation = $api.useMutation('post', '/messaging/mark-read')
-  const syncMutation = $api.useMutation('post', '/messaging/sync/{accountId}')
 
   // ─── Map conversations to ChatLayout format ───
   const apiConversations: Conversation[] = useMemo(() => {
@@ -853,20 +852,6 @@ function ChatsPage() {
     })
   }
 
-  const handleSync = () => {
-    if (!currentAccountId) return
-    syncMutation.mutate(
-      { params: { path: { accountId: currentAccountId } } },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({
-            queryKey: ['get', '/messaging/conversations/{accountId}'],
-          })
-        },
-      },
-    )
-  }
-
   // ─── WhatsApp connect mutation ───
   const connectWhatsAppMutation = $api.useMutation('post', '/social/connect/whatsapp')
 
@@ -1025,8 +1010,6 @@ function ChatsPage() {
         onSend={handleSend}
         onUploadAndSend={handleUploadAndSend}
         onSelectConversation={handleSelectConv}
-        onSync={handleSync}
-        syncing={syncMutation.isPending}
         onRetry={handleRetry}
         onChatClick={handleChatClick}
         hasReadyAgent={hasReadyAgent}

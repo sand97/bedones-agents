@@ -219,7 +219,6 @@
     "agent_toggle_error": "Could not update agent state",
     "type_message": "Type a message...",
     "search": "Search conversations...",
-    "sync": "Sync",
     "new_messages": "New messages",
     "whatsapp_setup_title": "Connect WhatsApp",
     "whatsapp_setup_desc": "Connect your WhatsApp Business account to receive and reply to messages directly from Bedones.",

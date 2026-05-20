@@ -219,7 +219,6 @@
     "agent_toggle_error": "Impossible de modifier l'état de l'agent",
     "type_message": "Tapez un message...",
     "search": "Rechercher une conversation...",
-    "sync": "Synchroniser",
     "new_messages": "Nouveaux messages",
     "whatsapp_setup_title": "Connecter WhatsApp",
     "whatsapp_setup_desc": "Connectez votre compte WhatsApp Business pour recevoir et répondre aux messages directement depuis Bedones.",

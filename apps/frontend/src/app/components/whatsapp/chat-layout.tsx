@@ -8,7 +8,6 @@ import {
   FileText,
   Megaphone,
   MessageCircle,
-  RefreshCw,
   Sparkles,
   ShoppingBag,
   Tag,
@@ -86,8 +85,6 @@ interface ChatLayoutProps {
     replyToId?: string,
   ) => Promise<void>
   onSelectConversation?: (convId: string) => void
-  onSync?: () => void
-  syncing?: boolean
   onRetry?: (messageId: string) => void
   /** Called when user clicks anywhere in the chat window area */
   onChatClick?: () => void
@@ -276,8 +273,6 @@ export function ChatLayout({
   onSend,
   onUploadAndSend,
   onSelectConversation,
-  onSync,
-  syncing,
   onRetry,
   onChatClick,
   hasReadyAgent = false,
@@ -475,19 +470,8 @@ export function ChatLayout({
               {selectedLabelIds.length > 0 ? ` (${selectedLabelIds.length})` : ''}
             </Button>
           </LabelsFilterPopover>
-          <div className="ml-auto flex items-center gap-1">
-            {onSync && (
-              <Button
-                type="text"
-                size="small"
-                icon={<RefreshCw size={16} />}
-                loading={syncing}
-                onClick={onSync}
-              >
-                {t('chat.sync')}
-              </Button>
-            )}
-            {provider === 'whatsapp' && (
+          {provider === 'whatsapp' && (
+            <div className="ml-auto">
               <WhatsAppToolsPopover
                 onOpenOptions={onOpenOptions}
                 onOpenTemplates={onOpenTemplates}
@@ -497,8 +481,8 @@ export function ChatLayout({
                   {t('chat.tools')}
                 </Button>
               </WhatsAppToolsPopover>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto">
