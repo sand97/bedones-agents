@@ -1511,7 +1511,7 @@ export class MessagingService {
     }
   }
 
-  private async mapTikTokMessageForStorage(
+  async mapTikTokMessageForStorage(
     businessId: string,
     accessToken: string,
     conversationId: string,
@@ -1902,6 +1902,7 @@ export class MessagingService {
     fileSize?: number | null,
     replyToMid?: string | null,
     metadata?: Record<string, unknown> | null,
+    platformThreadId?: string | null,
   ) {
     // Upsert conversation
     const conversation = await this.prisma.conversation.upsert({
@@ -1913,6 +1914,7 @@ export class MessagingService {
       },
       create: {
         socialAccountId,
+        platformThreadId: platformThreadId || null,
         participantId: senderId,
         participantName: senderName,
         participantAvatar: senderAvatar || null,
@@ -1921,6 +1923,7 @@ export class MessagingService {
         unreadCount: 1,
       },
       update: {
+        ...(platformThreadId ? { platformThreadId } : {}),
         participantName: senderName,
         ...(senderAvatar ? { participantAvatar: senderAvatar } : {}),
         lastMessageText: messageText || (mediaType ? `[${mediaType}]` : undefined),

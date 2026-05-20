@@ -60,6 +60,67 @@ export class WebhookService {
     return this.verifySignature(rawBody, signature, this.whatsappAppSecret)
   }
 
+  async verifyTikTokSignature(rawBody: Buffer, signature: string): Promise<boolean> {
+    const parsed = this.parseTikTokSignature(signature)
+    if (!parsed) return false
+
+    const configuredToleranceSeconds = Number(
+      this.configService.get<string>('TIKTOK_WEBHOOK_SIGNATURE_TOLERANCE_SECONDS', '300'),
+    )
+    const toleranceSeconds = Number.isFinite(configuredToleranceSeconds)
+      ? configuredToleranceSeconds
+      : 300
+    const now = Math.floor(Date.now() / 1000)
+    if (Math.abs(now - parsed.timestamp) > toleranceSeconds) {
+      this.logger.warn('[TikTok Webhook] Signature timestamp outside tolerance')
+      return false
+    }
+
+    const clientSecret = this.configService.getOrThrow<string>('TIKTOK_CLIENT_SECRET')
+    const signedPayload = `${parsed.timestamp}.${rawBody.toString('utf8')}`
+    const encoder = new TextEncoder()
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(clientSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    )
+    const signed = await crypto.subtle.sign('HMAC', key, encoder.encode(signedPayload))
+    const computedSignature = Array.from(new Uint8Array(signed))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+
+    return this.safeEqualHex(computedSignature, parsed.signature)
+  }
+
+  private parseTikTokSignature(signature: string): { timestamp: number; signature: string } | null {
+    const parts = new Map(
+      signature.split(',').map((part) => {
+        const [key, ...value] = part.trim().split('=')
+        return [key, value.join('=')] as const
+      }),
+    )
+    const timestamp = Number(parts.get('t'))
+    const signed = parts.get('s')
+    if (!Number.isFinite(timestamp) || !signed) return null
+    return { timestamp, signature: signed }
+  }
+
+  private safeEqualHex(left: string, right: string): boolean {
+    if (!/^[a-f0-9]+$/i.test(left) || !/^[a-f0-9]+$/i.test(right)) return false
+    const leftBytes = new Uint8Array(left.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) ?? [])
+    const rightBytes = new Uint8Array(
+      right.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) ?? [],
+    )
+    if (leftBytes.length !== rightBytes.length) return false
+    let diff = 0
+    for (let i = 0; i < leftBytes.length; i++) {
+      diff |= leftBytes[i] ^ rightBytes[i]
+    }
+    return diff === 0
+  }
+
   private async verifySignature(
     rawBody: Buffer,
     signature: string,
@@ -1221,6 +1282,16 @@ export class WebhookService {
       return
     }
 
+    if (event === 'im_receive_msg' || event === 'im_send_msg') {
+      await this.handleTikTokDirectMessage(payload)
+      return
+    }
+
+    if (event === 'im_mark_read_msg') {
+      await this.handleTikTokReadReceipt(payload)
+      return
+    }
+
     if (event !== 'comment.update') {
       this.logger.log(`[TikTok Webhook] Ignoring event type: ${event}`)
       return
@@ -1443,6 +1514,392 @@ export class WebhookService {
       fromName,
       fromId,
     })
+  }
+
+  private async handleTikTokDirectMessage(payload: TikTokWebhookPayload) {
+    const content = this.parseTikTokDirectMessageContent(payload.content)
+    if (!content) {
+      this.logger.warn('[TikTok DM Webhook] Invalid direct message content')
+      return
+    }
+
+    const businessUserId = this.getTikTokBusinessUserId(content) || payload.user_openid
+    if (!businessUserId) {
+      this.logger.warn('[TikTok DM Webhook] Missing business user id')
+      return
+    }
+
+    const socialAccount = await this.prisma.socialAccount.findFirst({
+      where: {
+        provider: 'TIKTOK',
+        providerAccountId: businessUserId,
+      },
+      select: {
+        id: true,
+        organisationId: true,
+        providerAccountId: true,
+        accessToken: true,
+        refreshToken: true,
+        tokenExpiresAt: true,
+      },
+    })
+
+    if (!socialAccount) {
+      this.logger.warn(
+        `[TikTok DM Webhook] No social account found for business_id ${businessUserId}`,
+      )
+      return
+    }
+
+    const personalUser = this.getTikTokPersonalUser(content)
+    const participantId =
+      personalUser?.id ||
+      (this.isTikTokBusinessRole(content.from_user?.role)
+        ? content.to_user?.id
+        : content.from_user?.id) ||
+      content.unique_identifier ||
+      content.conversation_id
+    if (!participantId) {
+      this.logger.warn('[TikTok DM Webhook] Missing participant id')
+      return
+    }
+
+    const isFromPage = this.isTikTokBusinessRole(content.from_user?.role)
+    const senderName = isFromPage
+      ? 'Page'
+      : content.from || personalUser?.display_name || 'Utilisateur TikTok'
+    const timestamp = this.parseTikTokTimestamp(content.timestamp ?? payload.create_time)
+    const messageType = this.normalizeTikTokMessageType(content.message_type || content.type)
+    const accessToken = await this.getTikTokAccessToken(socialAccount)
+    const mapped = await this.messagingService.mapTikTokMessageForStorage(
+      socialAccount.providerAccountId,
+      accessToken,
+      content.conversation_id,
+      {
+        message_id: content.message_id,
+        message_type: messageType,
+        text: content.text,
+        image: content.image,
+        video: content.video,
+        share_post: content.share_post,
+        template: content.template,
+        reactions: content.reactions,
+      },
+    )
+
+    if (isFromPage) {
+      await this.handleTikTokSentMessage({
+        socialAccountId: socialAccount.id,
+        orgId: socialAccount.organisationId,
+        participantId,
+        participantName: content.to || personalUser?.display_name || participantId,
+        platformThreadId: content.conversation_id,
+        platformMsgId: content.message_id || null,
+        message: mapped.message,
+        timestamp,
+        mediaUrl: mapped.mediaUrl,
+        mediaType: mapped.mediaType,
+        fileName: mapped.fileName,
+        fileSize: mapped.fileSize,
+        metadata: (mapped.metadata as Record<string, unknown> | undefined) ?? null,
+      })
+      return
+    }
+
+    const conversation = await this.messagingService.handleIncomingMessage(
+      socialAccount.id,
+      participantId,
+      senderName,
+      mapped.message,
+      content.message_id || null,
+      mapped.mediaUrl,
+      mapped.mediaType,
+      timestamp,
+      socialAccount.organisationId,
+      null,
+      mapped.fileName,
+      mapped.fileSize,
+      content.referenced_message_info?.referenced_message_id || null,
+      (mapped.metadata as Record<string, unknown> | undefined) ?? null,
+      content.conversation_id,
+    )
+
+    this.logger.log(
+      `[TikTok DM] New message from ${senderName} (${participantId}): "${
+        mapped.message?.substring(0, 50) || mapped.mediaType || '[message]'
+      }"`,
+    )
+
+    this.eventsGateway.emitToOrg(socialAccount.organisationId, 'message:new', {
+      conversationId: conversation.id,
+      socialAccountId: socialAccount.id,
+      provider: 'TIKTOK',
+    })
+
+    this.eventEmitter.emit('message.incoming', {
+      conversationId: conversation.id,
+      socialAccountId: socialAccount.id,
+      provider: 'TIKTOK',
+      orgId: socialAccount.organisationId,
+      message: {
+        text: mapped.message,
+        mediaUrl: mapped.mediaUrl,
+        mediaType: mapped.mediaType,
+        senderId: participantId,
+        senderName,
+      },
+    } satisfies IncomingMessageEvent)
+  }
+
+  private async handleTikTokSentMessage(params: {
+    socialAccountId: string
+    orgId: string
+    participantId: string
+    participantName: string
+    platformThreadId: string
+    platformMsgId: string | null
+    message: string
+    timestamp: Date
+    mediaUrl: string | null
+    mediaType: string | null
+    fileName: string | null
+    fileSize: number | null
+    metadata: Record<string, unknown> | null
+  }) {
+    if (params.platformMsgId) {
+      const existing = await this.prisma.directMessage.findUnique({
+        where: { platformMsgId: params.platformMsgId },
+        select: { id: true, conversationId: true, deliveryStatus: true },
+      })
+
+      if (existing) {
+        if (existing.deliveryStatus !== 'read' && existing.deliveryStatus !== 'delivered') {
+          await this.prisma.directMessage.update({
+            where: { id: existing.id },
+            data: { deliveryStatus: 'delivered' },
+          })
+        }
+
+        this.eventsGateway.emitToOrg(params.orgId, 'message:status', {
+          conversationId: existing.conversationId,
+          messageId: existing.id,
+          platformMsgId: params.platformMsgId,
+          deliveryStatus: existing.deliveryStatus === 'read' ? 'read' : 'delivered',
+        })
+        return
+      }
+    }
+
+    const displayText = params.message || (params.mediaType ? `[${params.mediaType}]` : '')
+    const conversation = await this.prisma.conversation.upsert({
+      where: {
+        socialAccountId_participantId: {
+          socialAccountId: params.socialAccountId,
+          participantId: params.participantId,
+        },
+      },
+      create: {
+        socialAccountId: params.socialAccountId,
+        platformThreadId: params.platformThreadId,
+        participantId: params.participantId,
+        participantName: params.participantName,
+        lastMessageText: displayText,
+        lastMessageAt: params.timestamp,
+        unreadCount: 0,
+      },
+      update: {
+        platformThreadId: params.platformThreadId,
+        participantName: params.participantName,
+        lastMessageText: displayText,
+        lastMessageAt: params.timestamp,
+      },
+    })
+
+    await this.prisma.directMessage.create({
+      data: {
+        conversationId: conversation.id,
+        platformMsgId: params.platformMsgId,
+        message: params.message,
+        senderId: 'page',
+        senderName: 'Page',
+        isFromPage: true,
+        isRead: true,
+        mediaUrl: params.mediaUrl,
+        mediaType: params.mediaType,
+        fileName: params.fileName,
+        fileSize: params.fileSize,
+        metadata: (params.metadata as Prisma.InputJsonValue | undefined) ?? Prisma.JsonNull,
+        deliveryStatus: 'delivered',
+        createdTime: params.timestamp,
+      },
+    })
+
+    this.eventsGateway.emitToOrg(params.orgId, 'message:new', {
+      conversationId: conversation.id,
+      socialAccountId: params.socialAccountId,
+      provider: 'TIKTOK',
+    })
+  }
+
+  private async handleTikTokReadReceipt(payload: TikTokWebhookPayload) {
+    const content = this.parseTikTokDirectMessageContent(payload.content)
+    if (!content) {
+      this.logger.warn('[TikTok Read Webhook] Invalid read receipt content')
+      return
+    }
+
+    const businessUserId = this.getTikTokBusinessUserId(content) || payload.user_openid
+    if (!businessUserId) {
+      this.logger.warn('[TikTok Read Webhook] Missing business user id')
+      return
+    }
+
+    const socialAccount = await this.prisma.socialAccount.findFirst({
+      where: { provider: 'TIKTOK', providerAccountId: businessUserId },
+      select: { id: true, organisationId: true },
+    })
+    if (!socialAccount) {
+      this.logger.warn(
+        `[TikTok Read Webhook] No social account found for business_id ${businessUserId}`,
+      )
+      return
+    }
+
+    const personalUser = this.getTikTokPersonalUser(content)
+    const participantId =
+      personalUser?.id ||
+      (this.isTikTokBusinessRole(content.from_user?.role)
+        ? content.to_user?.id
+        : content.from_user?.id) ||
+      content.unique_identifier
+
+    const conversation = await this.prisma.conversation.findFirst({
+      where: {
+        socialAccountId: socialAccount.id,
+        OR: [
+          { platformThreadId: content.conversation_id },
+          ...(participantId ? [{ participantId }] : []),
+        ],
+      },
+      select: { id: true },
+    })
+
+    if (!conversation) {
+      this.logger.warn(`[TikTok Read Webhook] Conversation not found: ${content.conversation_id}`)
+      return
+    }
+
+    const lastReadAt = this.parseTikTokTimestamp(this.getTikTokLastReadTimestamp(content))
+    const readerIsBusiness = this.isTikTokBusinessRole(content.from_user?.role)
+
+    if (readerIsBusiness) {
+      await this.prisma.directMessage.updateMany({
+        where: {
+          conversationId: conversation.id,
+          isFromPage: false,
+          createdTime: { lte: lastReadAt },
+        },
+        data: { isRead: true },
+      })
+      const unreadCount = await this.prisma.directMessage.count({
+        where: { conversationId: conversation.id, isFromPage: false, isRead: false },
+      })
+      await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { unreadCount },
+      })
+      return
+    }
+
+    const messages = await this.prisma.directMessage.findMany({
+      where: {
+        conversationId: conversation.id,
+        isFromPage: true,
+        createdTime: { lte: lastReadAt },
+        NOT: { deliveryStatus: 'read' },
+      },
+      select: { id: true, platformMsgId: true },
+    })
+
+    if (messages.length === 0) return
+
+    await this.prisma.directMessage.updateMany({
+      where: { id: { in: messages.map((message) => message.id) } },
+      data: { deliveryStatus: 'read' },
+    })
+
+    for (const message of messages) {
+      this.eventsGateway.emitToOrg(socialAccount.organisationId, 'message:status', {
+        conversationId: conversation.id,
+        messageId: message.id,
+        platformMsgId: message.platformMsgId,
+        deliveryStatus: 'read',
+      })
+    }
+  }
+
+  private parseTikTokDirectMessageContent(
+    rawContent: TikTokWebhookPayload['content'],
+  ): TikTokDirectMessageContent | null {
+    if (typeof rawContent !== 'string') {
+      return this.isTikTokDirectMessageContent(rawContent) ? rawContent : null
+    }
+
+    try {
+      const parsed = JSON.parse(rawContent) as unknown
+      return this.isTikTokDirectMessageContent(parsed) ? parsed : null
+    } catch (error) {
+      this.logger.warn(
+        `[TikTok DM Webhook] Failed to parse content: ${error instanceof Error ? error.message : error}`,
+      )
+      return null
+    }
+  }
+
+  private isTikTokDirectMessageContent(value: unknown): value is TikTokDirectMessageContent {
+    if (!value || typeof value !== 'object') return false
+    const candidate = value as Partial<TikTokDirectMessageContent>
+    return typeof candidate.conversation_id === 'string'
+  }
+
+  private getTikTokBusinessUserId(content: TikTokDirectMessageContent): string | null {
+    if (this.isTikTokBusinessRole(content.to_user?.role) && content.to_user?.id) {
+      return content.to_user.id
+    }
+    if (this.isTikTokBusinessRole(content.from_user?.role) && content.from_user?.id) {
+      return content.from_user.id
+    }
+    return null
+  }
+
+  private getTikTokPersonalUser(content: TikTokDirectMessageContent) {
+    if (this.isTikTokPersonalRole(content.from_user?.role)) return content.from_user
+    if (this.isTikTokPersonalRole(content.to_user?.role)) return content.to_user
+    return null
+  }
+
+  private isTikTokBusinessRole(role?: string) {
+    return role?.toUpperCase() === 'BUSINESS_ACCOUNT'
+  }
+
+  private isTikTokPersonalRole(role?: string) {
+    return role?.toUpperCase() === 'PERSONAL_ACCOUNT'
+  }
+
+  private normalizeTikTokMessageType(type?: string): string {
+    return (type || 'text').replace(/-/g, '_').toUpperCase()
+  }
+
+  private parseTikTokTimestamp(timestamp?: string | number | null): Date {
+    const value = Number(timestamp)
+    if (!Number.isFinite(value) || value <= 0) return new Date()
+    return new Date(value > 1_000_000_000_000 ? value : value * 1000)
+  }
+
+  private getTikTokLastReadTimestamp(content: TikTokDirectMessageContent): string | number | null {
+    if (!content.read) return content.timestamp ?? null
+    const entry = Object.entries(content.read).find(([key]) => key.trim() === 'last_read_timestamp')
+    return entry?.[1] ?? content.timestamp ?? null
   }
 
   private async getTikTokAccessToken(account: {
@@ -2218,7 +2675,7 @@ interface TikTokWebhookPayload {
   event: string
   create_time: number
   user_openid: string
-  content: string | TikTokCommentContent
+  content: string | TikTokCommentContent | TikTokDirectMessageContent
 }
 
 interface TikTokCommentContent {
@@ -2229,4 +2686,38 @@ interface TikTokCommentContent {
   comment_action: string // 'insert' | 'set_to_public' | 'delete' | etc.
   timestamp: number
   unique_identifier: string
+}
+
+interface TikTokDirectMessageContent {
+  timestamp?: number | string
+  unique_identifier?: string
+  conversation_id: string
+  message_id?: string
+  message_type?: string
+  type?: string
+  from?: string
+  to?: string
+  from_user?: TikTokDirectMessageUser
+  to_user?: TikTokDirectMessageUser
+  text?: { body?: string }
+  image?: { media_id?: string }
+  video?: { media_id?: string }
+  share_post?: { item_id?: string; embed_url?: string }
+  template?: {
+    type: 'QA_BUTTON_CARD' | 'QA_LINK_CARD'
+    title: string
+    buttons: Array<{ type?: 'REPLY'; title: string; id?: string }>
+  }
+  referenced_message_info?: { referenced_message_id?: string }
+  reactions?: Array<{ sender_id?: string; emoji?: string }>
+  read?: Record<string, string | number | undefined>
+  scene_type?: number
+  is_follower?: boolean
+  message_tag?: Record<string, unknown>
+}
+
+interface TikTokDirectMessageUser {
+  id?: string
+  role?: string
+  display_name?: string
 }
