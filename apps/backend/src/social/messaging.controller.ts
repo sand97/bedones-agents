@@ -57,6 +57,10 @@ export class MessagingController {
       body.fileName,
       body.fileSize,
       body.replyToId,
+      body.tiktokMessageType,
+      body.tiktokSharePostId,
+      body.tiktokTemplate,
+      body.tiktokSenderAction,
     )
   }
 

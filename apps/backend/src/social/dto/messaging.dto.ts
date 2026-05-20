@@ -138,6 +138,34 @@ export class SendMessageDto {
 
   @ApiPropertyOptional({ description: 'ID of the message to reply to' })
   replyToId?: string
+
+  @ApiPropertyOptional({
+    description:
+      'TikTok message type. When omitted, the backend infers TEXT, IMAGE, SHARE_POST, TEMPLATE or SENDER_ACTION from the provided fields.',
+    enum: ['TEXT', 'IMAGE', 'SHARE_POST', 'TEMPLATE', 'SENDER_ACTION'],
+  })
+  tiktokMessageType?: 'TEXT' | 'IMAGE' | 'SHARE_POST' | 'TEMPLATE' | 'SENDER_ACTION'
+
+  @ApiPropertyOptional({ description: 'TikTok post item_id for SHARE_POST messages' })
+  tiktokSharePostId?: string
+
+  @ApiPropertyOptional({
+    description:
+      'TikTok Q&A template payload. Supports type QA_BUTTON_CARD or QA_LINK_CARD with 1-3 REPLY buttons.',
+    type: 'object',
+    additionalProperties: true,
+  })
+  tiktokTemplate?: {
+    type: 'QA_BUTTON_CARD' | 'QA_LINK_CARD'
+    title: string
+    buttons: Array<{ type?: 'REPLY'; title: string; id?: string }>
+  }
+
+  @ApiPropertyOptional({
+    description: 'TikTok sender action for SENDER_ACTION messages',
+    enum: ['TYPING', 'MARK_READ'],
+  })
+  tiktokSenderAction?: 'TYPING' | 'MARK_READ'
 }
 
 export class SendProductMessageDto {

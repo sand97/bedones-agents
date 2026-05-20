@@ -49,7 +49,7 @@ export class AgentDbToolsService {
       {
         name: 'read_conversations',
         description:
-          "Lire les conversations récentes sur les réseaux sociaux de l'organisation. Peut filtrer par provider (WHATSAPP, FACEBOOK, INSTAGRAM).",
+          "Lire les conversations récentes sur les réseaux sociaux de l'organisation. Peut filtrer par provider (WHATSAPP, FACEBOOK, INSTAGRAM, TIKTOK).",
         schema: z.object({
           provider: z
             .enum(['WHATSAPP', 'FACEBOOK', 'INSTAGRAM', 'TIKTOK'])

@@ -8,6 +8,7 @@ import {
   FileText,
   Megaphone,
   MessageCircle,
+  RefreshCw,
   Sparkles,
   ShoppingBag,
   Tag,
@@ -21,13 +22,14 @@ import {
   WhatsAppIcon,
   InstagramIcon,
   MessengerIcon,
+  TikTokIcon,
   LabelBadgeIcon,
 } from '@app/components/icons/social-icons'
 import { ConversationListSkeleton, ChatWindowSkeleton } from './chat-skeleton'
 import { labelApi } from '@app/lib/api/agent-api'
 import type { Conversation } from './mock-data'
 
-type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger'
+type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger' | 'tiktok'
 
 const PROVIDER_EMPTY_STATE: Record<
   ChatProvider,
@@ -59,6 +61,13 @@ const PROVIDER_EMPTY_STATE: Record<
     noConvTitleKey: 'chat.no_messages',
     selectTitleKey: 'chat.select_conversation',
     selectDescKey: 'chat.messenger_select_desc',
+  },
+  tiktok: {
+    icon: <TikTokIcon width={40} height={40} />,
+    color: 'var(--color-brand-tiktok)',
+    noConvTitleKey: 'chat.no_messages',
+    selectTitleKey: 'chat.select_conversation',
+    selectDescKey: 'chat.tiktok_select_desc',
   },
 }
 
@@ -103,6 +112,7 @@ interface ChatLayoutProps {
   /** Called when user clicks the "Send catalog" attachment option */
   onCatalogClick?: () => void
   onTemplateClick?: () => void
+  onTikTokMessageClick?: () => void
 }
 
 /* ── Labels filter popover ── */
@@ -266,8 +276,8 @@ export function ChatLayout({
   onSend,
   onUploadAndSend,
   onSelectConversation,
-  onSync: _onSync,
-  syncing: _syncing,
+  onSync,
+  syncing,
   onRetry,
   onChatClick,
   hasReadyAgent = false,
@@ -282,6 +292,7 @@ export function ChatLayout({
   onProductClick,
   onCatalogClick,
   onTemplateClick,
+  onTikTokMessageClick,
 }: ChatLayoutProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -412,7 +423,9 @@ export function ChatLayout({
                 ? 'WhatsApp'
                 : provider === 'instagram-dm'
                   ? 'Instagram'
-                  : 'Messenger',
+                  : provider === 'tiktok'
+                    ? 'TikTok'
+                    : 'Messenger',
           })}
           primaryAction={{ title: t('agent.configure'), onClick: () => onConfigureAgent?.() }}
         />
@@ -462,8 +475,19 @@ export function ChatLayout({
               {selectedLabelIds.length > 0 ? ` (${selectedLabelIds.length})` : ''}
             </Button>
           </LabelsFilterPopover>
-          {provider === 'whatsapp' && (
-            <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            {onSync && (
+              <Button
+                type="text"
+                size="small"
+                icon={<RefreshCw size={16} />}
+                loading={syncing}
+                onClick={onSync}
+              >
+                {t('chat.sync')}
+              </Button>
+            )}
+            {provider === 'whatsapp' && (
               <WhatsAppToolsPopover
                 onOpenOptions={onOpenOptions}
                 onOpenTemplates={onOpenTemplates}
@@ -473,8 +497,8 @@ export function ChatLayout({
                   {t('chat.tools')}
                 </Button>
               </WhatsAppToolsPopover>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -527,6 +551,7 @@ export function ChatLayout({
             onProductClick={onProductClick}
             onCatalogClick={onCatalogClick}
             onTemplateClick={onTemplateClick}
+            onTikTokMessageClick={onTikTokMessageClick}
           />
         ) : (
           renderDesktopSetup()

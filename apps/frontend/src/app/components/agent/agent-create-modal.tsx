@@ -20,12 +20,13 @@ interface AgentCreateModalProps {
   editAgent?: Agent | null
 }
 
-const SUPPORTED_PROVIDERS = ['WHATSAPP', 'INSTAGRAM', 'FACEBOOK']
+const SUPPORTED_PROVIDERS = ['WHATSAPP', 'INSTAGRAM', 'FACEBOOK', 'TIKTOK']
 
 const PROVIDER_LABELS: Record<string, string> = {
   WHATSAPP: 'WhatsApp',
   FACEBOOK: 'Messenger',
   INSTAGRAM: 'Instagram',
+  TIKTOK: 'TikTok',
 }
 
 export function AgentCreateModal({

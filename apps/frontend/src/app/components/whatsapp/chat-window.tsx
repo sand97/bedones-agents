@@ -25,7 +25,7 @@ import { TicketDrawer, type RealTicket } from './ticket-drawer'
 import { ChatInput } from './chat-input'
 import { FeedbackModal, type FeedbackSubmitResult, type FeedbackTurn } from './feedback-modal'
 
-type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger'
+type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger' | 'tiktok'
 
 interface ChatWindowProps {
   conversation: Conversation
@@ -45,6 +45,7 @@ interface ChatWindowProps {
   onProductClick?: () => void
   onCatalogClick?: () => void
   onTemplateClick?: () => void
+  onTikTokMessageClick?: () => void
 }
 
 function formatTime(timestamp: string): string {
@@ -819,6 +820,7 @@ export function ChatWindow({
   onProductClick,
   onCatalogClick,
   onTemplateClick,
+  onTikTokMessageClick,
 }: ChatWindowProps) {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -1000,6 +1002,7 @@ export function ChatWindow({
         onProductClick={onProductClick}
         onCatalogClick={onCatalogClick}
         onTemplateClick={onTemplateClick}
+        onTikTokMessageClick={onTikTokMessageClick}
         templateOnly={templateOnly}
       />
 

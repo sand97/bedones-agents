@@ -27,7 +27,7 @@ export function createTicketTools(deps: {
             description,
             priority: (priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT') || 'MEDIUM',
             contactName,
-            provider: provider as 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK' | undefined,
+            provider: provider as 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK' | 'TIKTOK' | undefined,
             conversationId: deps.conversationId,
           },
           include: { status: true },
@@ -54,7 +54,7 @@ export function createTicketTools(deps: {
           .describe('Ticket priority. Default: MEDIUM'),
         contactName: z.string().optional().describe('Name of the contact/customer'),
         provider: z
-          .enum(['WHATSAPP', 'INSTAGRAM', 'FACEBOOK'])
+          .enum(['WHATSAPP', 'INSTAGRAM', 'FACEBOOK', 'TIKTOK'])
           .optional()
           .describe('Social platform of the conversation'),
       }),

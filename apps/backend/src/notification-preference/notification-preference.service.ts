@@ -12,7 +12,7 @@ import {
 } from './dto/notification-preference.dto'
 
 const COMMENT_PROVIDERS = ['FACEBOOK', 'INSTAGRAM', 'TIKTOK'] as const
-const MESSAGING_PROVIDERS = ['FACEBOOK', 'INSTAGRAM', 'WHATSAPP'] as const
+const MESSAGING_PROVIDERS = ['FACEBOOK', 'INSTAGRAM', 'WHATSAPP', 'TIKTOK'] as const
 
 const COMMENT_TYPES: NotificationTypeValue[] = [
   'COMMENT_TO_READ',

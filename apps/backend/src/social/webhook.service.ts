@@ -13,7 +13,7 @@ import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.con
 export interface IncomingMessageEvent {
   conversationId: string
   socialAccountId: string
-  provider: 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK'
+  provider: 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK' | 'TIKTOK'
   orgId: string
   message: {
     text: string
@@ -1910,9 +1910,7 @@ export class WebhookService {
         )
         const hideBody = (await hideResponse.json()) as { code: number; message: string }
         if (hideBody.code !== 0) {
-          this.logger.error(
-            `[AI] TikTok hide failed: ${hideBody.code} — ${hideBody.message}`,
-          )
+          this.logger.error(`[AI] TikTok hide failed: ${hideBody.code} — ${hideBody.message}`)
         }
       } catch (error) {
         this.logger.error(`[AI] TikTok hide error: ${error}`)

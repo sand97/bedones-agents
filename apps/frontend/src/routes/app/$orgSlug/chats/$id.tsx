@@ -15,9 +15,18 @@ import { ChatLayout } from '@app/components/whatsapp/chat-layout'
 import { ProductSendModal } from '@app/components/whatsapp/product-send-modal'
 import { CatalogSendModal } from '@app/components/whatsapp/catalog-send-modal'
 import { TemplateMessageModal } from '@app/components/whatsapp/template-message-modal'
+import {
+  TikTokMessageModal,
+  type TikTokRichMessagePayload,
+} from '@app/components/tiktok/tiktok-message-modal'
 import { LoyaltyTemplateModal } from '@app/components/loyalty/loyalty-template-modal'
 import { uploadChatMedia } from '@app/lib/api'
-import { WhatsAppIcon, InstagramIcon, MessengerIcon } from '@app/components/icons/social-icons'
+import {
+  WhatsAppIcon,
+  InstagramIcon,
+  MessengerIcon,
+  TikTokIcon,
+} from '@app/components/icons/social-icons'
 import { useLayout } from '@app/contexts/layout-context'
 import { $api } from '@app/lib/api/$api'
 import { agentApi, catalogApi, type Agent } from '@app/lib/api/agent-api'
@@ -25,6 +34,7 @@ import {
   setAuthRedirect,
   buildFacebookOAuthUrl,
   buildInstagramOAuthUrl,
+  buildTikTokOAuthUrl,
 } from '@app/lib/auth-redirect'
 import { launchWhatsAppSignup } from '@app/lib/facebook-sdk'
 import type { Conversation, Message } from '@app/components/whatsapp/mock-data'
@@ -48,7 +58,7 @@ interface ChatConfigEntry {
   descriptionKey: string
   buttonKey: string
   connectLabelKey: string
-  provider: 'FACEBOOK' | 'INSTAGRAM' | 'WHATSAPP'
+  provider: 'FACEBOOK' | 'INSTAGRAM' | 'WHATSAPP' | 'TIKTOK'
 }
 
 const CHAT_CONFIG: Record<string, ChatConfigEntry> = {
@@ -84,6 +94,17 @@ const CHAT_CONFIG: Record<string, ChatConfigEntry> = {
     buttonKey: 'chat.messenger_setup_btn',
     connectLabelKey: 'chat.messenger_connect_label',
     provider: 'FACEBOOK',
+  },
+  tiktok: {
+    label: 'TikTok',
+    mobileLabel: 'TikTok DM',
+    icon: <TikTokIcon width={ICON_SIZE} height={ICON_SIZE} />,
+    color: 'var(--color-brand-tiktok)',
+    titleKey: 'chat.tiktok_setup_title',
+    descriptionKey: 'chat.tiktok_setup_desc',
+    buttonKey: 'chat.tiktok_setup_btn',
+    connectLabelKey: 'chat.tiktok_connect_label',
+    provider: 'TIKTOK',
   },
 }
 
@@ -134,12 +155,18 @@ function mapApiConversation(
   provider?: string,
 ): Conversation {
   const isWhatsApp = provider === 'whatsapp'
+  const isTikTok = provider === 'tiktok'
   return {
     id: conv.id,
     contact: {
       id: conv.participantId,
       name: conv.participantName,
-      phone: isWhatsApp && conv.participantId ? `+${conv.participantId}` : '',
+      phone:
+        isWhatsApp && conv.participantId
+          ? `+${conv.participantId}`
+          : isTikTok
+            ? conv.participantId
+            : '',
       avatarUrl: conv.participantAvatar ?? undefined,
     },
     messages: messages.map((m) => {
@@ -149,13 +176,20 @@ function mapApiConversation(
       const deliveryStatus = raw.deliveryStatus as 'sent' | 'delivered' | 'read' | undefined
       const meta = (m.metadata || undefined) as
         | {
-            kind?: 'catalog' | 'order'
+            kind?: 'catalog' | 'order' | 'tiktok_template' | 'tiktok_post'
             format?: 'product' | 'product_list' | 'carousel' | 'catalog_message'
             header?: string
             body?: string
             footer?: string
             catalogId?: string
             text?: string
+            itemId?: string
+            embedUrl?: string | null
+            template?: {
+              type?: 'QA_BUTTON_CARD' | 'QA_LINK_CARD'
+              title?: string
+              buttons?: Array<{ id?: string; title?: string; type?: string }>
+            }
             total?: number
             currency?: string | null
             items?: Array<{
@@ -196,19 +230,35 @@ function mapApiConversation(
               currency: meta.currency ?? null,
             }
           : undefined
-      const resolvedBody = meta?.kind === 'catalog' ? meta.body || m.message : m.message
+      const tiktokTemplate = meta?.kind === 'tiktok_template' ? meta.template : undefined
+      const tiktokPostText =
+        meta?.kind === 'tiktok_post'
+          ? meta.embedUrl || meta.itemId || m.message || 'TikTok post'
+          : undefined
+      const resolvedBody =
+        meta?.kind === 'catalog'
+          ? meta.body || m.message
+          : tiktokTemplate
+            ? tiktokTemplate.title || m.message
+            : tiktokPostText || m.message
+      const rawType = m.mediaType || 'text'
+      const type =
+        tiktokTemplate || rawType === 'button'
+          ? 'button'
+          : rawType === 'tiktok_post'
+            ? 'text'
+            : (rawType as
+                | 'text'
+                | 'image'
+                | 'video'
+                | 'audio'
+                | 'file'
+                | 'catalog'
+                | 'catalog_message'
+                | 'order')
       return {
         id: m.id,
-        type:
-          (m.mediaType as
-            | 'text'
-            | 'image'
-            | 'video'
-            | 'audio'
-            | 'file'
-            | 'catalog'
-            | 'catalog_message'
-            | 'order') || 'text',
+        type,
         from: (m.isFromPage ? 'business' : 'customer') as 'business' | 'customer',
         isAi: m.isFromPage && m.senderName === 'AI Agent',
         text: resolvedBody,
@@ -230,6 +280,11 @@ function mapApiConversation(
         catalogFooter: meta?.footer,
         catalogFormat: meta?.format,
         order,
+        buttons: tiktokTemplate?.buttons?.map((button, idx) => ({
+          id: button.id || `button-${idx}`,
+          label: button.title || '',
+        })),
+        buttonHeader: tiktokTemplate?.type === 'QA_LINK_CARD' ? 'TikTok Q&A' : undefined,
         replyTo: m.replyTo
           ? {
               id: m.replyTo.id,
@@ -252,6 +307,7 @@ const PROVIDER_MAP: Record<string, string> = {
   whatsapp: 'WHATSAPP',
   messenger: 'FACEBOOK',
   'instagram-dm': 'INSTAGRAM',
+  tiktok: 'TIKTOK',
 }
 
 function ChatsPage() {
@@ -282,6 +338,7 @@ function ChatsPage() {
   const [catalogSendOpen, setCatalogSendOpen] = useState(false)
   const [templatesOpen, setTemplatesOpen] = useState(false)
   const [templateMessageOpen, setTemplateMessageOpen] = useState(false)
+  const [tiktokMessageOpen, setTikTokMessageOpen] = useState(false)
 
   // ─── Agents query: check if any agent covers the current provider ───
   const agentsQuery = usePersistedQuery<Agent[]>({
@@ -311,6 +368,14 @@ function ChatsPage() {
         if (a.provider !== config?.provider) return false
         // WhatsApp accounts are always messaging accounts — no scope check needed
         if (a.provider === 'WHATSAPP') return true
+        if (a.provider === 'TIKTOK') {
+          return (
+            a.scopes?.includes('messages') ||
+            a.scopes?.includes('message.list.read') ||
+            a.scopes?.includes('message.list.send') ||
+            a.scopes?.includes('message.list.manage')
+          )
+        }
         return a.scopes?.includes('messages')
       }),
     [accountsQuery.data, config?.provider],
@@ -633,7 +698,13 @@ function ChatsPage() {
 
   // Map route id to sidebar unread provider key
   const unreadProviderKey =
-    id === 'instagram-dm' ? 'INSTAGRAM_DM' : id === 'whatsapp' ? 'WHATSAPP' : 'MESSENGER'
+    id === 'instagram-dm'
+      ? 'INSTAGRAM_DM'
+      : id === 'whatsapp'
+        ? 'WHATSAPP'
+        : id === 'tiktok'
+          ? 'TIKTOK_DM'
+          : 'MESSENGER'
   const unreadCountsKey = [
     'get',
     '/social/unread-counts/{organisationId}',
@@ -744,6 +815,34 @@ function ChatsPage() {
     queryClient.invalidateQueries({ queryKey: messagesKey(convId) })
   }
 
+  const handleSendTikTokRichMessage = async (payload: TikTokRichMessagePayload) => {
+    if (!search.conv) return
+    const convId = search.conv
+    const savedMsg = await sendMutation.mutateAsync({
+      body: {
+        conversationId: convId,
+        ...payload,
+      },
+    })
+
+    queryClient.setQueryData(messagesKey(convId), (old: unknown[] | undefined) => [
+      ...(old ?? []),
+      savedMsg,
+    ])
+
+    const displayText =
+      payload.tiktokMessageType === 'SHARE_POST' ? '[tiktok post]' : payload.tiktokTemplate.title
+    queryClient.setQueryData(conversationsKey, (old: unknown[] | undefined) =>
+      (old ?? []).map((c) => {
+        const item = c as Record<string, unknown>
+        return item.id === convId
+          ? { ...item, lastMessageText: displayText, lastMessageAt: new Date().toISOString() }
+          : c
+      }),
+    )
+    setTikTokMessageOpen(false)
+  }
+
   const handleConfigureAgent = useCallback(() => {
     navigate({ to: '/app/$orgSlug/agents' as string, params: { orgSlug } })
   }, [navigate, orgSlug])
@@ -834,6 +933,15 @@ function ChatsPage() {
         scopes: ['messages'],
       })
       window.location.href = buildInstagramOAuthUrl('messages')
+    } else if (id === 'tiktok') {
+      setAuthRedirect({
+        intent: 'connect_pages',
+        orgId: orgSlug,
+        provider: 'tiktok',
+        pageId: 'tiktok',
+        scopes: ['messages', 'message.list.read', 'message.list.send', 'message.list.manage'],
+      })
+      window.location.href = buildTikTokOAuthUrl('messages')
     }
   }
 
@@ -857,7 +965,7 @@ function ChatsPage() {
         <ChatLayout
           conversations={[]}
           loading
-          provider={id as 'whatsapp' | 'instagram-dm' | 'messenger'}
+          provider={id as 'whatsapp' | 'instagram-dm' | 'messenger' | 'tiktok'}
         />
       </div>
     )
@@ -913,7 +1021,7 @@ function ChatsPage() {
       <ChatLayout
         conversations={apiConversations}
         loading={conversationsQuery.isLoading}
-        provider={id as 'whatsapp' | 'instagram-dm' | 'messenger'}
+        provider={id as 'whatsapp' | 'instagram-dm' | 'messenger' | 'tiktok'}
         onSend={handleSend}
         onUploadAndSend={handleUploadAndSend}
         onSelectConversation={handleSelectConv}
@@ -939,6 +1047,7 @@ function ChatsPage() {
         onProductClick={() => setProductSendOpen(true)}
         onCatalogClick={() => setCatalogSendOpen(true)}
         onTemplateClick={() => setTemplateMessageOpen(true)}
+        onTikTokMessageClick={() => setTikTokMessageOpen(true)}
       />
       {id === 'whatsapp' && currentAccount && (
         <>
@@ -1003,6 +1112,14 @@ function ChatsPage() {
             </>
           )}
         </>
+      )}
+      {id === 'tiktok' && (
+        <TikTokMessageModal
+          open={tiktokMessageOpen}
+          onClose={() => setTikTokMessageOpen(false)}
+          onSend={handleSendTikTokRichMessage}
+          loading={sendMutation.isPending}
+        />
       )}
     </div>
   )

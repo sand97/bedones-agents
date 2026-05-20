@@ -7,6 +7,7 @@
 const AUTH_REDIRECT_KEY = 'auth_redirect'
 
 export type InstagramScope = 'comments' | 'messages' | 'comments+messages'
+export type TikTokScope = 'comments' | 'messages' | 'comments+messages'
 
 export interface AuthRedirectIntent {
   intent: 'login' | 'onboarding' | 'connect_pages'
@@ -91,19 +92,24 @@ export function buildInstagramOAuthUrl(scope: InstagramScope = 'comments'): stri
 /**
  * Build the TikTok OAuth URL for business account connection.
  */
-export function buildTikTokOAuthUrl(): string {
+export function buildTikTokOAuthUrl(scope: TikTokScope = 'comments'): string {
   const clientKey = import.meta.env.VITE_TIKTOK_CLIENT_KEY
   const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
   const redirectUri = `${apiUrl}/auth/callback/tiktok`
+
+  const scopes = ['user.info.basic', 'user.info.username', 'user.account.type']
+  if (scope === 'comments' || scope === 'comments+messages') {
+    scopes.push('comment.list', 'comment.list.manage', 'video.list')
+  }
+  if (scope === 'messages' || scope === 'comments+messages') {
+    scopes.push('message.list.read', 'message.list.send', 'message.list.manage', 'video.list')
+  }
 
   const url = new URL('https://www.tiktok.com/v2/auth/authorize/')
   url.searchParams.set('client_key', clientKey)
   url.searchParams.set('redirect_uri', redirectUri)
   url.searchParams.set('response_type', 'code')
-  url.searchParams.set(
-    'scope',
-    'user.info.basic,user.info.username,user.account.type,comment.list,comment.list.manage,video.list',
-  )
+  url.searchParams.set('scope', [...new Set(scopes)].join(','))
 
   return url.toString()
 }

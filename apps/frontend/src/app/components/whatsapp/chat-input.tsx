@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   Store,
   MessageSquareText,
+  Share2,
 } from 'lucide-react'
 import { AudioRecorder } from './audio-recorder'
 import type { Message } from './mock-data'
@@ -47,6 +48,7 @@ function AttachmentPopover({
   onProductClick,
   onCatalogClick,
   onTemplateClick,
+  onTikTokMessageClick,
 }: {
   children: React.ReactNode
   onSelectFiles: (files: FileList, type: MediaType) => void
@@ -55,6 +57,7 @@ function AttachmentPopover({
   onProductClick?: () => void
   onCatalogClick?: () => void
   onTemplateClick?: () => void
+  onTikTokMessageClick?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const { t } = useTranslation()
@@ -73,7 +76,7 @@ function AttachmentPopover({
         photoInputRef.current?.click()
       },
     },
-    ...(provider !== 'messenger'
+    ...(provider !== 'messenger' && provider !== 'tiktok'
       ? [
           {
             icon: <Video size={18} />,
@@ -87,16 +90,20 @@ function AttachmentPopover({
           },
         ]
       : []),
-    {
-      icon: <FileText size={18} />,
-      label: t('chat.document'),
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-50',
-      onClick: () => {
-        setOpen(false)
-        fileInputRef.current?.click()
-      },
-    },
+    ...(provider !== 'tiktok'
+      ? [
+          {
+            icon: <FileText size={18} />,
+            label: t('chat.document'),
+            color: 'text-blue-500',
+            bgColor: 'bg-blue-50',
+            onClick: () => {
+              setOpen(false)
+              fileInputRef.current?.click()
+            },
+          },
+        ]
+      : []),
     ...(provider === 'whatsapp' && hasCatalog && onProductClick
       ? [
           {
@@ -135,6 +142,20 @@ function AttachmentPopover({
             onClick: () => {
               setOpen(false)
               onTemplateClick()
+            },
+          },
+        ]
+      : []),
+    ...(provider === 'tiktok' && onTikTokMessageClick
+      ? [
+          {
+            icon: <Share2 size={18} />,
+            label: t('chat.tiktok_rich_message'),
+            color: 'text-sky-500',
+            bgColor: 'bg-sky-50',
+            onClick: () => {
+              setOpen(false)
+              onTikTokMessageClick()
             },
           },
         ]
@@ -213,11 +234,12 @@ export function ChatInput({
   onProductClick,
   onCatalogClick,
   onTemplateClick,
+  onTikTokMessageClick,
   templateOnly,
 }: {
   onSend?: (
     message: string,
-    media?: { url: string; type: 'image' | 'video' | 'audio' },
+    media?: { url: string; type: 'image' | 'video' | 'audio' | 'file' },
   ) => Promise<void>
   onUploadAndSend?: (file: File, type: MediaType | 'audio') => Promise<void>
   provider?: string
@@ -227,6 +249,7 @@ export function ChatInput({
   onProductClick?: () => void
   onCatalogClick?: () => void
   onTemplateClick?: () => void
+  onTikTokMessageClick?: () => void
   templateOnly?: boolean
 }) {
   const { t } = useTranslation()
@@ -273,6 +296,17 @@ export function ChatInput({
     if (!onUploadAndSend || files.length === 0) return
     const file = files[0]
 
+    if (provider === 'tiktok') {
+      if (type !== 'image' || !['image/jpeg', 'image/png'].includes(file.type)) {
+        message.error(t('chat.tiktok_image_type_error'))
+        return
+      }
+      if (file.size > 3 * 1024 * 1024) {
+        message.error(t('chat.tiktok_image_size_error'))
+        return
+      }
+    }
+
     // Validate duration for audio/video (3 min max)
     if (type === 'video' || type === 'audio') {
       const duration = await getMediaDuration(file)
@@ -316,6 +350,7 @@ export function ChatInput({
           onProductClick={onProductClick}
           onCatalogClick={onCatalogClick}
           onTemplateClick={onTemplateClick}
+          onTikTokMessageClick={onTikTokMessageClick}
         >
           <Button
             type="text"
@@ -358,6 +393,15 @@ export function ChatInput({
               onClick={handleSend}
               icon={<Send size={18} />}
               className="flex-shrink-0"
+            />
+          ) : provider === 'tiktok' ? (
+            <Button
+              type="text"
+              shape="circle"
+              onClick={handleSend}
+              icon={<Send size={18} />}
+              className="flex-shrink-0"
+              disabled
             />
           ) : (
             <Button

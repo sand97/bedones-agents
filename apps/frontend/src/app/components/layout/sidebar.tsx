@@ -116,6 +116,18 @@ const mainGroups: NavGroup[] = [
         path: 'chats/messenger',
         unreadProvider: 'MESSENGER',
       },
+      {
+        key: 'tiktok-dm',
+        labelKey: 'sidebar.tiktok_dm',
+        icon: (
+          <span
+            className="sidebar__social-dot"
+            style={{ background: 'var(--color-brand-tiktok)' }}
+          />
+        ),
+        path: 'chats/tiktok',
+        unreadProvider: 'TIKTOK_DM',
+      },
     ],
   },
   {

@@ -599,7 +599,19 @@ export class SocialService {
     const encryptedRefresh = tokenData.refresh_token
       ? await this.encryptionService.encrypt(tokenData.refresh_token)
       : null
-    const newScopes = [...new Set([...(scopes ?? ['comments']), 'video.list'])]
+    const requestedScopes = scopes ?? ['comments']
+    const requestedMessaging = requestedScopes.some(
+      (scope) => scope === 'messages' || scope.startsWith('message.list.'),
+    )
+    const newScopes = [
+      ...new Set([
+        ...requestedScopes,
+        ...(requestedMessaging
+          ? ['messages', 'message.list.read', 'message.list.send', 'message.list.manage']
+          : []),
+        'video.list',
+      ]),
+    ]
 
     // Fetch existing scopes to merge
     const existingTk = await this.prisma.socialAccount.findUnique({
@@ -1301,9 +1313,17 @@ export class SocialService {
     })
   }
 
-  // ─── TikTok: Setup webhook (COMMENT) ───
+  // ─── TikTok: Setup webhooks ───
 
   async setupTikTokWebhook() {
+    return this.updateTikTokWebhook('COMMENT')
+  }
+
+  async setupTikTokDirectMessageWebhook() {
+    return this.updateTikTokWebhook('DIRECT_MESSAGE')
+  }
+
+  private async updateTikTokWebhook(eventType: 'COMMENT' | 'DIRECT_MESSAGE') {
     const appId = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
     const secret = this.configService.getOrThrow<string>('TIKTOK_CLIENT_SECRET')
     const appUrl = this.configService.getOrThrow<string>('APP_URL')
@@ -1317,18 +1337,18 @@ export class SocialService {
         body: JSON.stringify({
           app_id: appId,
           secret,
-          event_type: 'COMMENT',
+          event_type: eventType,
           callback_url: callbackUrl,
         }),
       },
     )
 
     const body = await response.json()
-    this.logger.log(`[TikTok Webhook] Setup response: ${JSON.stringify(body)}`)
+    this.logger.log(`[TikTok Webhook] ${eventType} setup response: ${JSON.stringify(body)}`)
 
     if ((body as { code?: number }).code !== 0) {
       throw new BadRequestException(
-        `TikTok webhook setup failed: ${(body as { message?: string }).message}`,
+        `TikTok ${eventType} webhook setup failed: ${(body as { message?: string }).message}`,
       )
     }
 
@@ -1950,9 +1970,7 @@ export class SocialService {
 
     const body = (await response.json()) as { code: number; message: string }
     if (body.code !== 0) {
-      this.logger.error(
-        `[TikTok] ${action} comment failed: ${body.code} — ${body.message}`,
-      )
+      this.logger.error(`[TikTok] ${action} comment failed: ${body.code} — ${body.message}`)
       throw new BadRequestException(
         `Failed to ${action.toLowerCase()} TikTok comment: ${body.message}`,
       )
@@ -1995,7 +2013,10 @@ export class SocialService {
       const hasMessaging =
         account.scopes.includes('messages') ||
         account.scopes.includes('whatsapp_business_messaging') ||
-        account.scopes.includes('whatsapp_business_management')
+        account.scopes.includes('whatsapp_business_management') ||
+        account.scopes.includes('message.list.read') ||
+        account.scopes.includes('message.list.send') ||
+        account.scopes.includes('message.list.manage')
       if (hasMessaging) {
         const unreadMessages = account.conversations.reduce(
           (sum, conv) => sum + conv.unreadCount,
@@ -2006,7 +2027,9 @@ export class SocialService {
             ? 'INSTAGRAM_DM'
             : account.provider === 'WHATSAPP'
               ? 'WHATSAPP'
-              : 'MESSENGER'
+              : account.provider === 'TIKTOK'
+                ? 'TIKTOK_DM'
+                : 'MESSENGER'
         counts[msgProvider] = (counts[msgProvider] || 0) + unreadMessages
       }
     }
