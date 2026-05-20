@@ -1005,6 +1005,30 @@
         ]
       }
     },
+    "/webhooks/tiktok/setup-direct-messages": {
+      "post": {
+        "operationId": "TikTokWebhookController_setupDirectMessages",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "query",
+            "description": "Admin token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Register the DIRECT_MESSAGE webhook on TikTok Business API"
+          }
+        },
+        "tags": [
+          "TikTok Webhooks"
+        ]
+      }
+    },
     "/webhooks/tiktok/list": {
       "get": {
         "operationId": "TikTokWebhookController_list",
@@ -1045,7 +1069,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Delete the COMMENT webhook from TikTok Business API"
+            "description": "Delete the COMMENT, DIRECT_MESSAGE webhooks from TikTok Business API"
           }
         },
         "tags": [
@@ -2382,6 +2406,39 @@
         ]
       }
     },
+    "/agent/{id}/social-accounts": {
+      "put": {
+        "operationId": "AgentController_updateSocialAccounts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentSocialAccountsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
     "/agent/{id}/messages": {
       "get": {
         "operationId": "AgentController_getMessages",
@@ -2450,6 +2507,37 @@
             }
           }
         },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/agent/{id}/start-setup": {
+      "post": {
+        "operationId": "AgentController_startSetup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "201": {
             "description": ""
@@ -4890,6 +4978,34 @@
           "replyToId": {
             "type": "string",
             "description": "ID of the message to reply to"
+          },
+          "tiktokMessageType": {
+            "type": "string",
+            "description": "TikTok message type. When omitted, the backend infers TEXT, IMAGE, SHARE_POST, TEMPLATE or SENDER_ACTION from the provided fields.",
+            "enum": [
+              "TEXT",
+              "IMAGE",
+              "SHARE_POST",
+              "TEMPLATE",
+              "SENDER_ACTION"
+            ]
+          },
+          "tiktokSharePostId": {
+            "type": "string",
+            "description": "TikTok post item_id for SHARE_POST messages"
+          },
+          "tiktokTemplate": {
+            "type": "object",
+            "description": "TikTok Q&A template payload. Supports type QA_BUTTON_CARD or QA_LINK_CARD with 1-3 REPLY buttons.",
+            "additionalProperties": true
+          },
+          "tiktokSenderAction": {
+            "type": "string",
+            "description": "TikTok sender action for SENDER_ACTION messages",
+            "enum": [
+              "TYPING",
+              "MARK_READ"
+            ]
           }
         },
         "required": [
@@ -5381,6 +5497,20 @@
         },
         "required": [
           "organisationId",
+          "socialAccountIds"
+        ]
+      },
+      "UpdateAgentSocialAccountsDto": {
+        "type": "object",
+        "properties": {
+          "socialAccountIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
           "socialAccountIds"
         ]
       },

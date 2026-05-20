@@ -1361,19 +1361,29 @@ export class SocialService {
     const appId = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
     const secret = this.configService.getOrThrow<string>('TIKTOK_CLIENT_SECRET')
 
-    const params = new URLSearchParams({
-      app_id: appId,
-      secret,
-      event_type: 'COMMENT',
-    })
-
-    const response = await fetch(
-      `https://business-api.tiktok.com/open_api/v1.3/business/webhook/list/?${params}`,
+    const bodies = await Promise.all(
+      ['COMMENT', 'DIRECT_MESSAGE'].map((eventType) => {
+        const params = new URLSearchParams({
+          app_id: appId,
+          secret,
+          event_type: eventType,
+        })
+        return fetch(
+          `https://business-api.tiktok.com/open_api/v1.3/business/webhook/list/?${params}`,
+        ).then((res) => res.json().then((body) => ({ eventType, body })))
+      }),
     )
 
-    const body = await response.json()
-    this.logger.log(`[TikTok Webhook] List response: ${JSON.stringify(body)}`)
-    return body
+    bodies.forEach(({ eventType, body }) => {
+      this.logger.log(`[TikTok Webhook] ${eventType} list response: ${JSON.stringify(body)}`)
+      if ((body as { code?: number }).code !== 0) {
+        this.logger.error(
+          `[TikTok Webhook] Failed to list ${eventType} webhooks: ${(body as { message?: string }).message}`,
+        )
+      }
+    })
+
+    return bodies
   }
 
   // ─── TikTok: Delete webhook (COMMENT) ───
@@ -1382,29 +1392,30 @@ export class SocialService {
     const appId = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
     const secret = this.configService.getOrThrow<string>('TIKTOK_CLIENT_SECRET')
 
-    const response = await fetch(
-      'https://business-api.tiktok.com/open_api/v1.3/business/webhook/delete/',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          app_id: appId,
-          secret,
-          event_type: 'COMMENT',
-        }),
-      },
+    const bodies = await Promise.all(
+      ['COMMENT', 'DIRECT_MESSAGE'].map((eventType) =>
+        fetch('https://business-api.tiktok.com/open_api/v1.3/business/webhook/delete/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            app_id: appId,
+            secret,
+            event_type: eventType,
+          }),
+        }).then((res) => res.json().then((body) => ({ eventType, body }))),
+      ),
     )
 
-    const body = await response.json()
-    this.logger.log(`[TikTok Webhook] Delete response: ${JSON.stringify(body)}`)
+    bodies.forEach(({ eventType, body }) => {
+      this.logger.log(`[TikTok Webhook] ${eventType} delete response: ${JSON.stringify(body)}`)
+      if ((body as { code?: number }).code !== 0) {
+        this.logger.error(
+          `[TikTok Webhook] Failed to delete ${eventType} webhook: ${(body as { message?: string }).message}`,
+        )
+      }
+    })
 
-    if ((body as { code?: number }).code !== 0) {
-      throw new BadRequestException(
-        `TikTok webhook delete failed: ${(body as { message?: string }).message}`,
-      )
-    }
-
-    return body
+    return bodies
   }
 
   // ─── Webhook subscriptions ───

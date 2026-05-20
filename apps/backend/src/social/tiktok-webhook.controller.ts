@@ -32,7 +32,9 @@ export class TikTokWebhookController {
 
   @Delete('delete')
   @ApiQuery({ name: 'token', required: true, description: 'Admin token' })
-  @ApiOkResponse({ description: 'Delete the COMMENT webhook from TikTok Business API' })
+  @ApiOkResponse({
+    description: 'Delete the COMMENT, DIRECT_MESSAGE webhooks from TikTok Business API',
+  })
   async delete(@Query('token') _token: string) {
     return this.socialService.deleteTikTokWebhook()
   }
