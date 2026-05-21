@@ -110,9 +110,7 @@ export class WebhookService {
   private safeEqualHex(left: string, right: string): boolean {
     if (!/^[a-f0-9]+$/i.test(left) || !/^[a-f0-9]+$/i.test(right)) return false
     const leftBytes = new Uint8Array(left.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) ?? [])
-    const rightBytes = new Uint8Array(
-      right.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) ?? [],
-    )
+    const rightBytes = new Uint8Array(right.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) ?? [])
     if (leftBytes.length !== rightBytes.length) return false
     let diff = 0
     for (let i = 0; i < leftBytes.length; i++) {
@@ -1564,13 +1562,32 @@ export class WebhookService {
       return
     }
 
-    const isFromPage = this.isTikTokBusinessRole(content.from_user?.role)
-    const senderName = isFromPage
-      ? 'Page'
-      : content.from || personalUser?.display_name || 'Utilisateur TikTok'
     const timestamp = this.parseTikTokTimestamp(content.timestamp ?? payload.create_time)
     const messageType = this.normalizeTikTokMessageType(content.message_type || content.type)
     const accessToken = await this.getTikTokAccessToken(socialAccount)
+    const isFromPage = this.isTikTokBusinessRole(content.from_user?.role)
+    const participantProfile =
+      await this.messagingService.fetchTikTokDirectMessageParticipantProfile(
+        socialAccount.providerAccountId,
+        accessToken,
+        content.conversation_id,
+        participantId,
+      )
+    const participantAvatar = await this.messagingService.mirrorTikTokParticipantAvatar(
+      socialAccount.id,
+      participantId,
+      participantProfile?.profileImage ||
+        personalUser?.profile_image ||
+        personalUser?.avatar_url ||
+        null,
+    )
+    const senderName = isFromPage
+      ? 'Page'
+      : personalUser?.display_name ||
+        participantProfile?.displayName ||
+        content.from ||
+        'Utilisateur TikTok'
+    const participantUsername = isFromPage ? content.to || null : content.from || null
     const mapped = await this.messagingService.mapTikTokMessageForStorage(
       socialAccount.providerAccountId,
       accessToken,
@@ -1592,7 +1609,13 @@ export class WebhookService {
         socialAccountId: socialAccount.id,
         orgId: socialAccount.organisationId,
         participantId,
-        participantName: content.to || personalUser?.display_name || participantId,
+        participantName:
+          personalUser?.display_name ||
+          participantProfile?.displayName ||
+          content.to ||
+          participantId,
+        participantUsername,
+        participantAvatar,
         platformThreadId: content.conversation_id,
         platformMsgId: content.message_id || null,
         message: mapped.message,
@@ -1616,12 +1639,13 @@ export class WebhookService {
       mapped.mediaType,
       timestamp,
       socialAccount.organisationId,
-      null,
+      participantAvatar,
       mapped.fileName,
       mapped.fileSize,
       content.referenced_message_info?.referenced_message_id || null,
       (mapped.metadata as Record<string, unknown> | undefined) ?? null,
       content.conversation_id,
+      participantUsername,
     )
 
     this.logger.log(
@@ -1656,6 +1680,8 @@ export class WebhookService {
     orgId: string
     participantId: string
     participantName: string
+    participantUsername: string | null
+    participantAvatar: string | null
     platformThreadId: string
     platformMsgId: string | null
     message: string
@@ -1703,6 +1729,8 @@ export class WebhookService {
         platformThreadId: params.platformThreadId,
         participantId: params.participantId,
         participantName: params.participantName,
+        participantUsername: params.participantUsername,
+        participantAvatar: params.participantAvatar,
         lastMessageText: displayText,
         lastMessageAt: params.timestamp,
         unreadCount: 0,
@@ -1710,6 +1738,8 @@ export class WebhookService {
       update: {
         platformThreadId: params.platformThreadId,
         participantName: params.participantName,
+        ...(params.participantUsername ? { participantUsername: params.participantUsername } : {}),
+        ...(params.participantAvatar ? { participantAvatar: params.participantAvatar } : {}),
         lastMessageText: displayText,
         lastMessageAt: params.timestamp,
       },
@@ -2720,4 +2750,6 @@ interface TikTokDirectMessageUser {
   id?: string
   role?: string
   display_name?: string
+  profile_image?: string
+  avatar_url?: string
 }

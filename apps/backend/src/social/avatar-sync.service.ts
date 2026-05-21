@@ -39,17 +39,13 @@ export class AvatarSyncService {
       }
     }
 
-    await this.queue.add(
-      AVATAR_SYNC_JOB,
-      { socialAccountId } satisfies AvatarSyncJobData,
-      {
-        jobId,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5_000 },
-        removeOnComplete: true,
-        removeOnFail: 50,
-      },
-    )
+    await this.queue.add(AVATAR_SYNC_JOB, { socialAccountId } satisfies AvatarSyncJobData, {
+      jobId,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5_000 },
+      removeOnComplete: true,
+      removeOnFail: 50,
+    })
   }
 
   /**
@@ -100,8 +96,6 @@ export class AvatarSyncService {
       data: { profilePictureUrl: minioUrl },
     })
 
-    this.logger.log(
-      `[AvatarSync] ${account.provider} account ${socialAccountId} → ${minioUrl}`,
-    )
+    this.logger.log(`[AvatarSync] ${account.provider} account ${socialAccountId} → ${minioUrl}`)
   }
 }

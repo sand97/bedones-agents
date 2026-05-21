@@ -528,6 +528,7 @@ model Conversation {
   platformThreadId         String? // Platform-specific thread/conversation ID
   participantId            String // Platform user ID of the other party
   participantName          String
+  participantUsername      String? // Platform username/handle (e.g. TikTok @username)
   participantAvatar        String?
   languageCode             String?
   languageSource           ContactLanguageSource            @default(UNKNOWN)

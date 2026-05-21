@@ -131,6 +131,7 @@ function mapApiConversation(
     id: string
     participantId: string
     participantName: string
+    participantUsername?: string | null
     participantAvatar?: string | null
     lastMessageText?: string | null
     lastMessageAt?: string | null
@@ -161,12 +162,8 @@ function mapApiConversation(
     contact: {
       id: conv.participantId,
       name: conv.participantName,
-      phone:
-        isWhatsApp && conv.participantId
-          ? `+${conv.participantId}`
-          : isTikTok
-            ? conv.participantId
-            : '',
+      phone: isWhatsApp && conv.participantId ? `+${conv.participantId}` : isTikTok ? '' : '',
+      username: isTikTok && conv.participantUsername ? `@${conv.participantUsername}` : undefined,
       avatarUrl: conv.participantAvatar ?? undefined,
     },
     messages: messages.map((m) => {

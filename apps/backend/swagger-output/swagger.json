@@ -4797,6 +4797,9 @@
           "participantName": {
             "type": "string"
           },
+          "participantUsername": {
+            "type": "string"
+          },
           "participantAvatar": {
             "type": "string"
           },

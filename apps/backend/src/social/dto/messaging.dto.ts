@@ -17,6 +17,9 @@ export class ConversationResponseDto {
   participantName: string
 
   @ApiPropertyOptional()
+  participantUsername?: string
+
+  @ApiPropertyOptional()
   participantAvatar?: string
 
   @ApiPropertyOptional()

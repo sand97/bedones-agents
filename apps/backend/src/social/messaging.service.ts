@@ -33,6 +33,37 @@ interface TikTokApiResponse<T> {
   data?: T
 }
 
+interface TikTokConversationMessage {
+  sender?: string
+  recipient?: string
+  conversation_id?: string
+  message_id?: string
+  timestamp?: string | number
+  message_type?: string
+  text?: { body?: string }
+  image?: { media_id?: string }
+  video?: { media_id?: string }
+  share_post?: { item_id?: string; embed_url?: string }
+  template?: TikTokTemplatePayload
+  from_user?: { id?: string; role?: string; display_name?: string }
+  to_user?: { id?: string; role?: string; display_name?: string }
+  referenced_message_info?: { referenced_message_id?: string }
+  reactions?: Array<{ sender_id?: string; emoji?: string }>
+}
+
+interface TikTokConversationParticipant {
+  id?: string
+  role?: string
+  display_name?: string
+  profile_image?: string
+  is_follower?: boolean
+}
+
+interface TikTokConversationContent {
+  messages?: TikTokConversationMessage[]
+  participants?: TikTokConversationParticipant[]
+}
+
 @Injectable()
 export class MessagingService {
   private readonly logger = new Logger(MessagingService.name)
@@ -1346,12 +1377,71 @@ export class MessagingService {
     this.logger.log(`[TikTok DM] Synced ${synced} conversations for account ${socialAccountId}`)
   }
 
-  private async syncTikTokConversationMessages(
-    socialAccountId: string,
+  async fetchTikTokDirectMessageParticipantProfile(
     businessId: string,
     accessToken: string,
     conversationId: string,
-    updateTime?: string | number,
+    participantId: string,
+  ): Promise<{ displayName: string | null; profileImage: string | null } | null> {
+    try {
+      const body = await this.fetchTikTokConversationContent(
+        businessId,
+        accessToken,
+        conversationId,
+        'fetch participant profile',
+      )
+      const participant = this.findTikTokConversationParticipant(
+        body.data?.participants || [],
+        participantId,
+      )
+      if (!participant) return null
+
+      return {
+        displayName: participant.display_name || null,
+        profileImage: participant.profile_image || null,
+      }
+    } catch (error) {
+      this.logger.warn(
+        `[TikTok DM] Failed to fetch participant profile: ${
+          error instanceof Error ? error.message : error
+        }`,
+      )
+      return null
+    }
+  }
+
+  async mirrorTikTokParticipantAvatar(
+    socialAccountId: string,
+    participantId: string,
+    candidateAvatar: string | null,
+  ): Promise<string | null> {
+    const existingConversation = await this.prisma.conversation.findUnique({
+      where: {
+        socialAccountId_participantId: {
+          socialAccountId,
+          participantId,
+        },
+      },
+      select: { participantAvatar: true },
+    })
+
+    const existingAvatar = existingConversation?.participantAvatar || null
+    if (existingAvatar && this.uploadService.isOwnUrl(existingAvatar)) {
+      return existingAvatar
+    }
+
+    const sourceAvatar = candidateAvatar || existingAvatar
+    if (!sourceAvatar) return existingAvatar
+
+    const uploaded = await this.uploadService.uploadFromUrl(sourceAvatar, 'avatars')
+    return uploaded || existingAvatar || sourceAvatar
+  }
+
+  private async fetchTikTokConversationContent(
+    businessId: string,
+    accessToken: string,
+    conversationId: string,
+    operation: string,
   ) {
     const url = new URL(
       'https://business-api.tiktok.com/open_api/v1.3/business/message/content/list/',
@@ -1362,40 +1452,52 @@ export class MessagingService {
     const response = await fetch(url.toString(), {
       headers: { 'Access-Token': accessToken },
     })
-    const body = await this.readTikTokResponse<{
-      messages?: Array<{
-        sender?: string
-        recipient?: string
-        conversation_id?: string
-        message_id?: string
-        timestamp?: string | number
-        message_type?: string
-        text?: { body?: string }
-        image?: { media_id?: string }
-        video?: { media_id?: string }
-        share_post?: { item_id?: string; embed_url?: string }
-        template?: TikTokTemplatePayload
-        from_user?: { id?: string; role?: string; display_name?: string }
-        to_user?: { id?: string; role?: string; display_name?: string }
-        referenced_message_info?: { referenced_message_id?: string }
-        reactions?: Array<{ sender_id?: string; emoji?: string }>
-      }>
-      participants?: Array<{
-        id?: string
-        role?: string
-        display_name?: string
-        profile_image?: string
-        is_follower?: boolean
-      }>
-    }>(response, 'sync conversation messages')
+    return this.readTikTokResponse<TikTokConversationContent>(response, operation)
+  }
+
+  private findTikTokConversationParticipant(
+    participants: TikTokConversationParticipant[],
+    participantId?: string,
+  ) {
+    return (
+      (participantId ? participants.find((entry) => entry.id === participantId) : undefined) ||
+      participants.find((entry) => this.isTikTokPersonalRole(entry.role))
+    )
+  }
+
+  private isTikTokBusinessRole(role?: string) {
+    return role?.toUpperCase() === 'BUSINESS_ACCOUNT'
+  }
+
+  private isTikTokPersonalRole(role?: string) {
+    return role?.toUpperCase() === 'PERSONAL_ACCOUNT'
+  }
+
+  private async syncTikTokConversationMessages(
+    socialAccountId: string,
+    businessId: string,
+    accessToken: string,
+    conversationId: string,
+    updateTime?: string | number,
+  ) {
+    const body = await this.fetchTikTokConversationContent(
+      businessId,
+      accessToken,
+      conversationId,
+      'sync conversation messages',
+    )
 
     const messages = (body.data?.messages || []).sort(
       (a, b) =>
         this.parseTikTokTimestamp(a.timestamp).getTime() -
         this.parseTikTokTimestamp(b.timestamp).getTime(),
     )
-    const personalParticipant = body.data?.participants?.find((p) => p.role === 'PERSONAL_ACCOUNT')
-    const fallbackUser = messages.find((m) => m.from_user?.role === 'PERSONAL_ACCOUNT')?.from_user
+    const personalParticipant = this.findTikTokConversationParticipant(
+      body.data?.participants || [],
+    )
+    const fallbackUser = messages.find((m) =>
+      this.isTikTokPersonalRole(m.from_user?.role),
+    )?.from_user
     const participantId =
       personalParticipant?.id ||
       fallbackUser?.id ||
@@ -1407,26 +1509,11 @@ export class MessagingService {
       personalParticipant?.id ||
       'Utilisateur TikTok'
 
-    const existingConversation = await this.prisma.conversation.findUnique({
-      where: {
-        socialAccountId_participantId: {
-          socialAccountId,
-          participantId,
-        },
-      },
-      select: { participantAvatar: true },
-    })
-
-    let participantAvatar: string | null = null
-    if (!existingConversation?.participantAvatar && personalParticipant?.profile_image) {
-      try {
-        participantAvatar =
-          (await this.uploadService.uploadFromUrl(personalParticipant.profile_image, 'avatars')) ||
-          null
-      } catch {
-        this.logger.warn(`[TikTok DM] Failed to mirror avatar for ${participantId}`)
-      }
-    }
+    const participantAvatar = await this.mirrorTikTokParticipantAvatar(
+      socialAccountId,
+      participantId,
+      personalParticipant?.profile_image || null,
+    )
 
     const latest = messages[messages.length - 1]
     const conversation = await this.prisma.conversation.upsert({
@@ -1464,7 +1551,7 @@ export class MessagingService {
       })
       if (existing) continue
 
-      const isFromPage = msg.from_user?.role === 'BUSINESS_ACCOUNT' || msg.sender === businessId
+      const isFromPage = this.isTikTokBusinessRole(msg.from_user?.role) || msg.sender === businessId
       const mapped = await this.mapTikTokMessageForStorage(
         businessId,
         accessToken,
@@ -1903,6 +1990,7 @@ export class MessagingService {
     replyToMid?: string | null,
     metadata?: Record<string, unknown> | null,
     platformThreadId?: string | null,
+    participantUsername?: string | null,
   ) {
     // Upsert conversation
     const conversation = await this.prisma.conversation.upsert({
@@ -1917,6 +2005,7 @@ export class MessagingService {
         platformThreadId: platformThreadId || null,
         participantId: senderId,
         participantName: senderName,
+        participantUsername: participantUsername || null,
         participantAvatar: senderAvatar || null,
         lastMessageText: messageText || (mediaType ? `[${mediaType}]` : ''),
         lastMessageAt: timestamp,
@@ -1925,6 +2014,7 @@ export class MessagingService {
       update: {
         ...(platformThreadId ? { platformThreadId } : {}),
         participantName: senderName,
+        ...(participantUsername ? { participantUsername } : {}),
         ...(senderAvatar ? { participantAvatar: senderAvatar } : {}),
         lastMessageText: messageText || (mediaType ? `[${mediaType}]` : undefined),
         lastMessageAt: timestamp,

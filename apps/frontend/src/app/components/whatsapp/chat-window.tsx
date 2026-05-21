@@ -719,9 +719,14 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
   const isAgentReady =
     !!agent && agent.score >= 80 && agent.status !== 'DRAFT' && agent.status !== 'CONFIGURING'
   const isActive = agentStatus?.isActive === true
+  const hasHeaderActions = Boolean(
+    conversation.contact.phone || conversation.contact.username || isAgentReady,
+  )
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(conversation.contact.phone)
+    await navigator.clipboard.writeText(
+      conversation.contact.phone || conversation.contact.username || '',
+    )
     setCopied(true)
     setTimeout(() => {
       setCopied(false)
@@ -759,51 +764,63 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
       </Avatar>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-text-primary">{conversation.contact.name}</div>
-        <div className="text-xs text-text-muted">{conversation.contact.phone}</div>
+        {conversation.contact.username && (
+          <div className="text-xs text-text-muted">{conversation.contact.username}</div>
+        )}
+        {!conversation.contact.username && conversation.contact.phone && (
+          <div className="text-xs text-text-muted">{conversation.contact.phone}</div>
+        )}
       </div>
 
-      {/* Options menu */}
-      <Popover
-        content={
-          <div className="w-56">
-            <Button
-              type="text"
-              block
-              onClick={handleCopy}
-              icon={copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-              className="py-2.5!"
-            >
-              {copied
-                ? t('common.copied')
-                : t('chat.copy_phone', { phone: conversation.contact.phone })}
-            </Button>
-            {isAgentReady && (
-              <Button
-                type="text"
-                block
-                onClick={handleToggleAgent}
-                loading={setOverrideMutation.isPending}
-                icon={isActive ? <BotOff size={14} /> : <Sparkles size={14} />}
-                className="py-2.5!"
-              >
-                {isActive ? t('chat.deactivate_agent') : t('chat.activate_agent')}
-              </Button>
-            )}
-          </div>
-        }
-        trigger="click"
-        open={optionsOpen}
-        onOpenChange={setOptionsOpen}
-        placement="bottomRight"
-        overlayClassName="org-switcher-popover"
-        arrow={false}
-      >
-        <Button
-          type="text"
-          icon={<OptionsIcon width={18} height={18} />}
-          className="flex-shrink-0"
-        />
-      </Popover>
+      {hasHeaderActions && (
+        <Popover
+          content={
+            <div className="w-56">
+              {(conversation.contact.phone || conversation.contact.username) && (
+                <Button
+                  type="text"
+                  block
+                  onClick={handleCopy}
+                  icon={
+                    copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />
+                  }
+                  className="py-2.5!"
+                >
+                  {copied
+                    ? t('common.copied')
+                    : conversation.contact.phone
+                      ? t('chat.copy_phone', { phone: conversation.contact.phone })
+                      : conversation.contact.username}
+                </Button>
+              )}
+              {isAgentReady && (
+                <Button
+                  type="text"
+                  block
+                  onClick={handleToggleAgent}
+                  loading={setOverrideMutation.isPending}
+                  icon={isActive ? <BotOff size={14} /> : <Sparkles size={14} />}
+                  className="py-2.5!"
+                >
+                  {isActive ? t('chat.deactivate_agent') : t('chat.activate_agent')}
+                </Button>
+              )}
+            </div>
+          }
+          trigger="click"
+          open={optionsOpen}
+          onOpenChange={setOptionsOpen}
+          placement="bottomRight"
+          overlayClassName="org-switcher-popover"
+          arrow={false}
+        >
+          <Button
+            type="text"
+            icon={<OptionsIcon width={18} height={18} />}
+            className="flex-shrink-0"
+          />
+        </Popover>
+      )}
     </div>
   )
 }

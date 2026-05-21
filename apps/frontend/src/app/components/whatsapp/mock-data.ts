@@ -2,6 +2,7 @@ export interface Contact {
   id: string
   name: string
   phone: string
+  username?: string
   avatarUrl?: string
 }
 

@@ -1992,6 +1992,7 @@ export interface components {
             platformThreadId?: string;
             participantId: string;
             participantName: string;
+            participantUsername?: string;
             participantAvatar?: string;
             languageCode?: string;
             languageSource?: string;
