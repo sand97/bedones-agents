@@ -156,6 +156,9 @@ export class SocialAccountResponseDto {
   @ApiPropertyOptional()
   profilePictureUrl?: string
 
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  metadata?: Record<string, unknown>
+
   @ApiProperty({ type: [String], description: 'Feature scopes (e.g. comments, messages)' })
   scopes: string[]
 

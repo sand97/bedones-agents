@@ -1972,6 +1972,9 @@ export interface components {
             pageName?: string;
             username?: string;
             profilePictureUrl?: string;
+            metadata?: {
+                [key: string]: unknown;
+            };
             /** @description Feature scopes (e.g. comments, messages) */
             scopes: string[];
             settings?: components["schemas"]["PageSettingsResponseDto"];

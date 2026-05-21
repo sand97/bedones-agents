@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { Prisma } from 'generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
 import { UploadService } from '../upload/upload.service'
@@ -19,6 +20,23 @@ interface FacebookPage {
   picture?: { data?: { url?: string } }
 }
 
+interface WhatsAppPhoneInfo {
+  id: string
+  display_phone_number?: string
+  verified_name?: string
+}
+
+interface WhatsAppBusinessProfile {
+  about?: string
+  address?: string
+  description?: string
+  email?: string
+  profile_picture_url?: string
+  websites?: string[]
+  vertical?: string
+  messaging_product?: string
+}
+
 @Injectable()
 export class SocialService {
   private readonly logger = new Logger(SocialService.name)
@@ -30,6 +48,94 @@ export class SocialService {
     private avatarSyncService: AvatarSyncService,
     private uploadService: UploadService,
   ) {}
+
+  private getMetaGraphReadTokens(primaryToken?: string | null): string[] {
+    const systemUserToken = this.configService.get<string>('META_SYSTEM_USER')
+    return [primaryToken, systemUserToken].filter((token): token is string => Boolean(token))
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+    return value as Record<string, unknown>
+  }
+
+  private cleanMetaString(value: unknown): string | null {
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
+  private buildWhatsAppBusinessProfileMetadata(profile: WhatsAppBusinessProfile | null) {
+    if (!profile) return null
+
+    const websites = Array.isArray(profile.websites)
+      ? profile.websites
+          .map((url) => this.cleanMetaString(url))
+          .filter((url): url is string => Boolean(url))
+      : []
+
+    return {
+      about: this.cleanMetaString(profile.about),
+      address: this.cleanMetaString(profile.address),
+      description: this.cleanMetaString(profile.description),
+      email: this.cleanMetaString(profile.email),
+      profilePictureUrl: this.cleanMetaString(profile.profile_picture_url),
+      websites,
+      vertical: this.cleanMetaString(profile.vertical),
+      messagingProduct: this.cleanMetaString(profile.messaging_product),
+      syncedAt: new Date().toISOString(),
+    }
+  }
+
+  private mergeSocialAccountMetadata(
+    existingMetadata: unknown,
+    whatsappBusinessProfile: WhatsAppBusinessProfile | null,
+  ): Prisma.InputJsonValue | undefined {
+    const normalizedProfile = this.buildWhatsAppBusinessProfileMetadata(whatsappBusinessProfile)
+    if (!normalizedProfile) return undefined
+
+    const existing = this.asRecord(existingMetadata)
+    const existingWhatsApp = this.asRecord(existing.whatsapp)
+
+    return {
+      ...existing,
+      whatsapp: {
+        ...existingWhatsApp,
+        businessProfile: normalizedProfile,
+      },
+    }
+  }
+
+  private hasWhatsAppBusinessProfileMetadata(metadata: unknown): boolean {
+    const root = this.asRecord(metadata)
+    const whatsapp = this.asRecord(root.whatsapp)
+    const businessProfile = this.asRecord(whatsapp.businessProfile)
+    return Object.keys(businessProfile).length > 0
+  }
+
+  private async metaGraphGet<T>(
+    path: string,
+    params: Record<string, string>,
+    tokens: string[],
+  ): Promise<T | null> {
+    for (const token of tokens) {
+      const url = new URL(`https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${path}`)
+      for (const [key, value] of Object.entries(params)) {
+        url.searchParams.set(key, value)
+      }
+
+      try {
+        const response = await fetch(url.toString(), {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (response.ok) return (await response.json()) as T
+      } catch {
+        // Try the next token when Meta or the network rejects this read.
+      }
+    }
+
+    return null
+  }
 
   // ─── Connect Facebook Pages ───
 
@@ -782,11 +888,16 @@ export class SocialService {
     const { access_token: accessToken } = JSON.parse(tokenBody) as { access_token: string }
     this.logger.log(`[WhatsApp] Token exchange OK`)
 
+    const readTokens = this.getMetaGraphReadTokens(accessToken)
+    const graphGet = <T>(path: string, params: Record<string, string>) =>
+      this.metaGraphGet<T>(path, params, readTokens)
+
     // 2. Resolve WABA ID and Phone Number ID
     let wabaId = clientWabaId
     let phoneId = clientPhoneId
+    let debugPhoneCandidates: string[] = []
 
-    if (!wabaId) {
+    if (!wabaId || !phoneId) {
       const debugResponse = await fetch(
         `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/debug_token?` +
           new URLSearchParams({
@@ -803,32 +914,58 @@ export class SocialService {
         const mgmtScope = debugData.data?.granular_scopes?.find(
           (s) => s.scope === 'whatsapp_business_management',
         )
-        if (mgmtScope?.target_ids?.length) {
+        if (!wabaId && mgmtScope?.target_ids?.length) {
           wabaId = mgmtScope.target_ids[0]
         }
-        if (!phoneId) {
-          const msgScope = debugData.data?.granular_scopes?.find(
-            (s) => s.scope === 'whatsapp_business_messaging',
-          )
-          if (msgScope?.target_ids?.length) {
-            phoneId = msgScope.target_ids[0]
-          }
+        const msgScope = debugData.data?.granular_scopes?.find(
+          (s) => s.scope === 'whatsapp_business_messaging',
+        )
+        debugPhoneCandidates = msgScope?.target_ids ?? []
+        if (!phoneId && !wabaId && debugPhoneCandidates.length) {
+          phoneId = debugPhoneCandidates[0]
         }
       }
     }
 
-    // 3. Fetch phone numbers from WABA if still missing
-    if (wabaId && !phoneId) {
-      const phonesResponse = await fetch(
-        `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${wabaId}/phone_numbers`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      )
-      if (phonesResponse.ok) {
-        const phonesData = (await phonesResponse.json()) as {
-          data?: Array<{ id: string; display_phone_number?: string; verified_name?: string }>
-        }
-        if (phonesData.data?.length) {
-          phoneId = phonesData.data[0].id
+    let wabaName: string | null = null
+    if (wabaId) {
+      const wabaInfo = await graphGet<{ id: string; name?: string }>(wabaId, { fields: 'name' })
+      wabaName = wabaInfo?.name || null
+    }
+
+    // 3. Fetch phone numbers from WABA. debug_token target_ids can contain the WABA ID,
+    // so only accept phone IDs that are validated through /{waba}/phone_numbers or /{phone}.
+    let phoneInfo: WhatsAppPhoneInfo | null = null
+    if (wabaId) {
+      const phonesData = await graphGet<{ data?: WhatsAppPhoneInfo[] }>(`${wabaId}/phone_numbers`, {
+        fields: 'id,display_phone_number,verified_name',
+      })
+      const phones = phonesData?.data ?? []
+      const matchedPhone =
+        (phoneId ? phones.find((phone) => phone.id === phoneId) : undefined) ||
+        debugPhoneCandidates
+          .map((candidateId) => phones.find((phone) => phone.id === candidateId))
+          .find((phone): phone is WhatsAppPhoneInfo => Boolean(phone)) ||
+        (!phoneId ? phones[0] : undefined)
+
+      if (matchedPhone) {
+        phoneId = matchedPhone.id
+        phoneInfo = matchedPhone
+      }
+    }
+
+    if (!phoneId && debugPhoneCandidates.length) {
+      for (const candidateId of debugPhoneCandidates) {
+        const candidateInfo = await graphGet<WhatsAppPhoneInfo>(candidateId, {
+          fields: 'display_phone_number,verified_name',
+        })
+        if (
+          candidateInfo?.id &&
+          (candidateInfo.display_phone_number || candidateInfo.verified_name)
+        ) {
+          phoneId = candidateInfo.id
+          phoneInfo = candidateInfo
+          break
         }
       }
     }
@@ -839,35 +976,29 @@ export class SocialService {
 
     // 4. Get phone number display info
     let displayName = phoneId
-    let displayPhone = ''
-    const phoneInfoRes = await fetch(
-      `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${phoneId}?fields=display_phone_number,verified_name`,
-      { headers: { Authorization: `Bearer ${accessToken}` } },
-    )
-    if (phoneInfoRes.ok) {
-      const phoneInfo = (await phoneInfoRes.json()) as {
-        display_phone_number?: string
-        verified_name?: string
-      }
-      displayName = phoneInfo.verified_name || phoneInfo.display_phone_number || phoneId
-      displayPhone = phoneInfo.display_phone_number || ''
+    let displayPhone: string | null = null
+    if (!phoneInfo?.display_phone_number || !phoneInfo?.verified_name) {
+      const fetchedPhoneInfo = await graphGet<WhatsAppPhoneInfo>(phoneId, {
+        fields: 'display_phone_number,verified_name',
+      })
+      phoneInfo = { ...(phoneInfo ?? { id: phoneId }), ...(fetchedPhoneInfo ?? {}), id: phoneId }
     }
+    displayName = phoneInfo?.verified_name || wabaName || phoneInfo?.display_phone_number || phoneId
+    displayPhone = phoneInfo?.display_phone_number || null
 
-    // 5. Fetch profile picture URL
+    // 5. Fetch WhatsApp Business profile metadata
     let profilePictureUrl: string | null = null
-    try {
-      const profileRes = await fetch(
-        `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${phoneId}/whatsapp_business_profile?fields=profile_picture_url`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      )
-      if (profileRes.ok) {
-        const profileData = (await profileRes.json()) as {
-          data?: Array<{ profile_picture_url?: string }>
-        }
-        profilePictureUrl = profileData.data?.[0]?.profile_picture_url || null
-      }
-    } catch {
-      this.logger.warn(`[WhatsApp] Could not fetch profile picture for ${phoneId}`)
+    const profileData = await graphGet<{ data?: WhatsAppBusinessProfile[] }>(
+      `${phoneId}/whatsapp_business_profile`,
+      {
+        fields:
+          'about,address,description,email,profile_picture_url,websites,vertical,messaging_product',
+      },
+    )
+    const businessProfile = profileData?.data?.[0] || null
+    profilePictureUrl = businessProfile?.profile_picture_url || null
+    if (!profileData) {
+      this.logger.warn(`[WhatsApp] Could not fetch business profile for ${phoneId}`)
     }
 
     // 6. Webhook subscription is configured at app level in the Meta Dashboard
@@ -876,32 +1007,69 @@ export class SocialService {
     // 7. Save the account
     const encryptedToken = await this.encryptionService.encrypt(accessToken)
 
-    const socialAccount = await this.prisma.socialAccount.upsert({
+    const existingPhoneAccount = await this.prisma.socialAccount.findUnique({
       where: {
         provider_providerAccountId: {
           provider: 'WHATSAPP',
           providerAccountId: phoneId,
         },
       },
-      create: {
-        organisationId,
-        provider: 'WHATSAPP',
-        providerAccountId: phoneId,
-        wabaId: wabaId || null,
-        pageName: displayName,
-        username: displayPhone || null,
-        profilePictureUrl,
-        accessToken: encryptedToken,
-        scopes: ['whatsapp_business_management', 'whatsapp_business_messaging'],
-      },
-      update: {
-        pageName: displayName,
-        username: displayPhone || null,
-        profilePictureUrl,
-        accessToken: encryptedToken,
-        wabaId: wabaId || null,
-      },
     })
+    const staleWabaAccount =
+      wabaId && wabaId !== phoneId
+        ? await this.prisma.socialAccount.findUnique({
+            where: {
+              provider_providerAccountId: {
+                provider: 'WHATSAPP',
+                providerAccountId: wabaId,
+              },
+            },
+          })
+        : null
+
+    const existingMetadata = existingPhoneAccount?.metadata ?? staleWabaAccount?.metadata ?? null
+    const metadata = this.mergeSocialAccountMetadata(existingMetadata, businessProfile)
+    const pageAbout =
+      this.cleanMetaString(businessProfile?.description) ||
+      this.cleanMetaString(businessProfile?.about)
+    const finalProfilePictureUrl =
+      profilePictureUrl ||
+      existingPhoneAccount?.profilePictureUrl ||
+      staleWabaAccount?.profilePictureUrl ||
+      null
+
+    const accountData = {
+      wabaId: wabaId || null,
+      pageName: displayName,
+      ...(pageAbout ? { pageAbout } : {}),
+      username: displayPhone,
+      profilePictureUrl: finalProfilePictureUrl,
+      ...(metadata ? { metadata } : {}),
+      accessToken: encryptedToken,
+      scopes: ['whatsapp_business_management', 'whatsapp_business_messaging'],
+    }
+
+    const socialAccount = existingPhoneAccount
+      ? await this.prisma.socialAccount.update({
+          where: { id: existingPhoneAccount.id },
+          data: accountData,
+        })
+      : staleWabaAccount?.organisationId === organisationId
+        ? await this.prisma.socialAccount.update({
+            where: { id: staleWabaAccount.id },
+            data: {
+              ...accountData,
+              providerAccountId: phoneId,
+            },
+          })
+        : await this.prisma.socialAccount.create({
+            data: {
+              organisationId,
+              provider: 'WHATSAPP',
+              providerAccountId: phoneId,
+              ...accountData,
+            },
+          })
 
     // Create default settings
     await this.prisma.pageSettings.upsert({
@@ -913,7 +1081,7 @@ export class SocialService {
     await this.avatarSyncService.enqueue(socialAccount.id)
 
     this.logger.log(
-      `[WhatsApp] ✅ Connected "${displayName}" (phone=${phoneId}, waba=${wabaId}) for org ${organisationId}`,
+      `[WhatsApp] ✅ Connected "${displayName}" (number=${displayPhone || 'n/a'}, phone=${phoneId}, waba=${wabaId}) for org ${organisationId}`,
     )
     return socialAccount
   }
@@ -1569,8 +1737,200 @@ export class SocialService {
 
   // ─── Get social accounts for org ───
 
+  private needsWhatsAppProfileBackfill(account: {
+    provider: string
+    providerAccountId: string
+    wabaId?: string | null
+    pageName?: string | null
+    pageAbout?: string | null
+    username?: string | null
+    profilePictureUrl?: string | null
+    metadata?: unknown
+  }) {
+    if (account.provider !== 'WHATSAPP') return false
+
+    const hasFallbackName =
+      !account.pageName ||
+      account.pageName === account.providerAccountId ||
+      account.pageName === account.wabaId
+
+    return (
+      hasFallbackName ||
+      !account.username ||
+      !account.profilePictureUrl ||
+      !this.hasWhatsAppBusinessProfileMetadata(account.metadata)
+    )
+  }
+
+  private async backfillWhatsAppProfile(socialAccountId: string): Promise<boolean> {
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: socialAccountId },
+      select: {
+        id: true,
+        organisationId: true,
+        provider: true,
+        providerAccountId: true,
+        wabaId: true,
+        pageName: true,
+        pageAbout: true,
+        username: true,
+        profilePictureUrl: true,
+        metadata: true,
+        accessToken: true,
+      },
+    })
+
+    if (!account || account.provider !== 'WHATSAPP') return false
+
+    let accountAccessToken: string | null = null
+    try {
+      accountAccessToken = await this.encryptionService.decrypt(account.accessToken)
+    } catch {
+      this.logger.warn(`[WhatsApp] Could not decrypt token for profile backfill ${account.id}`)
+    }
+
+    const readTokens = this.getMetaGraphReadTokens(accountAccessToken)
+    if (readTokens.length === 0) return false
+
+    let phoneId = account.providerAccountId
+    let phoneInfo: WhatsAppPhoneInfo | null = null
+    let wabaName: string | null = null
+
+    if (account.wabaId) {
+      const wabaInfo = await this.metaGraphGet<{ id: string; name?: string }>(
+        account.wabaId,
+        { fields: 'name' },
+        readTokens,
+      )
+      wabaName = wabaInfo?.name || null
+
+      const phonesData = await this.metaGraphGet<{ data?: WhatsAppPhoneInfo[] }>(
+        `${account.wabaId}/phone_numbers`,
+        { fields: 'id,display_phone_number,verified_name' },
+        readTokens,
+      )
+      const phones = phonesData?.data ?? []
+      const matchedPhone =
+        phones.find((phone) => phone.id === account.providerAccountId) || phones[0]
+      if (matchedPhone) {
+        phoneId = matchedPhone.id
+        phoneInfo = matchedPhone
+      }
+    }
+
+    if (!phoneInfo?.display_phone_number || !phoneInfo?.verified_name) {
+      const fetchedPhoneInfo = await this.metaGraphGet<WhatsAppPhoneInfo>(
+        phoneId,
+        { fields: 'display_phone_number,verified_name' },
+        readTokens,
+      )
+      phoneInfo = { ...(phoneInfo ?? { id: phoneId }), ...(fetchedPhoneInfo ?? {}), id: phoneId }
+    }
+
+    const profileData = await this.metaGraphGet<{ data?: WhatsAppBusinessProfile[] }>(
+      `${phoneId}/whatsapp_business_profile`,
+      {
+        fields:
+          'about,address,description,email,profile_picture_url,websites,vertical,messaging_product',
+      },
+      readTokens,
+    )
+    const businessProfile = profileData?.data?.[0] || null
+
+    const displayName =
+      phoneInfo?.verified_name || wabaName || phoneInfo?.display_phone_number || account.pageName
+    const displayPhone = phoneInfo?.display_phone_number || account.username
+    const profilePictureUrl = businessProfile?.profile_picture_url || account.profilePictureUrl
+    const metadata = this.mergeSocialAccountMetadata(account.metadata, businessProfile)
+    const pageAbout =
+      this.cleanMetaString(businessProfile?.description) ||
+      this.cleanMetaString(businessProfile?.about)
+
+    const data: {
+      providerAccountId?: string
+      pageName?: string | null
+      pageAbout?: string | null
+      username?: string | null
+      profilePictureUrl?: string | null
+      metadata?: Prisma.InputJsonValue
+    } = {}
+    if (phoneId !== account.providerAccountId) data.providerAccountId = phoneId
+    if (displayName && displayName !== account.pageName) data.pageName = displayName
+    if (pageAbout && pageAbout !== account.pageAbout) data.pageAbout = pageAbout
+    if (displayPhone && displayPhone !== account.username) data.username = displayPhone
+    if (profilePictureUrl && profilePictureUrl !== account.profilePictureUrl) {
+      data.profilePictureUrl = profilePictureUrl
+    }
+    if (metadata) data.metadata = metadata
+
+    if (Object.keys(data).length === 0) return false
+
+    const existingPhoneAccount =
+      data.providerAccountId && data.providerAccountId !== account.providerAccountId
+        ? await this.prisma.socialAccount.findUnique({
+            where: {
+              provider_providerAccountId: {
+                provider: 'WHATSAPP',
+                providerAccountId: data.providerAccountId,
+              },
+            },
+            select: { id: true, organisationId: true },
+          })
+        : null
+
+    if (existingPhoneAccount && existingPhoneAccount.id !== account.id) {
+      if (existingPhoneAccount.organisationId !== account.organisationId) {
+        this.logger.warn(
+          `[WhatsApp] Cannot backfill ${account.id}: phone ${data.providerAccountId} already belongs to another org`,
+        )
+        return false
+      }
+
+      const { providerAccountId: _providerAccountId, ...existingAccountData } = data
+      await this.prisma.socialAccount.update({
+        where: { id: existingPhoneAccount.id },
+        data: existingAccountData,
+      })
+      if (existingAccountData.profilePictureUrl) {
+        await this.avatarSyncService.enqueue(existingPhoneAccount.id)
+      }
+      return true
+    }
+
+    await this.prisma.socialAccount.update({
+      where: { id: account.id },
+      data,
+    })
+    if (data.profilePictureUrl) {
+      await this.avatarSyncService.enqueue(account.id)
+    }
+    this.logger.log(`[WhatsApp] Backfilled profile for ${account.id} (phone=${phoneId})`)
+    return true
+  }
+
   async getAccountsForOrg(userId: string, organisationId: string) {
     await this.assertMembership(userId, organisationId)
+
+    const accounts = await this.prisma.socialAccount.findMany({
+      where: { organisationId },
+      include: {
+        settings: { include: { faqRules: true } },
+        _count: { select: { posts: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    const backfillIds = accounts
+      .filter((account) => this.needsWhatsAppProfileBackfill(account))
+      .map((account) => account.id)
+
+    if (backfillIds.length === 0) return accounts
+
+    const results = await Promise.allSettled(
+      backfillIds.map((accountId) => this.backfillWhatsAppProfile(accountId)),
+    )
+    const hasUpdates = results.some((result) => result.status === 'fulfilled' && result.value)
+    if (!hasUpdates) return accounts
 
     return this.prisma.socialAccount.findMany({
       where: { organisationId },

@@ -12,6 +12,7 @@ interface SocialAccountInfo {
   pageName?: string | null
   pageAbout?: string | null
   username?: string | null
+  metadata?: unknown
 }
 
 interface EvaluationInput {
@@ -23,6 +24,52 @@ interface EvaluationInput {
 
 @Injectable()
 export class AgentPromptsService {
+  private asRecord(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+    return value as Record<string, unknown>
+  }
+
+  private asString(value: unknown): string | null {
+    return typeof value === 'string' && value.trim() ? value.trim() : null
+  }
+
+  private getWhatsAppBusinessProfile(metadata: unknown): Record<string, unknown> {
+    const root = this.asRecord(metadata)
+    const whatsapp = this.asRecord(root.whatsapp)
+    return this.asRecord(whatsapp.businessProfile)
+  }
+
+  private formatSocialAccountDescription(account: SocialAccountInfo): string {
+    const name = account.pageName || account.username || 'N/A'
+    const details: string[] = []
+
+    if (account.pageAbout) details.push(`Resume: ${account.pageAbout}`)
+
+    const businessProfile = this.getWhatsAppBusinessProfile(account.metadata)
+    const description = this.asString(businessProfile.description)
+    const about = this.asString(businessProfile.about)
+    const address = this.asString(businessProfile.address)
+    const vertical = this.asString(businessProfile.vertical)
+    const messagingProduct = this.asString(businessProfile.messagingProduct)
+    const websites = Array.isArray(businessProfile.websites)
+      ? businessProfile.websites
+          .map((url) => this.asString(url))
+          .filter((url): url is string => Boolean(url))
+      : []
+
+    if (description && description !== account.pageAbout)
+      details.push(`Description: ${description}`)
+    if (about && about !== account.pageAbout && about !== description)
+      details.push(`A propos: ${about}`)
+    if (address) details.push(`Adresse: ${address}`)
+    if (vertical) details.push(`Categorie Meta: ${vertical}`)
+    if (messagingProduct) details.push(`Produit de messagerie: ${messagingProduct}`)
+    if (websites.length > 0) details.push(`Sites: ${websites.join(', ')}`)
+
+    if (details.length === 0) return `- ${account.provider}: ${name}`
+    return `- ${account.provider}: ${name}\n${details.map((detail) => `  - ${detail}`).join('\n')}`
+  }
+
   /**
    * Build the initial evaluation prompt when catalogs are analyzed
    * and the agent starts the onboarding conversation.
@@ -42,10 +89,7 @@ export class AgentPromptsService {
       .join('\n')
 
     const socialDescriptions = socialAccounts
-      .map((s) => {
-        const about = s.pageAbout ? ` — ${s.pageAbout}` : ''
-        return `- ${s.provider}: ${s.pageName || s.username || 'N/A'}${about}`
-      })
+      .map((s) => this.formatSocialAccountDescription(s))
       .join('\n')
 
     return `Tu es un assistant IA qui aide les entrepreneurs à configurer leur agent conversationnel.
@@ -120,13 +164,12 @@ ${input.messageHistory}
    * Build the system prompt for the active agent processing messages.
    */
   buildAgentSystemPrompt(context: string, socialAccounts: SocialAccountInfo[]): string {
-    const socialInfo = socialAccounts
-      .map((s) => `${s.provider}: ${s.pageName || s.username || 'N/A'}`)
-      .join(', ')
+    const socialInfo = socialAccounts.map((s) => this.formatSocialAccountDescription(s)).join('\n')
 
     return `Tu es un assistant IA professionnel pour une entreprise.
 
-## Réseaux sociaux gérés: ${socialInfo}
+## Réseaux sociaux gérés:
+${socialInfo || 'Aucun réseau social connecté'}
 
 ## Contexte business:
 ${context}

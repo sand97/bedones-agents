@@ -196,6 +196,7 @@ model SocialAccount {
   pageAbout         String?
   username          String?
   profilePictureUrl String?
+  metadata          Json? // Provider-specific public profile details (e.g. WhatsApp Business profile)
   accessToken       String
   refreshToken      String?
   tokenExpiresAt    DateTime?

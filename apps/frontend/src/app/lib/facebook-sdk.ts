@@ -27,6 +27,14 @@ export interface WhatsAppSessionInfo {
   current_step?: string
 }
 
+const WHATSAPP_SIGNUP_FINISH_EVENTS = new Set(['FINISH', 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'])
+
+interface WhatsAppEmbeddedSignupMessage {
+  type?: string
+  event?: string
+  data?: WhatsAppSessionInfo
+}
+
 function ensureSDKScript(): Promise<void> {
   if (typeof window.FB !== 'undefined') return Promise.resolve()
 
@@ -85,14 +93,17 @@ export async function launchWhatsAppSignup(
       try {
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
 
-        if (data.type === 'WA_EMBEDDED_SIGNUP') {
-          if (data.event === 'FINISH') {
+        const messages = Array.isArray(data) ? data : [data]
+        for (const message of messages as WhatsAppEmbeddedSignupMessage[]) {
+          if (message.type !== 'WA_EMBEDDED_SIGNUP') continue
+
+          if (message.event && WHATSAPP_SIGNUP_FINISH_EVENTS.has(message.event)) {
             sessionInfo = {
-              waba_id: data.data?.waba_id,
-              phone_number_id: data.data?.phone_number_id,
+              waba_id: message.data?.waba_id,
+              phone_number_id: message.data?.phone_number_id,
             }
-          } else if (data.event === 'CANCEL') {
-            sessionInfo = { current_step: data.data?.current_step }
+          } else if (message.event === 'CANCEL') {
+            sessionInfo = { current_step: message.data?.current_step }
           }
         }
       } catch {

@@ -7,7 +7,12 @@ import { App, Button, Progress } from 'antd'
 import { ArrowLeft, CheckCircle, MessageSquareOff, Settings } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { SocialSetup } from '@app/components/social/social-setup'
-import { AccountSwitcher, type SocialAccount } from '@app/components/social/account-switcher'
+import {
+  AccountSwitcher,
+  formatSocialAccountDescription,
+  formatSocialAccountName,
+  type SocialAccount,
+} from '@app/components/social/account-switcher'
 import { CommentsLayout } from '@app/components/comments/comments-layout'
 import { CommentsConfigModal } from '@app/components/comments/comments-config'
 import { FacebookIcon, InstagramIcon, TikTokIcon } from '@app/components/icons/social-icons'
@@ -403,7 +408,8 @@ function CommentsPage() {
   // ─── Build account switcher items ───
   const accountSwitcherItems: SocialAccount[] = accounts.map((a) => ({
     id: a.id,
-    name: a.pageName || a.username || a.providerAccountId,
+    name: formatSocialAccountName(a),
+    description: formatSocialAccountDescription(a),
     avatarUrl: a.profilePictureUrl ?? undefined,
   }))
 

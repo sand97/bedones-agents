@@ -10,7 +10,12 @@ import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { WhatsappConfigModal } from '@app/components/whatsapp/whatsapp-config-modal'
 import { CatalogLinkModal } from '@app/components/whatsapp/catalog-link-modal'
-import { AccountSwitcher, type SocialAccount } from '@app/components/social/account-switcher'
+import {
+  AccountSwitcher,
+  formatSocialAccountDescription,
+  formatSocialAccountName,
+  type SocialAccount,
+} from '@app/components/social/account-switcher'
 import { ChatLayout } from '@app/components/whatsapp/chat-layout'
 import { ProductSendModal } from '@app/components/whatsapp/product-send-modal'
 import { CatalogSendModal } from '@app/components/whatsapp/catalog-send-modal'
@@ -986,7 +991,8 @@ function ChatsPage() {
   // ─── Account switcher ───
   const accountSwitcherItems: SocialAccount[] = accounts.map((a) => ({
     id: a.id,
-    name: a.pageName || a.username || a.providerAccountId,
+    name: formatSocialAccountName(a),
+    description: formatSocialAccountDescription(a),
     avatarUrl: a.profilePictureUrl ?? undefined,
   }))
   const currentSwitcherItem =

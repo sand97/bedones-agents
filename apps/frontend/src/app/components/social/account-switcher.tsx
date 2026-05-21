@@ -7,7 +7,32 @@ import { SwitcherPopover } from '@app/components/shared/switcher-popover'
 export interface SocialAccount {
   id: string
   name: string
+  description?: string
   avatarUrl?: string
+}
+
+interface SocialAccountNameSource {
+  provider?: string
+  providerAccountId?: string | null
+  pageName?: string | null
+  username?: string | null
+}
+
+export function formatSocialAccountName(account: SocialAccountNameSource) {
+  return account.pageName || account.username || account.providerAccountId || ''
+}
+
+export function formatSocialAccountDescription(account: SocialAccountNameSource) {
+  if (
+    account.provider === 'WHATSAPP' &&
+    account.pageName &&
+    account.username &&
+    account.pageName !== account.username
+  ) {
+    return account.username
+  }
+
+  return undefined
 }
 
 interface AccountSwitcherProps {
@@ -46,8 +71,11 @@ export function AccountSwitcher({
             {account.name[0]}
           </Avatar>
         )}
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary">
-          {account.name}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-medium text-text-primary">{account.name}</span>
+          {account.description && (
+            <span className="truncate text-xs text-text-muted">{account.description}</span>
+          )}
         </span>
       </div>
     ),

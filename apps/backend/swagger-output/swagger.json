@@ -4520,6 +4520,10 @@
           "profilePictureUrl": {
             "type": "string"
           },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
           "scopes": {
             "description": "Feature scopes (e.g. comments, messages)",
             "type": "array",

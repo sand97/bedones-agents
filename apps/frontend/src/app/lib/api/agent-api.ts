@@ -30,6 +30,7 @@ export interface AgentSocialAccount {
     pageAbout?: string
     username?: string
     profilePictureUrl?: string
+    metadata?: Record<string, unknown>
   }
 }
 

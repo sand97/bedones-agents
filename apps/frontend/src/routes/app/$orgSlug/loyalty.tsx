@@ -4,7 +4,12 @@ import { useTranslation } from 'react-i18next'
 import { Segmented } from 'antd'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { SocialSetup } from '@app/components/social/social-setup'
-import { AccountSwitcher, type SocialAccount } from '@app/components/social/account-switcher'
+import {
+  AccountSwitcher,
+  formatSocialAccountDescription,
+  formatSocialAccountName,
+  type SocialAccount,
+} from '@app/components/social/account-switcher'
 import { WhatsAppIcon } from '@app/components/icons/social-icons'
 import { $api } from '@app/lib/api/$api'
 import { LoyaltyContactsTab } from '@app/components/loyalty/loyalty-contacts-tab'
@@ -126,7 +131,8 @@ function LoyaltyPage() {
 
   const accountSwitcherItems: SocialAccount[] = whatsappAccounts.map((a) => ({
     id: a.id,
-    name: a.pageName || a.username || a.providerAccountId,
+    name: formatSocialAccountName(a),
+    description: formatSocialAccountDescription(a),
     avatarUrl: a.profilePictureUrl ?? undefined,
   }))
   const currentSwitcherItem =
