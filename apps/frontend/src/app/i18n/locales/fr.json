@@ -1096,5 +1096,29 @@
     "col_delivered": "Délivrés",
     "col_read": "Lus",
     "col_replied": "Réponses"
+  },
+
+  "tiktok_business": {
+    "modal_title": "Compte TikTok Business requis",
+    "description": "Pour utiliser les messages directs TikTok, votre compte doit être un compte Business (pas Creator ni Personnel). Suivez ces étapes pour le convertir :",
+    "step1_title": "Ouvrir les paramètres TikTok",
+    "step1_desc": "Ouvrez l'application TikTok → Paramètres et confidentialité → Gérer le compte",
+    "step2_title": "Passer en compte Business",
+    "step2_desc": "Appuyez sur « Passer à un compte Business » et choisissez une catégorie",
+    "step3_title": "Reconnecter le compte",
+    "step3_desc": "Une fois le compte converti, cliquez sur « Reconnecter » ci-dessous",
+    "cant_find_switch": "Je ne trouve pas cette option",
+    "next": "Suivant",
+    "back": "Retour",
+    "retry_connect": "Reconnecter TikTok",
+    "alt_description": "Si l'option « Passer en Business » n'apparaît pas dans l'app, vous pouvez créer un Business Center TikTok et y rattacher votre compte :",
+    "alt_step1_title": "Créer un Business Center",
+    "alt_step1_desc": "Rendez-vous sur",
+    "alt_step2_title": "Configurer le Business Center",
+    "alt_step2_desc": "Créez un nouveau Business Center en choisissant n'importe quel pays et en remplissant les informations demandées",
+    "alt_step3_title": "Ajouter votre compte TikTok",
+    "alt_step3_desc": "Dans le Business Center, allez dans Compte → Comptes TikTok et ajoutez votre compte. On vous demandera alors de le convertir en Business",
+    "alt_step4_title": "Reconnecter le compte",
+    "alt_step4_desc": "Une fois la conversion effectuée, cliquez sur « Reconnecter » ci-dessous"
   }
 }

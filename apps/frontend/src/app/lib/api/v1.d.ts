@@ -485,6 +485,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/social/tiktok/{accountId}/check-business": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SocialController_checkTikTokBusiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/social/tiktok/{accountId}/sync-comments/{videoId}": {
         parameters: {
             query?: never;
@@ -527,6 +543,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["TikTokWebhookController_setup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks/tiktok/setup-direct-messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TikTokWebhookController_setupDirectMessages"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1141,6 +1173,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agent/{id}/social-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["AgentController_updateSocialAccounts"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agent/{id}/messages": {
         parameters: {
             query?: never;
@@ -1151,6 +1199,22 @@ export interface paths {
         get: operations["AgentController_getMessages"];
         put?: never;
         post: operations["AgentController_sendMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/{id}/start-setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AgentController_startSetup"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1986,6 +2050,9 @@ export interface components {
             /** @description Phone Number ID from Embedded Signup session info */
             phoneNumberId?: string;
         };
+        TikTokBusinessCheckDto: {
+            isBusiness: boolean;
+        };
         ConversationResponseDto: {
             id: string;
             socialAccountId: string;
@@ -2060,13 +2127,7 @@ export interface components {
             tiktokSharePostId?: string;
             /** @description TikTok Q&A template payload. Supports type QA_BUTTON_CARD or QA_LINK_CARD with 1-3 REPLY buttons. */
             tiktokTemplate?: {
-                type?: "QA_BUTTON_CARD" | "QA_LINK_CARD";
-                title?: string;
-                buttons?: {
-                    type?: "REPLY";
-                    title?: string;
-                    id?: string;
-                }[];
+                [key: string]: unknown;
             };
             /**
              * @description TikTok sender action for SENDER_ACTION messages
@@ -2221,6 +2282,9 @@ export interface components {
             organisationId: string;
             socialAccountIds: string[];
             name?: string;
+        };
+        UpdateAgentSocialAccountsDto: {
+            socialAccountIds: string[];
         };
         SendAgentMessageDto: {
             content: string;
@@ -3204,6 +3268,27 @@ export interface operations {
             };
         };
     };
+    SocialController_checkTikTokBusiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TikTokBusinessCheckDto"];
+                };
+            };
+        };
+    };
     SocialController_syncTikTokComments: {
         parameters: {
             query?: never;
@@ -3268,6 +3353,27 @@ export interface operations {
             };
         };
     };
+    TikTokWebhookController_setupDirectMessages: {
+        parameters: {
+            query: {
+                /** @description Admin token */
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Register the DIRECT_MESSAGE webhook on TikTok Business API */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     TikTokWebhookController_list: {
         parameters: {
             query: {
@@ -3301,7 +3407,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Delete the COMMENT webhook from TikTok Business API */
+            /** @description Delete the COMMENT, DIRECT_MESSAGE webhooks from TikTok Business API */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4267,6 +4373,29 @@ export interface operations {
             };
         };
     };
+    AgentController_updateSocialAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentSocialAccountsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AgentController_getMessages: {
         parameters: {
             query: {
@@ -4305,6 +4434,27 @@ export interface operations {
                 "application/json": components["schemas"]["SendAgentMessageDto"];
             };
         };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AgentController_startSetup: {
+        parameters: {
+            query: {
+                organisationId: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             201: {
                 headers: {

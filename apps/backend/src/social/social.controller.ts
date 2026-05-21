@@ -17,6 +17,7 @@ import {
   ReplyToCommentDto,
   CommentOnPostDto,
   CommentActionDto,
+  TikTokBusinessCheckDto,
 } from './dto/social.dto'
 
 @ApiTags('Social')
@@ -214,6 +215,17 @@ export class SocialController {
     @Param('accountId') accountId: string,
   ) {
     return this.socialService.syncTikTokVideos(user.id, accountId)
+  }
+
+  // ─── TikTok: Check Business account ───
+
+  @Get('tiktok/:accountId/check-business')
+  @ApiOkResponse({ type: TikTokBusinessCheckDto })
+  async checkTikTokBusiness(
+    @CurrentUser() user: { id: string },
+    @Param('accountId') accountId: string,
+  ) {
+    return this.socialService.checkTikTokBusinessAccount(user.id, accountId)
   }
 
   // ─── TikTok: Sync comments for a video ───

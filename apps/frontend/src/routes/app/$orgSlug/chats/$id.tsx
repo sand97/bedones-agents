@@ -37,6 +37,8 @@ import {
   buildTikTokOAuthUrl,
 } from '@app/lib/auth-redirect'
 import { launchWhatsAppSignup } from '@app/lib/facebook-sdk'
+import { useTikTokBusinessCheck } from '@app/hooks/use-tiktok-business-check'
+import { TikTokBusinessGuideModal } from '@app/components/tiktok/tiktok-business-guide-modal'
 import type { Conversation, Message } from '@app/components/whatsapp/mock-data'
 
 export const Route = createFileRoute('/app/$orgSlug/chats/$id')({
@@ -163,7 +165,10 @@ function mapApiConversation(
       id: conv.participantId,
       name: conv.participantName,
       phone: isWhatsApp && conv.participantId ? `+${conv.participantId}` : isTikTok ? '' : '',
-      username: isTikTok && conv.participantUsername ? `@${conv.participantUsername}` : undefined,
+      username:
+        isTikTok && conv.participantUsername && conv.participantUsername !== conv.participantName
+          ? `@${conv.participantUsername}`
+          : undefined,
       avatarUrl: conv.participantAvatar ?? undefined,
     },
     messages: messages.map((m) => {
@@ -380,6 +385,12 @@ function ChatsPage() {
 
   const currentAccountId = (search as { account?: string }).account || accounts[0]?.id || null
   const currentAccount = accounts.find((a) => a.id === currentAccountId) || accounts[0] || null
+
+  // ─── TikTok Business account check ───
+  const { showBusinessGuide, closeGuide } = useTikTokBusinessCheck(
+    currentAccountId,
+    config?.provider,
+  )
 
   // ─── WhatsApp commerce settings query ───
   type CommerceEntry = { is_catalog_visible: boolean; id?: string }
@@ -1099,6 +1110,23 @@ function ChatsPage() {
           onClose={() => setTikTokMessageOpen(false)}
           onSend={handleSendTikTokRichMessage}
           loading={sendMutation.isPending}
+        />
+      )}
+      {id === 'tiktok' && (
+        <TikTokBusinessGuideModal
+          open={showBusinessGuide}
+          onClose={closeGuide}
+          onRetry={() => {
+            setAuthRedirect({
+              intent: 'connect_pages',
+              orgId: orgSlug,
+              provider: 'tiktok',
+              pageId: 'tiktok',
+              scopes: ['messages', 'message.list.read', 'message.list.send', 'message.list.manage'],
+              returnTo: window.location.pathname,
+            })
+            window.location.href = buildTikTokOAuthUrl('messages')
+          }}
         />
       )}
     </div>

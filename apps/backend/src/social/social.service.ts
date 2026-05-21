@@ -454,6 +454,59 @@ export class SocialService {
     return socialAccount
   }
 
+  // ─── Check TikTok Business Account ───
+
+  async checkTikTokBusinessAccount(userId: string, accountId: string) {
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: accountId },
+      select: {
+        id: true,
+        provider: true,
+        organisationId: true,
+        accessToken: true,
+        refreshToken: true,
+        tokenExpiresAt: true,
+      },
+    })
+
+    if (!account || account.provider !== 'TIKTOK') {
+      throw new NotFoundException('TikTok account not found')
+    }
+
+    await this.assertMembership(userId, account.organisationId)
+
+    const accessToken = await this.getTikTokAccessToken(account)
+    const clientKey = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
+
+    const tokenInfoRes = await fetch(
+      'https://business-api.tiktok.com/open_api/v1.3/tt_user/token_info/get/',
+      {
+        method: 'POST',
+        headers: {
+          'Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ app_id: clientKey, access_token: accessToken }),
+      },
+    )
+
+    if (!tokenInfoRes.ok) {
+      return { isBusiness: false }
+    }
+
+    const tokenInfo = (await tokenInfoRes.json()) as {
+      code?: number
+      data?: { business_id?: string; creator_id?: string }
+    }
+
+    if (tokenInfo.code !== 0) {
+      return { isBusiness: false }
+    }
+
+    const isBusiness = !!tokenInfo.data?.business_id
+    return { isBusiness }
+  }
+
   // ─── Connect TikTok Account ───
 
   async connectTikTokAccount(
@@ -534,7 +587,7 @@ export class SocialService {
           'Access-Token': tokenData.access_token,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ app_id: clientKey, access_token: tokenData.access_token }),
       },
     )
     if (tokenInfoRes.ok) {
@@ -544,6 +597,15 @@ export class SocialService {
         code?: number
         data?: { business_id?: string; open_id?: string; creator_id?: string }
       }
+
+      // If token_info returns creator_id but no business_id, the account is NOT a Business account
+      if (tokenInfo.code === 0 && tokenInfo.data?.creator_id && !tokenInfo.data?.business_id) {
+        this.logger.warn(
+          `[TikTok] Account is a Creator account (creator_id=${tokenInfo.data.creator_id}), not Business. Message API requires a Business account.`,
+        )
+        throw new BadRequestException('tiktok_not_business_account')
+      }
+
       const bid =
         tokenInfo.data?.business_id ?? tokenInfo.data?.open_id ?? tokenInfo.data?.creator_id
       if (tokenInfo.code === 0 && bid) {

@@ -919,6 +919,36 @@
         ]
       }
     },
+    "/social/tiktok/{accountId}/check-business": {
+      "get": {
+        "operationId": "SocialController_checkTikTokBusiness",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TikTokBusinessCheckDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
     "/social/tiktok/{accountId}/sync-comments/{videoId}": {
       "post": {
         "operationId": "SocialController_syncTikTokComments",
@@ -4777,6 +4807,17 @@
         "required": [
           "organisationId",
           "code"
+        ]
+      },
+      "TikTokBusinessCheckDto": {
+        "type": "object",
+        "properties": {
+          "isBusiness": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "isBusiness"
         ]
       },
       "ConversationResponseDto": {

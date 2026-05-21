@@ -1401,11 +1401,15 @@ export class MessagingService {
         profileImage: participant.profile_image || null,
       }
     } catch (error) {
-      this.logger.warn(
-        `[TikTok DM] Failed to fetch participant profile: ${
-          error instanceof Error ? error.message : error
-        }`,
-      )
+      const msg = error instanceof Error ? error.message : String(error)
+      if (msg.includes('Business account') || msg.includes('40002')) {
+        this.logger.warn(
+          `[TikTok DM] Message API not authorized — cannot fetch participant profile. ` +
+            `Enable "Direct Message" permission in TikTok Developer Portal.`,
+        )
+      } else {
+        this.logger.warn(`[TikTok DM] Failed to fetch participant profile: ${msg}`)
+      }
       return null
     }
   }
@@ -1805,6 +1809,7 @@ export class MessagingService {
           `  Payload: ${payload ? JSON.stringify(payload) : '-'}\n` +
           `  Response: ${raw}`,
       )
+
       throw new BadRequestException(`TikTok ${operation} failed: ${data.message || raw}`)
     }
 

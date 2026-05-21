@@ -1080,5 +1080,29 @@
     "col_delivered": "Delivered",
     "col_read": "Read",
     "col_replied": "Replies"
+  },
+
+  "tiktok_business": {
+    "modal_title": "TikTok Business Account Required",
+    "description": "To use TikTok direct messages, your account must be a Business account (not Creator or Personal). Follow these steps to convert it:",
+    "step1_title": "Open TikTok settings",
+    "step1_desc": "Open the TikTok app → Settings and privacy → Manage account",
+    "step2_title": "Switch to Business account",
+    "step2_desc": "Tap 'Switch to Business Account' and choose a category",
+    "step3_title": "Reconnect your account",
+    "step3_desc": "Once converted, click 'Reconnect' below",
+    "cant_find_switch": "I can't find this option",
+    "next": "Next",
+    "back": "Back",
+    "retry_connect": "Reconnect TikTok",
+    "alt_description": "If the 'Switch to Business' option doesn't appear in the app, you can create a TikTok Business Center and link your account:",
+    "alt_step1_title": "Create a Business Center",
+    "alt_step1_desc": "Go to",
+    "alt_step2_title": "Set up the Business Center",
+    "alt_step2_desc": "Create a new Business Center by choosing any country and filling in the required information",
+    "alt_step3_title": "Add your TikTok account",
+    "alt_step3_desc": "In the Business Center, go to Account → TikTok accounts and add your account. You will be asked to convert it to Business",
+    "alt_step4_title": "Reconnect your account",
+    "alt_step4_desc": "Once the conversion is done, click 'Reconnect' below"
   }
 }

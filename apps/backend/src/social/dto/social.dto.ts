@@ -171,6 +171,11 @@ export class UnreadCountDto {
   count: number
 }
 
+export class TikTokBusinessCheckDto {
+  @ApiProperty()
+  isBusiness: boolean
+}
+
 export class UserStatsResponseDto {
   @ApiProperty()
   fromId: string
