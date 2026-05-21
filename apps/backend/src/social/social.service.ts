@@ -462,6 +462,7 @@ export class SocialService {
       select: {
         id: true,
         provider: true,
+        providerAccountId: true,
         organisationId: true,
         accessToken: true,
         refreshToken: true,
@@ -476,34 +477,26 @@ export class SocialService {
     await this.assertMembership(userId, account.organisationId)
 
     const accessToken = await this.getTikTokAccessToken(account)
-    const clientKey = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
 
-    const tokenInfoRes = await fetch(
-      'https://business-api.tiktok.com/open_api/v1.3/tt_user/token_info/get/',
+    // Check Business account access via /business/get/
+    const bizCheckRes = await fetch(
+      `https://business-api.tiktok.com/open_api/v1.3/business/get/?business_id=${encodeURIComponent(account.providerAccountId || '')}&fields=${encodeURIComponent(JSON.stringify(['display_name']))}`,
       {
-        method: 'POST',
-        headers: {
-          'Access-Token': accessToken,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ app_id: clientKey, access_token: accessToken }),
+        headers: { 'Access-Token': accessToken },
       },
     )
+    const bizCheckRaw = await bizCheckRes.text()
+    this.logger.log(`[TikTok] check-business business/get response: ${bizCheckRaw}`)
 
-    if (!tokenInfoRes.ok) {
-      return { isBusiness: false }
+    let bizCheckData: { code?: number } = {}
+    try {
+      bizCheckData = JSON.parse(bizCheckRaw)
+    } catch {
+      // non-JSON response means not a valid business account
     }
 
-    const tokenInfo = (await tokenInfoRes.json()) as {
-      code?: number
-      data?: { business_id?: string; creator_id?: string }
-    }
-
-    if (tokenInfo.code !== 0) {
-      return { isBusiness: false }
-    }
-
-    const isBusiness = !!tokenInfo.data?.business_id
+    // If the Business API returns code 0, the account has Business access
+    const isBusiness = bizCheckData.code === 0
     return { isBusiness }
   }
 
@@ -598,19 +591,32 @@ export class SocialService {
         data?: { business_id?: string; open_id?: string; creator_id?: string }
       }
 
-      // If token_info returns creator_id but no business_id, the account is NOT a Business account
-      if (tokenInfo.code === 0 && tokenInfo.data?.creator_id && !tokenInfo.data?.business_id) {
-        this.logger.warn(
-          `[TikTok] Account is a Creator account (creator_id=${tokenInfo.data.creator_id}), not Business. Message API requires a Business account.`,
-        )
-        throw new BadRequestException('tiktok_not_business_account')
-      }
-
       const bid =
         tokenInfo.data?.business_id ?? tokenInfo.data?.open_id ?? tokenInfo.data?.creator_id
       if (tokenInfo.code === 0 && bid) {
         businessId = bid
         this.logger.log(`[TikTok] Resolved business_id=${businessId}`)
+      }
+
+      // Verify Business account access via /business/get/
+      if (businessId) {
+        const bizCheckRes = await fetch(
+          `https://business-api.tiktok.com/open_api/v1.3/business/get/?business_id=${encodeURIComponent(businessId)}&fields=${encodeURIComponent(JSON.stringify(['display_name']))}`,
+          { headers: { 'Access-Token': tokenData.access_token } },
+        )
+        const bizCheckRaw = await bizCheckRes.text()
+        let bizCheckData: { code?: number } = {}
+        try {
+          bizCheckData = JSON.parse(bizCheckRaw)
+        } catch {
+          // non-JSON response
+        }
+        if (bizCheckData.code !== 0) {
+          this.logger.warn(
+            `[TikTok] Account is not a Business account (business/get returned code=${bizCheckData.code}). Message API requires a Business account.`,
+          )
+          throw new BadRequestException('tiktok_not_business_account')
+        }
       }
     } else {
       const errBody = await tokenInfoRes.text()
