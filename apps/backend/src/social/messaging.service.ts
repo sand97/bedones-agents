@@ -33,6 +33,20 @@ interface TikTokApiResponse<T> {
   data?: T
 }
 
+interface EchoMessageOptions {
+  createConversation?: boolean
+  recipientName?: string | null
+  senderId?: string | null
+  senderName?: string | null
+  deliveryStatus?: string | null
+  metadata?: Record<string, unknown> | null
+}
+
+interface EchoMessageResult {
+  conversationId: string
+  messageId: string
+}
+
 interface TikTokConversationMessage {
   sender?: string
   recipient?: string
@@ -2079,52 +2093,80 @@ export class MessagingService {
     mediaType?: string | null,
     fileName?: string | null,
     fileSize?: number | null,
-  ) {
+    options?: EchoMessageOptions,
+  ): Promise<EchoMessageResult | null> {
     // Check if message already exists (e.g. sent from our app)
     if (platformMsgId) {
       const existing = await this.prisma.directMessage.findUnique({
         where: { platformMsgId },
       })
-      if (existing) return
+      if (existing) return null
     }
 
-    const conversation = await this.prisma.conversation.findUnique({
-      where: {
-        socialAccountId_participantId: {
-          socialAccountId,
-          participantId: recipientId,
-        },
-      },
-    })
-
-    if (!conversation) return
-
     const displayText = messageText || (mediaType ? `[${mediaType}]` : '')
+    const conversation = options?.createConversation
+      ? await this.prisma.conversation.upsert({
+          where: {
+            socialAccountId_participantId: {
+              socialAccountId,
+              participantId: recipientId,
+            },
+          },
+          create: {
+            socialAccountId,
+            participantId: recipientId,
+            participantName: options.recipientName || recipientId,
+            lastMessageText: displayText,
+            lastMessageAt: timestamp,
+            unreadCount: 0,
+          },
+          update: {
+            ...(options.recipientName ? { participantName: options.recipientName } : {}),
+            lastMessageText: displayText,
+            lastMessageAt: timestamp,
+          },
+        })
+      : await this.prisma.conversation.findUnique({
+          where: {
+            socialAccountId_participantId: {
+              socialAccountId,
+              participantId: recipientId,
+            },
+          },
+        })
 
-    await this.prisma.directMessage.create({
+    if (!conversation) return null
+
+    const savedMessage = await this.prisma.directMessage.create({
       data: {
         conversationId: conversation.id,
         platformMsgId,
         message: messageText || '',
-        senderId: 'page',
-        senderName: 'Page',
+        senderId: options?.senderId || 'page',
+        senderName: options?.senderName || 'Page',
         isFromPage: true,
         isRead: true,
         mediaUrl: mediaUrl || null,
         mediaType: mediaType || null,
         fileName: fileName || null,
         fileSize: fileSize || null,
+        deliveryStatus: options?.deliveryStatus || null,
+        metadata: (options?.metadata as Prisma.InputJsonValue | undefined) ?? Prisma.JsonNull,
         createdTime: timestamp,
       },
     })
 
-    await this.prisma.conversation.update({
-      where: { id: conversation.id },
-      data: {
-        lastMessageText: displayText,
-        lastMessageAt: timestamp,
-      },
-    })
+    if (!options?.createConversation) {
+      await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          lastMessageText: displayText,
+          lastMessageAt: timestamp,
+        },
+      })
+    }
+
+    return { conversationId: conversation.id, messageId: savedMessage.id }
   }
 
   // ─── WhatsApp Product Message ───

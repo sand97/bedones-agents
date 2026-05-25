@@ -883,7 +883,7 @@ export class LoyaltyService {
 
   private async scheduleCampaign(campaignId: string, startDate: Date | null) {
     if (!startDate) return
-    const jobId = `campaign:${campaignId}`
+    const jobId = `campaign-${campaignId}`
     const existing = await this.campaignQueue.getJob(jobId)
     if (existing) await existing.remove().catch(() => undefined)
     await this.campaignQueue.add('send-campaign', { campaignId } satisfies LoyaltyCampaignJobData, {

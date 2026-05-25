@@ -918,7 +918,9 @@ export class WebhookService {
   async processWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
     for (const entry of payload.entry || []) {
       for (const change of entry.changes || []) {
-        if (change.field !== 'messages') continue
+        const isMessageField = change.field === 'messages'
+        const isMessageEchoField = change.field === 'smb_message_echoes'
+        if (!isMessageField && !isMessageEchoField) continue
 
         const value = change.value
         if (!value?.metadata?.phone_number_id) continue
@@ -929,7 +931,7 @@ export class WebhookService {
         // SocialAccount. These are replies from members on the daily opt-in
         // template. Emit so WhatsappOptinService can refresh their window.
         const coreNumberId = process.env.CORE_WHATSAPP_NUMBER_ID
-        if (coreNumberId && phoneNumberId === coreNumberId) {
+        if (isMessageField && coreNumberId && phoneNumberId === coreNumberId) {
           for (const msg of value.messages || []) {
             const reply = this.extractWhatsAppButtonReply(msg)
             this.eventEmitter.emit('whatsapp.core.inbound', {
@@ -962,6 +964,18 @@ export class WebhookService {
         // Handle incoming messages
         for (const msg of value.messages || []) {
           await this.handleWhatsAppMessage(
+            socialAccount.id,
+            phoneNumberId,
+            msg,
+            value.contacts,
+            orgId,
+          )
+        }
+
+        // Handle messages sent from the WhatsApp Business app. Meta sends
+        // those as "smb_message_echoes" instead of regular inbound messages.
+        for (const msg of value.message_echoes || []) {
+          await this.handleWhatsAppMessageEcho(
             socialAccount.id,
             phoneNumberId,
             msg,
@@ -1140,6 +1154,120 @@ export class WebhookService {
       orgId,
       message: { text: messageText, mediaUrl, mediaType, senderId, senderName },
     } satisfies IncomingMessageEvent)
+  }
+
+  private async handleWhatsAppMessageEcho(
+    socialAccountId: string,
+    phoneNumberId: string,
+    msg: WhatsAppMessageEcho,
+    contacts: WhatsAppContact[] | undefined,
+    orgId: string,
+  ) {
+    const recipientId = msg.to || contacts?.[0]?.wa_id
+    if (!recipientId) return
+
+    const timestamp = new Date(parseInt(msg.timestamp) * 1000)
+    const platformMsgId = msg.id
+    const contact = contacts?.find((c) => c.wa_id === recipientId)
+    const recipientName = contact?.profile?.name || null
+
+    let messageText = ''
+    let mediaUrl: string | null = null
+    let mediaType: string | null = null
+    let fileName: string | null = null
+    let metadata: Record<string, unknown> | null = null
+
+    switch (msg.type) {
+      case 'text':
+        messageText = msg.text?.body || ''
+        break
+      case 'image':
+        mediaType = 'image'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.image?.id)
+        messageText = msg.image?.caption || ''
+        break
+      case 'video':
+        mediaType = 'video'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.video?.id)
+        messageText = msg.video?.caption || ''
+        break
+      case 'audio':
+        mediaType = 'audio'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.audio?.id)
+        break
+      case 'document':
+        mediaType = 'file'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.document?.id)
+        fileName = msg.document?.filename || null
+        break
+      case 'sticker':
+        mediaType = 'image'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.sticker?.id)
+        break
+      case 'interactive': {
+        const reply = this.extractWhatsAppButtonReply(msg)
+        if (reply) {
+          messageText = reply.title
+          metadata = {
+            kind: reply.kind,
+            replyId: reply.id,
+            replyTitle: reply.title,
+            ...(reply.description ? { replyDescription: reply.description } : {}),
+          }
+        } else {
+          messageText = '[interactive]'
+        }
+        break
+      }
+      case 'button': {
+        const reply = this.extractWhatsAppButtonReply(msg)
+        if (reply) {
+          messageText = reply.title
+          metadata = {
+            kind: reply.kind,
+            replyId: reply.id,
+            replyTitle: reply.title,
+          }
+        } else {
+          messageText = '[button]'
+        }
+        break
+      }
+      default:
+        messageText = `[${msg.type}]`
+    }
+
+    const saved = await this.messagingService.handleEchoMessage(
+      socialAccountId,
+      recipientId,
+      messageText,
+      platformMsgId,
+      timestamp,
+      mediaUrl,
+      mediaType,
+      fileName,
+      null,
+      {
+        createConversation: true,
+        recipientName,
+        senderId: msg.from || phoneNumberId,
+        senderName: 'WhatsApp',
+        deliveryStatus: 'sent',
+        metadata,
+      },
+    )
+
+    if (!saved) return
+
+    this.logger.log(
+      `[WhatsApp Echo] New outbound message to ${recipientName || recipientId}: "${messageText?.substring(0, 50) || '[media]'}"`,
+    )
+
+    this.eventsGateway.emitToOrg(orgId, 'message:new', {
+      conversationId: saved.conversationId,
+      socialAccountId,
+      provider: 'WHATSAPP',
+    })
   }
 
   private extractWhatsAppButtonReply(msg: WhatsAppMessage): {
@@ -2655,6 +2783,7 @@ interface WhatsAppWebhookValue {
   }
   contacts?: WhatsAppContact[]
   messages?: WhatsAppMessage[]
+  message_echoes?: WhatsAppMessageEcho[]
   statuses?: Array<{
     id: string
     status: string
@@ -2665,6 +2794,7 @@ interface WhatsAppWebhookValue {
 
 interface WhatsAppContact {
   wa_id: string
+  user_id?: string
   profile?: { name?: string }
 }
 
@@ -2696,6 +2826,12 @@ interface WhatsAppMessage {
   }
   button?: { payload?: string; text?: string }
   context?: { id?: string; from?: string }
+}
+
+interface WhatsAppMessageEcho extends WhatsAppMessage {
+  to?: string
+  to_user_id?: string
+  from_user_id?: string
 }
 
 // ─── TikTok webhook payload types ───

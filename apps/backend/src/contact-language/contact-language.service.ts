@@ -62,7 +62,7 @@ export class ContactLanguageService {
       'detect-contact-language',
       { conversationId: payload.conversationId } satisfies ContactLanguageJobData,
       {
-        jobId: `detect-contact-language:${payload.conversationId}`,
+        jobId: `detect-contact-language-${payload.conversationId}`,
         delay: 5_000,
         attempts: 2,
         backoff: { type: 'exponential', delay: 30_000 },
