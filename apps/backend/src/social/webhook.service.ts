@@ -677,6 +677,7 @@ export class WebhookService {
       fileSize,
       message.reply_to?.mid || null,
     )
+    if (!conversation) return
 
     this.logger.log(
       `[Messenger] New message from ${senderName} (${senderId}): "${message.text?.substring(0, 50) || '[media]'}"`,
@@ -834,6 +835,7 @@ export class WebhookService {
       fileSize,
       message.reply_to?.mid || null,
     )
+    if (!conversation) return
 
     this.logger.log(
       `[Instagram DM] New message from ${senderName} (${senderId}): "${message.text?.substring(0, 50) || '[media]'}"`,
@@ -1136,6 +1138,9 @@ export class WebhookService {
       replyToMid,
       metadata,
     )
+    if (!conversation) return
+
+    await this.markOutboundMessagesAsRead(conversation.id, orgId, timestamp)
 
     this.logger.log(
       `[WhatsApp] New message from ${senderName} (${senderId}): "${messageText?.substring(0, 50) || '[media]'}"`,
@@ -1267,6 +1272,7 @@ export class WebhookService {
       conversationId: saved.conversationId,
       socialAccountId,
       provider: 'WHATSAPP',
+      isFromPage: true,
     })
   }
 
@@ -1348,6 +1354,33 @@ export class WebhookService {
       platformMsgId: status.id,
       status: status.status,
     })
+  }
+
+  private async markOutboundMessagesAsRead(conversationId: string, orgId: string, readAt: Date) {
+    const messages = await this.prisma.directMessage.findMany({
+      where: {
+        conversationId,
+        isFromPage: true,
+        createdTime: { lte: readAt },
+        OR: [{ deliveryStatus: null }, { deliveryStatus: { not: 'read' } }],
+      },
+      select: { id: true, platformMsgId: true },
+    })
+    if (messages.length === 0) return
+
+    await this.prisma.directMessage.updateMany({
+      where: { id: { in: messages.map((message) => message.id) } },
+      data: { deliveryStatus: 'read' },
+    })
+
+    for (const message of messages) {
+      this.eventsGateway.emitToOrg(orgId, 'message:status', {
+        conversationId,
+        messageId: message.id,
+        platformMsgId: message.platformMsgId,
+        deliveryStatus: 'read',
+      })
+    }
   }
 
   private async downloadWhatsAppMedia(
@@ -1775,6 +1808,7 @@ export class WebhookService {
       content.conversation_id,
       participantUsername,
     )
+    if (!conversation) return
 
     this.logger.log(
       `[TikTok DM] New message from ${senderName} (${participantId}): "${

@@ -2011,6 +2011,14 @@ export class MessagingService {
     platformThreadId?: string | null,
     participantUsername?: string | null,
   ) {
+    if (platformMsgId) {
+      const existing = await this.prisma.directMessage.findUnique({
+        where: { platformMsgId },
+        select: { id: true },
+      })
+      if (existing) return null
+    }
+
     // Upsert conversation
     const conversation = await this.prisma.conversation.upsert({
       where: {
@@ -2041,12 +2049,12 @@ export class MessagingService {
       },
     })
 
-    // Create message (skip if already exists)
+    // Create message (skip if it was inserted concurrently)
     if (platformMsgId) {
       const existing = await this.prisma.directMessage.findUnique({
         where: { platformMsgId },
       })
-      if (existing) return conversation
+      if (existing) return null
     }
 
     // Resolve reply_to mid → id
@@ -2124,6 +2132,7 @@ export class MessagingService {
             ...(options.recipientName ? { participantName: options.recipientName } : {}),
             lastMessageText: displayText,
             lastMessageAt: timestamp,
+            unreadCount: 0,
           },
         })
       : await this.prisma.conversation.findUnique({
@@ -2156,15 +2165,19 @@ export class MessagingService {
       },
     })
 
-    if (!options?.createConversation) {
-      await this.prisma.conversation.update({
-        where: { id: conversation.id },
-        data: {
-          lastMessageText: displayText,
-          lastMessageAt: timestamp,
-        },
-      })
-    }
+    await this.prisma.directMessage.updateMany({
+      where: { conversationId: conversation.id, isFromPage: false, isRead: false },
+      data: { isRead: true },
+    })
+
+    await this.prisma.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        lastMessageText: displayText,
+        lastMessageAt: timestamp,
+        unreadCount: 0,
+      },
+    })
 
     return { conversationId: conversation.id, messageId: savedMessage.id }
   }

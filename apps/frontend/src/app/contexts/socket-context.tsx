@@ -97,7 +97,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       })
     }
 
-    const handleMessageNew = (data: { conversationId: string }) => {
+    const handleMessageNew = (data: { conversationId: string; isFromPage?: boolean }) => {
       queryClient.invalidateQueries({
         queryKey: ['get', '/messaging/conversations/{accountId}'],
       })
@@ -110,7 +110,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       })
 
       // Play sound if user is NOT currently viewing this conversation
-      if (!isViewingConversation(data.conversationId)) {
+      if (!data.isFromPage && !isViewingConversation(data.conversationId)) {
         playNotificationSound()
       }
     }
