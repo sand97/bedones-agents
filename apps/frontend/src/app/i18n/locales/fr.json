@@ -56,6 +56,13 @@
     "recap": "Récapitulatif"
   },
 
+  "errors": {
+    "AUTH_INVALID_CREDENTIALS": "Email ou mot de passe incorrect",
+    "AUTH_SESSION_MISSING": "Session manquante",
+    "AUTH_SESSION_EXPIRED": "Session expirée",
+    "AUTH_SESSION_INVALID": "Session invalide"
+  },
+
   "auth": {
     "login": "Connexion",
     "login_error": "Erreur de connexion",

@@ -17,7 +17,10 @@ export class AuthGuard implements CanActivate {
     const i18n = I18nContext.current()
 
     if (!token) {
-      throw new UnauthorizedException(i18n?.t('errors.auth.session_missing') ?? 'Session manquante')
+      throw new UnauthorizedException({
+        code: 'AUTH_SESSION_MISSING',
+        message: i18n?.t('errors.auth.session_missing') ?? 'Session manquante',
+      })
     }
 
     try {
@@ -34,14 +37,20 @@ export class AuthGuard implements CanActivate {
         if (session) {
           await this.prisma.session.delete({ where: { id: session.id } })
         }
-        throw new UnauthorizedException(i18n?.t('errors.auth.session_expired') ?? 'Session expirée')
+        throw new UnauthorizedException({
+          code: 'AUTH_SESSION_EXPIRED',
+          message: i18n?.t('errors.auth.session_expired') ?? 'Session expirée',
+        })
       }
 
       request.user = session.user
       return true
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error
-      throw new UnauthorizedException(i18n?.t('errors.auth.session_invalid') ?? 'Session invalide')
+      throw new UnauthorizedException({
+        code: 'AUTH_SESSION_INVALID',
+        message: i18n?.t('errors.auth.session_invalid') ?? 'Session invalide',
+      })
     }
   }
 }

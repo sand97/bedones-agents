@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Button, Card, Form, Input, Modal, Select, Typography, message } from 'antd'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Lock, Mail, BookOpen, HelpCircle, Send } from 'lucide-react'
 import { featuresConfig, type Feature } from '@app/data/features'
 import { login, fetchMe } from '@app/lib/api'
@@ -14,6 +15,7 @@ export const Route = createFileRoute('/auth/login')({
 
 function LoginPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -46,7 +48,7 @@ function LoginPage() {
         navigate({ to: '/create-organisation', search: { step: undefined } })
       }
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Erreur de connexion')
+      message.error(err instanceof Error ? err.message : t('auth.login_error'))
     } finally {
       setLoading(false)
     }
