@@ -150,6 +150,21 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       )
     }
 
+    const handleConversationRead = (data: { conversationId: string; unreadCount: number }) => {
+      queryClient.setQueriesData<{ id: string; unreadCount: number }[]>(
+        { queryKey: ['get', '/messaging/conversations/{accountId}'] },
+        (old) => {
+          if (!old) return old
+          return old.map((conv) =>
+            conv.id === data.conversationId ? { ...conv, unreadCount: data.unreadCount } : conv,
+          )
+        },
+      )
+      queryClient.invalidateQueries({
+        queryKey: ['get', '/social/unread-counts/{organisationId}'],
+      })
+    }
+
     const handleCatalogIndexingProgress = (data: {
       catalogId: string
       percentage: number
@@ -191,6 +206,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socket.on('message:new', handleMessageNew)
     socket.on('message:reaction', handleMessageReaction)
     socket.on('message:status', handleMessageStatus)
+    socket.on('conversation:read', handleConversationRead)
     socket.on('catalog:indexing-progress', handleCatalogIndexingProgress)
     socket.on('catalog:indexing-completed', handleCatalogIndexingCompleted)
     socket.on('catalog:indexing-failed', handleCatalogIndexingFailed)
@@ -202,6 +218,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socket.off('message:new', handleMessageNew)
       socket.off('message:reaction', handleMessageReaction)
       socket.off('message:status', handleMessageStatus)
+      socket.off('conversation:read', handleConversationRead)
       socket.off('catalog:indexing-progress', handleCatalogIndexingProgress)
       socket.off('catalog:indexing-completed', handleCatalogIndexingCompleted)
       socket.off('catalog:indexing-failed', handleCatalogIndexingFailed)

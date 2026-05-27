@@ -1264,6 +1264,10 @@ export class WebhookService {
 
     if (!saved) return
 
+    // Reply sent from the WhatsApp Business mobile app implies the owner
+    // has read the inbound messages up to that point. Clear the badge.
+    await this.markInboundMessagesAsRead(saved.conversationId, orgId, timestamp)
+
     this.logger.log(
       `[WhatsApp Echo] New outbound message to ${recipientName || recipientId}: "${messageText?.substring(0, 50) || '[media]'}"`,
     )
@@ -1326,10 +1330,24 @@ export class WebhookService {
     // Find the message by platformMsgId
     const message = await this.prisma.directMessage.findUnique({
       where: { platformMsgId: status.id },
-      select: { id: true, conversationId: true, deliveryStatus: true },
+      select: {
+        id: true,
+        conversationId: true,
+        deliveryStatus: true,
+        isFromPage: true,
+        createdTime: true,
+      },
     })
 
     if (!message) return
+
+    // Read receipt on an inbound message → business owner read it from a
+    // linked device (e.g. WhatsApp Business mobile app). Mark all earlier
+    // inbound messages as read and refresh the conversation unread count.
+    if (status.status === 'read' && !message.isFromPage) {
+      await this.markInboundMessagesAsRead(message.conversationId, orgId, message.createdTime)
+      return
+    }
 
     // Only upgrade status: sent → delivered → read (never downgrade)
     const statusOrder = { sent: 1, delivered: 2, read: 3 }
@@ -1353,6 +1371,33 @@ export class WebhookService {
     this.eventEmitter.emit('campaign.whatsapp.status', {
       platformMsgId: status.id,
       status: status.status,
+    })
+  }
+
+  private async markInboundMessagesAsRead(conversationId: string, orgId: string, readAt: Date) {
+    const result = await this.prisma.directMessage.updateMany({
+      where: {
+        conversationId,
+        isFromPage: false,
+        isRead: false,
+        createdTime: { lte: readAt },
+      },
+      data: { isRead: true },
+    })
+    if (result.count === 0) return
+
+    const unreadCount = await this.prisma.directMessage.count({
+      where: { conversationId, isFromPage: false, isRead: false },
+    })
+
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { unreadCount },
+    })
+
+    this.eventsGateway.emitToOrg(orgId, 'conversation:read', {
+      conversationId,
+      unreadCount,
     })
   }
 
