@@ -81,6 +81,48 @@ function groupMessagesByDate(
   return groups
 }
 
+/* ── Lazy video player ──
+   Avoids pre-buffering: shows a placeholder with a play button. The <video>
+   element is mounted only on click, so the network request happens at user
+   intent rather than at render time. */
+
+function LazyVideo({ src, onPlay }: { src?: string; onPlay?: () => void }) {
+  const [active, setActive] = useState(false)
+
+  if (!active) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setActive(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setActive(true)
+          }
+        }}
+        aria-label="Lire la vidéo"
+        className="chat-video-placeholder"
+      >
+        <span className="chat-video-placeholder__play">
+          <Play size={20} />
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <video
+      src={src}
+      controls
+      autoPlay
+      preload="auto"
+      className="w-full rounded-control aspect-video bg-bg-muted"
+      onLoadedMetadata={onPlay}
+    />
+  )
+}
+
 /* ── Audio message player ── */
 
 function AudioPlayer({
@@ -432,13 +474,7 @@ function MessageBubble({
       case 'video':
         return (
           <div>
-            <video
-              src={message.videoUrl || message.videoThumbnail}
-              controls
-              preload="metadata"
-              className="w-full rounded-control aspect-video bg-bg-muted"
-              onLoadedMetadata={onMediaLoad}
-            />
+            <LazyVideo src={message.videoUrl || message.videoThumbnail} onPlay={onMediaLoad} />
             {message.text && <p className="m-0 mt-2 text-sm text-text-primary">{message.text}</p>}
           </div>
         )

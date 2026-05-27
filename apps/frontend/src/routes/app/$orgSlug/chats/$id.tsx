@@ -1000,7 +1000,7 @@ function ChatsPage() {
 
   // ─── Full chat UI ───
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-[100dvh] flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
       <DashboardHeader
         title={config.label}
         mobileTitle={config.mobileLabel}
