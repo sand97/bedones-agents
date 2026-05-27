@@ -329,7 +329,25 @@
     "template_only_placeholder": "The WhatsApp window is closed. Use a template or WhatsApp Business.",
     "reply_tooltip": "Reply",
     "improve_tooltip": "Improve the response with AI",
-    "by_ai": "by AI"
+    "by_ai": "by AI",
+    "preview_image": "Photo",
+    "preview_video": "Video",
+    "preview_audio": "Audio",
+    "preview_file": "Document",
+    "preview_document": "Document",
+    "preview_sticker": "Sticker",
+    "preview_location": "Location",
+    "preview_contact": "Contact",
+    "preview_order": "Order",
+    "preview_button": "Button",
+    "preview_interactive": "Interactive message",
+    "preview_template": "Template",
+    "preview_product": "Product",
+    "preview_products": "{{count}} products",
+    "preview_catalog": "Catalog",
+    "preview_tiktok_post": "TikTok post",
+    "preview_unsupported": "Unsupported message",
+    "preview_message": "Message"
   },
 
   "feedback": {

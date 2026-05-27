@@ -44,6 +44,7 @@ import {
 import { launchWhatsAppSignup } from '@app/lib/facebook-sdk'
 import { useTikTokBusinessCheck } from '@app/hooks/use-tiktok-business-check'
 import { TikTokBusinessGuideModal } from '@app/components/tiktok/tiktok-business-guide-modal'
+import { getStoredChatAccount, setStoredChatAccount } from '@app/lib/chat-account-storage'
 import type { Conversation, Message } from '@app/components/whatsapp/mock-data'
 
 export const Route = createFileRoute('/app/$orgSlug/chats/$id')({
@@ -123,7 +124,12 @@ function MobileBackButton() {
   return (
     <Button
       type="text"
-      onClick={() => navigate({ search: {} as never })}
+      onClick={() =>
+        navigate({
+          search: (prev: Record<string, unknown>) =>
+            ({ ...prev, conv: undefined, ticket: undefined }) as never,
+        })
+      }
       icon={<ArrowLeft size={18} strokeWidth={1.5} />}
       className="p-0!"
     >
@@ -388,8 +394,19 @@ function ChatsPage() {
     [accountsQuery.data, config?.provider],
   )
 
-  const currentAccountId = (search as { account?: string }).account || accounts[0]?.id || null
+  const urlAccountId = (search as { account?: string }).account
+  const currentAccountId = useMemo(() => {
+    if (urlAccountId) return urlAccountId
+    const stored = getStoredChatAccount(id)
+    if (stored && accounts.some((a) => a.id === stored)) return stored
+    return accounts[0]?.id || null
+  }, [urlAccountId, accounts, id])
   const currentAccount = accounts.find((a) => a.id === currentAccountId) || accounts[0] || null
+
+  // Persist the active account per channel so navigating away & back restores it.
+  useEffect(() => {
+    if (currentAccountId) setStoredChatAccount(id, currentAccountId)
+  }, [id, currentAccountId])
 
   // ─── TikTok Business account check ───
   const { showBusinessGuide, closeGuide } = useTikTokBusinessCheck(

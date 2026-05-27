@@ -329,7 +329,25 @@
     "template_only_placeholder": "La fenêtre WhatsApp est fermée. Utilisez un template ou WhatsApp Business.",
     "reply_tooltip": "Répondre",
     "improve_tooltip": "Améliorer la réponse avec l'IA",
-    "by_ai": "par l'IA"
+    "by_ai": "par l'IA",
+    "preview_image": "Photo",
+    "preview_video": "Vidéo",
+    "preview_audio": "Audio",
+    "preview_file": "Document",
+    "preview_document": "Document",
+    "preview_sticker": "Sticker",
+    "preview_location": "Localisation",
+    "preview_contact": "Contact",
+    "preview_order": "Commande",
+    "preview_button": "Bouton",
+    "preview_interactive": "Message interactif",
+    "preview_template": "Template",
+    "preview_product": "Produit",
+    "preview_products": "{{count}} produits",
+    "preview_catalog": "Catalogue",
+    "preview_tiktok_post": "Post TikTok",
+    "preview_unsupported": "Message non supporté",
+    "preview_message": "Message"
   },
 
   "feedback": {

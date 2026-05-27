@@ -19,6 +19,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { DoubleCheckIcon, SingleCheckIcon, OptionsIcon } from '@app/components/icons/social-icons'
 import { $api } from '@app/lib/api/$api'
+import { getAvatarColor } from '@app/lib/avatar-color'
 import type { Conversation, Message } from './mock-data'
 import { TicketCard } from './ticket-card'
 import { TicketDrawer, type RealTicket } from './ticket-drawer'
@@ -795,7 +796,14 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
 
   return (
     <div className="flex items-center gap-3 border-b border-border-subtle px-4 py-2.5">
-      <Avatar src={conversation.contact.avatarUrl} size={36} className="flex-shrink-0">
+      <Avatar
+        src={conversation.contact.avatarUrl}
+        size={36}
+        className="flex-shrink-0"
+        style={{
+          backgroundColor: getAvatarColor(conversation.contact.id || conversation.contact.name),
+        }}
+      >
         {conversation.contact.name[0]}
       </Avatar>
       <div className="min-w-0 flex-1">
