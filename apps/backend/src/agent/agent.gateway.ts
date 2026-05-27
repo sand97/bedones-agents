@@ -14,7 +14,7 @@ import { AgentService } from './agent.service'
  */
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL || 'https://moderator.bedones.local',
+    origin: process.env.FRONTEND_URL || 'https://moderator.bedones.test',
     credentials: true,
   },
 })

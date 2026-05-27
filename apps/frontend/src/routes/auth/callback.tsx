@@ -65,7 +65,7 @@ function AuthCallbackPage() {
       setLoadingMessage(i18n.t('auth.finalizing_connection'))
 
       const provider = redirect.provider || 'facebook'
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
       const redirectUri = `${apiUrl}/auth/callback/${provider}`
 
       const featureScopes = redirect.scopes

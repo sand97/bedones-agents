@@ -30,7 +30,7 @@ export function persistLocale(locale: AppLocale) {
  */
 export function persistLocaleToServer(locale: AppLocale): void {
   if (!isClient) return
-  const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+  const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
   fetch(`${apiUrl}/auth/me/locale`, {
     method: 'PATCH',
     credentials: 'include',

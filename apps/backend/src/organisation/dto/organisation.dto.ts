@@ -12,7 +12,7 @@ export class UpdateOrganisationDto {
   @ApiPropertyOptional({ example: 'Nouveau nom' })
   name?: string
 
-  @ApiPropertyOptional({ example: 'https://minio.bedones.local/logos/logo.png' })
+  @ApiPropertyOptional({ example: 'https://minio.bedones.test/logos/logo.png' })
   logoUrl?: string
 
   @ApiPropertyOptional({ example: 'Africa/Douala' })

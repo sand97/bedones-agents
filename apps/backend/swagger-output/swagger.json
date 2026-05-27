@@ -4395,7 +4395,7 @@
           },
           "logoUrl": {
             "type": "string",
-            "example": "https://minio.bedones.local/logos/logo.png"
+            "example": "https://minio.bedones.test/logos/logo.png"
           },
           "timezone": {
             "type": "string",
@@ -4408,7 +4408,7 @@
         "properties": {
           "url": {
             "type": "string",
-            "example": "https://minio.bedones.local/logos/abc123.png"
+            "example": "https://minio.bedones.test/logos/abc123.png"
           }
         },
         "required": [

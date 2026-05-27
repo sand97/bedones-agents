@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
 
 /**
  * Typed API client for Agent, Catalog, Ticket, Promotion endpoints.

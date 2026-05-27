@@ -1,4 +1,4 @@
-moderator.bedones.local {
+moderator.bedones.test {
 	# Enable automatic HTTPS with self-signed certificate for local development
 	tls internal
 
@@ -6,7 +6,7 @@ moderator.bedones.local {
 	reverse_proxy 127.0.0.1:3007
 }
 
-api-moderator.bedones.local {
+api-moderator.bedones.test {
 	# Enable automatic HTTPS with self-signed certificate for local development
 	tls internal
 

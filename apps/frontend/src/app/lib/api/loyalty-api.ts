@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
 
 async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
