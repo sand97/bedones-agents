@@ -474,6 +474,134 @@ export class MessagingService {
     return { id: savedMessage.id, message: savedMessage.message }
   }
 
+  // ─── Typing indicator (best-effort, never throws) ───
+
+  async sendTypingIndicator(conversationId: string, userId?: string): Promise<void> {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        socialAccount: {
+          select: {
+            id: true,
+            provider: true,
+            providerAccountId: true,
+            organisationId: true,
+          },
+        },
+      },
+    })
+    if (!conversation) return
+
+    if (userId) {
+      try {
+        await this.assertMembership(userId, conversation.socialAccount.organisationId)
+      } catch {
+        return
+      }
+    }
+
+    try {
+      const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
+      const provider = conversation.socialAccount.provider
+
+      if (provider === 'WHATSAPP') {
+        const lastIncoming = await this.prisma.directMessage.findFirst({
+          where: { conversationId, isFromPage: false, platformMsgId: { not: null } },
+          orderBy: { createdTime: 'desc' },
+          select: { platformMsgId: true },
+        })
+        if (!lastIncoming?.platformMsgId) return
+        await this.sendWhatsAppTypingIndicator(
+          conversation.socialAccount.providerAccountId,
+          lastIncoming.platformMsgId,
+          accessToken,
+        )
+      } else if (provider === 'FACEBOOK') {
+        await this.sendMetaSenderAction(
+          conversation.socialAccount.providerAccountId,
+          conversation.participantId,
+          accessToken,
+          'typing_on',
+          'Messenger',
+        )
+      } else if (provider === 'INSTAGRAM') {
+        await this.sendMetaSenderAction(
+          conversation.socialAccount.providerAccountId,
+          conversation.participantId,
+          accessToken,
+          'typing_on',
+          'Instagram',
+        )
+      } else if (provider === 'TIKTOK') {
+        await this.sendTikTokMessage({
+          conversationId,
+          businessId: conversation.socialAccount.providerAccountId,
+          conversationPlatformId: conversation.platformThreadId || conversation.participantId,
+          accessToken,
+          messageType: 'SENDER_ACTION',
+          senderAction: 'TYPING',
+        })
+      }
+    } catch (err) {
+      this.logger.warn(
+        `[Typing] Failed for conversation ${conversationId}: ${err instanceof Error ? err.message : String(err)}`,
+      )
+    }
+  }
+
+  private async sendWhatsAppTypingIndicator(
+    phoneNumberId: string,
+    incomingMessageId: string,
+    accessToken: string,
+  ): Promise<void> {
+    const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${phoneNumberId}/messages`
+    const body = {
+      messaging_product: 'whatsapp',
+      status: 'read',
+      message_id: incomingMessageId,
+      typing_indicator: { type: 'text' },
+    }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      this.logger.warn(
+        `[WhatsApp] Typing indicator failed (${response.status}): ${JSON.stringify(data)}`,
+      )
+    }
+  }
+
+  private async sendMetaSenderAction(
+    pageOrIgId: string,
+    recipientId: string,
+    accessToken: string,
+    action: 'typing_on' | 'typing_off' | 'mark_seen',
+    label: 'Messenger' | 'Instagram',
+  ): Promise<void> {
+    const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${pageOrIgId}/messages?access_token=${accessToken}`
+    const body = {
+      recipient: { id: recipientId },
+      sender_action: action,
+    }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      this.logger.warn(
+        `[${label}] Sender action ${action} failed (${response.status}): ${JSON.stringify(data)}`,
+      )
+    }
+  }
+
   // ─── Per-conversation agent override ───
 
   /**

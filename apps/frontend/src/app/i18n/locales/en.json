@@ -199,7 +199,10 @@
     "quick_replies_description": "Fill in the most common questions and answers, e.g. your store location or WhatsApp contact",
     "add_reply": "Add a reply",
     "custom_instructions_label": "Custom instructions (optional)",
-    "custom_instructions_tone_placeholder": "You can e.g. describe the tone of replies: serious, funny, friendly… to customize the reply style"
+    "custom_instructions_tone_placeholder": "You can e.g. describe the tone of replies: serious, funny, friendly… to customize the reply style",
+    "catalog_title": "Linked catalog",
+    "catalog_description": "Link a catalog to this page so the agent can detect product references in comments and respond.",
+    "catalog_placeholder": "No catalog linked"
   },
 
   "chat": {

@@ -693,6 +693,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/messaging/typing/{conversationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MessagingController_sendTyping"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/messaging/sync/{accountId}": {
         parameters: {
             query?: never;
@@ -1935,13 +1951,13 @@ export interface components {
         UpdateOrganisationDto: {
             /** @example Nouveau nom */
             name?: string;
-            /** @example https://minio.bedones.local/logos/logo.png */
+            /** @example https://minio.bedones.test/logos/logo.png */
             logoUrl?: string;
             /** @example Africa/Douala */
             timezone?: string;
         };
         UploadResponseDto: {
-            /** @example https://minio.bedones.local/logos/abc123.png */
+            /** @example https://minio.bedones.test/logos/abc123.png */
             url: string;
         };
         ConnectPagesDto: {
@@ -1963,6 +1979,7 @@ export interface components {
             spamAction: string;
             customInstructions?: string;
             faqRules: components["schemas"]["FAQRuleResponseDto"][];
+            catalogId?: string | null;
         };
         SocialAccountResponseDto: {
             id: string;
@@ -2022,6 +2039,8 @@ export interface components {
             spamAction?: "hide" | "delete" | "none";
             customInstructions?: string;
             faqRules?: components["schemas"]["FAQRuleDto"][];
+            /** @description Catalog associated to this page (null to unlink) */
+            catalogId?: string | null;
         };
         UserStatsResponseDto: {
             fromId: string;
@@ -3542,6 +3561,25 @@ export interface operations {
                 "application/json": components["schemas"]["MarkConversationReadDto"];
             };
         };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MessagingController_sendTyping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             201: {
                 headers: {

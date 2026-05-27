@@ -41,6 +41,7 @@ interface ChatWindowProps {
     type: 'image' | 'video' | 'audio' | 'file',
     replyToId?: string,
   ) => Promise<void>
+  onTyping?: () => void
   onRetry?: (messageId: string) => void
   hasCatalog?: boolean
   onProductClick?: () => void
@@ -876,6 +877,7 @@ export function ChatWindow({
   provider = 'whatsapp',
   onSend,
   onUploadAndSend,
+  onTyping,
   onRetry,
   hasCatalog,
   onProductClick,
@@ -1056,6 +1058,7 @@ export function ChatWindow({
               }
             : undefined
         }
+        onTyping={onTyping}
         provider={provider}
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}

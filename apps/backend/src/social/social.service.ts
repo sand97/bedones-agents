@@ -1685,6 +1685,7 @@ export class SocialService {
       spamAction?: string
       customInstructions?: string
       faqRules?: { question: string; answer: string }[]
+      catalogId?: string | null
     },
   ) {
     const account = await this.prisma.socialAccount.findUnique({
@@ -1695,6 +1696,16 @@ export class SocialService {
 
     await this.assertMembership(userId, account.organisationId)
 
+    if (data.catalogId) {
+      const catalog = await this.prisma.catalog.findUnique({
+        where: { id: data.catalogId },
+        select: { organisationId: true },
+      })
+      if (!catalog || catalog.organisationId !== account.organisationId) {
+        throw new NotFoundException('Catalog not found')
+      }
+    }
+
     const settings = await this.prisma.pageSettings.upsert({
       where: { socialAccountId },
       create: {
@@ -1703,12 +1714,14 @@ export class SocialService {
         undesiredCommentsAction: data.undesiredCommentsAction || 'hide',
         spamAction: data.spamAction || 'delete',
         customInstructions: data.customInstructions,
+        catalogId: data.catalogId ?? null,
       },
       update: {
         isConfigured: true,
         undesiredCommentsAction: data.undesiredCommentsAction,
         spamAction: data.spamAction,
         customInstructions: data.customInstructions,
+        ...(data.catalogId !== undefined && { catalogId: data.catalogId }),
       },
     })
 

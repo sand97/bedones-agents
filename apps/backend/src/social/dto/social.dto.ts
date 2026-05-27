@@ -37,6 +37,13 @@ export class UpdatePageSettingsDto {
 
   @ApiPropertyOptional({ type: [FAQRuleDto] })
   faqRules?: FAQRuleDto[]
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Catalog associated to this page (null to unlink)',
+  })
+  catalogId?: string | null
 }
 
 export class FAQRuleResponseDto {
@@ -68,6 +75,9 @@ export class PageSettingsResponseDto {
 
   @ApiProperty({ type: [FAQRuleResponseDto] })
   faqRules: FAQRuleResponseDto[]
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  catalogId?: string | null
 }
 
 export class CommentResponseDto {

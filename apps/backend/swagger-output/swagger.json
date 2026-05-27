@@ -1290,6 +1290,29 @@
         ]
       }
     },
+    "/messaging/typing/{conversationId}": {
+      "post": {
+        "operationId": "MessagingController_sendTyping",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
     "/messaging/sync/{accountId}": {
       "post": {
         "operationId": "MessagingController_syncConversations",
@@ -4483,6 +4506,10 @@
             "items": {
               "$ref": "#/components/schemas/FAQRuleResponseDto"
             }
+          },
+          "catalogId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -4705,6 +4732,11 @@
             "items": {
               "$ref": "#/components/schemas/FAQRuleDto"
             }
+          },
+          "catalogId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Catalog associated to this page (null to unlink)"
           }
         }
       },

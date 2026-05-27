@@ -266,6 +266,7 @@ model Catalog {
 
   products       Product[]
   socialAccounts CatalogSocialAccount[]
+  pageSettings   PageSettings[]
 
   @@index([organisationId])
 }
@@ -463,10 +464,14 @@ model PageSettings {
   undesiredCommentsAction String        @default("hide")
   spamAction              String        @default("delete")
   customInstructions      String?
+  catalogId               String?
+  catalog                 Catalog?      @relation(fields: [catalogId], references: [id], onDelete: SetNull)
   createdAt               DateTime      @default(now())
   updatedAt               DateTime      @updatedAt
 
   faqRules FAQRule[]
+
+  @@index([catalogId])
 }
 
 model FAQRule {

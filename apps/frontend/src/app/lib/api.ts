@@ -236,6 +236,7 @@ export async function updatePageSettings(
     spamAction?: 'hide' | 'delete' | 'none'
     customInstructions?: string
     faqRules?: { question: string; answer: string }[]
+    catalogId?: string | null
   },
 ): Promise<PageSettingsResponse> {
   const { data, error } = await apiClient.PATCH('/social/accounts/{accountId}/settings', {

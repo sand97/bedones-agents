@@ -227,6 +227,7 @@ function AttachmentPopover({
 export function ChatInput({
   onSend,
   onUploadAndSend,
+  onTyping,
   provider,
   replyTo,
   onCancelReply,
@@ -242,6 +243,7 @@ export function ChatInput({
     media?: { url: string; type: 'image' | 'video' | 'audio' | 'file' },
   ) => Promise<void>
   onUploadAndSend?: (file: File, type: MediaType | 'audio') => Promise<void>
+  onTyping?: () => void
   provider?: string
   replyTo?: Message | null
   onCancelReply?: () => void
@@ -256,6 +258,16 @@ export function ChatInput({
   const [mode, setMode] = useState<InputMode>('text')
   const [inputValue, setInputValue] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const lastTypingAtRef = useRef<number>(0)
+
+  const handleTyping = () => {
+    if (!onTyping) return
+    const now = Date.now()
+    // Throttle to one call per 10s — providers' indicators last ~20s.
+    if (now - lastTypingAtRef.current < 10_000) return
+    lastTypingAtRef.current = now
+    onTyping()
+  }
 
   // Focus input when replyTo changes
   useEffect(() => {
@@ -370,7 +382,10 @@ export function ChatInput({
               templateOnly ? t('chat.template_only_placeholder') : t('chat.type_message')
             }
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => {
+              setInputValue(e.target.value)
+              if (e.target.value.trim()) handleTyping()
+            }}
             onKeyDown={handleKeyDown}
             autoSize={{ minRows: 1, maxRows: 4 }}
             className="rounded-2xl!"

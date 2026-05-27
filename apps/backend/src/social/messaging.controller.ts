@@ -111,6 +111,17 @@ export class MessagingController {
     return this.messagingService.markConversationAsRead(user.id, body.conversationId)
   }
 
+  // ─── Send typing indicator (best-effort) ───
+
+  @Post('typing/:conversationId')
+  async sendTyping(
+    @CurrentUser() user: { id: string },
+    @Param('conversationId') conversationId: string,
+  ) {
+    await this.messagingService.sendTypingIndicator(conversationId, user.id)
+    return { ok: true }
+  }
+
   // ─── Sync conversations from platform ───
 
   @Post('sync/:accountId')

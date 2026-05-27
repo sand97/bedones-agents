@@ -448,12 +448,14 @@ function CommentsPage() {
           <CommentsConfigModal
             pageName={currentSwitcherItem.name}
             accountId={currentAccountId}
+            organisationId={orgSlug}
             open={configOpen}
             onClose={() => setConfigOpen(false)}
             onSaved={() => {
               setConfigJustConnected(false)
               invalidateAccounts()
             }}
+            initialSettings={currentAccount?.settings ?? undefined}
           />
         )}
       </div>
@@ -483,6 +485,7 @@ function CommentsPage() {
           <CommentsConfigModal
             pageName={currentSwitcherItem.name}
             accountId={currentAccountId}
+            organisationId={orgSlug}
             open={configOpen}
             onClose={() => setConfigOpen(false)}
             onSaved={() => invalidateAccounts()}
@@ -521,7 +524,9 @@ function CommentsPage() {
         loading={postsQuery.isLoading}
         pageName={currentSwitcherItem.name}
         accountId={currentAccountId || undefined}
+        organisationId={orgSlug}
         isConfigured={isConfigured}
+        initialSettings={currentAccount?.settings ?? undefined}
         onReply={handleReply}
         onComment={handleComment}
         onHide={handleHide}

@@ -84,6 +84,8 @@ interface ChatLayoutProps {
     type: 'image' | 'video' | 'audio' | 'file',
     replyToId?: string,
   ) => Promise<void>
+  /** Called (throttled) when the admin is typing in the input — used to send typing indicator to the customer */
+  onTyping?: () => void
   onSelectConversation?: (convId: string) => void
   onRetry?: (messageId: string) => void
   /** Called when user clicks anywhere in the chat window area */
@@ -272,6 +274,7 @@ export function ChatLayout({
   provider = 'whatsapp',
   onSend,
   onUploadAndSend,
+  onTyping,
   onSelectConversation,
   onRetry,
   onChatClick,
@@ -435,9 +438,6 @@ export function ChatLayout({
       <div
         className={`chat-split__left ${selectedConversation ? 'chat-split__left--hidden-mobile' : ''}`}
       >
-        {/* Mobile: show HeaderHelper if conversations exist + setup needed */}
-        <div className="md:hidden">{renderMobileHeaderHelper()}</div>
-
         {/* Filter bar */}
         <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-3.5">
           <Button
@@ -486,6 +486,9 @@ export function ChatLayout({
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          {/* Mobile: HeaderHelper scrolls with the list (under the filter bar) */}
+          <div className="md:hidden">{renderMobileHeaderHelper()}</div>
+
           {/* Mobile only: show SocialSetup when no conversations + setup needed */}
           {!hasConversations && setupState ? (
             <div className="md:hidden">
@@ -530,6 +533,7 @@ export function ChatLayout({
             provider={provider}
             onSend={onSend}
             onUploadAndSend={onUploadAndSend}
+            onTyping={onTyping}
             onRetry={onRetry}
             hasCatalog={hasCatalogForProducts}
             onProductClick={onProductClick}

@@ -199,7 +199,10 @@
     "quick_replies_description": "Renseignez les questions que les utilisateurs posent le plus et les réponses, par ex l'emplacement de votre boutique ou votre contact WhatsApp",
     "add_reply": "Ajouter une réponse",
     "custom_instructions_label": "Instructions personnalisées (optionnel)",
-    "custom_instructions_tone_placeholder": "Vous pouvez par ex décrire le ton des réponses : sérieux, drôle, jovial… pour personnaliser le style des réponses"
+    "custom_instructions_tone_placeholder": "Vous pouvez par ex décrire le ton des réponses : sérieux, drôle, jovial… pour personnaliser le style des réponses",
+    "catalog_title": "Catalogue associé",
+    "catalog_description": "Associez un catalogue à cette page pour que l'agent puisse détecter les références produits dans les commentaires et y répondre.",
+    "catalog_placeholder": "Aucun catalogue associé"
   },
 
   "chat": {

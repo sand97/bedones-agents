@@ -294,6 +294,13 @@ export class AgentMessageProcessorService {
 
     const callLimit = this.config.get<number>('AGENT_MODEL_CALL_LIMIT') || 6
 
+    // Fire-and-forget typing indicator while the agent is reflecting.
+    // WhatsApp/Meta indicators auto-expire after ~20-25s; we refresh every 18s.
+    const typingInterval = setInterval(() => {
+      void this.messagingService.sendTypingIndicator(event.conversationId)
+    }, 18_000)
+    void this.messagingService.sendTypingIndicator(event.conversationId)
+
     try {
       await agentExecutor.invoke(
         {
@@ -311,6 +318,8 @@ export class AgentMessageProcessorService {
       this.logger.log(`Agent ${agent.id} processed message successfully`)
     } catch (error: unknown) {
       this.logger.error(`Agent execution failed: ${error instanceof Error ? error.message : error}`)
+    } finally {
+      clearInterval(typingInterval)
     }
   }
 

@@ -11,6 +11,7 @@ import { CommentThread } from './comment-thread'
 import { CommentsConfigModal } from './comments-config'
 import { PostListSkeleton, CommentThreadSkeleton } from './comments-skeleton'
 import type { Post } from './mock-data'
+import type { PageSettingsResponse } from '@app/lib/api'
 
 const EMPTY_ICON_SIZE = 40
 
@@ -20,8 +21,11 @@ interface CommentsLayoutProps {
   loading?: boolean
   pageName?: string
   accountId?: string
+  organisationId?: string
   /** Whether the page settings have been configured by the user */
   isConfigured?: boolean
+  /** Pre-loaded settings to populate the config modal */
+  initialSettings?: PageSettingsResponse
   onReply?: (commentId: string, message: string) => Promise<void>
   onComment?: (postId: string, message: string) => Promise<void>
   onHide?: (commentId: string) => Promise<void>
@@ -37,7 +41,9 @@ export function CommentsLayout({
   loading = false,
   pageName,
   accountId,
+  organisationId,
   isConfigured = false,
+  initialSettings,
   onReply,
   onComment,
   onHide,
@@ -116,9 +122,11 @@ export function CommentsLayout({
           <CommentsConfigModal
             pageName={pageName}
             accountId={accountId}
+            organisationId={organisationId}
             open={configOpen}
             onClose={() => setConfigOpen(false)}
             onSaved={onSettingsSaved}
+            initialSettings={initialSettings}
           />
         )}
       </>
@@ -208,9 +216,11 @@ export function CommentsLayout({
         <CommentsConfigModal
           pageName={pageName}
           accountId={accountId}
+          organisationId={organisationId}
           open={configOpen}
           onClose={() => setConfigOpen(false)}
           onSaved={onSettingsSaved}
+          initialSettings={initialSettings}
         />
       )}
     </div>

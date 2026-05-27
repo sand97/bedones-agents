@@ -489,6 +489,13 @@ function ChatsPage() {
   const sendTemplateMutation = $api.useMutation('post', '/messaging/send-template')
   const sendProductMutation = $api.useMutation('post', '/messaging/send-products')
   const markReadMutation = $api.useMutation('post', '/messaging/mark-read')
+  const typingMutation = $api.useMutation('post', '/messaging/typing/{conversationId}')
+
+  const handleTyping = useCallback(() => {
+    const convId = search.conv
+    if (!convId) return
+    typingMutation.mutate({ params: { path: { conversationId: convId } } })
+  }, [search.conv, typingMutation])
 
   // ─── Map conversations to ChatLayout format ───
   const apiConversations: Conversation[] = useMemo(() => {
@@ -1040,6 +1047,7 @@ function ChatsPage() {
         provider={id as 'whatsapp' | 'instagram-dm' | 'messenger' | 'tiktok'}
         onSend={handleSend}
         onUploadAndSend={handleUploadAndSend}
+        onTyping={handleTyping}
         onSelectConversation={handleSelectConv}
         onRetry={handleRetry}
         onChatClick={handleChatClick}
