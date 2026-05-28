@@ -6,6 +6,8 @@
     "dev": "vite dev --port 3007",
     "generate:api": "node scripts/generate-api.mjs",
     "generate:api:watch": "node scripts/generate-api.mjs --watch",
+    "generate:sitemap": "node scripts/generate-sitemap.mjs",
+    "prebuild": "node scripts/generate-sitemap.mjs",
     "build": "vite build",
     "start": "node .output/server/index.mjs",
     "lint": "eslint .",
