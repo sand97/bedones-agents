@@ -5026,7 +5026,7 @@ a {
   align-items: center;
   gap: 8px;
   height: 38px;
-  padding: 0 16px;
+  padding: 0 18px;
   border-radius: 999px;
   border: 1px solid var(--mk-border);
   background: #fff;
@@ -5045,6 +5045,9 @@ a {
   color: #fff;
   border-color: var(--mk-text);
   font-weight: 600;
+  /* The active state needs more visible breathing room so the dark pill
+     doesn't read as cramped next to the lighter inactive pills. */
+  padding: 0 22px;
 }
 .mk-cat-pill .swatch {
   width: 8px;
@@ -5201,7 +5204,10 @@ a {
   height: 13px;
 }
 .mk-featured-main .mk-card-cover {
-  aspect-ratio: 16 / 11;
+  /* Was 16/11 — too tall, the illustration looked stranded at the top
+     of an oversized cover. 16/9 keeps it generous without dwarfing the
+     central illustration. */
+  aspect-ratio: 16 / 9;
 }
 .mk-featured-main .mk-card-body {
   padding: 28px 30px 30px;
