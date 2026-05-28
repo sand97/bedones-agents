@@ -264,11 +264,80 @@ model Catalog {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
-  products       Product[]
-  socialAccounts CatalogSocialAccount[]
-  pageSettings   PageSettings[]
+  products            Product[]
+  socialAccounts      CatalogSocialAccount[]
+  pageSettings        PageSettings[]
+  productContexts     ProductContext[]
+  collectionContexts  CollectionContext[]
+  productPostLinks    ProductPostLink[]
+  collectionPostLinks CollectionPostLink[]
 
   @@index([organisationId])
+}
+
+// ─── Product / Collection AI Context ───
+// Products and collections live in Meta (Facebook Catalog), not in our DB. We
+// store the user-curated AI context keyed by (catalogId, providerProductId) /
+// (catalogId, providerCollectionId). The `content` field is plain text/markdown
+// authored or refined by the AI from the user's natural-language prompt.
+
+model ProductContext {
+  id                String   @id @default(uuid())
+  catalogId         String
+  catalog           Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  providerProductId String // Meta product ID
+  content           String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([catalogId, providerProductId])
+  @@index([catalogId])
+  @@index([catalogId, content])
+}
+
+model CollectionContext {
+  id                   String   @id @default(uuid())
+  catalogId            String
+  catalog              Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  providerCollectionId String // Meta product set ID
+  content              String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([catalogId, providerCollectionId])
+  @@index([catalogId])
+  @@index([catalogId, content])
+}
+
+// Posts are stored locally (model Post) keyed by their provider ID (FB Post ID
+// or IG Media ID). Link rows tie a Meta product/collection to a stored post.
+
+model ProductPostLink {
+  id                String   @id @default(uuid())
+  catalogId         String
+  catalog           Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  providerProductId String
+  postId            String
+  post              Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+
+  @@unique([catalogId, providerProductId, postId])
+  @@index([catalogId, providerProductId])
+  @@index([postId])
+}
+
+model CollectionPostLink {
+  id                   String   @id @default(uuid())
+  catalogId            String
+  catalog              Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  providerCollectionId String
+  postId               String
+  post                 Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt            DateTime @default(now())
+
+  @@unique([catalogId, providerCollectionId, postId])
+  @@index([catalogId, providerCollectionId])
+  @@index([postId])
 }
 
 model Product {
@@ -496,6 +565,9 @@ model Post {
   comments        Comment[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+
+  productLinks    ProductPostLink[]
+  collectionLinks CollectionPostLink[]
 
   @@index([socialAccountId])
 }

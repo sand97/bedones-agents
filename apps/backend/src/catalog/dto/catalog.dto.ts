@@ -177,6 +177,81 @@ export class UpdateCollectionDto {
   name?: string
 }
 
+// ─── Context DTOs ───
+
+export class AnalyzeContextDto {
+  @ApiProperty({ description: 'User natural-language prompt describing the change to apply.' })
+  @IsString()
+  @IsNotEmpty()
+  prompt: string
+
+  @ApiPropertyOptional({ type: [String], description: 'Meta product IDs targeted.' })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  productIds?: string[]
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Meta product set (collection) IDs targeted.',
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  collectionIds?: string[]
+}
+
+export class SaveContextDto {
+  @ApiProperty({ description: 'Final context content to persist on each selected entity.' })
+  @IsString()
+  content: string
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  productIds?: string[]
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  collectionIds?: string[]
+}
+
+export class UpdateProductContextDto {
+  @ApiProperty()
+  @IsString()
+  content: string
+
+  @ApiPropertyOptional({
+    description: 'When true, also update every product sharing the previous identical content.',
+  })
+  @IsOptional()
+  applyToSiblings?: boolean
+}
+
+// ─── Post linking DTOs ───
+
+export class LinkPostsDto {
+  @ApiProperty({ type: [String], description: 'Provider post IDs (FB post / IG media) to link.' })
+  @IsArray()
+  @IsString({ each: true })
+  postIds: string[]
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  productIds?: string[]
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  collectionIds?: string[]
+}
+
 // ─── Phone Association DTOs ───
 
 export class AssociatePhoneDto {
