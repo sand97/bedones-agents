@@ -5,79 +5,100 @@ import { useEffect } from 'react'
  *
  *  1. `.mk-reveal` — section-level fade-in-up applied once when the
  *     section enters the viewport (used for headlines, stats, etc).
- *  2. Animation hosts — when one of `.mk-feature-visual`, `.mk-mockup` or
- *     `.mk-platforms-row` enters view, it gets `.mk-anim-in`. Children
- *     carrying `data-anim` attributes (with optional `--mk-d` stagger CSS
- *     var) then play their entrance / typing / pulse animations defined
- *     in styles.css.
+ *  2. Animation hosts — when one of `.mk-feature-visual`, `.mk-mockup`,
+ *     `.mk-platforms-row` or `.mk-anim-host` enters view, it gets
+ *     `.mk-anim-in`. Children carrying `data-anim` attributes (with
+ *     optional `--mk-d` stagger CSS var) then play their entrance /
+ *     typing / pulse animations defined in styles.css.
  *
- * Multiple fallbacks (rAF + scroll listener + 1.8s safety timer) cover
- * preview iframes where IntersectionObserver doesn't fire reliably.
+ * Triggering rules:
+ *   - On mount we sync-check what's already visible and reveal it
+ *     immediately (no waiting for the first IO callback).
+ *   - We use `threshold: 0` + a generous positive `rootMargin` so the
+ *     entrance starts a touch *before* the host enters the viewport,
+ *     giving the choreography time to play as the user scrolls in.
+ *   - Triple fallback (scroll listener + 700ms safety timer) covers the
+ *     edge cases where IO is throttled or doesn't fire at all (some
+ *     preview iframes, low-power mode, etc).
  */
 const HOST_SELECTOR = '.mk-feature-visual, .mk-mockup, .mk-platforms-row, .mk-anim-host'
 
 export function useScrollReveal() {
   useEffect(() => {
-    const sectionReveals = document.querySelectorAll('.mk-reveal')
-    const hosts = document.querySelectorAll(HOST_SELECTOR)
-    if (!sectionReveals.length && !hosts.length) return
-
     const revealSection = (el: Element) => el.classList.add('in')
     const revealHost = (el: Element) => el.classList.add('mk-anim-in')
 
+    // 1. Immediate pass — reveal anything already in (or above) the
+    // viewport on mount, no observer round-trip required.
+    const syncCheck = () => {
+      const vh = window.innerHeight || 800
+      document.querySelectorAll('.mk-reveal:not(.in)').forEach((el) => {
+        const r = el.getBoundingClientRect()
+        if (r.top < vh - 20 && r.bottom > 0) revealSection(el)
+      })
+      document.querySelectorAll(`${HOST_SELECTOR}:not(.mk-anim-in)`).forEach((el) => {
+        const r = el.getBoundingClientRect()
+        // Trigger as soon as the host is even peeking into the viewport
+        // (with a 200px buffer below for a slightly anticipated start).
+        if (r.top < vh + 200 && r.bottom > -100) revealHost(el)
+      })
+    }
+    syncCheck()
+    requestAnimationFrame(syncCheck)
+
+    // 2. IntersectionObserver for ongoing reveals as the user scrolls.
+    let sectionIO: IntersectionObserver | null = null
+    let hostIO: IntersectionObserver | null = null
     if ('IntersectionObserver' in window) {
-      const sectionIO = new IntersectionObserver(
+      sectionIO = new IntersectionObserver(
         (entries) => {
           entries.forEach((e) => {
             if (e.isIntersecting) {
               revealSection(e.target)
-              sectionIO.unobserve(e.target)
+              sectionIO?.unobserve(e.target)
             }
           })
         },
-        { threshold: 0.08, rootMargin: '0px 0px -40px 0px' },
+        { threshold: 0, rootMargin: '0px 0px 0px 0px' },
       )
-      sectionReveals.forEach((el) => sectionIO.observe(el))
+      document.querySelectorAll('.mk-reveal:not(.in)').forEach((el) => sectionIO!.observe(el))
 
-      const hostIO = new IntersectionObserver(
+      hostIO = new IntersectionObserver(
         (entries) => {
           entries.forEach((e) => {
             if (e.isIntersecting) {
               revealHost(e.target)
-              hostIO.unobserve(e.target)
+              hostIO?.unobserve(e.target)
             }
           })
         },
-        // Trigger as soon as ~15% of the host is in view so the
-        // choreography starts a touch before the user fully reaches it.
-        { threshold: 0.15, rootMargin: '0px 0px -40px 0px' },
+        // Fire as soon as any pixel of the host is in (or near) the
+        // viewport. The 200px bottom margin makes the animation start
+        // just before the user actually sees the element.
+        { threshold: 0, rootMargin: '0px 0px 200px 0px' },
       )
-      hosts.forEach((el) => hostIO.observe(el))
+      document
+        .querySelectorAll(`${HOST_SELECTOR}:not(.mk-anim-in)`)
+        .forEach((el) => hostIO!.observe(el))
     }
 
-    const check = () => {
-      document.querySelectorAll('.mk-reveal:not(.in)').forEach((el) => {
-        const r = el.getBoundingClientRect()
-        if (r.top < window.innerHeight - 40 && r.bottom > 0) revealSection(el)
-      })
-      document.querySelectorAll(`${HOST_SELECTOR}:not(.mk-anim-in)`).forEach((el) => {
-        const r = el.getBoundingClientRect()
-        if (r.top < window.innerHeight * 0.9 && r.bottom > 0) revealHost(el)
-      })
-    }
-    requestAnimationFrame(() => {
-      check()
-      setTimeout(check, 200)
-    })
-    window.addEventListener('scroll', check, { passive: true })
+    // 3. Scroll listener as a redundant trigger (in case IO is throttled).
+    const onScroll = () => syncCheck()
+    window.addEventListener('scroll', onScroll, { passive: true })
+
+    // 4. Safety net — reveal everything after 700ms regardless. Faster
+    // than the previous 1.5s so even on slow / stuck observer setups the
+    // page is never left with invisible illustrations.
     const safety = setTimeout(() => {
       document.querySelectorAll('.mk-reveal:not(.in)').forEach(revealSection)
       document.querySelectorAll(`${HOST_SELECTOR}:not(.mk-anim-in)`).forEach(revealHost)
-    }, 1800)
+    }, 700)
 
     return () => {
-      window.removeEventListener('scroll', check)
+      window.removeEventListener('scroll', onScroll)
       clearTimeout(safety)
+      sectionIO?.disconnect()
+      hostIO?.disconnect()
     }
   }, [])
 }
