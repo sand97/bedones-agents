@@ -14,9 +14,9 @@ const BRAND_TIKTOK = '#111111'
 const BRAND_WHATSAPP = '#25D366'
 
 /** Stagger helper. Returns inline style with the `--mk-d` CSS var that the
- *  `[data-anim="..."]` rules read as `animation-delay`. The argument is
- *  expressed in "stagger steps" of 80ms — `d(8)` → 640ms delay. */
-const d = (steps: number): CSSProperties => ({ ['--mk-d' as string]: `${steps * 80}ms` })
+ *  `[data-anim="..."]` rules read as `animation-delay`. The argument is a
+ *  delay in milliseconds — `d(640)` → 640ms delay. */
+const d = (ms: number): CSSProperties => ({ ['--mk-d' as string]: `${ms}ms` })
 
 export function Features() {
   return (
@@ -41,7 +41,7 @@ export function Features() {
                 Boîte unifiée
                 <span className="count">12</span>
               </div>
-              <div className="mk-mini-row" data-anim="left" style={d(1)}>
+              <div className="mk-mini-row" data-anim="left" style={d(200)}>
                 <span className="av" style={{ background: BRAND_WHATSAPP }}>
                   <WhatsAppIcon />
                 </span>
@@ -53,7 +53,7 @@ export function Features() {
                 </div>
                 <span className="tm">16h25</span>
               </div>
-              <div className="mk-mini-row" data-anim="left" style={d(3)}>
+              <div className="mk-mini-row" data-anim="left" style={d(400)}>
                 <span className="av" style={{ background: BRAND_INSTAGRAM }}>
                   <InstagramIcon />
                 </span>
@@ -63,7 +63,7 @@ export function Features() {
                 </div>
                 <span className="tm">15h58</span>
               </div>
-              <div className="mk-mini-row" data-anim="left" style={d(5)}>
+              <div className="mk-mini-row" data-anim="left" style={d(600)}>
                 <span className="av" style={{ background: BRAND_TIKTOK }}>
                   <TikTokIcon />
                 </span>
@@ -75,7 +75,7 @@ export function Features() {
                 </div>
                 <span className="tm">15h12</span>
               </div>
-              <div className="mk-mini-row" data-anim="left" style={d(7)}>
+              <div className="mk-mini-row" data-anim="left" style={d(800)}>
                 <span className="av" style={{ background: BRAND_FACEBOOK }}>
                   <FacebookIcon />
                 </span>
@@ -85,7 +85,7 @@ export function Features() {
                 </div>
                 <span className="tm">16h24</span>
               </div>
-              <div className="mk-mini-row" data-anim="left" style={d(9)}>
+              <div className="mk-mini-row" data-anim="left" style={d(1000)}>
                 <span className="av" style={{ background: BRAND_MESSENGER }}>
                   <MessengerIcon />
                 </span>
@@ -153,11 +153,11 @@ export function Features() {
               </div>
               <div className="mk-training-body">
                 <div className="mk-training-row">
-                  <div className="mk-training-msg-out" data-anim="left" style={d(2)}>
+                  <div className="mk-training-msg-out" data-anim="left" style={d(220)}>
                     <div className="by">Vous</div>
                     On livre à Cocody pour 1 500 FCFA, sous 24h.
                   </div>
-                  <div className="mk-training-msg-in" data-anim="right" style={d(5)}>
+                  <div className="mk-training-msg-in" data-anim="right" style={d(800)}>
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"
@@ -172,11 +172,11 @@ export function Features() {
                   </div>
                 </div>
                 <div className="mk-training-row">
-                  <div className="mk-training-msg-out" data-anim="left" style={d(9)}>
+                  <div className="mk-training-msg-out" data-anim="left" style={d(1400)}>
                     <div className="by">Vous</div>
                     Commande &gt; 25 000 FCFA = livraison offerte sur Abidjan.
                   </div>
-                  <div className="mk-training-msg-in" data-anim="right" style={d(12)}>
+                  <div className="mk-training-msg-in" data-anim="right" style={d(2000)}>
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"
@@ -191,7 +191,7 @@ export function Features() {
                   </div>
                 </div>
               </div>
-              <div className="mk-training-stats" data-anim="up" style={d(16)}>
+              <div className="mk-training-stats" data-anim="up" style={d(2700)}>
                 <span>
                   <strong>12</strong>zones livraison
                 </span>
@@ -213,7 +213,7 @@ export function Features() {
         <div className="mk-feature-row mk-reveal">
           <div className="mk-feature-visual v3">
             <div className="mk-catalog-stage">
-              <div className="mk-wa-card" data-anim="scale" style={d(0)}>
+              <div className="mk-wa-card" data-anim="scale-bump" style={d(0)}>
                 <div className="mk-wa-head">
                   <span className="ic">
                     <WhatsAppIcon />
@@ -231,18 +231,18 @@ export function Features() {
                   </div>
                 </div>
               </div>
-              <div className="mk-wa-question" data-anim="left" style={d(4)}>
+              <div className="mk-wa-question" data-anim="left" style={d(550)}>
                 Bonjour, quelles tailles vous avez en bleu ?
               </div>
               {/* Typing dots: appears around 640ms after the question, runs the
                   show-hide keyframe (~1.7s) and fades out before the AI reply
                   arrives. Aria-hidden because it's a visual flourish. */}
-              <div className="mk-typing-dots" data-anim="typing" style={d(8)} aria-hidden="true">
+              <div className="mk-typing-dots" data-anim="typing" style={d(1200)} aria-hidden="true">
                 <span />
                 <span />
                 <span />
               </div>
-              <div className="mk-wa-answer" data-anim="after-typing" style={d(22)}>
+              <div className="mk-wa-answer" data-anim="after-typing" style={d(2800)}>
                 <div className="ai-badge">Agent · WhatsApp</div>
                 Disponible en M, L et XL à 12 500 FCFA (promo de 15 000). Combien de pièces
                 souhaitez-vous commander ?
@@ -281,7 +281,7 @@ export function Features() {
           </div>
           <div className="mk-feature-visual v4">
             <div className="mk-feedback-stage">
-              <div className="mk-fb-card" data-anim="scale" style={d(0)}>
+              <div className="mk-fb-card" data-anim="scale-bump" style={d(0)}>
                 <div className="mk-fb-msg">
                   <div className="src">Agent · Instagram DM · à Fatou Y.</div>« Bonjour Fatou ! Oui
                   nous livrons à Cocody ce soir, jusqu&apos;à 19h. La livraison est à 1 500 FCFA.
@@ -303,7 +303,7 @@ export function Features() {
                   </div>
                 </div>
               </div>
-              <div className="mk-fb-proposal" data-anim="up" style={d(8)}>
+              <div className="mk-fb-proposal" data-anim="up" style={d(900)}>
                 <div className="head">✦ Nouvelle proposition de l&apos;IA</div>
                 <h4>Ajouter une règle pour la livraison express</h4>
                 <p>

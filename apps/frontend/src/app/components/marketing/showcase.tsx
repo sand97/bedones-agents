@@ -199,7 +199,13 @@ export function Showcase() {
                       </span>
                     </div>
                   </div>
-                  <div className="mk-convo active">
+                  {/* Conversation rows slide in from the left, one after the
+                      other — the mockup feels like a list being filled live. */}
+                  <div
+                    className="mk-convo active"
+                    data-anim="left"
+                    style={{ ['--mk-d' as string]: '120ms' }}
+                  >
                     <div className="mk-avatar av-green">L</div>
                     <div className="mk-convo-meta">
                       <div className="mk-convo-row1">
@@ -211,7 +217,11 @@ export function Showcase() {
                       </div>
                     </div>
                   </div>
-                  <div className="mk-convo">
+                  <div
+                    className="mk-convo"
+                    data-anim="left"
+                    style={{ ['--mk-d' as string]: '260ms' }}
+                  >
                     <div className="mk-avatar av-blue">A</div>
                     <div className="mk-convo-meta">
                       <div className="mk-convo-row1">
@@ -223,7 +233,11 @@ export function Showcase() {
                       </div>
                     </div>
                   </div>
-                  <div className="mk-convo">
+                  <div
+                    className="mk-convo"
+                    data-anim="left"
+                    style={{ ['--mk-d' as string]: '400ms' }}
+                  >
                     <div className="mk-avatar av-yellow">J</div>
                     <div className="mk-convo-meta">
                       <div className="mk-convo-row1">
@@ -235,7 +249,11 @@ export function Showcase() {
                       </div>
                     </div>
                   </div>
-                  <div className="mk-convo">
+                  <div
+                    className="mk-convo"
+                    data-anim="left"
+                    style={{ ['--mk-d' as string]: '540ms' }}
+                  >
                     <div className="mk-avatar av-coral">F</div>
                     <div className="mk-convo-meta">
                       <div className="mk-convo-row1">
@@ -250,16 +268,33 @@ export function Showcase() {
                 </div>
 
                 <div className="mk-mockup-thread">
-                  <div className="mk-thread-head">
+                  <div
+                    className="mk-thread-head"
+                    data-anim="fade"
+                    style={{ ['--mk-d' as string]: '120ms' }}
+                  >
                     <div className="mk-avatar av-green">L</div>
                     <div>
                       <div className="title">Laure Epoupa</div>
                       <div className="sub">+237 695 33 33 33</div>
                     </div>
                   </div>
+                  {/* Bubbles appear one after the other — like watching a
+                      real chat unfold. Customer bubbles slide in from the
+                      left, AI bubbles slide in from the right. */}
                   <div className="mk-thread-body">
-                    <span className="mk-date-pill">20 avril</span>
-                    <div className="mk-bubble in has-image">
+                    <span
+                      className="mk-date-pill"
+                      data-anim="fade"
+                      style={{ ['--mk-d' as string]: '300ms' }}
+                    >
+                      20 avril
+                    </span>
+                    <div
+                      className="mk-bubble in has-image"
+                      data-anim="left"
+                      style={{ ['--mk-d' as string]: '500ms' }}
+                    >
                       <div
                         className="mk-bubble-image"
                         style={{
@@ -272,7 +307,11 @@ export function Showcase() {
                         <span>00:52</span>
                       </div>
                     </div>
-                    <div className="mk-bubble ai">
+                    <div
+                      className="mk-bubble ai"
+                      data-anim="right"
+                      style={{ ['--mk-d' as string]: '1200ms' }}
+                    >
                       Oui, il est disponible. Quelles tailles et combien de pièces souhaitez-vous ?
                       <div className="meta">
                         <span>00:53</span>
@@ -291,13 +330,21 @@ export function Showcase() {
                         </span>
                       </div>
                     </div>
-                    <div className="mk-bubble in">
+                    <div
+                      className="mk-bubble in"
+                      data-anim="left"
+                      style={{ ['--mk-d' as string]: '1900ms' }}
+                    >
                       Taille 38, une seule pièce.
                       <div className="meta">
                         <span>00:55</span>
                       </div>
                     </div>
-                    <div className="mk-bubble ai">
+                    <div
+                      className="mk-bubble ai"
+                      data-anim="right"
+                      style={{ ['--mk-d' as string]: '2600ms' }}
+                    >
                       Merci. Dans quelle ville souhaitez-vous être livrée ?
                       <div className="meta">
                         <span>00:56</span>
@@ -325,33 +372,55 @@ export function Showcase() {
 
         <div className="mk-platforms-row">
           <div className="mk-platforms-inner">
-            <span className="mk-platforms-label">5 plateformes connectées</span>
+            <span className="mk-platforms-label" data-anim="fade">
+              5 plateformes connectées
+            </span>
             <div className="mk-platforms">
-              <span className="mk-plat-item fb">
+              <span
+                className="mk-plat-item fb"
+                data-anim="scale-bump"
+                style={{ ['--mk-d' as string]: '120ms' }}
+              >
                 <span className="mk-plat-tile">
                   <FacebookIcon />
                 </span>
                 Facebook
               </span>
-              <span className="mk-plat-item ig">
+              <span
+                className="mk-plat-item ig"
+                data-anim="scale-bump"
+                style={{ ['--mk-d' as string]: '220ms' }}
+              >
                 <span className="mk-plat-tile">
                   <InstagramIcon />
                 </span>
                 Instagram
               </span>
-              <span className="mk-plat-item ms">
+              <span
+                className="mk-plat-item ms"
+                data-anim="scale-bump"
+                style={{ ['--mk-d' as string]: '320ms' }}
+              >
                 <span className="mk-plat-tile">
                   <MessengerIcon />
                 </span>
                 Messenger
               </span>
-              <span className="mk-plat-item tt">
+              <span
+                className="mk-plat-item tt"
+                data-anim="scale-bump"
+                style={{ ['--mk-d' as string]: '420ms' }}
+              >
                 <span className="mk-plat-tile">
                   <TikTokIcon />
                 </span>
                 TikTok
               </span>
-              <span className="mk-plat-item wa">
+              <span
+                className="mk-plat-item wa"
+                data-anim="scale-bump"
+                style={{ ['--mk-d' as string]: '520ms' }}
+              >
                 <span className="mk-plat-tile">
                   <WhatsAppIcon />
                 </span>
