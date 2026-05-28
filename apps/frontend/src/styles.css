@@ -3255,6 +3255,23 @@ a {
   opacity: 0.92;
   transform: translateY(-1px);
 }
+.mk-hero-form .cc {
+  cursor: pointer;
+}
+.mk-hero-cc-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font: inherit;
+  font-weight: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  max-width: 80px;
+}
 .mk-hero-disclaimer {
   font-size: 12.5px;
   color: var(--mk-text-soft);

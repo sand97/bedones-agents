@@ -1,4 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
+import countryCodes from '@app/data/CountryCodes.json'
 import {
   FacebookIcon,
   InstagramIcon,
@@ -6,6 +8,16 @@ import {
   TikTokIcon,
   WhatsAppIcon,
 } from '@app/components/marketing/social-icons'
+import { formatPhoneNumber } from '@app/lib/phone-format'
+
+interface CountryEntry {
+  name: string
+  dial_code: string
+  code: string
+}
+
+const DEFAULT_DIAL_CODE = '+237'
+const DEFAULT_ISO = 'CM'
 
 /** Entrance choreography for the floating logos. Each value is the
  *  animation-delay in ms — prominent logos pop in first, ghost ones after.
@@ -24,6 +36,57 @@ const PARALLAX_START_MS = 1600
 
 export function Hero() {
   const heroRef = useRef<HTMLElement>(null)
+  const navigate = useNavigate()
+  const [dialCode, setDialCode] = useState<string>(DEFAULT_DIAL_CODE)
+  const [iso, setIso] = useState<string>(DEFAULT_ISO)
+  const [phone, setPhone] = useState<string>('')
+
+  // Detect country from IP on mount and auto-fill the dial code.
+  useEffect(() => {
+    let cancelled = false
+    fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) })
+      .then((res) => res.json())
+      .then((data: { country_calling_code?: string; country_code?: string }) => {
+        if (cancelled) return
+        if (data.country_calling_code) {
+          const entry = (countryCodes as CountryEntry[]).find(
+            (c) => c.dial_code === data.country_calling_code,
+          )
+          if (entry) {
+            setDialCode(entry.dial_code)
+            setIso(entry.code)
+            return
+          }
+        }
+        if (data.country_code) {
+          const entry = (countryCodes as CountryEntry[]).find((c) => c.code === data.country_code)
+          if (entry) {
+            setDialCode(entry.dial_code)
+            setIso(entry.code)
+          }
+        }
+      })
+      .catch(() => {
+        // Silently keep defaults.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const cleanPhone = phone.replace(/[^0-9]/g, '')
+    if (!cleanPhone || cleanPhone.length < 6) {
+      // No phone yet — go to the login page so the user can fill it there.
+      navigate({ to: '/auth/login' })
+      return
+    }
+    navigate({
+      to: '/auth/login',
+      search: { country: dialCode, phone: cleanPhone },
+    })
+  }
 
   useEffect(() => {
     const hero = heroRef.current
@@ -156,14 +219,8 @@ export function Hero() {
             Bedones Moderator gère vos conversations sur WhatsApp, Instagram, TikTok, Messenger et
             Facebook — en apprenant de votre catalogue et de votre façon de répondre.
           </p>
-          <form
-            className="mk-hero-form"
-            onSubmit={(e) => {
-              e.preventDefault()
-              window.location.href = '/auth/login'
-            }}
-          >
-            <span className="cc">
+          <form className="mk-hero-form" onSubmit={handleSubmit}>
+            <label className="cc">
               <svg
                 width="14"
                 height="14"
@@ -176,7 +233,30 @@ export function Hero() {
               >
                 <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13 1 .37 1.97.72 2.91a2 2 0 01-.45 2.11L8.09 10.09a16 16 0 006 6l1.35-1.35a2 2 0 012.11-.45c.94.35 1.91.59 2.91.72A2 2 0 0122 16.92z" />
               </svg>
-              +237
+              <select
+                value={dialCode}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setDialCode(next)
+                  const entry = (countryCodes as CountryEntry[]).find((c) => c.dial_code === next)
+                  if (entry) setIso(entry.code)
+                }}
+                aria-label="Indicatif pays"
+                className="mk-hero-cc-select"
+              >
+                {Array.from(
+                  new Map(
+                    (countryCodes as CountryEntry[])
+                      .slice()
+                      .sort((a, b) => a.dial_code.localeCompare(b.dial_code))
+                      .map((c) => [c.dial_code, c]),
+                  ).values(),
+                ).map((c) => (
+                  <option key={c.dial_code} value={c.dial_code}>
+                    {c.code} {c.dial_code}
+                  </option>
+                ))}
+              </select>
               <svg
                 width="10"
                 height="10"
@@ -188,8 +268,14 @@ export function Hero() {
               >
                 <path d="M6 9l6 6 6-6" />
               </svg>
-            </span>
-            <input type="tel" placeholder="6 9X XX XX XX" aria-label="Numéro WhatsApp" />
+            </label>
+            <input
+              type="tel"
+              placeholder="6 57 88 86 90"
+              aria-label="Numéro WhatsApp"
+              value={formatPhoneNumber(phone, iso)}
+              onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
+            />
             <button type="submit">Commencer →</button>
           </form>
           <p className="mk-hero-disclaimer">

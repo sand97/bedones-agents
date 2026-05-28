@@ -80,7 +80,16 @@
     "fetch_user_error": "Unable to retrieve your information. Please try again.",
     "back_to_login": "Back to login",
     "user_info_error": "Unable to retrieve your information from the social network.",
-    "unexpected_error": "An unexpected error occurred. Please try again."
+    "unexpected_error": "An unexpected error occurred. Please try again.",
+    "whatsapp_subtitle": "Enter your WhatsApp number to receive a verification code.",
+    "send_verification_code": "Send verification code",
+    "remember_phone": "Remember this number",
+    "invalid_phone": "Invalid phone number",
+    "verify_code": "Verify code",
+    "welcome": "Welcome!",
+    "your_name": "How would you like to be called?",
+    "full_name_placeholder": "Ex: Jane Smith",
+    "name_required": "Please enter your name"
   },
 
   "org": {

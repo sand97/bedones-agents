@@ -47,6 +47,68 @@
         ]
       }
     },
+    "/auth/whatsapp/send-otp": {
+      "post": {
+        "operationId": "AuthController_sendWhatsAppOtp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendWhatsAppOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/whatsapp/verify-otp": {
+      "post": {
+        "operationId": "AuthController_verifyWhatsAppOtp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyWhatsAppOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatsAppVerifyResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/cookie-consent": {
       "post": {
         "operationId": "AuthController_setCookieConsent",
@@ -172,6 +234,41 @@
       "patch": {
         "operationId": "AuthController_updateLocale",
         "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/me/name": {
+      "patch": {
+        "operationId": "AuthController_updateName",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "example": "Aminata Diallo" }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -4128,6 +4225,14 @@
             "type": "object",
             "nullable": true
           },
+          "phoneCountryCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "phoneLocal": {
+            "type": "object",
+            "nullable": true
+          },
           "name": {
             "type": "string"
           },
@@ -4140,7 +4245,8 @@
             "enum": [
               "PASSWORD",
               "FACEBOOK",
-              "INSTAGRAM"
+              "INSTAGRAM",
+              "WHATSAPP"
             ]
           },
           "status": {
@@ -4158,6 +4264,64 @@
           "authType",
           "status"
         ]
+      },
+      "SendWhatsAppOtpDto": {
+        "type": "object",
+        "properties": {
+          "countryCode": {
+            "type": "string",
+            "example": "+237"
+          },
+          "phone": {
+            "type": "string",
+            "example": "657888690"
+          }
+        },
+        "required": [
+          "countryCode",
+          "phone"
+        ]
+      },
+      "VerifyWhatsAppOtpDto": {
+        "type": "object",
+        "properties": {
+          "countryCode": {
+            "type": "string",
+            "example": "+237"
+          },
+          "phone": {
+            "type": "string",
+            "example": "657888690"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "countryCode",
+          "phone",
+          "code"
+        ]
+      },
+      "WhatsAppLoginUserDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "phone": { "type": "string", "nullable": true },
+          "phoneCountryCode": { "type": "string", "nullable": true },
+          "phoneLocal": { "type": "string", "nullable": true }
+        },
+        "required": ["id", "name", "phone", "phoneCountryCode", "phoneLocal"]
+      },
+      "WhatsAppVerifyResponseDto": {
+        "type": "object",
+        "properties": {
+          "user": { "$ref": "#/components/schemas/WhatsAppLoginUserDto" },
+          "isNewUser": { "type": "boolean" }
+        },
+        "required": ["user", "isNewUser"]
       },
       "SocialAccountDto": {
         "type": "object",

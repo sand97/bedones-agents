@@ -37,6 +37,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/whatsapp/send-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AuthController_sendWhatsAppOtp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/whatsapp/verify-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AuthController_verifyWhatsAppOtp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/cookie-consent": {
         parameters: {
             query?: never;
@@ -131,6 +163,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["AuthController_updateLocale"];
+        trace?: never;
+    };
+    "/auth/me/name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["AuthController_updateName"];
         trace?: never;
     };
     "/auth/logout": {
@@ -1886,12 +1934,39 @@ export interface components {
             id: string;
             email?: Record<string, never> | null;
             phone?: Record<string, never> | null;
+            phoneCountryCode?: Record<string, never> | null;
+            phoneLocal?: Record<string, never> | null;
             name: string;
             avatar: Record<string, never> | null;
             /** @enum {string} */
-            authType: "PASSWORD" | "FACEBOOK" | "INSTAGRAM";
+            authType: "PASSWORD" | "FACEBOOK" | "INSTAGRAM" | "WHATSAPP";
             /** @enum {string} */
             status: "PENDING" | "VERIFIED";
+        };
+        SendWhatsAppOtpDto: {
+            /** @example +237 */
+            countryCode: string;
+            /** @example 657888690 */
+            phone: string;
+        };
+        VerifyWhatsAppOtpDto: {
+            /** @example +237 */
+            countryCode: string;
+            /** @example 657888690 */
+            phone: string;
+            /** @example 123456 */
+            code: string;
+        };
+        WhatsAppLoginUserDto: {
+            id: string;
+            name: string;
+            phone: string | null;
+            phoneCountryCode: string | null;
+            phoneLocal: string | null;
+        };
+        WhatsAppVerifyResponseDto: {
+            user: components["schemas"]["WhatsAppLoginUserDto"];
+            isNewUser: boolean;
         };
         SocialAccountDto: {
             id: string;
@@ -2201,13 +2276,14 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        MarkConversationReadDto: {
-            conversationId: string;
-        };
         SendReactionDto: {
+            /** @description ID of the message to react to */
             messageId: string;
             /** @description Emoji to react with. Pass an empty string to remove the current reaction. */
             emoji: string;
+        };
+        MarkConversationReadDto: {
+            conversationId: string;
         };
         ConversationAgentSummaryDto: {
             id: string;
@@ -2674,6 +2750,52 @@ export interface operations {
             };
         };
     };
+    AuthController_sendWhatsAppOtp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendWhatsAppOtpDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusResponseDto"];
+                };
+            };
+        };
+    };
+    AuthController_verifyWhatsAppOtp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyWhatsAppOtpDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsAppVerifyResponseDto"];
+                };
+            };
+        };
+    };
     AuthController_setCookieConsent: {
         parameters: {
             query?: never;
@@ -2781,6 +2903,32 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusResponseDto"];
+                };
+            };
+        };
+    };
+    AuthController_updateName: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example Aminata Diallo */
+                    name: string;
+                };
+            };
+        };
         responses: {
             200: {
                 headers: {

@@ -80,7 +80,16 @@
     "fetch_user_error": "Impossible de récupérer vos informations. Veuillez réessayer.",
     "back_to_login": "Retour à la connexion",
     "user_info_error": "Impossible de récupérer vos informations depuis le réseau social.",
-    "unexpected_error": "Une erreur inattendue est survenue. Veuillez réessayer."
+    "unexpected_error": "Une erreur inattendue est survenue. Veuillez réessayer.",
+    "whatsapp_subtitle": "Saisissez votre numéro WhatsApp pour recevoir un code de vérification.",
+    "send_verification_code": "Envoyer un code de vérification",
+    "remember_phone": "Retenir ce numéro",
+    "invalid_phone": "Numéro de téléphone invalide",
+    "verify_code": "Vérification du code",
+    "welcome": "Bienvenue !",
+    "your_name": "Comment souhaitez-vous être appelé ?",
+    "full_name_placeholder": "Ex: Aminata Diallo",
+    "name_required": "Veuillez saisir votre nom"
   },
 
   "org": {
