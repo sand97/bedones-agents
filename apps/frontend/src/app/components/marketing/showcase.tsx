@@ -30,7 +30,10 @@ export function Showcase() {
                 <span />
                 <span />
               </div>
-              <div className="url">app.bedones.com / whatsapp</div>
+              <div className="url">
+                <span className="url-host">moderator.bedones.com</span>
+                <span className="url-path"> / whatsapp</span>
+              </div>
               <span className="user-pill">
                 <span className="user-av">M</span>
                 Mboa
