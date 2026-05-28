@@ -4715,7 +4715,9 @@ a {
     padding: 0 20px;
   }
   .mk-hero {
-    padding: 40px 0 24px;
+    /* Extra bottom padding leaves ~24px of clearance between the
+       "Démarrez gratuitement…" disclaimer and the bottom floating icons. */
+    padding: 40px 0 120px;
     min-height: auto;
   }
   .mk-hero-inner {
@@ -5600,5 +5602,155 @@ a {
   .mk-cat-rail {
     top: 64px;
     padding: 16px 0;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   MARKETING — illustration micro-animations
+   Triggered by IntersectionObserver: parent gets `.mk-anim-in`
+   and any child with `[data-anim]` plays its entrance.
+
+   Stagger by setting style="--mk-d: N" on the element (delay = N * 80ms).
+   Delays default to 0. Variants:
+     up       — slides up
+     down     — slides down (rare)
+     left     — slides from the left
+     right    — slides from the right
+     scale    — scales in
+     fade     — opacity only
+     typing   — small bounce, opacity, fades back out after 1.2s
+     after-typing — appears after the typing dots disappear
+   ═══════════════════════════════════════════ */
+.mk-feature-visual [data-anim] {
+  opacity: 0;
+  will-change: transform, opacity;
+  transition-property: opacity, transform;
+  transition-duration: 0.7s;
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--mk-d, 0) * 80ms);
+}
+.mk-feature-visual [data-anim='up'] {
+  transform: translateY(22px);
+}
+.mk-feature-visual [data-anim='down'] {
+  transform: translateY(-22px);
+}
+.mk-feature-visual [data-anim='left'] {
+  transform: translateX(-26px);
+}
+.mk-feature-visual [data-anim='right'] {
+  transform: translateX(26px);
+}
+.mk-feature-visual [data-anim='scale'] {
+  transform: scale(0.92);
+}
+.mk-feature-visual [data-anim='fade'] {
+  transform: none;
+}
+.mk-feature-visual.mk-anim-in [data-anim] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Typing indicator: appears, dots bounce, then fades out around 1.2s in. */
+.mk-feature-visual [data-anim='typing'] {
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+  transform-origin: left center;
+  transition-property: opacity, transform;
+  transition-duration: 0.35s;
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--mk-d, 0) * 80ms);
+}
+.mk-feature-visual.mk-anim-in [data-anim='typing'] {
+  animation: mkTypingShowHide 1.7s ease both;
+  animation-delay: calc(var(--mk-d, 0) * 80ms);
+  opacity: 1;
+  transform: none;
+}
+@keyframes mkTypingShowHide {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  18% {
+    opacity: 1;
+    transform: none;
+  }
+  78% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+}
+
+/* Appears after typing dots have faded; uses a delayed transition. */
+.mk-feature-visual [data-anim='after-typing'] {
+  opacity: 0;
+  transform: translateY(14px);
+  transition-property: opacity, transform;
+  transition-duration: 0.55s;
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--mk-d, 0) * 80ms);
+}
+.mk-feature-visual.mk-anim-in [data-anim='after-typing'] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Mini animated typing-dots indicator (mirrors the .typing styles already
+   used in the showcase mockup, but scoped for the feature illustrations). */
+.mk-typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fff;
+  border: 1px solid var(--mk-border);
+  border-radius: 18px;
+  border-bottom-left-radius: 6px;
+  padding: 12px 14px;
+  align-self: flex-start;
+  box-shadow: var(--mk-shadow-soft);
+}
+.mk-typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #c7c2b8;
+  animation: mkTypingBounce 1.2s infinite;
+}
+.mk-typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.mk-typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes mkTypingBounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+/* Reduced motion — skip transitions and animations. */
+@media (prefers-reduced-motion: reduce) {
+  .mk-feature-visual [data-anim] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    animation: none !important;
+  }
+  .mk-typing-dots span {
+    animation: none !important;
+    opacity: 0.7;
   }
 }

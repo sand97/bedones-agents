@@ -279,15 +279,14 @@ export function Showcase() {
                         <span className="ai-tag">by AI</span>
                         <span className="check">
                           <svg
-                            viewBox="0 0 16 11"
+                            viewBox="0 0 16 13"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="1.6"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                           >
-                            <path d="M1 6l3 3 6-6" />
-                            <path d="M6 9l3-3M9 9l5-7" />
+                            <path d="M1 6.5 L4 9.5 L10 3.5 M5.5 6.5 L8.5 9.5 L14.5 3.5" />
                           </svg>
                         </span>
                       </div>
@@ -305,15 +304,14 @@ export function Showcase() {
                         <span className="ai-tag">by AI</span>
                         <span className="check">
                           <svg
-                            viewBox="0 0 16 11"
+                            viewBox="0 0 16 13"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="1.6"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                           >
-                            <path d="M1 6l3 3 6-6" />
-                            <path d="M6 9l3-3M9 9l5-7" />
+                            <path d="M1 6.5 L4 9.5 L10 3.5 M5.5 6.5 L8.5 9.5 L14.5 3.5" />
                           </svg>
                         </span>
                       </div>

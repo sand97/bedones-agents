@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import {
   FacebookIcon,
   InstagramIcon,
@@ -12,15 +13,19 @@ const BRAND_MESSENGER = '#0084FF'
 const BRAND_TIKTOK = '#111111'
 const BRAND_WHATSAPP = '#25D366'
 
+/** Stagger helper: returns a CSS variable consumed by the `[data-anim]` rules. */
+const d = (n: number): CSSProperties => ({ ['--mk-d' as string]: String(n) })
+
 export function Features() {
   return (
     <section className="mk-features" id="features">
       <div className="mk-container">
-        {/* Feature 1 — Unified inbox */}
+        {/* Feature 1 — Unified inbox: header fades in, then each conversation
+            row slides in from the left in sequence (left-to-right reading). */}
         <div className="mk-feature-row mk-reveal">
           <div className="mk-feature-visual v1">
             <div className="mk-mini-inbox">
-              <div className="mk-mini-inbox-head">
+              <div className="mk-mini-inbox-head" data-anim="fade" style={d(0)}>
                 <svg
                   width="16"
                   height="16"
@@ -34,7 +39,7 @@ export function Features() {
                 Boîte unifiée
                 <span className="count">12</span>
               </div>
-              <div className="mk-mini-row">
+              <div className="mk-mini-row" data-anim="left" style={d(1)}>
                 <span className="av" style={{ background: BRAND_WHATSAPP }}>
                   <WhatsAppIcon />
                 </span>
@@ -46,7 +51,7 @@ export function Features() {
                 </div>
                 <span className="tm">16h25</span>
               </div>
-              <div className="mk-mini-row">
+              <div className="mk-mini-row" data-anim="left" style={d(3)}>
                 <span className="av" style={{ background: BRAND_INSTAGRAM }}>
                   <InstagramIcon />
                 </span>
@@ -56,7 +61,7 @@ export function Features() {
                 </div>
                 <span className="tm">15h58</span>
               </div>
-              <div className="mk-mini-row">
+              <div className="mk-mini-row" data-anim="left" style={d(5)}>
                 <span className="av" style={{ background: BRAND_TIKTOK }}>
                   <TikTokIcon />
                 </span>
@@ -68,7 +73,7 @@ export function Features() {
                 </div>
                 <span className="tm">15h12</span>
               </div>
-              <div className="mk-mini-row">
+              <div className="mk-mini-row" data-anim="left" style={d(7)}>
                 <span className="av" style={{ background: BRAND_FACEBOOK }}>
                   <FacebookIcon />
                 </span>
@@ -78,7 +83,7 @@ export function Features() {
                 </div>
                 <span className="tm">16h24</span>
               </div>
-              <div className="mk-mini-row">
+              <div className="mk-mini-row" data-anim="left" style={d(9)}>
                 <span className="av" style={{ background: BRAND_MESSENGER }}>
                   <MessengerIcon />
                 </span>
@@ -106,7 +111,9 @@ export function Features() {
           </div>
         </div>
 
-        {/* Feature 2 — Training */}
+        {/* Feature 2 — Training: the user prompts ("Vous") slide in from the
+            left, the agent confirmations ("Ajoutée") slide in from the right,
+            mimicking a back-and-forth conversation. */}
         <div className="mk-feature-row reverse mk-reveal">
           <div className="mk-feature-text">
             <span className="mk-eyebrow">Apprentissage continu</span>
@@ -122,7 +129,7 @@ export function Features() {
           </div>
           <div className="mk-feature-visual v2">
             <div className="mk-training-card">
-              <div className="mk-training-head">
+              <div className="mk-training-head" data-anim="fade" style={d(0)}>
                 <span className="ic">
                   <svg
                     viewBox="0 0 24 24"
@@ -144,11 +151,11 @@ export function Features() {
               </div>
               <div className="mk-training-body">
                 <div className="mk-training-row">
-                  <div className="mk-training-msg-out">
+                  <div className="mk-training-msg-out" data-anim="left" style={d(2)}>
                     <div className="by">Vous</div>
                     On livre à Cocody pour 1 500 FCFA, sous 24h.
                   </div>
-                  <div className="mk-training-msg-in">
+                  <div className="mk-training-msg-in" data-anim="right" style={d(5)}>
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"
@@ -163,11 +170,11 @@ export function Features() {
                   </div>
                 </div>
                 <div className="mk-training-row">
-                  <div className="mk-training-msg-out">
+                  <div className="mk-training-msg-out" data-anim="left" style={d(9)}>
                     <div className="by">Vous</div>
                     Commande &gt; 25 000 FCFA = livraison offerte sur Abidjan.
                   </div>
-                  <div className="mk-training-msg-in">
+                  <div className="mk-training-msg-in" data-anim="right" style={d(12)}>
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"
@@ -182,7 +189,7 @@ export function Features() {
                   </div>
                 </div>
               </div>
-              <div className="mk-training-stats">
+              <div className="mk-training-stats" data-anim="up" style={d(16)}>
                 <span>
                   <strong>12</strong>zones livraison
                 </span>
@@ -197,11 +204,14 @@ export function Features() {
           </div>
         </div>
 
-        {/* Feature 3 — Catalog */}
+        {/* Feature 3 — Catalog: the product card eases in, then a customer
+            question slides from the left, the agent shows a typing indicator
+            for ~1s (the "agent is thinking" moment), and the AI reply slides
+            in from the right after the dots disappear. */}
         <div className="mk-feature-row mk-reveal">
           <div className="mk-feature-visual v3">
             <div className="mk-catalog-stage">
-              <div className="mk-wa-card">
+              <div className="mk-wa-card" data-anim="scale" style={d(0)}>
                 <div className="mk-wa-head">
                   <span className="ic">
                     <WhatsAppIcon />
@@ -219,8 +229,18 @@ export function Features() {
                   </div>
                 </div>
               </div>
-              <div className="mk-wa-question">Bonjour, quelles tailles vous avez en bleu ?</div>
-              <div className="mk-wa-answer">
+              <div className="mk-wa-question" data-anim="left" style={d(4)}>
+                Bonjour, quelles tailles vous avez en bleu ?
+              </div>
+              {/* Typing dots: appears around 640ms after the question, runs the
+                  show-hide keyframe (~1.7s) and fades out before the AI reply
+                  arrives. Aria-hidden because it's a visual flourish. */}
+              <div className="mk-typing-dots" data-anim="typing" style={d(8)} aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
+              <div className="mk-wa-answer" data-anim="after-typing" style={d(22)}>
                 <div className="ai-badge">Agent · WhatsApp</div>
                 Disponible en M, L et XL à 12 500 FCFA (promo de 15 000). Combien de pièces
                 souhaitez-vous commander ?
@@ -241,7 +261,9 @@ export function Features() {
           </div>
         </div>
 
-        {/* Feature 4 — Feedback */}
+        {/* Feature 4 — Feedback: the message card scales in, the rate row
+            slides up, and the AI proposal card rises in last, like a hint
+            surfacing on top of the response. */}
         <div className="mk-feature-row reverse mk-reveal">
           <div className="mk-feature-text">
             <span className="mk-eyebrow">Vous gardez le contrôle</span>
@@ -257,7 +279,7 @@ export function Features() {
           </div>
           <div className="mk-feature-visual v4">
             <div className="mk-feedback-stage">
-              <div className="mk-fb-card">
+              <div className="mk-fb-card" data-anim="scale" style={d(0)}>
                 <div className="mk-fb-msg">
                   <div className="src">Agent · Instagram DM · à Fatou Y.</div>« Bonjour Fatou ! Oui
                   nous livrons à Cocody ce soir, jusqu&apos;à 19h. La livraison est à 1 500 FCFA.
@@ -279,7 +301,7 @@ export function Features() {
                   </div>
                 </div>
               </div>
-              <div className="mk-fb-proposal">
+              <div className="mk-fb-proposal" data-anim="up" style={d(8)}>
                 <div className="head">✦ Nouvelle proposition de l&apos;IA</div>
                 <h4>Ajouter une règle pour la livraison express</h4>
                 <p>
