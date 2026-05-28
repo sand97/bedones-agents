@@ -7,6 +7,21 @@ import {
   WhatsAppIcon,
 } from '@app/components/marketing/social-icons'
 
+/** Entrance choreography for the floating logos. Each value is the
+ *  animation-delay in ms — prominent logos pop in first, ghost ones after.
+ *  The keyframe itself (`mkHeroLogoIn` in styles.css) lasts 0.8s, so the
+ *  full entrance finishes around ${last + 800}ms (~1600ms below). */
+const HERO_ICON_DELAYS_MS = [
+  // p1..p7 — prominent
+  0, 120, 240, 360, 480, 600, 720,
+  // g1..g4 — ghost (start after the main wave)
+  640, 720, 800, 880,
+]
+// Wait until the entrance is mostly complete before letting the mouse-parallax
+// JS start writing `transform` on each logo (it would otherwise clobber the
+// keyframe's scale/rotate during the intro).
+const PARALLAX_START_MS = 1600
+
 export function Hero() {
   const heroRef = useRef<HTMLElement>(null)
 
@@ -16,9 +31,16 @@ export function Hero() {
     const logos = Array.from(hero.querySelectorAll<HTMLElement>('.mk-float-logo'))
     if (!logos.length) return
 
+    // Apply the entrance stagger directly to each logo's --mk-d var.
+    logos.forEach((logo, i) => {
+      const ms = HERO_ICON_DELAYS_MS[i] ?? 0
+      logo.style.setProperty('--mk-d', `${ms}ms`)
+    })
+
     let mouseX = 0
     let mouseY = 0
     let active = false
+    let parallaxStarted = false
     const states = logos.map(() => ({ tx: 0, ty: 0 }))
 
     const onMove = (e: MouseEvent) => {
@@ -40,6 +62,10 @@ export function Hero() {
     let raf = 0
 
     const tick = () => {
+      if (!parallaxStarted) {
+        raf = requestAnimationFrame(tick)
+        return
+      }
       const heroRect = hero.getBoundingClientRect()
       logos.forEach((logo, i) => {
         const r = logo.getBoundingClientRect()
@@ -65,9 +91,13 @@ export function Hero() {
       })
       raf = requestAnimationFrame(tick)
     }
+    const startTimer = window.setTimeout(() => {
+      parallaxStarted = true
+    }, PARALLAX_START_MS)
     raf = requestAnimationFrame(tick)
 
     return () => {
+      window.clearTimeout(startTimer)
       cancelAnimationFrame(raf)
       hero.removeEventListener('mousemove', onMove)
       hero.removeEventListener('mouseleave', onLeave)
