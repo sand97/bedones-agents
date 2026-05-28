@@ -4715,9 +4715,11 @@ a {
     padding: 0 20px;
   }
   .mk-hero {
-    /* Extra bottom padding leaves ~24px of clearance between the
-       "Démarrez gratuitement…" disclaimer and the bottom floating icons. */
-    padding: 40px 0 120px;
+    /* The bottom row of floating icons is absolutely positioned just above
+       the disclaimer (see .mk-float-logo.p5/p6/p7 overrides below). The
+       disclaimer itself gets a 120px top margin to carve out that space
+       in the natural flow. Hero padding-bottom stays small. */
+    padding: 40px 0 32px;
     min-height: auto;
   }
   .mk-hero-inner {
@@ -4763,21 +4765,33 @@ a {
   .mk-float-logo.p2 {
     right: 4%;
   }
+  /* The 3 bottom icons sit in a horizontal row anchored 80px from the
+     bottom of the hero, which puts them above the disclaimer (which sits
+     ~32px from the hero bottom). The disclaimer gets a margin-top below
+     to push it into the natural flow under the icons. */
   .mk-float-logo.p5 {
-    left: 4%;
+    left: 6%;
+    bottom: 80px;
   }
   .mk-float-logo.p6 {
-    right: 4%;
+    left: auto;
+    right: 6%;
+    bottom: 80px;
   }
-  /* Reveal mobile-only bottom-center Instagram */
   .mk-float-logo.p7 {
     display: inline-flex;
-    bottom: 4%;
+    bottom: 80px;
     left: calc(50% - 26px);
   }
   /* Hide the social-proof line on mobile */
   .mk-hero-proof {
     display: none;
+  }
+  /* Carve out vertical space in the natural flow so the absolutely-
+     positioned bottom icons sit between the form and the disclaimer
+     instead of overlapping the disclaimer line. */
+  .mk-hero-disclaimer {
+    margin-top: 120px;
   }
   .mk-showcase {
     padding: 24px 0 56px;
@@ -5607,68 +5621,84 @@ a {
 
 /* ═══════════════════════════════════════════
    MARKETING — illustration micro-animations
-   Triggered by IntersectionObserver: parent gets `.mk-anim-in`
-   and any child with `[data-anim]` plays its entrance.
 
-   Stagger by setting style="--mk-d: N" on the element (delay = N * 80ms).
-   Delays default to 0. Variants:
-     up       — slides up
-     down     — slides down (rare)
-     left     — slides from the left
-     right    — slides from the right
-     scale    — scales in
-     fade     — opacity only
-     typing   — small bounce, opacity, fades back out after 1.2s
-     after-typing — appears after the typing dots disappear
+   Driven by IntersectionObserver: when a `.mk-feature-visual` enters the
+   viewport, `useScrollReveal` adds `.mk-anim-in` to it. The selectors
+   below match descendants with `data-anim="..."` and run a dedicated
+   keyframe animation per variant.
+
+   Stagger via inline style `style={{ '--mk-d': '640ms' }}`, which is
+   forwarded as `animation-delay`. Default 0ms when not set.
+
+   Variants:
+     up | down | left | right | scale | fade — entrance animations
+     typing       — show, bounce, hide (~1.7s) — "agent is thinking"
+     after-typing — appears once typing has finished fading
    ═══════════════════════════════════════════ */
 .mk-feature-visual [data-anim] {
   opacity: 0;
   will-change: transform, opacity;
-  transition-property: opacity, transform;
-  transition-duration: 0.7s;
-  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
-  transition-delay: calc(var(--mk-d, 0) * 80ms);
-}
-.mk-feature-visual [data-anim='up'] {
-  transform: translateY(22px);
-}
-.mk-feature-visual [data-anim='down'] {
-  transform: translateY(-22px);
-}
-.mk-feature-visual [data-anim='left'] {
-  transform: translateX(-26px);
-}
-.mk-feature-visual [data-anim='right'] {
-  transform: translateX(26px);
-}
-.mk-feature-visual [data-anim='scale'] {
-  transform: scale(0.92);
-}
-.mk-feature-visual [data-anim='fade'] {
-  transform: none;
-}
-.mk-feature-visual.mk-anim-in [data-anim] {
-  opacity: 1;
-  transform: none;
 }
 
-/* Typing indicator: appears, dots bounce, then fades out around 1.2s in. */
-.mk-feature-visual [data-anim='typing'] {
-  opacity: 0;
-  transform: translateY(8px) scale(0.96);
-  transform-origin: left center;
-  transition-property: opacity, transform;
-  transition-duration: 0.35s;
-  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
-  transition-delay: calc(var(--mk-d, 0) * 80ms);
+@keyframes mkAnimUp {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
-.mk-feature-visual.mk-anim-in [data-anim='typing'] {
-  animation: mkTypingShowHide 1.7s ease both;
-  animation-delay: calc(var(--mk-d, 0) * 80ms);
-  opacity: 1;
-  transform: none;
+@keyframes mkAnimDown {
+  from {
+    opacity: 0;
+    transform: translateY(-22px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
-@keyframes mkTypingShowHide {
+@keyframes mkAnimLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mkAnimRight {
+  from {
+    opacity: 0;
+    transform: translateX(26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mkAnimScale {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mkAnimFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes mkAnimTyping {
   0% {
     opacity: 0;
     transform: translateY(8px) scale(0.96);
@@ -5687,22 +5717,41 @@ a {
   }
 }
 
-/* Appears after typing dots have faded; uses a delayed transition. */
-.mk-feature-visual [data-anim='after-typing'] {
-  opacity: 0;
-  transform: translateY(14px);
-  transition-property: opacity, transform;
-  transition-duration: 0.55s;
-  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
-  transition-delay: calc(var(--mk-d, 0) * 80ms);
+.mk-feature-visual.mk-anim-in [data-anim='up'] {
+  animation: mkAnimUp 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-feature-visual.mk-anim-in [data-anim='down'] {
+  animation: mkAnimDown 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-feature-visual.mk-anim-in [data-anim='left'] {
+  animation: mkAnimLeft 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-feature-visual.mk-anim-in [data-anim='right'] {
+  animation: mkAnimRight 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-feature-visual.mk-anim-in [data-anim='scale'] {
+  animation: mkAnimScale 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-feature-visual.mk-anim-in [data-anim='fade'] {
+  animation: mkAnimFade 0.7s ease both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-feature-visual.mk-anim-in [data-anim='typing'] {
+  animation: mkAnimTyping 1.7s ease both;
+  animation-delay: var(--mk-d, 0ms);
+  transform-origin: left center;
 }
 .mk-feature-visual.mk-anim-in [data-anim='after-typing'] {
-  opacity: 1;
-  transform: none;
+  animation: mkAnimUp 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--mk-d, 0ms);
 }
 
-/* Mini animated typing-dots indicator (mirrors the .typing styles already
-   used in the showcase mockup, but scoped for the feature illustrations). */
+/* Mini typing-dots indicator (scoped to the feature illustrations). */
 .mk-typing-dots {
   display: inline-flex;
   align-items: center;
@@ -5741,13 +5790,18 @@ a {
   }
 }
 
-/* Reduced motion — skip transitions and animations. */
+/* Reduced motion — skip transforms but keep elements visible. We use a
+   trimmed-down fade so the page never appears empty for users who have
+   the OS setting enabled. */
 @media (prefers-reduced-motion: reduce) {
   .mk-feature-visual [data-anim] {
-    opacity: 1 !important;
-    transform: none !important;
-    transition: none !important;
+    opacity: 1;
     animation: none !important;
+    transform: none !important;
+  }
+  .mk-feature-visual [data-anim='typing'] {
+    /* Static dots row — no bouncing. */
+    opacity: 0.65;
   }
   .mk-typing-dots span {
     animation: none !important;

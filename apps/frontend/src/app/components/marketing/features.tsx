@@ -13,8 +13,10 @@ const BRAND_MESSENGER = '#0084FF'
 const BRAND_TIKTOK = '#111111'
 const BRAND_WHATSAPP = '#25D366'
 
-/** Stagger helper: returns a CSS variable consumed by the `[data-anim]` rules. */
-const d = (n: number): CSSProperties => ({ ['--mk-d' as string]: String(n) })
+/** Stagger helper. Returns inline style with the `--mk-d` CSS var that the
+ *  `[data-anim="..."]` rules read as `animation-delay`. The argument is
+ *  expressed in "stagger steps" of 80ms — `d(8)` → 640ms delay. */
+const d = (steps: number): CSSProperties => ({ ['--mk-d' as string]: `${steps * 80}ms` })
 
 export function Features() {
   return (
