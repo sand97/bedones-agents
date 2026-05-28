@@ -96,6 +96,9 @@ export function Hero() {
         <span className="mk-float-logo wa p6">
           <WhatsAppIcon />
         </span>
+        <span className="mk-float-logo ig p7">
+          <InstagramIcon />
+        </span>
         <span className="mk-float-logo fb ghost g1">
           <FacebookIcon />
         </span>

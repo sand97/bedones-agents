@@ -3373,6 +3373,10 @@ a {
   bottom: 12%;
   right: 18%;
 }
+/* p7 is a mobile-only Instagram float anchored bottom-center */
+.mk-float-logo.p7 {
+  display: none;
+}
 .mk-float-logo.g1 {
   top: 30%;
   left: 22%;
@@ -4763,6 +4767,16 @@ a {
   .mk-float-logo.p6 {
     right: 4%;
   }
+  /* Reveal mobile-only bottom-center Instagram */
+  .mk-float-logo.p7 {
+    display: inline-flex;
+    bottom: 4%;
+    left: calc(50% - 26px);
+  }
+  /* Hide the social-proof line on mobile */
+  .mk-hero-proof {
+    display: none;
+  }
   .mk-showcase {
     padding: 24px 0 56px;
   }
@@ -4787,6 +4801,17 @@ a {
   .mk-platforms {
     gap: 20px;
   }
+  /* Hide platform name labels on mobile — keep just the icon tiles. */
+  .mk-plat-item {
+    font-size: 0;
+  }
+  .mk-plat-tile {
+    font-size: 14px;
+  }
+  /* Hide the host part of the mockup URL; keep just "/ whatsapp" */
+  .mk-mockup-bar .url .url-host {
+    display: none;
+  }
   .mk-features {
     padding: 64px 0 32px;
   }
@@ -4795,8 +4820,15 @@ a {
     gap: 32px;
     margin-bottom: 72px;
   }
-  .mk-feature-row.reverse .mk-feature-text {
+  /* On mobile, force the illustration above the text on every row,
+     regardless of the desktop left/right alternation. */
+  .mk-feature-row .mk-feature-visual,
+  .mk-feature-row.reverse .mk-feature-visual {
     order: 0;
+  }
+  .mk-feature-row .mk-feature-text,
+  .mk-feature-row.reverse .mk-feature-text {
+    order: 1;
   }
   .mk-feature-visual {
     aspect-ratio: 4 / 3;
