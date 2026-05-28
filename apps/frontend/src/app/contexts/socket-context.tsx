@@ -130,6 +130,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
           )
         },
       )
+      // The backend also rewrites lastMessageText to `[reaction:<emoji>]`,
+      // so the conversation list preview needs a refresh.
+      queryClient.invalidateQueries({
+        queryKey: ['get', '/messaging/conversations/{accountId}'],
+      })
     }
 
     const handleMessageStatus = (data: {

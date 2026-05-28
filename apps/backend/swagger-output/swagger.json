@@ -1266,6 +1266,30 @@
         ]
       }
     },
+    "/messaging/send-reaction": {
+      "post": {
+        "operationId": "MessagingController_sendReaction",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendReactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
     "/messaging/mark-read": {
       "post": {
         "operationId": "MessagingController_markRead",
@@ -5166,6 +5190,23 @@
           "conversationId",
           "metaTemplateName",
           "metaTemplateLanguage"
+        ]
+      },
+      "SendReactionDto": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "description": "ID of the message to react to"
+          },
+          "emoji": {
+            "type": "string",
+            "description": "Emoji to react with. Pass an empty string to remove the current reaction."
+          }
+        },
+        "required": [
+          "messageId",
+          "emoji"
         ]
       },
       "MarkConversationReadDto": {

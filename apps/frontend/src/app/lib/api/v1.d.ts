@@ -677,6 +677,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/messaging/send-reaction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MessagingController_sendReaction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/messaging/mark-read": {
         parameters: {
             query?: never;
@@ -2188,6 +2204,11 @@ export interface components {
         MarkConversationReadDto: {
             conversationId: string;
         };
+        SendReactionDto: {
+            messageId: string;
+            /** @description Emoji to react with. Pass an empty string to remove the current reaction. */
+            emoji: string;
+        };
         ConversationAgentSummaryDto: {
             id: string;
             name?: string;
@@ -3546,6 +3567,27 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DirectMessageResponseDto"];
                 };
+            };
+        };
+    };
+    MessagingController_sendReaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendReactionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

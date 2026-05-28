@@ -11,6 +11,7 @@ import {
   FileText,
   RotateCcw,
   Reply,
+  Smile,
   Sparkles,
   BotOff,
 } from 'lucide-react'
@@ -276,6 +277,51 @@ function ReplyContextBubble({
   )
 }
 
+/* ── Reaction picker ── */
+
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢'] as const
+
+function ReactionPicker({
+  onPick,
+  children,
+}: {
+  onPick: (emoji: string) => void
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Popover
+      content={
+        <div className="flex items-center gap-1">
+          {REACTION_EMOJIS.map((emoji) => (
+            <Button
+              key={emoji}
+              type="text"
+              shape="circle"
+              size="large"
+              onClick={() => {
+                onPick(emoji)
+                setOpen(false)
+              }}
+              className="!text-xl !leading-none"
+            >
+              {emoji}
+            </Button>
+          ))}
+        </div>
+      }
+      trigger="click"
+      open={open}
+      onOpenChange={setOpen}
+      placement="top"
+      arrow={false}
+    >
+      {children}
+    </Popover>
+  )
+}
+
 /* ── Message bubble ── */
 
 function formatFileSize(bytes: number): string {
@@ -342,8 +388,10 @@ function MessageBubble({
   onScrollToMessage,
   onRetry,
   onReply,
+  onReact,
   onImprove,
   onMediaLoad,
+  windowClosed = false,
 }: {
   message: Message
   position: 'first' | 'middle' | 'last' | 'single'
@@ -351,13 +399,22 @@ function MessageBubble({
   onScrollToMessage?: (id: string) => void
   onRetry?: (messageId: string) => void
   onReply?: (message: Message) => void
+  onReact?: (message: Message, emoji: string) => void
   onImprove?: (message: Message) => void
   onMediaLoad?: () => void
+  windowClosed?: boolean
 }) {
   const { t } = useTranslation()
   const isOutgoing = message.from === 'business'
   const isSending = message.status === 'sending'
   const isError = message.status === 'error'
+  const windowClosedTooltip = windowClosed
+    ? t(
+        provider === 'tiktok'
+          ? 'chat.window_closed_tooltip_tiktok'
+          : 'chat.window_closed_tooltip_whatsapp',
+      )
+    : null
   const hasMedia =
     message.type === 'image' ||
     message.type === 'video' ||
@@ -654,14 +711,46 @@ function MessageBubble({
           />
         </Tooltip>
       )}
+      {isOutgoing &&
+        onReact &&
+        !isSending &&
+        !isError &&
+        (windowClosed ? (
+          <Tooltip title={windowClosedTooltip} placement="top">
+            <Button
+              variant="text"
+              size="small"
+              shape="circle"
+              icon={<Smile size={14} />}
+              disabled
+              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            />
+          </Tooltip>
+        ) : (
+          <ReactionPicker onPick={(emoji) => onReact(message, emoji)}>
+            <Tooltip title={t('chat.react_tooltip')} placement="top">
+              <Button
+                variant="text"
+                size="small"
+                shape="circle"
+                icon={<Smile size={14} />}
+                className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              />
+            </Tooltip>
+          </ReactionPicker>
+        ))}
       {isOutgoing && onReply && !isSending && !isError && (
-        <Tooltip title={t('chat.reply_tooltip')} placement="top">
+        <Tooltip
+          title={windowClosed ? windowClosedTooltip : t('chat.reply_tooltip')}
+          placement="top"
+        >
           <Button
             variant="text"
             size="small"
             shape="circle"
             icon={<Reply size={14} />}
             onClick={() => onReply(message)}
+            disabled={windowClosed}
             className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
           />
         </Tooltip>
@@ -716,19 +805,51 @@ function MessageBubble({
           </div>
         )}
       </div>
-      {/* Reply button — right of incoming messages */}
+      {/* Reply + reaction buttons — right of incoming messages */}
       {!isOutgoing && onReply && !isSending && !isError && (
-        <Tooltip title={t('chat.reply_tooltip')} placement="top">
+        <Tooltip
+          title={windowClosed ? windowClosedTooltip : t('chat.reply_tooltip')}
+          placement="top"
+        >
           <Button
             variant="text"
             size="small"
             shape="circle"
             icon={<Reply size={14} />}
             onClick={() => onReply(message)}
+            disabled={windowClosed}
             className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
           />
         </Tooltip>
       )}
+      {!isOutgoing &&
+        onReact &&
+        !isSending &&
+        !isError &&
+        (windowClosed ? (
+          <Tooltip title={windowClosedTooltip} placement="top">
+            <Button
+              variant="text"
+              size="small"
+              shape="circle"
+              icon={<Smile size={14} />}
+              disabled
+              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            />
+          </Tooltip>
+        ) : (
+          <ReactionPicker onPick={(emoji) => onReact(message, emoji)}>
+            <Tooltip title={t('chat.react_tooltip')} placement="top">
+              <Button
+                variant="text"
+                size="small"
+                shape="circle"
+                icon={<Smile size={14} />}
+                className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              />
+            </Tooltip>
+          </ReactionPicker>
+        ))}
     </div>
   )
 }
@@ -893,6 +1014,22 @@ export function ChatWindow({
   const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null)
 
   const feedbackMutation = $api.useMutation('post', '/agent/feedback/{messageId}')
+  const reactionMutation = $api.useMutation('post', '/messaging/send-reaction')
+
+  const handleReact = useCallback(
+    async (message: Message, emoji: string) => {
+      // Strip the optimistic prefix — backend only knows real message IDs.
+      if (message.id.startsWith('optimistic-')) return
+      try {
+        await reactionMutation.mutateAsync({
+          body: { messageId: message.id, emoji },
+        })
+      } catch (err) {
+        antdMessage.error(err instanceof Error ? err.message : t('chat.react_error'))
+      }
+    },
+    [reactionMutation, t],
+  )
 
   const handleFeedbackSubmit = useCallback(
     async (params: {
@@ -991,11 +1128,14 @@ export function ChatWindow({
     return active.length > 0 ? active[active.length - 1] : null
   }, [tickets])
 
-  const templateOnly = useMemo(() => {
-    if (provider !== 'whatsapp') return false
+  // Customer-service window. WhatsApp closes after 24h since the last inbound
+  // message; TikTok Business Messaging closes after 48h.
+  const windowClosed = useMemo(() => {
+    if (provider !== 'whatsapp' && provider !== 'tiktok') return false
     const lastInbound = [...conversation.messages].reverse().find((msg) => msg.from === 'customer')
     if (!lastInbound) return false
-    return dayjs().diff(dayjs(lastInbound.timestamp), 'hour', true) > 24
+    const limitHours = provider === 'tiktok' ? 48 : 24
+    return dayjs().diff(dayjs(lastInbound.timestamp), 'hour', true) > limitHours
   }, [conversation.messages, provider])
 
   return (
@@ -1029,8 +1169,10 @@ export function ChatWindow({
                   onScrollToMessage={scrollToMessage}
                   onRetry={onRetry}
                   onReply={provider !== 'instagram-dm' ? setReplyTo : undefined}
+                  onReact={provider === 'whatsapp' ? handleReact : undefined}
                   onImprove={setFeedbackMessage}
                   onMediaLoad={scrollToBottom}
+                  windowClosed={windowClosed}
                 />
               )
             })}
@@ -1067,7 +1209,7 @@ export function ChatWindow({
         onCatalogClick={onCatalogClick}
         onTemplateClick={onTemplateClick}
         onTikTokMessageClick={onTikTokMessageClick}
-        templateOnly={templateOnly}
+        windowClosed={windowClosed}
       />
 
       {/* Ticket drawer */}

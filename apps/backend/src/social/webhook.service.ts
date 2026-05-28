@@ -904,8 +904,73 @@ export class WebhookService {
       data: { reactions: updated },
     })
 
+    if (reaction.action === 'react' && reaction.emoji) {
+      await this.prisma.conversation.update({
+        where: { id: targetMessage.conversationId },
+        data: {
+          lastMessageText: `[reaction:${reaction.emoji}]`,
+          lastMessageAt: new Date(),
+        },
+      })
+    }
+
     this.logger.log(
       `[${provider} Reaction] ${reaction.action} "${reaction.emoji || ''}" on message ${targetMsgId} by ${senderId}`,
+    )
+
+    this.eventsGateway.emitToOrg(orgId, 'message:reaction', {
+      conversationId: targetMessage.conversationId,
+      messageId: targetMessage.id,
+      reactions: updated,
+    })
+  }
+
+  // ─── WhatsApp reaction handling ───
+  // WhatsApp sends reactions as a `messages` entry with `type: "reaction"`.
+  // An empty emoji string means the user removed their reaction.
+  private async handleWhatsAppReaction(msg: WhatsAppMessage, senderId: string, orgId: string) {
+    const targetMsgId = msg.reaction?.message_id
+    if (!targetMsgId) return
+
+    const emoji = msg.reaction?.emoji ?? ''
+
+    const targetMessage = await this.prisma.directMessage.findUnique({
+      where: { platformMsgId: targetMsgId },
+      select: { id: true, conversationId: true, reactions: true },
+    })
+
+    if (!targetMessage) {
+      this.logger.warn(
+        `[WhatsApp Reaction] Message ${targetMsgId} not found in DB, skipping reaction`,
+      )
+      return
+    }
+
+    const existing = (targetMessage.reactions as { senderId: string; emoji: string }[]) || []
+
+    // WhatsApp only allows a single reaction per user — replace any previous one.
+    const updated = existing.filter((r) => r.senderId !== senderId)
+    if (emoji) {
+      updated.push({ senderId, emoji })
+    }
+
+    await this.prisma.directMessage.update({
+      where: { id: targetMessage.id },
+      data: { reactions: updated },
+    })
+
+    if (emoji) {
+      await this.prisma.conversation.update({
+        where: { id: targetMessage.conversationId },
+        data: {
+          lastMessageText: `[reaction:${emoji}]`,
+          lastMessageAt: new Date(),
+        },
+      })
+    }
+
+    this.logger.log(
+      `[WhatsApp Reaction] ${emoji ? 'react' : 'unreact'} "${emoji}" on message ${targetMsgId} by ${senderId}`,
     )
 
     this.eventsGateway.emitToOrg(orgId, 'message:reaction', {
@@ -1014,6 +1079,11 @@ export class WebhookService {
 
     if (msg.context?.id) {
       replyToMid = msg.context.id
+    }
+
+    if (msg.type === 'reaction') {
+      await this.handleWhatsAppReaction(msg, senderId, orgId)
+      return
     }
 
     switch (msg.type) {
@@ -1181,6 +1251,13 @@ export class WebhookService {
     let mediaType: string | null = null
     let fileName: string | null = null
     let metadata: Record<string, unknown> | null = null
+
+    if (msg.type === 'reaction') {
+      // Echo on the business side = the owner reacted from the mobile app.
+      // The sender of the reaction is the business phone number.
+      await this.handleWhatsAppReaction(msg, phoneNumberId, orgId)
+      return
+    }
 
     switch (msg.type) {
       case 'text':
@@ -2904,6 +2981,7 @@ interface WhatsAppMessage {
     list_reply?: { id: string; title: string; description?: string }
   }
   button?: { payload?: string; text?: string }
+  reaction?: { message_id: string; emoji: string }
   context?: { id?: string; from?: string }
 }
 

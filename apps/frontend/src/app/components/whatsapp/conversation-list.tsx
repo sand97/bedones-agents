@@ -82,14 +82,23 @@ const PREVIEW_ICONS: Record<PreviewKind, ReactNode> = {
 interface ParsedPreview {
   kind: PreviewKind
   count?: number
+  emoji?: string
 }
 
 function parsePreviewToken(text: string): ParsedPreview | null {
   const match = /^\[([^\]]+)\]$/.exec(text.trim())
   if (!match) return null
 
-  const raw = match[1].toLowerCase().trim()
+  // Preserve case for the emoji payload; lowercase the rest.
+  const innerRaw = match[1].trim()
+  const raw = innerRaw.toLowerCase()
   if (!raw) return null
+
+  // "[reaction:👍]" — emoji is kept as-is so it can be rendered next to the label.
+  if (raw.startsWith('reaction:')) {
+    const emoji = innerRaw.slice('reaction:'.length).trim()
+    return { kind: 'message', emoji }
+  }
 
   // "[3 products]"
   const productCount = /^(\d+)\s+products?$/.exec(raw)
@@ -151,6 +160,16 @@ function MessagePreview({ text }: { text: string }) {
   const parsed = parsePreviewToken(text)
   if (!parsed) {
     return <>{text}</>
+  }
+
+  // Reaction: render the emoji itself in place of the icon, with a "reaction" label.
+  if (parsed.emoji) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <span className="inline-flex items-center">{parsed.emoji}</span>
+        <span>{t('chat.preview_reaction')}</span>
+      </span>
+    )
   }
 
   const label =

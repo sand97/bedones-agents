@@ -7,6 +7,7 @@ import { MediaConverterService } from '../upload/media-converter.service'
 import { UploadService } from '../upload/upload.service'
 import { CatalogService } from '../catalog/catalog.service'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
+import { EventsGateway } from '../gateway/events.gateway'
 import { ProductImageSyncService } from './product-image-sync.service'
 
 type TikTokMessageType = 'TEXT' | 'IMAGE' | 'SHARE_POST' | 'TEMPLATE' | 'SENDER_ACTION'
@@ -90,6 +91,7 @@ export class MessagingService {
     private uploadService: UploadService,
     private catalogService: CatalogService,
     private productImageSyncService: ProductImageSyncService,
+    private eventsGateway: EventsGateway,
   ) {}
 
   // ─── Get conversations for a social account ───
@@ -314,6 +316,85 @@ export class MessagingService {
           }
         : undefined,
     }
+  }
+
+  // ─── Send a reaction (WhatsApp) ───
+  // Pass an empty `emoji` to remove the current reaction.
+  async sendReaction(userId: string, messageId: string, emoji: string) {
+    const message = await this.prisma.directMessage.findUnique({
+      where: { id: messageId },
+      include: {
+        conversation: {
+          include: {
+            socialAccount: {
+              select: {
+                id: true,
+                provider: true,
+                providerAccountId: true,
+                organisationId: true,
+                scopes: true,
+              },
+            },
+          },
+        },
+      },
+    })
+    if (!message) throw new NotFoundException('Message not found')
+
+    const conversation = message.conversation
+    const provider = conversation.socialAccount.provider
+    await this.assertMembership(userId, conversation.socialAccount.organisationId)
+    this.assertScope(conversation.socialAccount.scopes, 'messages')
+
+    if (provider !== 'WHATSAPP') {
+      throw new BadRequestException(`Reactions are only supported on WhatsApp (got ${provider})`)
+    }
+    if (!message.platformMsgId) {
+      throw new BadRequestException(
+        'Cannot react: target message has no platform ID (not yet synced with WhatsApp)',
+      )
+    }
+
+    const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
+
+    await this.sendWhatsAppReaction(
+      conversation.socialAccount.providerAccountId,
+      conversation.participantId,
+      accessToken,
+      message.platformMsgId,
+      emoji,
+    )
+
+    // The business is the reactor — store the reaction under the business phone number.
+    const businessSenderId = conversation.socialAccount.providerAccountId
+    const existing = (message.reactions as { senderId: string; emoji: string }[]) || []
+    const updated = existing.filter((r) => r.senderId !== businessSenderId)
+    if (emoji) {
+      updated.push({ senderId: businessSenderId, emoji })
+    }
+
+    await this.prisma.directMessage.update({
+      where: { id: message.id },
+      data: { reactions: updated },
+    })
+
+    if (emoji) {
+      await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          lastMessageText: `[reaction:${emoji}]`,
+          lastMessageAt: new Date(),
+        },
+      })
+    }
+
+    this.eventsGateway.emitToOrg(conversation.socialAccount.organisationId, 'message:reaction', {
+      conversationId: conversation.id,
+      messageId: message.id,
+      reactions: updated,
+    })
+
+    return { messageId: message.id, reactions: updated }
   }
 
   async sendTemplateMessage(
@@ -2040,6 +2121,56 @@ export class MessagingService {
 
     const messages = (data as { messages?: Array<{ id: string }> }).messages
     return messages?.[0]?.id || null
+  }
+
+  // ─── WhatsApp reaction send ───
+  // Per Meta docs: POST /{phone-number-id}/messages with type=reaction.
+  // An empty emoji string removes the previous reaction.
+  private async sendWhatsAppReaction(
+    phoneNumberId: string,
+    recipientPhone: string,
+    accessToken: string,
+    targetMessageId: string,
+    emoji: string,
+  ): Promise<void> {
+    const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${phoneNumberId}/messages`
+
+    const body = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipientPhone,
+      type: 'reaction',
+      reaction: {
+        message_id: targetMessageId,
+        emoji,
+      },
+    }
+
+    this.logger.log(
+      `[WhatsApp] Reaction ${emoji ? `"${emoji}"` : '(remove)'} on ${targetMessageId}`,
+    )
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      this.logger.error(
+        `[WhatsApp] Reaction failed (${response.status})\n` +
+          `  Payload: ${JSON.stringify(body)}\n` +
+          `  Response: ${JSON.stringify(data)}`,
+      )
+      throw new BadRequestException(
+        `Failed to send WhatsApp reaction: ${JSON.stringify(data?.error?.message || data)}`,
+      )
+    }
   }
 
   async sendWhatsAppTemplatePayload(

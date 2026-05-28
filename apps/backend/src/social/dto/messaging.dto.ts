@@ -233,6 +233,16 @@ export class MarkConversationReadDto {
   conversationId: string
 }
 
+export class SendReactionDto {
+  @ApiProperty({ description: 'ID of the message to react to' })
+  messageId: string
+
+  @ApiProperty({
+    description: 'Emoji to react with. Pass an empty string to remove the current reaction.',
+  })
+  emoji: string
+}
+
 export class ConversationAgentSummaryDto {
   @ApiProperty()
   id: string

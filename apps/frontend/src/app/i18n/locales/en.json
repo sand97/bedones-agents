@@ -329,8 +329,13 @@
     "tools_templates": "Templates",
     "tools_campaigns": "Campaigns",
     "template": "Template",
-    "template_only_placeholder": "The WhatsApp window is closed. Use a template or WhatsApp Business.",
+    "window_closed_placeholder_whatsapp": "No customer message in last 24h. Use template or mobile app",
+    "window_closed_placeholder_tiktok": "No customer message in last 48h, you can't send new message",
+    "window_closed_tooltip_whatsapp": "Unavailable — last customer message is over 24h old",
+    "window_closed_tooltip_tiktok": "Unavailable — last customer message is over 48h old",
     "reply_tooltip": "Reply",
+    "react_tooltip": "React",
+    "react_error": "Could not send reaction",
     "improve_tooltip": "Improve the response with AI",
     "by_ai": "by AI",
     "preview_image": "Photo",
@@ -350,7 +355,8 @@
     "preview_catalog": "Catalog",
     "preview_tiktok_post": "TikTok post",
     "preview_unsupported": "Unsupported message",
-    "preview_message": "Message"
+    "preview_message": "Message",
+    "preview_reaction": "Reaction"
   },
 
   "feedback": {

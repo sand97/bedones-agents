@@ -9,6 +9,7 @@ import {
   DirectMessageResponseDto,
   SendMessageDto,
   SendProductMessageDto,
+  SendReactionDto,
   SendTemplateMessageDto,
   MarkConversationReadDto,
   SetConversationAgentOverrideDto,
@@ -101,6 +102,14 @@ export class MessagingController {
       body.renderedBody,
       body.metaTemplateId,
     )
+  }
+
+  // ─── Send a reaction (WhatsApp) ───
+
+  @Post('send-reaction')
+  @ApiBody({ type: SendReactionDto })
+  async sendReaction(@CurrentUser() user: { id: string }, @Body() body: SendReactionDto) {
+    return this.messagingService.sendReaction(user.id, body.messageId, body.emoji)
   }
 
   // ─── Mark conversation as read ───

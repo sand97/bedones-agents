@@ -236,7 +236,7 @@ export function ChatInput({
   onCatalogClick,
   onTemplateClick,
   onTikTokMessageClick,
-  templateOnly,
+  windowClosed,
 }: {
   onSend?: (
     message: string,
@@ -252,7 +252,7 @@ export function ChatInput({
   onCatalogClick?: () => void
   onTemplateClick?: () => void
   onTikTokMessageClick?: () => void
-  templateOnly?: boolean
+  windowClosed?: boolean
 }) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<InputMode>('text')
@@ -280,7 +280,7 @@ export function ChatInput({
   }, [replyTo])
 
   const handleSend = () => {
-    if (templateOnly) return
+    if (windowClosed) return
     if (!inputValue.trim()) return
     const msg = inputValue.trim()
     setInputValue('')
@@ -369,7 +369,7 @@ export function ChatInput({
             shape="circle"
             icon={<Paperclip size={18} />}
             className="flex-shrink-0"
-            disabled={templateOnly}
+            disabled={windowClosed}
           />
         </AttachmentPopover>
 
@@ -377,9 +377,15 @@ export function ChatInput({
           <AudioRecorder onSend={handleAudioSend} onCancel={() => setMode('text')} />
         ) : (
           <Input.TextArea
-            disabled={templateOnly}
+            disabled={windowClosed}
             placeholder={
-              templateOnly ? t('chat.template_only_placeholder') : t('chat.type_message')
+              windowClosed
+                ? t(
+                    provider === 'tiktok'
+                      ? 'chat.window_closed_placeholder_tiktok'
+                      : 'chat.window_closed_placeholder_whatsapp',
+                  )
+                : t('chat.type_message')
             }
             value={inputValue}
             onChange={(e) => {
@@ -393,14 +399,24 @@ export function ChatInput({
         )}
 
         {mode === 'text' &&
-          (templateOnly ? (
-            <Button
-              type="text"
-              shape="circle"
-              onClick={onTemplateClick}
-              icon={<MessageSquareText size={18} />}
-              className="flex-shrink-0"
-            />
+          (windowClosed ? (
+            provider === 'whatsapp' ? (
+              <Button
+                type="text"
+                shape="circle"
+                onClick={onTemplateClick}
+                icon={<MessageSquareText size={18} />}
+                className="flex-shrink-0"
+              />
+            ) : (
+              <Button
+                type="text"
+                shape="circle"
+                icon={<Send size={18} />}
+                className="flex-shrink-0"
+                disabled
+              />
+            )
           ) : inputValue.trim() ? (
             <Button
               type="text"
