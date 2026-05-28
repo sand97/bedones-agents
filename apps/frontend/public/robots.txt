@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Allow: /pricing
+Allow: /blog
+Allow: /blog/*
+
+Disallow: /app/
+Disallow: /auth/
+Disallow: /create-organisation
+Disallow: /organisations
+Disallow: /invitation
+
+Sitemap: https://bedones.com/sitemap.xml
