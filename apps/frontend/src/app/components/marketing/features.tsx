@@ -25,6 +25,10 @@ export function Features() {
         {/* Feature 1 — Unified inbox: header fades in, then each conversation
             row slides in from the left in sequence (left-to-right reading). */}
         <div className="mk-feature-row mk-reveal">
+          <div className="mk-feature-head">
+            <span className="mk-eyebrow">Un seul tableau de bord</span>
+            <h2>Un seul agent, 5 plateformes</h2>
+          </div>
           <div className="mk-feature-visual v1">
             <div className="mk-mini-inbox">
               <div className="mk-mini-inbox-head" data-anim="fade" style={d(0)}>
@@ -99,9 +103,7 @@ export function Features() {
               </div>
             </div>
           </div>
-          <div className="mk-feature-text">
-            <span className="mk-eyebrow">Un seul tableau de bord</span>
-            <h2>Un seul agent, 5 plateformes</h2>
+          <div className="mk-feature-body">
             <p>
               Gérez tous vos messages et commentaires depuis un tableau de bord unifié. Bedones
               Moderator répond en votre nom sur TikTok, Facebook, Messenger, Instagram et WhatsApp —
@@ -117,9 +119,11 @@ export function Features() {
             left, the agent confirmations ("Ajoutée") slide in from the right,
             mimicking a back-and-forth conversation. */}
         <div className="mk-feature-row reverse mk-reveal">
-          <div className="mk-feature-text">
+          <div className="mk-feature-head">
             <span className="mk-eyebrow">Apprentissage continu</span>
             <h2>Une IA formée sur votre business</h2>
+          </div>
+          <div className="mk-feature-body">
             <p>
               L&apos;agent apprend de vos conversations avec lui : vos produits, vos prix, vos
               conditions de livraison, votre façon de répondre aux objections. Pas de configuration
@@ -211,6 +215,10 @@ export function Features() {
             for ~1s (the "agent is thinking" moment), and the AI reply slides
             in from the right after the dots disappear. */}
         <div className="mk-feature-row mk-reveal">
+          <div className="mk-feature-head">
+            <span className="mk-eyebrow">Catalogue natif</span>
+            <h2>Votre catalogue WhatsApp, automatisé</h2>
+          </div>
           <div className="mk-feature-visual v3">
             <div className="mk-catalog-stage">
               <div className="mk-wa-card" data-anim="scale-bump" style={d(0)}>
@@ -249,9 +257,7 @@ export function Features() {
               </div>
             </div>
           </div>
-          <div className="mk-feature-text">
-            <span className="mk-eyebrow">Catalogue natif</span>
-            <h2>Votre catalogue WhatsApp, automatisé</h2>
+          <div className="mk-feature-body">
             <p>
               Importez votre catalogue directement depuis votre compte WhatsApp Business. Votre
               numéro reste sur votre téléphone. L&apos;IA répond aux questions sur vos produits avec
@@ -267,9 +273,11 @@ export function Features() {
             slides up, and the AI proposal card rises in last, like a hint
             surfacing on top of the response. */}
         <div className="mk-feature-row reverse mk-reveal">
-          <div className="mk-feature-text">
+          <div className="mk-feature-head">
             <span className="mk-eyebrow">Vous gardez le contrôle</span>
             <h2>Vous corrigez, l&apos;IA apprend</h2>
+          </div>
+          <div className="mk-feature-body">
             <p>
               Laissez un feedback sur chaque réponse générée — un pouce, une note, un commentaire.
               Bedones Moderator s&apos;améliore à chaque interaction et vous propose des mises à

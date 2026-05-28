@@ -3899,32 +3899,61 @@ a {
 .mk-features {
   padding: 120px 0 80px;
 }
+/* Feature row layout — uses grid-template-areas to support a different
+   reading order on mobile. The row holds three direct children:
+     .mk-feature-head    (eyebrow + h2)
+     .mk-feature-visual  (illustration)
+     .mk-feature-body    (paragraph + link)
+
+   Desktop default puts the visual on the left, head + body stacked on the
+   right (head bottom-aligned in row 1, body top-aligned in row 2, so the
+   two text blocks meet in the middle and read as a single text column).
+   `.reverse` mirrors the visual to the right.
+
+   Mobile re-orders the three children vertically: head → visual → body,
+   so the reader sees the title, *then* the illustration that illustrates
+   it, *then* the supporting paragraph. */
 .mk-feature-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 80px;
+  grid-template-areas:
+    'visual head'
+    'visual body';
+  column-gap: 80px;
+  row-gap: 0;
   align-items: center;
   margin-bottom: 140px;
 }
 .mk-feature-row:last-child {
   margin-bottom: 0;
 }
-.mk-feature-row.reverse .mk-feature-visual {
-  order: 2;
+.mk-feature-row.reverse {
+  grid-template-areas:
+    'head visual'
+    'body visual';
 }
-.mk-feature-row.reverse .mk-feature-text {
-  order: 1;
+.mk-feature-head {
+  grid-area: head;
+  align-self: end;
+  padding-bottom: 4px;
 }
-.mk-feature-text h2 {
+.mk-feature-body {
+  grid-area: body;
+  align-self: start;
+}
+.mk-feature-visual {
+  grid-area: visual;
+}
+.mk-feature-head h2 {
   font-size: clamp(28px, 3.6vw, 44px);
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
-.mk-feature-text p {
+.mk-feature-body p {
   font-size: 17px;
   color: var(--mk-text-muted);
   margin: 0 0 28px;
 }
-.mk-feature-text .link {
+.mk-feature-body .link {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -3935,7 +3964,7 @@ a {
   font-size: 14.5px;
   transition: gap 0.2s;
 }
-.mk-feature-text .link:hover {
+.mk-feature-body .link:hover {
   gap: 12px;
 }
 .mk-feature-visual {
@@ -4712,14 +4741,15 @@ a {
 }
 @media (max-width: 768px) {
   .mk-container {
-    padding: 0 20px;
+    /* Tighter side padding on mobile — buys us 8px each side vs desktop. */
+    padding: 0 16px;
   }
   .mk-hero {
-    /* The bottom row of floating icons is absolutely positioned just above
-       the disclaimer (see .mk-float-logo.p5/p6/p7 overrides below). The
-       disclaimer itself gets a 120px top margin to carve out that space
-       in the natural flow. Hero padding-bottom stays small. */
-    padding: 40px 0 32px;
+    /* Padding-bottom carves out room for the floating icons row that sits
+       at the bottom of the hero. The disclaimer now flows naturally just
+       under the form, and the icons sit BELOW the disclaimer (see the
+       .mk-float-logo.p5/p6/p7 overrides further down). */
+    padding: 40px 0 120px;
     min-height: auto;
   }
   .mk-hero-inner {
@@ -4765,33 +4795,31 @@ a {
   .mk-float-logo.p2 {
     right: 4%;
   }
-  /* The 3 bottom icons sit in a horizontal row anchored 80px from the
-     bottom of the hero, which puts them above the disclaimer (which sits
-     ~32px from the hero bottom). The disclaimer gets a margin-top below
-     to push it into the natural flow under the icons. */
+  /* The 3 bottom icons sit in a horizontal row anchored 16px from the
+     bottom of the hero — BELOW the disclaimer line in natural reading
+     order. The hero's 120px padding-bottom (above) carves out the room. */
   .mk-float-logo.p5 {
     left: 6%;
-    bottom: 80px;
+    bottom: 16px;
   }
   .mk-float-logo.p6 {
     left: auto;
     right: 6%;
-    bottom: 80px;
+    bottom: 16px;
   }
   .mk-float-logo.p7 {
     display: inline-flex;
-    bottom: 80px;
+    bottom: 16px;
     left: calc(50% - 26px);
   }
   /* Hide the social-proof line on mobile */
   .mk-hero-proof {
     display: none;
   }
-  /* Carve out vertical space in the natural flow so the absolutely-
-     positioned bottom icons sit between the form and the disclaimer
-     instead of overlapping the disclaimer line. */
+  /* Disclaimer sits just under the form — no longer pushed below the
+     icons. The hero's bottom padding leaves room for the icons row. */
   .mk-hero-disclaimer {
-    margin-top: 120px;
+    margin-top: 20px;
   }
   .mk-showcase {
     padding: 24px 0 56px;
@@ -4831,24 +4859,62 @@ a {
   .mk-features {
     padding: 64px 0 32px;
   }
-  .mk-feature-row {
+  .mk-feature-row,
+  .mk-feature-row.reverse {
+    /* Single column with the three children stacked in a deliberate
+       reading order: title first (so the reader knows what they're
+       looking at), then the illustration, then the supporting copy.
+       Same areas on .reverse to neutralize the desktop mirror. */
     grid-template-columns: 1fr;
-    gap: 32px;
+    grid-template-areas:
+      'head'
+      'visual'
+      'body';
+    row-gap: 16px;
     margin-bottom: 72px;
   }
-  /* On mobile, force the illustration above the text on every row,
-     regardless of the desktop left/right alternation. */
-  .mk-feature-row .mk-feature-visual,
-  .mk-feature-row.reverse .mk-feature-visual {
-    order: 0;
+  /* Drop the desktop end/start alignment — natural top-of-cell flow is
+     fine when each area is its own row. */
+  .mk-feature-head {
+    align-self: auto;
+    padding-bottom: 0;
   }
-  .mk-feature-row .mk-feature-text,
-  .mk-feature-row.reverse .mk-feature-text {
-    order: 1;
+  .mk-feature-body {
+    align-self: auto;
+  }
+  /* Tighter title on mobile + a touch of room before the illustration. */
+  .mk-feature-head h2 {
+    font-size: 28px;
+    line-height: 1.15;
   }
   .mk-feature-visual {
-    aspect-ratio: 4 / 3;
-    padding: 24px;
+    /* Tighten the colored box around the illustration: less inner padding
+       and drop the fixed aspect ratio so the box sizes to its content
+       (catalog answer + feedback proposal were getting clipped by the
+       4/3 ratio combined with overflow: hidden). */
+    aspect-ratio: auto;
+    padding: 16px;
+  }
+  /* Kill the playful rotation on mobile — the rotated bounding box was
+     pushing card content past the visual's right edge (overflow: hidden
+     was then clipping the time/price text). */
+  .mk-mini-inbox,
+  .mk-wa-card,
+  .mk-fb-card,
+  .mk-fb-proposal {
+    transform: none;
+  }
+  /* The "typing dots" animation fades out (opacity 0) but still occupies
+     ~50px of vertical space, leaving a big white gap between the question
+     and answer bubbles on mobile. Hide entirely — the marketing flair is
+     barely readable at this size anyway. */
+  .mk-typing-dots {
+    display: none;
+  }
+  /* Bring the catalog/feedback stacks closer together on mobile. */
+  .mk-catalog-stage,
+  .mk-feedback-stage {
+    gap: 10px;
   }
   .mk-how {
     padding: 64px 0;
@@ -5020,13 +5086,13 @@ a {
 .mk-cat-rail-inner::-webkit-scrollbar {
   display: none;
 }
-.mk-cat-pill {
+.mk-cat-rail .mk-cat-pill {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   height: 38px;
-  padding: 0 16px;
+  padding: 0 18px;
   border-radius: 999px;
   border: 1px solid var(--mk-border);
   background: #fff;
@@ -5036,15 +5102,14 @@ a {
   transition: all 0.15s;
   cursor: pointer;
 }
-.mk-cat-pill:hover {
+.mk-cat-rail .mk-cat-pill:hover {
   background: var(--mk-surface-tinted);
   border-color: var(--mk-text);
 }
-.mk-cat-pill.active {
+.mk-cat-rail .mk-cat-pill.active {
   background: var(--mk-text);
   color: #fff;
   border-color: var(--mk-text);
-  font-weight: 600;
 }
 .mk-cat-pill .swatch {
   width: 8px;
@@ -5052,8 +5117,36 @@ a {
   border-radius: 999px;
   background: var(--mk-text);
 }
+.mk-cat-pill.wa .swatch {
+  background: var(--color-brand-whatsapp);
+}
+.mk-cat-pill.ig .swatch {
+  background: var(--color-brand-instagram);
+}
+.mk-cat-pill.fb .swatch {
+  background: var(--color-brand-facebook);
+}
+.mk-cat-pill.tt .swatch {
+  background: var(--color-brand-tiktok);
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 1px var(--mk-border);
+}
+.mk-cat-pill.mm .swatch {
+  background: #f7931a;
+}
+.mk-cat-pill.cs .swatch {
+  background: #6ba9d4;
+}
+.mk-cat-pill.ai .swatch {
+  background: #8b5cf6;
+}
+.mk-cat-pill.pd .swatch {
+  background: #98c97e;
+}
 .mk-cat-pill.active .swatch {
   background: #fff !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
 /* Featured */
@@ -5201,7 +5294,11 @@ a {
   height: 13px;
 }
 .mk-featured-main .mk-card-cover {
-  aspect-ratio: 16 / 11;
+  aspect-ratio: 16 / 8;
+}
+.mk-featured-main .mk-card-cover svg.illu {
+  width: 42%;
+  height: 78%;
 }
 .mk-featured-main .mk-card-body {
   padding: 28px 30px 30px;
@@ -5258,7 +5355,12 @@ a {
   line-height: 1.22;
 }
 .mk-featured-side .mk-card-excerpt {
-  display: none;
+  font-size: 13.5px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* Grid */

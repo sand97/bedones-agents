@@ -235,19 +235,19 @@ function CardIllustration({ category }: { category: string }) {
   )
 }
 
-// Static list of category filters
-const CATEGORIES = [
-  'WhatsApp Business',
-  'Instagram',
-  'TikTok',
-  'Facebook',
-  'Mobile Money',
-  'Automatisation',
-  'Ventes',
-  'Service Client',
-  'Fidélisation',
-  'IA',
-  'Étude de cas',
+// Static list of category filters with brand color codes (matches .mk-cat-pill.<code>)
+const CATEGORIES: { label: string; code: string }[] = [
+  { label: 'WhatsApp Business', code: 'wa' },
+  { label: 'Instagram', code: 'ig' },
+  { label: 'TikTok', code: 'tt' },
+  { label: 'Facebook', code: 'fb' },
+  { label: 'Mobile Money', code: 'mm' },
+  { label: 'Automatisation', code: 'ai' },
+  { label: 'IA', code: 'ai' },
+  { label: 'Ventes', code: 'pd' },
+  { label: 'Service Client', code: 'cs' },
+  { label: 'Fidélisation', code: 'pd' },
+  { label: 'Étude de cas', code: 'cs' },
 ]
 
 function BlogListPage() {
@@ -337,14 +337,14 @@ function BlogListPage() {
             <span className="swatch" />
             Tous
           </button>
-          {CATEGORIES.map((cat) => (
+          {CATEGORIES.map(({ label, code }) => (
             <button
-              key={cat}
-              className={`mk-cat-pill${activeCat === cat ? ' active' : ''}`}
-              onClick={() => setActiveCat(cat)}
+              key={label}
+              className={`mk-cat-pill ${code}${activeCat === label ? ' active' : ''}`}
+              onClick={() => setActiveCat(label)}
             >
               <span className="swatch" />
-              {cat}
+              {label}
             </button>
           ))}
         </div>
@@ -357,7 +357,7 @@ function BlogListPage() {
             {sideFeatured.length > 0 && (
               <div className="mk-featured-side">
                 {sideFeatured.map((a) => (
-                  <ArticleCard key={a.slug} article={a} showExcerpt={false} />
+                  <ArticleCard key={a.slug} article={a} />
                 ))}
               </div>
             )}
@@ -365,23 +365,25 @@ function BlogListPage() {
         </section>
       )}
 
-      <section className="mk-grid-section">
-        <div className="mk-container">
-          <div className="mk-grid-head">
-            <h2>Tous les articles</h2>
-            <div className="filter-meta">
-              {activeCat === 'all' ? 'Tous' : activeCat} · {filtered.length} résultat
-              {filtered.length > 1 ? 's' : ''}
-            </div>
-          </div>
-          {gridArticles.length > 0 ? (
-            <div className="mk-blog-grid">
-              {gridArticles.map((a) => (
-                <ArticleCard key={a.slug} article={a} variant="grid" />
-              ))}
-            </div>
-          ) : (
-            filtered.length === 0 && (
+      {(gridArticles.length > 0 || filtered.length === 0) && (
+        <section className="mk-grid-section">
+          <div className="mk-container">
+            {gridArticles.length > 0 && (
+              <div className="mk-grid-head">
+                <h2>Tous les articles</h2>
+                <div className="filter-meta">
+                  {activeCat === 'all' ? 'Tous' : activeCat} · {filtered.length} résultat
+                  {filtered.length > 1 ? 's' : ''}
+                </div>
+              </div>
+            )}
+            {gridArticles.length > 0 ? (
+              <div className="mk-blog-grid">
+                {gridArticles.map((a) => (
+                  <ArticleCard key={a.slug} article={a} variant="grid" />
+                ))}
+              </div>
+            ) : (
               <div
                 style={{
                   padding: '60px 0',
@@ -391,10 +393,10 @@ function BlogListPage() {
               >
                 Aucun article ne correspond à votre recherche.
               </div>
-            )
-          )}
-        </div>
-      </section>
+            )}
+          </div>
+        </section>
+      )}
 
       <section className="mk-feature-band">
         <div className="mk-container mk-feature-band-grid">

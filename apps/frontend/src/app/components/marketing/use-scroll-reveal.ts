@@ -11,94 +11,86 @@ import { useEffect } from 'react'
  *     optional `--mk-d` stagger CSS var) then play their entrance /
  *     typing / pulse animations defined in styles.css.
  *
- * Triggering rules:
- *   - On mount we sync-check what's already visible and reveal it
- *     immediately (no waiting for the first IO callback).
- *   - We use `threshold: 0` + a generous positive `rootMargin` so the
- *     entrance starts a touch *before* the host enters the viewport,
- *     giving the choreography time to play as the user scrolls in.
- *   - Triple fallback (scroll listener + 700ms safety timer) covers the
- *     edge cases where IO is throttled or doesn't fire at all (some
- *     preview iframes, low-power mode, etc).
+ * Triggering rule:
+ *   The animation fires when the block's vertical center crosses the
+ *   trigger line, defined as 10% of the viewport height *above* the
+ *   viewport center — i.e. y = 40% from the top. In other words: we
+ *   wait until the block is well-centered (a touch above center) before
+ *   playing the entrance choreography.
+ *
+ *   Driven by a rAF-throttled scroll listener (precise to the pixel,
+ *   cheap for the ~20 reveal targets we have). An initial check fires
+ *   one frame after mount so the browser can paint the hidden state
+ *   before we add the `.in` class — without that frame the CSS
+ *   transition on `.mk-reveal` has nothing to animate *from*.
  */
 const HOST_SELECTOR = '.mk-feature-visual, .mk-mockup, .mk-platforms-row, .mk-anim-host'
+
+// Trigger lines as a fraction of viewport height, measured from the top.
+//
+// We split into two phases so that "header" content (titles, paragraphs,
+// app-layout chrome marked `.mk-reveal`) fades in early — otherwise the
+// user reads the title, scrolls, and stares at a big empty block while
+// waiting for the illustration to enter its trigger zone.
+//
+// Phase 1 — `.mk-reveal` (titles + layout wrappers):
+//   Fires almost as soon as the block enters the viewport from below.
+// Phase 2 — animation hosts (`.mk-mockup`, `.mk-feature-visual`,
+//   `.mk-platforms-row`, `.mk-anim-host`):
+//   Fires once the host is well-centered, so the staggered children
+//   animation (e.g. the chat conversation) plays while the user is
+//   actually looking at it.
+const HEADER_TRIGGER_RATIO = 0.95
+const ILLUSTRATION_TRIGGER_RATIO = 0.7
 
 export function useScrollReveal() {
   useEffect(() => {
     const revealSection = (el: Element) => el.classList.add('in')
     const revealHost = (el: Element) => el.classList.add('mk-anim-in')
 
-    // 1. Immediate pass — reveal anything already in (or above) the
-    // viewport on mount, no observer round-trip required.
-    const syncCheck = () => {
+    const checkVisible = () => {
       const vh = window.innerHeight || 800
+      const headerTriggerY = vh * HEADER_TRIGGER_RATIO
+      const illustrationTriggerY = vh * ILLUSTRATION_TRIGGER_RATIO
+
       document.querySelectorAll('.mk-reveal:not(.in)').forEach((el) => {
         const r = el.getBoundingClientRect()
-        if (r.top < vh - 20 && r.bottom > 0) revealSection(el)
+        if (r.height === 0) return // not yet laid out
+        const blockCenter = r.top + r.height / 2
+        if (blockCenter <= headerTriggerY) revealSection(el)
       })
+
       document.querySelectorAll(`${HOST_SELECTOR}:not(.mk-anim-in)`).forEach((el) => {
         const r = el.getBoundingClientRect()
-        // Trigger as soon as the host is even peeking into the viewport
-        // (with a 200px buffer below for a slightly anticipated start).
-        if (r.top < vh + 200 && r.bottom > -100) revealHost(el)
+        if (r.height === 0) return
+        const blockCenter = r.top + r.height / 2
+        if (blockCenter <= illustrationTriggerY) revealHost(el)
       })
     }
-    syncCheck()
-    requestAnimationFrame(syncCheck)
 
-    // 2. IntersectionObserver for ongoing reveals as the user scrolls.
-    let sectionIO: IntersectionObserver | null = null
-    let hostIO: IntersectionObserver | null = null
-    if ('IntersectionObserver' in window) {
-      sectionIO = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((e) => {
-            if (e.isIntersecting) {
-              revealSection(e.target)
-              sectionIO?.unobserve(e.target)
-            }
-          })
-        },
-        { threshold: 0, rootMargin: '0px 0px 0px 0px' },
-      )
-      document.querySelectorAll('.mk-reveal:not(.in)').forEach((el) => sectionIO!.observe(el))
+    // Defer one frame so the browser paints the initial (hidden) state
+    // before we add the `.in` class. Without this, the CSS transition on
+    // `.mk-reveal` has no "from" frame and the element appears instantly.
+    const initialRaf = requestAnimationFrame(checkVisible)
 
-      hostIO = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((e) => {
-            if (e.isIntersecting) {
-              revealHost(e.target)
-              hostIO?.unobserve(e.target)
-            }
-          })
-        },
-        // Fire as soon as any pixel of the host is in (or near) the
-        // viewport. The 200px bottom margin makes the animation start
-        // just before the user actually sees the element.
-        { threshold: 0, rootMargin: '0px 0px 200px 0px' },
-      )
-      document
-        .querySelectorAll(`${HOST_SELECTOR}:not(.mk-anim-in)`)
-        .forEach((el) => hostIO!.observe(el))
+    // rAF-throttled scroll/resize handler so we run at most one check
+    // per frame regardless of how chatty the scroll events are.
+    let pending: number | null = null
+    const schedule = () => {
+      if (pending !== null) return
+      pending = requestAnimationFrame(() => {
+        pending = null
+        checkVisible()
+      })
     }
-
-    // 3. Scroll listener as a redundant trigger (in case IO is throttled).
-    const onScroll = () => syncCheck()
-    window.addEventListener('scroll', onScroll, { passive: true })
-
-    // 4. Safety net — reveal everything after 700ms regardless. Faster
-    // than the previous 1.5s so even on slow / stuck observer setups the
-    // page is never left with invisible illustrations.
-    const safety = setTimeout(() => {
-      document.querySelectorAll('.mk-reveal:not(.in)').forEach(revealSection)
-      document.querySelectorAll(`${HOST_SELECTOR}:not(.mk-anim-in)`).forEach(revealHost)
-    }, 700)
+    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule, { passive: true })
 
     return () => {
-      window.removeEventListener('scroll', onScroll)
-      clearTimeout(safety)
-      sectionIO?.disconnect()
-      hostIO?.disconnect()
+      cancelAnimationFrame(initialRaf)
+      if (pending !== null) cancelAnimationFrame(pending)
+      window.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
     }
   }, [])
 }
