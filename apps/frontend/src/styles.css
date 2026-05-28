@@ -2986,7 +2986,8 @@ a {
     opacity 0.15s ease;
   white-space: nowrap;
 }
-.mk-btn-primary {
+.mk-btn-primary,
+.mk a.mk-btn-primary {
   background: var(--mk-text);
   color: #fff;
   box-shadow:
@@ -2997,7 +2998,8 @@ a {
   opacity: 0.92;
   transform: translateY(-1px);
 }
-.mk-btn-ghost {
+.mk-btn-ghost,
+.mk a.mk-btn-ghost {
   background: var(--mk-surface);
   color: var(--mk-text);
   border: 1px solid var(--mk-border);
@@ -3005,7 +3007,8 @@ a {
 .mk-btn-ghost:hover {
   border-color: var(--mk-text);
 }
-.mk-btn-white {
+.mk-btn-white,
+.mk a.mk-btn-white {
   background: #fff;
   color: var(--mk-text);
 }
