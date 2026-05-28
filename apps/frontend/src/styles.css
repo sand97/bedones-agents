@@ -5892,20 +5892,6 @@ a {
   }
 }
 
-/* Replay illustration sequence when the user hovers the area, so they
-   can re-trigger the choreography intentionally after first scroll-in. */
-@media (hover: hover) {
-  .mk-feature-visual:hover [data-anim],
-  .mk-mockup:hover [data-anim] {
-    animation: none;
-  }
-  .mk-feature-visual.mk-anim-in:hover [data-anim],
-  .mk-mockup.mk-anim-in:hover [data-anim] {
-    /* Restart the same animation by toggling animation-play-state */
-    animation-play-state: running;
-  }
-}
-
 /* Reduced motion — skip transforms but keep elements visible. */
 @media (prefers-reduced-motion: reduce) {
   .mk-anim-host [data-anim],
