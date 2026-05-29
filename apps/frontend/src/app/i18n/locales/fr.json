@@ -24,7 +24,9 @@
     "change": "Changer",
     "details": "Détails",
     "all": "Tout",
-    "none": "Aucun"
+    "none": "Aucun",
+    "previous": "Précédent",
+    "next": "Suivant"
   },
 
   "sidebar": {
@@ -701,6 +703,8 @@
     "thinking": "L'agent réfléchit...",
     "score_ready_tooltip": "Votre agent peut être activé.",
     "score_not_ready_tooltip": "Votre agent doit avoir un score > 80 pour être activé.",
+    "default_name": "votre agent",
+    "activation_success_title": "Agent {{name}} activé avec succès",
     "activate_banner_title": "Vous pouvez activer ou tester votre agent",
     "activate_banner_desc": "Nous avons suffisamment d'informations pour répondre à vos clients. Vous pouvez activer l'agent pour certains contacts uniquement ou pour tous les messages entrants.",
     "activate_banner_btn": "Activer",
@@ -864,6 +868,7 @@
     "title": "Récapitulatif",
     "welcome_title": "Bienvenue sur Bedones",
     "welcome_description": "Centralisez vos interactions sociales et convertissez vos prospects en clients. Connectez vos réseaux pour commencer.",
+    "welcome_setup_subtitle": "Nous avons maintenant accès à vos pages, vous devez maintenant configurer comment l'IA doit répondre à vos clients.",
     "comments_title": "Commentaires",
     "comments_description": "Connectez vos réseaux sociaux et laissez l'IA gérer vos commentaires pour vous.",
     "messaging_title": "Messagerie",
@@ -871,7 +876,31 @@
     "agent_title": "Créez votre agent",
     "agent_description": "Créez un agent pour gérer vos conversations et créer des tickets qui seront envoyés aux membres de votre équipe.",
     "agent_members_link": "Ajoutez des membres",
-    "agent_description_2": " à votre équipe. Vous pouvez aussi créer des promotions qui seront prises en compte par l'agent."
+    "agent_description_2": " à votre équipe. Vous pouvez aussi créer des promotions qui seront prises en compte par l'agent.",
+
+    "step_catalog_title": "Catalogue",
+    "step_catalog_desc": "Nous avons besoin de comprendre vos produits. Ajoutez un Catalogue Commerce Manager pour commencer — nous vous guidons pas à pas.",
+    "step_catalog_action": "Configurer mon catalogue",
+    "step_comments_desc": "Indiquez à notre IA comment elle doit s'occuper des commentaires de {{page}}.",
+    "step_comments_action": "Configurer les réponses maintenant",
+    "step_agent_desc_none": "Créez un agent pour {{page}} afin que l'IA puisse répondre à vos clients sur {{channel}}.",
+    "step_agent_desc_configuring": "Votre agent est en cours de configuration ({{score}}%). Continuez la configuration pour qu'il atteigne 80%.",
+    "step_agent_desc_below_threshold": "L'agent est prêt mais son score est encore de {{score}}%. Continuez la configuration pour pouvoir l'activer.",
+    "step_agent_action": "Continuer la configuration",
+    "step_progress": "Étape {{current}} sur {{total}}",
+
+    "no_accounts_title": "Aucun compte connecté",
+    "no_accounts_desc": "Connectez un réseau social pour commencer à gérer vos interactions depuis Bedones.",
+    "network_accounts_count_one": "{{count}} compte connecté",
+    "network_accounts_count_other": "{{count}} comptes connectés",
+    "account_no_name": "Compte {{provider}}",
+    "action_comments": "Commentaires",
+    "action_messaging": "Messagerie",
+
+    "setup_success_title": "{{subject}} configuré avec succès",
+    "setup_success_desc": "Vous pouvez maintenant passer à la configuration d'un de vos autres comptes.",
+    "setup_success_later": "Plus tard",
+    "setup_success_continue": "Continuer"
   },
 
   "meta": {

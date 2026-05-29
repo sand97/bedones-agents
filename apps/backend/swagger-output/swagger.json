@@ -53,7 +53,7 @@
         "parameters": [
           {
             "name": "accept-language",
-            "required": true,
+            "required": false,
             "in": "header",
             "schema": {
               "type": "string"
@@ -264,6 +264,20 @@
       "patch": {
         "operationId": "AuthController_updateName",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "example": "Aminata Diallo" }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -399,6 +413,32 @@
         "tags": [
           "Organisations"
         ]
+      }
+    },
+    "/organisations/{id}/setup-status": {
+      "get": {
+        "operationId": "OrganisationController_getSetupStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Organisations"]
       }
     },
     "/upload/logo": {
@@ -4619,6 +4659,68 @@
           "updatedAt",
           "socialAccounts",
           "members"
+        ]
+      },
+      "PendingCommentsStepDto": {
+        "type": "object",
+        "properties": {
+          "socialAccountId": { "type": "string" },
+          "provider": { "type": "string", "enum": ["FACEBOOK", "INSTAGRAM", "TIKTOK"] },
+          "pageName": { "type": "string", "nullable": true },
+          "profilePictureUrl": { "type": "string", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["socialAccountId", "provider", "pageName", "profilePictureUrl", "createdAt"]
+      },
+      "PendingAgentStepDto": {
+        "type": "object",
+        "properties": {
+          "socialAccountId": { "type": "string" },
+          "provider": { "type": "string", "enum": ["FACEBOOK", "INSTAGRAM", "WHATSAPP", "TIKTOK"] },
+          "channel": { "type": "string", "enum": ["WHATSAPP", "MESSENGER", "INSTAGRAM_DM", "TIKTOK_DM"] },
+          "pageName": { "type": "string", "nullable": true },
+          "profilePictureUrl": { "type": "string", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "agentStatus": {
+            "type": "string",
+            "enum": ["NONE", "DRAFT_OR_CONFIGURING", "READY_BELOW_THRESHOLD"]
+          },
+          "agentScore": { "type": "number" },
+          "agentId": { "type": "string", "nullable": true }
+        },
+        "required": [
+          "socialAccountId",
+          "provider",
+          "channel",
+          "pageName",
+          "profilePictureUrl",
+          "createdAt",
+          "agentStatus",
+          "agentScore",
+          "agentId"
+        ]
+      },
+      "SetupStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "catalogPending": { "type": "boolean" },
+          "pendingComments": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PendingCommentsStepDto" }
+          },
+          "pendingAgents": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PendingAgentStepDto" }
+          },
+          "pendingCount": { "type": "number" },
+          "allConfigured": { "type": "boolean" }
+        },
+        "required": [
+          "catalogPending",
+          "pendingComments",
+          "pendingAgents",
+          "pendingCount",
+          "allConfigured"
         ]
       },
       "UpdateOrganisationDto": {

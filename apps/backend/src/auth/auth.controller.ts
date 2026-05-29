@@ -21,7 +21,7 @@ import { AuthGuard } from './auth.guard'
 import { CurrentUser } from './decorators/current-user.decorator'
 import { LoginDto } from './dto/login.dto'
 import { CookieConsentDto } from './dto/cookie-consent.dto'
-import { MeResponseDto, StatusResponseDto } from './dto/auth-response.dto'
+import { MeResponseDto, StatusResponseDto, UpdateNameDto } from './dto/auth-response.dto'
 import { WhatsAppLoginService } from './whatsapp-login.service'
 import {
   SendWhatsAppOtpDto,
@@ -186,8 +186,9 @@ export class AuthController {
   @Patch('me/name')
   @UseGuards(AuthGuard)
   @HttpCode(200)
+  @ApiBody({ type: UpdateNameDto })
   @ApiOkResponse({ type: StatusResponseDto })
-  async updateName(@CurrentUser() user: { id: string }, @Body() body: { name: string }) {
+  async updateName(@CurrentUser() user: { id: string }, @Body() body: UpdateNameDto) {
     const name = body?.name?.trim()
     if (!name || name.length > 120) {
       throw new BadRequestException('Invalid name')

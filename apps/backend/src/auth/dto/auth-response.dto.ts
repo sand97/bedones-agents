@@ -92,3 +92,8 @@ export class MeResponseDto {
   @ApiProperty({ type: [PendingInvitationDto] })
   pendingInvitations: PendingInvitationDto[]
 }
+
+export class UpdateNameDto {
+  @ApiProperty({ example: 'Aminata Diallo' })
+  name: string
+}

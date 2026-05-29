@@ -229,6 +229,22 @@ export interface paths {
         patch: operations["OrganisationController_update"];
         trace?: never;
     };
+    "/organisations/{id}/setup-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrganisationController_getSetupStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/upload/logo": {
         parameters: {
             query?: never;
@@ -1923,6 +1939,38 @@ export interface components {
             /** @example success */
             status: string;
         };
+        SendWhatsAppOtpDto: {
+            /**
+             * @description Country dial code with leading +
+             * @example +237
+             */
+            countryCode: string;
+            /**
+             * @description Local phone number (digits only)
+             * @example 657888690
+             */
+            phone: string;
+        };
+        VerifyWhatsAppOtpDto: {
+            /** @example +237 */
+            countryCode: string;
+            /** @example 657888690 */
+            phone: string;
+            /** @example 123456 */
+            code: string;
+        };
+        WhatsAppLoginUserDto: {
+            id: string;
+            name: string;
+            phone: Record<string, never> | null;
+            phoneCountryCode: Record<string, never> | null;
+            phoneLocal: Record<string, never> | null;
+        };
+        WhatsAppVerifyResponseDto: {
+            user: components["schemas"]["WhatsAppLoginUserDto"];
+            /** @description True if the user was just created on this verification */
+            isNewUser: boolean;
+        };
         CookieConsentDto: {
             /**
              * @example all
@@ -1942,31 +1990,6 @@ export interface components {
             authType: "PASSWORD" | "FACEBOOK" | "INSTAGRAM" | "WHATSAPP";
             /** @enum {string} */
             status: "PENDING" | "VERIFIED";
-        };
-        SendWhatsAppOtpDto: {
-            /** @example +237 */
-            countryCode: string;
-            /** @example 657888690 */
-            phone: string;
-        };
-        VerifyWhatsAppOtpDto: {
-            /** @example +237 */
-            countryCode: string;
-            /** @example 657888690 */
-            phone: string;
-            /** @example 123456 */
-            code: string;
-        };
-        WhatsAppLoginUserDto: {
-            id: string;
-            name: string;
-            phone: string | null;
-            phoneCountryCode: string | null;
-            phoneLocal: string | null;
-        };
-        WhatsAppVerifyResponseDto: {
-            user: components["schemas"]["WhatsAppLoginUserDto"];
-            isNewUser: boolean;
         };
         SocialAccountDto: {
             id: string;
@@ -2038,6 +2061,37 @@ export interface components {
             updatedAt: string;
             socialAccounts: components["schemas"]["OrgSocialAccountDto"][];
             members: components["schemas"]["OrgMemberDto"][];
+        };
+        PendingCommentsStepDto: {
+            socialAccountId: string;
+            /** @enum {string} */
+            provider: "FACEBOOK" | "INSTAGRAM" | "TIKTOK";
+            pageName: string | null;
+            profilePictureUrl: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PendingAgentStepDto: {
+            socialAccountId: string;
+            /** @enum {string} */
+            provider: "FACEBOOK" | "INSTAGRAM" | "WHATSAPP" | "TIKTOK";
+            /** @enum {string} */
+            channel: "WHATSAPP" | "MESSENGER" | "INSTAGRAM_DM" | "TIKTOK_DM";
+            pageName: string | null;
+            profilePictureUrl: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** @enum {string} */
+            agentStatus: "NONE" | "DRAFT_OR_CONFIGURING" | "READY_BELOW_THRESHOLD";
+            agentScore: number;
+            agentId: string | null;
+        };
+        SetupStatusResponseDto: {
+            catalogPending: boolean;
+            pendingComments: components["schemas"]["PendingCommentsStepDto"][];
+            pendingAgents: components["schemas"]["PendingAgentStepDto"][];
+            pendingCount: number;
+            allConfigured: boolean;
         };
         UpdateOrganisationDto: {
             /** @example Nouveau nom */
@@ -2753,7 +2807,9 @@ export interface operations {
     AuthController_sendWhatsAppOtp: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "accept-language"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -3024,6 +3080,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganisationResponseDto"];
+                };
+            };
+        };
+    };
+    OrganisationController_getSetupStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupStatusResponseDto"];
                 };
             };
         };
