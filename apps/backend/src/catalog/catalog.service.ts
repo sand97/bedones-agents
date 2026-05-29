@@ -16,6 +16,29 @@ export class CatalogService {
   private readonly logger = new Logger(CatalogService.name)
   private readonly META_API_BASE = 'https://graph.facebook.com/v22.0'
 
+  /**
+   * In-memory TTL cache for product lookups by retailer_id, keyed by
+   * `${catalogProviderId}::${retailerId}`. Comment moderation resolves product codes
+   * on (potentially) every incoming comment, so without a cache a popular post would
+   * hammer the Meta Graph API. A `null` value is cached too (negative caching) so codes
+   * that don't match a real product aren't re-queried on each comment.
+   */
+  private readonly productCache = new Map<
+    string,
+    {
+      value: {
+        retailerId: string
+        name: string | null
+        imageUrl: string | null
+        price: number | null
+        currency: string | null
+      } | null
+      expiresAt: number
+    }
+  >()
+  private readonly PRODUCT_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+  private readonly PRODUCT_CACHE_MAX_ENTRIES = 5000
+
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
@@ -226,12 +249,35 @@ export class CatalogService {
   > {
     const ids = Array.from(new Set(retailerIds.filter(Boolean)))
     if (ids.length === 0) return []
+
+    const now = Date.now()
+    const hydrated: Array<{
+      retailerId: string
+      name: string | null
+      imageUrl: string | null
+      price: number | null
+      currency: string | null
+    }> = []
+    const misses: string[] = []
+
+    // Serve from cache where possible; collect the rest as misses.
+    for (const id of ids) {
+      const cached = this.productCache.get(this.productCacheKey(catalogProviderId, id))
+      if (cached && cached.expiresAt > now) {
+        if (cached.value) hydrated.push(cached.value)
+      } else {
+        misses.push(id)
+      }
+    }
+
+    if (misses.length === 0) return hydrated
+
     // Meta Graph API supports filtering products by retailer_id via a JSON filter
     // on the catalog's /products edge. We request only the fields we need for UI.
-    const filter = JSON.stringify({ retailer_id: { is_any: ids } })
+    const filter = JSON.stringify({ retailer_id: { is_any: misses } })
     const query = new URLSearchParams({
       fields: 'id,retailer_id,name,image_url,price,currency',
-      limit: String(Math.max(ids.length, 50)),
+      limit: String(Math.max(misses.length, 50)),
       filter,
       access_token: accessToken,
     })
@@ -242,12 +288,13 @@ export class CatalogService {
       if (!response.ok) {
         const errorText = await response.text()
         this.logger.warn(`hydrateProducts: Meta API error ${response.status}: ${errorText}`)
-        return []
+        // Return whatever we already had cached; don't cache failures.
+        return hydrated
       }
       const data = (await response.json()) as {
         data: Array<Record<string, unknown>>
       }
-      return (data.data || []).map((p) => {
+      const fetched = (data.data || []).map((p) => {
         const priceInfo = p.price ? this.parseMetaPrice(String(p.price)) : null
         return {
           retailerId: String(p.retailer_id ?? ''),
@@ -257,12 +304,55 @@ export class CatalogService {
           currency: (p.currency as string) ?? priceInfo?.currency ?? null,
         }
       })
+
+      const byId = new Map(fetched.map((p) => [p.retailerId, p]))
+      // Cache each miss — including the ones Meta didn't return (negative cache).
+      for (const id of misses) {
+        const value = byId.get(id) ?? null
+        this.setProductCache(catalogProviderId, id, value)
+        if (value) hydrated.push(value)
+      }
+
+      return hydrated
     } catch (error: unknown) {
       this.logger.warn(
         `hydrateProducts: fetch failed: ${error instanceof Error ? error.message : error}`,
       )
-      return []
+      // Return whatever we already had cached; don't cache failures.
+      return hydrated
     }
+  }
+
+  private productCacheKey(catalogProviderId: string, retailerId: string): string {
+    return `${catalogProviderId}::${retailerId}`
+  }
+
+  private setProductCache(
+    catalogProviderId: string,
+    retailerId: string,
+    value: {
+      retailerId: string
+      name: string | null
+      imageUrl: string | null
+      price: number | null
+      currency: string | null
+    } | null,
+  ): void {
+    // Cheap bound: when the cache grows too large, drop expired entries first and,
+    // if still over budget, clear it entirely. Avoids unbounded memory growth.
+    if (this.productCache.size >= this.PRODUCT_CACHE_MAX_ENTRIES) {
+      const now = Date.now()
+      for (const [k, v] of this.productCache) {
+        if (v.expiresAt <= now) this.productCache.delete(k)
+      }
+      if (this.productCache.size >= this.PRODUCT_CACHE_MAX_ENTRIES) {
+        this.productCache.clear()
+      }
+    }
+    this.productCache.set(this.productCacheKey(catalogProviderId, retailerId), {
+      value,
+      expiresAt: Date.now() + this.PRODUCT_CACHE_TTL_MS,
+    })
   }
 
   async findProducts(
