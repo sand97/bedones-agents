@@ -13,6 +13,7 @@ enum AuthType {
   PASSWORD
   FACEBOOK
   INSTAGRAM
+  WHATSAPP
 }
 
 enum SocialProvider {
@@ -122,7 +123,14 @@ enum NotificationType {
 model User {
   id             String     @id @default(uuid())
   email          String?    @unique
+  // Full phone number in E.164 format (e.g. "+237657888690"). Kept as the
+  // unique key used for lookups across modules (members, invitations, OTP).
   phone          String?    @unique
+  // Split components for display/formatting. `phoneCountryCode` is the dial
+  // code with leading "+" (e.g. "+237"); `phoneLocal` is the local part
+  // without the dial code (e.g. "657888690").
+  phoneCountryCode String?
+  phoneLocal       String?
   name           String
   avatar         String?
   passwordHash   String?

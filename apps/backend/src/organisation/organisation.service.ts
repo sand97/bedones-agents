@@ -23,6 +23,10 @@ export class OrganisationService {
           create: {
             userId,
             role: 'OWNER',
+            // The creator is an active member immediately. Without this the
+            // membership defaults to INVITED (see schema) and the creator's own
+            // org wrongly shows up under pendingInvitations in /auth/me.
+            status: 'ACTIVE',
           },
         },
         ticketStatuses: {

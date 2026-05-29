@@ -25,7 +25,7 @@ export function getSocket(orgId: string): Socket {
     socket.disconnect()
   }
 
-  const backendUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
+  const backendUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
 
   socket = io(backendUrl, {
     query: { orgId },

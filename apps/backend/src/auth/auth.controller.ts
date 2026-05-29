@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   Logger,
   Patch,
@@ -20,7 +21,13 @@ import { AuthGuard } from './auth.guard'
 import { CurrentUser } from './decorators/current-user.decorator'
 import { LoginDto } from './dto/login.dto'
 import { CookieConsentDto } from './dto/cookie-consent.dto'
-import { MeResponseDto, StatusResponseDto } from './dto/auth-response.dto'
+import { MeResponseDto, StatusResponseDto, UpdateNameDto } from './dto/auth-response.dto'
+import { WhatsAppLoginService } from './whatsapp-login.service'
+import {
+  SendWhatsAppOtpDto,
+  VerifyWhatsAppOtpDto,
+  WhatsAppVerifyResponseDto,
+} from './dto/whatsapp-login.dto'
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -32,6 +39,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
+    private whatsappLoginService: WhatsAppLoginService,
   ) {
     this.frontendUrl = this.configService.getOrThrow<string>('FRONTEND_URL')
     this.isProduction = this.configService.get<string>('NODE_ENV') === 'production'
@@ -47,6 +55,37 @@ export class AuthController {
     const { jwt, expiresAt } = await this.authService.loginWithPassword(body.email, body.password)
     this.setSessionCookie(res, jwt, expiresAt)
     return { status: 'success' }
+  }
+
+  // ─── WhatsApp OTP Login (default flow) ───
+
+  @Post('whatsapp/send-otp')
+  @HttpCode(200)
+  @ApiBody({ type: SendWhatsAppOtpDto })
+  @ApiOkResponse({ type: StatusResponseDto })
+  async sendWhatsAppOtp(
+    @Body() body: SendWhatsAppOtpDto,
+    @Headers('accept-language') acceptLang?: string,
+  ) {
+    const lang = acceptLang?.startsWith('en') ? 'en' : 'fr'
+    return this.whatsappLoginService.sendOtp(body.countryCode, body.phone, lang)
+  }
+
+  @Post('whatsapp/verify-otp')
+  @HttpCode(200)
+  @ApiBody({ type: VerifyWhatsAppOtpDto })
+  @ApiOkResponse({ type: WhatsAppVerifyResponseDto })
+  async verifyWhatsAppOtp(
+    @Body() body: VerifyWhatsAppOtpDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.whatsappLoginService.verifyOtp(
+      body.countryCode,
+      body.phone,
+      body.code,
+    )
+    this.setSessionCookie(res, result.session.jwt, result.session.expiresAt)
+    return { user: result.user, isNewUser: result.isNewUser }
   }
 
   // ─── Cookie Consent ───
@@ -141,6 +180,20 @@ export class AuthController {
       throw new BadRequestException('Invalid locale (expected 2-letter BCP-47 tag)')
     }
     await this.authService.updateLocale(user.id, body.locale.toLowerCase())
+    return { status: 'success' }
+  }
+
+  @Patch('me/name')
+  @UseGuards(AuthGuard)
+  @HttpCode(200)
+  @ApiBody({ type: UpdateNameDto })
+  @ApiOkResponse({ type: StatusResponseDto })
+  async updateName(@CurrentUser() user: { id: string }, @Body() body: UpdateNameDto) {
+    const name = body?.name?.trim()
+    if (!name || name.length > 120) {
+      throw new BadRequestException('Invalid name')
+    }
+    await this.authService.updateName(user.id, name)
     return { status: 'success' }
   }
 

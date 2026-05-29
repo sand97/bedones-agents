@@ -11,7 +11,7 @@ async function bootstrap() {
   app.use(cookieParser())
 
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'https://moderator.bedones.test',
+    origin: process.env.FRONTEND_URL || 'https://moderator.bedones.local',
     credentials: true,
   })
 
