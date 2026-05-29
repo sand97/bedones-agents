@@ -109,17 +109,24 @@ export function SetupCarousel({
     return out
   }, [status, t, onConfigureCatalog, onConfigureComments, onConfigureAgent])
 
-  // When a step disappears (after a successful save), keep the same index — the
-  // entry that used to be "next" now sits at the same position, which is exactly
-  // the "advance to next step" behaviour we want. We only clamp when the user
-  // was on the last step and it just disappeared.
+  // After a successful save the saved step disappears and `steps` shrinks by
+  // one. We want the user to land on what used to be the "next" step — i.e.
+  // keep the same React index. Slick's internal index does NOT keep up on its
+  // own (it silently snaps back to 0 when children change), so we re-issue a
+  // `goTo` every time the step count changes. We only react to `steps.length`
+  // by tracking it through a ref — re-syncing on every `current` change would
+  // fight Slick's own animations on Prev/Next.
+  const prevStepsLengthRef = useRef(steps.length)
   useEffect(() => {
-    if (steps.length === 0) return
-    if (current >= steps.length) {
-      const last = steps.length - 1
-      setCurrent(last)
-      carouselRef.current?.goTo(last, true)
+    if (steps.length === 0) {
+      prevStepsLengthRef.current = 0
+      return
     }
+    if (steps.length === prevStepsLengthRef.current) return
+    prevStepsLengthRef.current = steps.length
+    const target = Math.min(current, steps.length - 1)
+    if (target !== current) setCurrent(target)
+    carouselRef.current?.goTo(target, true)
   }, [steps.length, current])
 
   if (steps.length === 0) return null

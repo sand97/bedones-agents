@@ -900,8 +900,7 @@
     "setup_success_title": "{{subject}} configuré avec succès",
     "setup_success_desc": "Vous pouvez maintenant passer à la configuration d'un de vos autres comptes.",
     "setup_success_later": "Plus tard",
-    "setup_success_continue": "Continuer",
-    "comments_saved_toast": "{{page}} configurée — passons au compte suivant."
+    "setup_success_continue": "Continuer"
   },
 
   "meta": {

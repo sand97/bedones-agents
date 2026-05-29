@@ -884,8 +884,7 @@
     "setup_success_title": "{{subject}} successfully configured",
     "setup_success_desc": "You can now move on to configuring one of your other accounts.",
     "setup_success_later": "Later",
-    "setup_success_continue": "Continue",
-    "comments_saved_toast": "{{page}} configured — moving on to the next account."
+    "setup_success_continue": "Continue"
   },
 
   "meta": {
