@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
-import { Skeleton, Typography } from 'antd'
+import { App, Skeleton, Typography } from 'antd'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
@@ -22,6 +22,7 @@ function DashboardPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
+  const { message } = App.useApp()
 
   const accountsQuery = $api.useQuery('get', '/social/accounts/{organisationId}', {
     params: { path: { organisationId: orgSlug } },
@@ -67,11 +68,14 @@ function DashboardPage() {
   }
 
   const handleCommentsSaved = () => {
-    // We're already on the dashboard — no success modal needed. The carousel
-    // will re-render with the next pending step once the queries settle.
+    // We're already on the dashboard — show a lightweight toast and let the
+    // carousel advance naturally to the next pending step once the queries
+    // settle. The "Configurer xxx" message uses the page name we were just on.
+    const pageName = commentsModal?.pageName ?? ''
     setCommentsModal(null)
     setupStatusQuery.refetch()
     accountsQuery.refetch()
+    message.success(t('dashboard.comments_saved_toast', { page: pageName }))
   }
 
   const handleOpenComments = (provider: string, _accountId: string) => {

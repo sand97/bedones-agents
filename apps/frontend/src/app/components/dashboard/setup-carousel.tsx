@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Avatar, Button, Carousel } from 'antd'
 import type { CarouselRef } from 'antd/es/carousel'
 import { ArrowLeft, ArrowRight, ShoppingBag } from 'lucide-react'
@@ -109,10 +109,18 @@ export function SetupCarousel({
     return out
   }, [status, t, onConfigureCatalog, onConfigureComments, onConfigureAgent])
 
-  // Reset to the first slide whenever the set of steps changes (after a save).
-  if (current >= steps.length && current > 0) {
-    queueMicrotask(() => setCurrent(0))
-  }
+  // When a step disappears (after a successful save), keep the same index — the
+  // entry that used to be "next" now sits at the same position, which is exactly
+  // the "advance to next step" behaviour we want. We only clamp when the user
+  // was on the last step and it just disappeared.
+  useEffect(() => {
+    if (steps.length === 0) return
+    if (current >= steps.length) {
+      const last = steps.length - 1
+      setCurrent(last)
+      carouselRef.current?.goTo(last, true)
+    }
+  }, [steps.length, current])
 
   if (steps.length === 0) return null
 
