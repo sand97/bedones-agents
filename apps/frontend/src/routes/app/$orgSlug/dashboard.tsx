@@ -1,19 +1,16 @@
 import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
-import { Skeleton, Typography } from 'antd'
-import { useQueryClient } from '@tanstack/react-query'
+import { App, Skeleton, Typography } from 'antd'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { $api } from '@app/lib/api/$api'
 import { SetupCarousel } from '@app/components/dashboard/setup-carousel'
 import { AccountOverview } from '@app/components/dashboard/account-overview'
-import { SetupSuccessModal } from '@app/components/dashboard/setup-success-modal'
 import { CommentsConfigModal } from '@app/components/comments/comments-config'
 import type { components } from '@app/lib/api/v1'
 
 const { Title, Text } = Typography
 
-type SetupStatus = components['schemas']['SetupStatusResponseDto']
 type PendingComment = components['schemas']['PendingCommentsStepDto']
 type PendingAgent = components['schemas']['PendingAgentStepDto']
 
@@ -25,7 +22,7 @@ function DashboardPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
-  const queryClient = useQueryClient()
+  const { message } = App.useApp()
 
   const accountsQuery = $api.useQuery('get', '/social/accounts/{organisationId}', {
     params: { path: { organisationId: orgSlug } },
@@ -39,12 +36,6 @@ function DashboardPage() {
   const [commentsModal, setCommentsModal] = useState<{
     accountId: string
     pageName: string
-  } | null>(null)
-
-  // ─── State for the success modal opened after a configuration step ───
-  const [successModal, setSuccessModal] = useState<{
-    subject: string
-    remaining: number
   } | null>(null)
 
   const status = setupStatusQuery.data
@@ -72,40 +63,19 @@ function DashboardPage() {
 
   const handleConfigureAgent = (step: PendingAgent) => {
     navigate({ to: '/app/$orgSlug/agents', params: { orgSlug } })
-    // Best-effort: pass the agent id via search params so the page can pre-select it.
-    // (Agents page currently doesn't read query state — kept as a future hook.)
+    // Future hook: pass the agent id via search params so the page can preselect it.
     void step
   }
 
-  const handleCommentsSaved = async () => {
-    const previousPageName = commentsModal?.pageName ?? ''
+  const handleCommentsSaved = () => {
+    // We're already on the dashboard — show a lightweight toast and let the
+    // carousel advance naturally to the next pending step once the queries
+    // settle. The "Configurer xxx" message uses the page name we were just on.
+    const pageName = commentsModal?.pageName ?? ''
     setCommentsModal(null)
-
-    // Refetch setup status — the API now knows we just configured a page.
-    const refreshed = await queryClient
-      .fetchQuery<SetupStatus>({
-        queryKey: [
-          'get',
-          '/organisations/{id}/setup-status',
-          { params: { path: { id: orgSlug } } },
-        ],
-        queryFn: () => fetchSetupStatus(orgSlug),
-      })
-      .catch(() => undefined)
-
-    const remaining = refreshed?.pendingCount ?? 0
-    // Always refresh the live query too so the carousel re-renders.
     setupStatusQuery.refetch()
     accountsQuery.refetch()
-
-    if (remaining > 0) {
-      setSuccessModal({ subject: previousPageName, remaining })
-    }
-  }
-
-  const handleSuccessContinue = () => {
-    setSuccessModal(null)
-    // We already are on /dashboard — nothing else to do; the carousel now shows the next step.
+    message.success(t('dashboard.comments_saved_toast', { page: pageName }))
   }
 
   const handleOpenComments = (provider: string, _accountId: string) => {
@@ -180,24 +150,6 @@ function DashboardPage() {
           onSaved={handleCommentsSaved}
         />
       )}
-
-      {/* Success modal — opens after a configuration step when steps remain */}
-      <SetupSuccessModal
-        open={Boolean(successModal)}
-        subjectName={successModal?.subject ?? ''}
-        remainingCount={successModal?.remaining ?? 0}
-        onContinue={handleSuccessContinue}
-        onLater={() => setSuccessModal(null)}
-      />
     </div>
   )
-}
-
-async function fetchSetupStatus(orgId: string): Promise<SetupStatus> {
-  const baseUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
-  const res = await fetch(`${baseUrl}/organisations/${orgId}/setup-status`, {
-    credentials: 'include',
-  })
-  if (!res.ok) throw new Error(`Failed to fetch setup status: ${res.status}`)
-  return res.json()
 }
