@@ -867,10 +867,12 @@
     "step_catalog_action": "Configure my catalog",
     "step_comments_desc": "Tell our AI how it should handle comments on {{page}}.",
     "step_comments_action": "Configure replies now",
+    "step_comments_action_edit": "Edit configuration",
     "step_agent_desc_none": "Create an agent for {{page}} so the AI can reply to your customers on {{channel}}.",
     "step_agent_desc_configuring": "Your agent is being configured ({{score}}%). Keep going to reach the 80% threshold.",
     "step_agent_desc_below_threshold": "The agent is ready but its score is still {{score}}%. Keep configuring it before activating.",
     "step_agent_action": "Continue configuration",
+    "step_agent_action_edit": "Edit agent",
     "step_progress": "Step {{current}} of {{total}}",
 
     "no_accounts_title": "No connected accounts",
