@@ -9,15 +9,6 @@ permissions:
   packages: write
 
 on:
-  pull_request:
-    paths:
-      - ".dockerignore"
-      - ".github/workflows/container-images.yml"
-      - "apps/backend/**"
-      - "services/image-cropper/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
   push:
     branches:
       - main
