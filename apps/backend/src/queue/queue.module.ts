@@ -8,6 +8,7 @@ export const SOCIAL_AVATAR_SYNC_QUEUE = 'social-avatar-sync'
 export const LOYALTY_CAMPAIGN_QUEUE = 'loyalty-campaign'
 export const CONTACT_LANGUAGE_QUEUE = 'contact-language'
 export const WHATSAPP_PRODUCT_IMAGE_SYNC_QUEUE = 'whatsapp-product-image-sync'
+export const CATALOG_MIGRATION_QUEUE = 'catalog-migration'
 
 const catalogQueue = BullModule.registerQueue({ name: CATALOG_INDEXING_QUEUE })
 const whatsappOptinQueue = BullModule.registerQueue({ name: WHATSAPP_OPTIN_QUEUE })
@@ -17,6 +18,7 @@ const contactLanguageQueue = BullModule.registerQueue({ name: CONTACT_LANGUAGE_Q
 const whatsappProductImageSyncQueue = BullModule.registerQueue({
   name: WHATSAPP_PRODUCT_IMAGE_SYNC_QUEUE,
 })
+const catalogMigrationQueue = BullModule.registerQueue({ name: CATALOG_MIGRATION_QUEUE })
 
 @Module({
   imports: [
@@ -41,6 +43,7 @@ const whatsappProductImageSyncQueue = BullModule.registerQueue({
     loyaltyCampaignQueue,
     contactLanguageQueue,
     whatsappProductImageSyncQueue,
+    catalogMigrationQueue,
   ],
   exports: [
     catalogQueue,
@@ -49,6 +52,7 @@ const whatsappProductImageSyncQueue = BullModule.registerQueue({
     loyaltyCampaignQueue,
     contactLanguageQueue,
     whatsappProductImageSyncQueue,
+    catalogMigrationQueue,
   ],
 })
 export class QueueModule {}
