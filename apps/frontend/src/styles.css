@@ -95,6 +95,35 @@ body {
   background-size: 24px 24px;
 }
 
+/* Login line grid — centered on the form card, opacity fades outward via a radial mask */
+.login-grid-lines {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1600px;
+  height: 1600px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.07) 1px, transparent 1px);
+  background-size: 44px 44px;
+  background-position: center;
+  -webkit-mask-image: radial-gradient(
+    circle 760px at center,
+    #000 0%,
+    rgba(0, 0, 0, 0.45) 45%,
+    transparent 80%
+  );
+  mask-image: radial-gradient(
+    circle 760px at center,
+    #000 0%,
+    rgba(0, 0, 0, 0.45) 45%,
+    transparent 80%
+  );
+}
+
 /* Corner marks — positioned relative to card wrapper */
 .onboarding-corner {
   position: absolute;

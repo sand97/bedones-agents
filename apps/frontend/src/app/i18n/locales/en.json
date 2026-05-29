@@ -64,6 +64,7 @@
   },
 
   "auth": {
+    "title": "Login / Sign up",
     "login": "Login",
     "login_error": "Login error",
     "email": "Email",

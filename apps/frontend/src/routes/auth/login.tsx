@@ -1,17 +1,37 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Button, Card, Checkbox, Form, Input, Modal, Select, Typography, message } from 'antd'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Lock, Mail, BookOpen, HelpCircle, Send } from 'lucide-react'
+import { ArrowLeft, Lock, Mail, BookOpen, HelpCircle, RotateCw, Send } from 'lucide-react'
 import { featuresConfig, type Feature } from '@app/data/features'
-import { login, fetchMe } from '@app/lib/api'
+import { login, fetchMe, type MeResponse } from '@app/lib/api'
 import { $api } from '@app/lib/api/$api'
+import { resolvePostAuthRoute } from '@app/lib/post-auth-route'
 import { CookieConsentModal } from '@app/components/auth/cookie-consent-modal'
 import { CountryPhoneInput } from '@app/components/shared/country-phone-input'
 
 const { Title, Text } = Typography
 
+/** Send the user to the right place after authentication (see resolvePostAuthRoute). */
+function navigateAfterAuth(navigate: ReturnType<typeof useNavigate>, data: MeResponse) {
+  const route = resolvePostAuthRoute(data)
+  if (route.kind === 'dashboard') {
+    navigate({ to: '/app/$orgSlug/dashboard', params: { orgSlug: route.orgId } })
+  } else if (route.kind === 'organisations') {
+    navigate({ to: '/organisations' })
+  } else {
+    navigate({ to: '/create-organisation', search: { step: undefined } })
+  }
+}
+
 const LAST_LOGIN_PHONE_KEY = 'bedones:last_login_phone'
+
+// Délai minimum (secondes) avant de pouvoir renvoyer un code OTP.
+const RESEND_INTERVAL_SECONDS = 60
+
+// Affichage des blocs d'aide (Messagerie, Commentaires, Agents) sous le formulaire.
+// Désactivés par défaut — définir VITE_LOGIN_TOOLTIP_VISIBLE=true pour les afficher.
+const LOGIN_TOOLTIP_VISIBLE = import.meta.env.VITE_LOGIN_TOOLTIP_VISIBLE === 'true'
 
 type LoginMethod = 'whatsapp' | 'email'
 type WhatsAppStep = 'phone' | 'otp' | 'name'
@@ -67,26 +87,32 @@ function LoginPage() {
   })
 
   return (
-    <div className="flex min-h-screen flex-col items-center px-4 py-12">
-      <div className="flex w-full max-w-md flex-col items-center gap-8 mt-[12vh]">
+    <div className="relative flex min-h-screen flex-col items-center overflow-hidden px-4 py-12">
+      <div className="relative z-1 flex w-full max-w-md flex-col items-center gap-8 mt-[12vh]">
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-black">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black">
             <span className="text-sm font-bold text-white">B</span>
           </div>
           <span className="text-lg font-semibold">Bedones</span>
         </div>
 
-        {method === 'email' ? (
-          <EmailLoginCard navigate={navigate} t={t} />
-        ) : (
-          <WhatsAppLoginCard
-            initialCountry={search.country}
-            initialPhone={search.phone}
-            navigate={navigate}
-            t={t}
-          />
-        )}
+        {/* Card du formulaire + grille de lignes centrée dessus, opacité décroissante vers l'extérieur */}
+        <div className="relative w-full">
+          <div className="login-grid-lines" />
+          <div className="relative z-1">
+            {method === 'email' ? (
+              <EmailLoginCard navigate={navigate} t={t} />
+            ) : (
+              <WhatsAppLoginCard
+                initialCountry={search.country}
+                initialPhone={search.phone}
+                navigate={navigate}
+                t={t}
+              />
+            )}
+          </div>
+        </div>
 
         <div className="flex items-center gap-3">
           <Button
@@ -110,31 +136,35 @@ function LoginPage() {
         </div>
       </div>
 
-      {/* Features Section */}
-      <div className="mt-16 flex flex-wrap items-start justify-center gap-14">
-        {Object.entries(featuresConfig).map(([key, category]) => (
-          <div key={key} className="flex flex-col items-center gap-2 rounded-panel p-4">
-            <p className="mb-1 text-lg text-text-secondary">{category.title}</p>
-            <div className="flex flex-col items-center gap-2">
-              {category.features.map((feature) => {
-                const FeatureIcon = feature.icon
+      {/* Features Section — masquée par défaut, activable via VITE_LOGIN_TOOLTIP_VISIBLE */}
+      {LOGIN_TOOLTIP_VISIBLE && (
+        <div className="relative z-1 mt-16 flex flex-wrap items-start justify-center gap-14">
+          {Object.entries(featuresConfig).map(([key, category]) => (
+            <div key={key} className="flex flex-col items-center gap-2 rounded-panel p-4">
+              <p className="mb-1 text-lg text-text-secondary">{category.title}</p>
+              <div className="flex flex-col items-center gap-2">
+                {category.features.map((feature) => {
+                  const FeatureIcon = feature.icon
 
-                return (
-                  <button
-                    key={feature.title}
-                    type="button"
-                    onClick={() => setSelectedFeature(feature)}
-                    className="flex h-11 cursor-pointer items-center gap-2.5 rounded-pill border border-transparent bg-white px-6 shadow-pill transition-colors hover:border-black"
-                  >
-                    <FeatureIcon />
-                    <span className="whitespace-nowrap text-base text-black">{feature.title}</span>
-                  </button>
-                )
-              })}
+                  return (
+                    <button
+                      key={feature.title}
+                      type="button"
+                      onClick={() => setSelectedFeature(feature)}
+                      className="flex h-11 cursor-pointer items-center gap-2.5 rounded-pill border border-transparent bg-white px-6 shadow-pill transition-colors hover:border-black"
+                    >
+                      <FeatureIcon />
+                      <span className="whitespace-nowrap text-base text-black">
+                        {feature.title}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Feature detail modal */}
       <Modal
@@ -270,8 +300,17 @@ function WhatsAppLoginCard({
   const [rememberPhone, setRememberPhone] = useState<boolean>(() => readStoredPhone() != null)
   const [otpCode, setOtpCode] = useState('')
   const [name, setName] = useState('')
+  // Secondes restantes avant de pouvoir renvoyer le code (0 = renvoi autorisé).
+  const [resendSeconds, setResendSeconds] = useState(0)
 
   const prefilled = Boolean(initialCountry && initialPhone)
+
+  // Décrémente le compte à rebours du renvoi de code chaque seconde.
+  useEffect(() => {
+    if (resendSeconds <= 0) return
+    const id = setTimeout(() => setResendSeconds((s) => s - 1), 1000)
+    return () => clearTimeout(id)
+  }, [resendSeconds])
 
   const sendOtp = $api.useMutation('post', '/auth/whatsapp/send-otp')
   const verifyOtp = $api.useMutation('post', '/auth/whatsapp/verify-otp')
@@ -290,6 +329,7 @@ function WhatsAppLoginCard({
       })
       message.success(t('invitation.otp_sent'))
       setOtpCode('')
+      setResendSeconds(RESEND_INTERVAL_SECONDS)
       setStep('otp')
     } catch (err) {
       message.error(err instanceof Error ? err.message : t('invitation.otp_send_error'))
@@ -339,23 +379,12 @@ function WhatsAppLoginCard({
 
   const goToNextScreen = async () => {
     const data = await fetchMe()
-    const hasPendingInvitations =
-      (data as { pendingInvitations?: unknown[] }).pendingInvitations?.length ?? 0 > 0
-    if (hasPendingInvitations) {
-      navigate({ to: '/organisations' })
-    } else if (data.organisations.length > 0) {
-      navigate({
-        to: '/app/$orgSlug/dashboard',
-        params: { orgSlug: data.organisations[0].id },
-      })
-    } else {
-      navigate({ to: '/create-organisation', search: { step: undefined } })
-    }
+    navigateAfterAuth(navigate, data)
   }
 
   if (step === 'name') {
     return (
-      <Card className="w-full" styles={{ body: { padding: 32 } }}>
+      <Card className="w-full" classNames={{ body: 'p-4! md:p-8!' }}>
         <div className="flex flex-col items-center gap-6">
           <div className="text-center">
             <Title level={4} style={{ marginBottom: 4 }}>
@@ -393,7 +422,7 @@ function WhatsAppLoginCard({
 
   if (step === 'otp') {
     return (
-      <Card className="w-full" styles={{ body: { padding: 32 } }}>
+      <Card className="w-full" classNames={{ body: 'p-4! md:p-8!' }}>
         <div className="flex flex-col items-center gap-6">
           <div className="text-center">
             <Title level={4} style={{ marginBottom: 4 }}>
@@ -405,7 +434,9 @@ function WhatsAppLoginCard({
           </div>
 
           <div className="flex w-full flex-col items-center gap-3">
-            <Input.OTP length={6} value={otpCode} onChange={setOtpCode} />
+            {/* onInput (et non onChange) se déclenche à chaque frappe ET suppression,
+                pour garder otpCode — donc le disabled du bouton Verify — synchronisé. */}
+            <Input.OTP length={6} value={otpCode} onInput={(cells) => setOtpCode(cells.join(''))} />
             <Button
               type="primary"
               size="large"
@@ -417,11 +448,29 @@ function WhatsAppLoginCard({
             >
               {t('invitation.verify')}
             </Button>
-            <Button type="link" onClick={handleSendOtp} loading={sendOtp.isPending}>
-              {t('invitation.resend_code')}
+            <Button
+              type="default"
+              icon={<RotateCw size={16} />}
+              size="large"
+              block
+              style={{ height: 44 }}
+              onClick={handleSendOtp}
+              loading={sendOtp.isPending}
+              disabled={resendSeconds > 0}
+            >
+              {resendSeconds > 0
+                ? `${t('invitation.resend_code')} (${resendSeconds}s)`
+                : t('invitation.resend_code')}
             </Button>
-            <Button type="text" onClick={() => setStep('phone')} size="small">
-              {t('common.back')}
+            <Button
+              type="default"
+              icon={<ArrowLeft size={16} />}
+              size="large"
+              block
+              style={{ height: 44 }}
+              onClick={() => setStep('phone')}
+            >
+              Modifier le numéro
             </Button>
           </div>
         </div>
@@ -430,11 +479,11 @@ function WhatsAppLoginCard({
   }
 
   return (
-    <Card className="w-full" styles={{ body: { padding: 32 } }}>
+    <Card className="w-full" classNames={{ body: 'p-4! md:p-8!' }}>
       <div className="flex flex-col items-center gap-6">
         <div className="text-center">
           <Title level={4} style={{ marginBottom: 4 }}>
-            Centralisez vos interactions sociales
+            {t('auth.title')}
           </Title>
           <Text type="secondary">{t('auth.whatsapp_subtitle')}</Text>
         </div>
@@ -508,19 +557,7 @@ function EmailLoginCard({
     try {
       await login(email, password)
       const data = await fetchMe()
-
-      const hasPendingInvitations =
-        (data as { pendingInvitations?: unknown[] }).pendingInvitations?.length ?? 0 > 0
-      if (hasPendingInvitations) {
-        navigate({ to: '/organisations' })
-      } else if (data.organisations.length > 0) {
-        navigate({
-          to: '/app/$orgSlug/dashboard',
-          params: { orgSlug: data.organisations[0].id },
-        })
-      } else {
-        navigate({ to: '/create-organisation', search: { step: undefined } })
-      }
+      navigateAfterAuth(navigate, data)
     } catch (err) {
       message.error(err instanceof Error ? err.message : t('auth.login_error'))
     } finally {
@@ -529,11 +566,11 @@ function EmailLoginCard({
   }
 
   return (
-    <Card className="w-full" styles={{ body: { padding: 32 } }}>
+    <Card className="w-full" classNames={{ body: 'p-4! md:p-8!' }}>
       <div className="flex flex-col items-center gap-6">
         <div className="text-center">
           <Title level={4} style={{ marginBottom: 4 }}>
-            Centralisez vos interactions sociales
+            {t('auth.title')}
           </Title>
           <Text type="secondary">Connectez-vous pour commencer</Text>
         </div>

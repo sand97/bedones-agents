@@ -1,15 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useState, useMemo, type ReactNode } from 'react'
-import { Button, Card, Checkbox, Input, Steps, Tooltip, Upload } from 'antd'
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  MessageSquareText,
-  MessagesSquare,
-  Plus,
-  Trash2,
-} from 'lucide-react'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useEffect, useState, useMemo, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Avatar, Button, Card, Checkbox, Input, Steps, Upload, message } from 'antd'
+import { ArrowLeft, ArrowRight, Check, MessageSquareText, MessagesSquare, Plus } from 'lucide-react'
 import {
   FacebookIcon,
   InstagramIcon,
@@ -23,6 +16,18 @@ import {
   buildInstagramOAuthUrl,
   buildTikTokOAuthUrl,
 } from '@app/lib/auth-redirect'
+import { $api } from '@app/lib/api/$api'
+import { createOrganisation, updateOrganisation, uploadLogo } from '@app/lib/api'
+import { launchWhatsAppSignup } from '@app/lib/facebook-sdk'
+import {
+  clearOnboardingDraft,
+  readOnboardingDraft,
+  writeOnboardingDraft,
+} from '@app/lib/onboarding-draft'
+import {
+  formatSocialAccountDescription,
+  formatSocialAccountName,
+} from '@app/components/social/account-switcher'
 
 export const Route = createFileRoute('/create-organisation')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -147,6 +152,25 @@ const FEATURE_CATEGORIES: FeatureCategoryConfig[] = [
   },
 ]
 
+/* ─── Onboarding ─── */
+
+/** Map an onboarding platform id to its social account provider. */
+const PROVIDER_BY_PLATFORM: Record<string, 'WHATSAPP' | 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK'> = {
+  whatsapp: 'WHATSAPP',
+  facebook: 'FACEBOOK',
+  instagram: 'INSTAGRAM',
+  tiktok: 'TIKTOK',
+}
+
+/** A connected social account, ready to display in a connection step. */
+interface ConnectedAccount {
+  id: string
+  name: string
+  description?: string
+  /** The page's own profile picture; the platform logo is used as a fallback. */
+  avatarUrl?: string
+}
+
 /* ─── Helpers ─── */
 
 /** Get which features the user actually selected for this specific platform */
@@ -247,19 +271,67 @@ function formatConnectedPages(pages: string[], platformId?: string): string {
 /* ─── Main component ─── */
 
 function CreateOrganisationPage() {
-  const { step: initialStep } = Route.useSearch()
-  const [currentStep, setCurrentStep] = useState(initialStep || 0)
-  const [orgName, setOrgName] = useState('')
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { step: searchStep } = Route.useSearch()
+
+  // Restore any in-progress onboarding (survives OAuth redirects and re-login).
+  const [draft] = useState(readOnboardingDraft)
+
+  const [currentStep, setCurrentStep] = useState(draft.step ?? searchStep ?? 0)
+  const [orgName, setOrgName] = useState(draft.orgName ?? '')
   const [orgLogo, setOrgLogo] = useState<string | null>(null)
+  const [orgLogoFile, setOrgLogoFile] = useState<File | null>(null)
+  const [orgId, setOrgId] = useState<string | null>(draft.orgId ?? null)
+  const [savingOrg, setSavingOrg] = useState(false)
+  const [connecting, setConnecting] = useState(false)
 
   // Feature selections: which feature+platform combos the user picked
-  const [selectedFeatures, setSelectedFeatures] = useState<Record<FeatureType, Set<string>>>({
-    comments: new Set<string>(),
-    messaging: new Set<string>(),
-  })
+  const [selectedFeatures, setSelectedFeatures] = useState<Record<FeatureType, Set<string>>>(
+    () => ({
+      comments: new Set<string>(draft.comments ?? []),
+      messaging: new Set<string>(draft.messaging ?? []),
+    }),
+  )
 
-  // Connected pages per platform (simulated)
-  const [connectedPages, setConnectedPages] = useState<Record<string, string[]>>({})
+  // ─── Real data ───
+  const meQuery = $api.useQuery('get', '/auth/me')
+  const accountsQuery = $api.useQuery(
+    'get',
+    '/social/accounts/{organisationId}',
+    { params: { path: { organisationId: orgId ?? '' } } },
+    { enabled: !!orgId },
+  )
+  const accounts = accountsQuery.data ?? []
+  const connectWhatsApp = $api.useMutation('post', '/social/connect/whatsapp')
+
+  // Resume an existing organisation the user administers that has no social
+  // account yet (abandoned onboarding then logged back in) — avoids creating a
+  // duplicate. Its creation step is already done, so jump to the network choice.
+  useEffect(() => {
+    if (orgId) return
+    const orgs = meQuery.data?.organisations
+    if (!orgs?.length) return
+    const resumable = orgs.find(
+      (o) => o.socialAccounts.length === 0 && (o.role === 'OWNER' || o.role === 'ADMIN'),
+    )
+    if (resumable) {
+      setOrgId(resumable.id)
+      setOrgName((prev) => prev || resumable.name)
+      setCurrentStep((s) => Math.max(s, 1))
+    }
+  }, [meQuery.data, orgId])
+
+  // Persist the draft so the flow survives OAuth redirects / re-login.
+  useEffect(() => {
+    writeOnboardingDraft({
+      orgId: orgId ?? undefined,
+      orgName: orgName || undefined,
+      step: currentStep,
+      comments: [...selectedFeatures.comments],
+      messaging: [...selectedFeatures.messaging],
+    })
+  }, [orgId, orgName, currentStep, selectedFeatures])
 
   // Derive which features are active (at least one platform selected)
   const activeFeatures = useMemo<FeatureType[]>(() => {
@@ -281,6 +353,24 @@ function CreateOrganisationPage() {
     return PLATFORMS.filter((p) => platformIds.has(p.id)).sort((a, b) => a.priority - b.priority)
   }, [activeFeatures, selectedFeatures])
 
+  // Group the real connected accounts by onboarding platform id.
+  const connectedByPlatform = useMemo(() => {
+    const map: Record<string, ConnectedAccount[]> = {}
+    for (const account of accounts) {
+      const platformId = Object.keys(PROVIDER_BY_PLATFORM).find(
+        (key) => PROVIDER_BY_PLATFORM[key] === account.provider,
+      )
+      if (!platformId) continue
+      ;(map[platformId] ??= []).push({
+        id: account.id,
+        name: formatSocialAccountName(account),
+        description: formatSocialAccountDescription(account),
+        avatarUrl: account.profilePictureUrl ?? undefined,
+      })
+    }
+    return map
+  }, [accounts])
+
   // Build all steps: org creation + feature selection + platform connections
   const steps = useMemo(() => {
     const base = [
@@ -292,20 +382,59 @@ function CreateOrganisationPage() {
       key: `connect-${p.id}`,
       title: getPlatformStepLabel(p, selectedFeatures),
       platformId: p.id,
-      description: formatConnectedPages(connectedPages[p.id] || [], p.id),
+      description: formatConnectedPages(
+        (connectedByPlatform[p.id] ?? []).map((a) => a.name),
+        p.id,
+      ),
     }))
 
     return [...base, ...platformSteps]
-  }, [requiredPlatforms, activeFeatures, connectedPages])
+  }, [requiredPlatforms, selectedFeatures, connectedByPlatform])
 
-  const isLastStep = currentStep === steps.length - 1 && steps.length > 2
+  // Ensure currentStep doesn't exceed available steps
+  const safeCurrentStep = Math.min(currentStep, steps.length - 1)
+  const isLastStep = safeCurrentStep === steps.length - 1 && steps.length > 2
+
   const canGoNext = () => {
-    if (currentStep === 0) return orgName.trim().length > 0
-    if (currentStep === 1) return activeFeatures.length > 0
+    if (safeCurrentStep === 0) return orgName.trim().length > 0
+    if (safeCurrentStep === 1) return activeFeatures.length > 0
     return true
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    // Step 0 → create (or update) the organisation now that we have the name,
+    // so every connection step below has a real organisationId to use.
+    if (safeCurrentStep === 0) {
+      const name = orgName.trim()
+      if (!name) return
+      setSavingOrg(true)
+      try {
+        let id = orgId
+        if (!id) {
+          const org = await createOrganisation(name)
+          id = org.id
+          setOrgId(org.id)
+        } else {
+          await updateOrganisation(id, { name })
+        }
+        // Best-effort logo upload — never blocks the rest of the flow.
+        if (orgLogoFile && id) {
+          try {
+            const logoUrl = await uploadLogo(orgLogoFile)
+            await updateOrganisation(id, { logoUrl })
+            setOrgLogoFile(null)
+          } catch (err) {
+            console.error('[Onboarding] Logo upload failed:', err)
+          }
+        }
+      } catch (err) {
+        message.error(err instanceof Error ? err.message : "Échec de la création de l'organisation")
+        setSavingOrg(false)
+        return
+      }
+      setSavingOrg(false)
+    }
+
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1)
     }
@@ -314,6 +443,15 @@ function CreateOrganisationPage() {
   const handleBack = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1)
+    }
+  }
+
+  const handleFinish = () => {
+    clearOnboardingDraft()
+    if (orgId) {
+      navigate({ to: '/app/$orgSlug/dashboard', params: { orgSlug: orgId } })
+    } else {
+      navigate({ to: '/organisations' })
     }
   }
 
@@ -329,45 +467,94 @@ function CreateOrganisationPage() {
     })
   }
 
-  const handleConnect = (platformId: string) => {
-    // Determine the correct Facebook Login Configuration ID based on platform + features
-    const configId = getConfigIdForPlatform(platformId, selectedFeatures)
+  const handleConnect = async (platformId: string) => {
+    if (!orgId) {
+      message.error("L'organisation n'est pas encore prête, réessayez dans un instant.")
+      return
+    }
 
-    if (platformId === 'facebook' && configId) {
-      setAuthRedirect({ intent: 'onboarding', step: safeCurrentStep })
+    // WhatsApp → Embedded Signup popup, then persist via the API (no redirect).
+    if (platformId === 'whatsapp') {
+      setConnecting(true)
+      try {
+        const appId = import.meta.env.VITE_FACEBOOK_APP_ID
+        const waConfigId = import.meta.env.VITE_WHATSAPP_CONFIGGURATION_ID
+        if (!appId || !waConfigId) return
+        const { loginResponse, sessionInfo } = await launchWhatsAppSignup(appId, waConfigId)
+        if (!loginResponse.authResponse?.code) return
+        await connectWhatsApp.mutateAsync({
+          body: {
+            organisationId: orgId,
+            code: loginResponse.authResponse.code,
+            wabaId: sessionInfo.waba_id,
+            phoneNumberId: sessionInfo.phone_number_id,
+          },
+        })
+        queryClient.invalidateQueries({
+          queryKey: ['get', '/social/accounts/{organisationId}'],
+        })
+      } catch (err) {
+        console.error('[Onboarding] WhatsApp connect failed:', err)
+        message.error(err instanceof Error ? err.message : 'Échec de la connexion WhatsApp')
+      } finally {
+        setConnecting(false)
+      }
+      return
+    }
+
+    // FB / IG / TikTok → OAuth redirect. The callback persists the account and
+    // returns here (returnTo); the draft restores the flow on remount.
+    const hasComments = selectedFeatures.comments.has(platformId)
+    const hasMessaging = selectedFeatures.messaging.has(platformId)
+    const returnTo = '/create-organisation'
+
+    if (platformId === 'facebook') {
+      const configId = getConfigIdForPlatform('facebook', selectedFeatures)
+      if (!configId) return
+      setAuthRedirect({
+        intent: 'connect_pages',
+        orgId,
+        provider: 'facebook',
+        pageId: 'facebook',
+        scopes: [...(hasComments ? ['comments'] : []), ...(hasMessaging ? ['messages'] : [])],
+        returnTo,
+      })
       window.location.href = buildFacebookOAuthUrl(configId)
       return
     }
 
     if (platformId === 'instagram') {
-      const hasComments = selectedFeatures.comments.has('instagram')
-      const hasMessaging = selectedFeatures.messaging.has('instagram')
       const igScope =
         hasComments && hasMessaging
           ? ('comments+messages' as const)
           : hasMessaging
             ? ('messages' as const)
             : ('comments' as const)
-
-      setAuthRedirect({ intent: 'onboarding', step: safeCurrentStep, igScope })
+      setAuthRedirect({
+        intent: 'connect_pages',
+        orgId,
+        provider: 'instagram',
+        pageId: 'instagram',
+        igScope,
+        scopes: [...(hasComments ? ['comments'] : []), ...(hasMessaging ? ['messages'] : [])],
+        returnTo,
+      })
       window.location.href = buildInstagramOAuthUrl(igScope)
       return
     }
 
     if (platformId === 'tiktok') {
-      const hasComments = selectedFeatures.comments.has('tiktok')
-      const hasMessaging = selectedFeatures.messaging.has('tiktok')
       const tkScope =
         hasComments && hasMessaging
           ? ('comments+messages' as const)
           : hasMessaging
             ? ('messages' as const)
             : ('comments' as const)
-
       setAuthRedirect({
-        intent: 'onboarding',
-        step: safeCurrentStep,
+        intent: 'connect_pages',
+        orgId,
         provider: 'tiktok',
+        pageId: 'tiktok',
         scopes: [
           ...(hasComments ? ['comments', 'comment.list', 'comment.list.manage'] : []),
           ...(hasMessaging
@@ -375,31 +562,12 @@ function CreateOrganisationPage() {
             : []),
           'video.list',
         ],
+        returnTo,
       })
       window.location.href = buildTikTokOAuthUrl(tkScope)
       return
     }
-
-    // WhatsApp uses Embedded Signup (handled separately)
-    // For now keep mock behavior
-    const mockPages: Record<string, string[]> = {
-      whatsapp: ['+237 691 000 001'],
-    }
-    setConnectedPages((prev) => ({
-      ...prev,
-      [platformId]: mockPages[platformId] || ['Page connectée'],
-    }))
   }
-
-  const handleRemovePage = (platformId: string, page: string) => {
-    setConnectedPages((prev) => ({
-      ...prev,
-      [platformId]: (prev[platformId] || []).filter((p) => p !== page),
-    }))
-  }
-
-  // Ensure currentStep doesn't exceed available steps
-  const safeCurrentStep = Math.min(currentStep, steps.length - 1)
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-bg-page p-4">
@@ -466,6 +634,7 @@ function CreateOrganisationPage() {
               orgLogo={orgLogo}
               onNameChange={setOrgName}
               onLogoChange={setOrgLogo}
+              onLogoFileChange={setOrgLogoFile}
             />
           )}
 
@@ -477,11 +646,11 @@ function CreateOrganisationPage() {
             <StepConnectPlatform
               platform={requiredPlatforms[safeCurrentStep - 2]}
               selectedFeatures={selectedFeatures}
-              connectedPages={connectedPages[requiredPlatforms[safeCurrentStep - 2]?.id] || []}
-              onConnect={() => handleConnect(requiredPlatforms[safeCurrentStep - 2]?.id)}
-              onRemovePage={(page) =>
-                handleRemovePage(requiredPlatforms[safeCurrentStep - 2]?.id, page)
+              connectedAccounts={
+                connectedByPlatform[requiredPlatforms[safeCurrentStep - 2]?.id] ?? []
               }
+              connecting={connecting}
+              onConnect={() => handleConnect(requiredPlatforms[safeCurrentStep - 2]?.id)}
             />
           )}
 
@@ -496,19 +665,14 @@ function CreateOrganisationPage() {
             </div>
             <div>
               {isLastStep ? (
-                <Button
-                  type="primary"
-                  icon={<Check size={16} />}
-                  onClick={() => {
-                    window.location.href = '/app/demo-org/dashboard'
-                  }}
-                >
+                <Button type="primary" icon={<Check size={16} />} onClick={handleFinish}>
                   Terminer
                 </Button>
               ) : (
                 <Button
                   type="primary"
                   onClick={handleNext}
+                  loading={savingOrg}
                   disabled={!canGoNext()}
                   icon={<ArrowRight size={16} />}
                   iconPosition="end"
@@ -558,11 +722,13 @@ function StepOrganisation({
   orgLogo,
   onNameChange,
   onLogoChange,
+  onLogoFileChange,
 }: {
   orgName: string
   orgLogo: string | null
   onNameChange: (name: string) => void
   onLogoChange: (logo: string | null) => void
+  onLogoFileChange: (file: File) => void
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -591,6 +757,7 @@ function StepOrganisation({
         showUploadList={false}
         accept="image/png, image/jpeg, image/svg+xml, image/webp"
         beforeUpload={(file) => {
+          onLogoFileChange(file)
           const reader = new FileReader()
           reader.onload = (e) => onLogoChange(e.target?.result as string)
           reader.readAsDataURL(file)
@@ -680,22 +847,24 @@ function StepFeatures({
 function StepConnectPlatform({
   platform,
   selectedFeatures,
-  connectedPages,
+  connectedAccounts,
+  connecting,
   onConnect,
-  onRemovePage,
 }: {
   platform: PlatformConfig
   selectedFeatures: Record<FeatureType, Set<string>>
-  connectedPages: string[]
+  connectedAccounts: ConnectedAccount[]
+  connecting: boolean
   onConnect: () => void
-  onRemovePage: (page: string) => void
 }) {
   if (!platform) return null
 
   const branding = getPlatformBranding(platform, selectedFeatures)
   const description = getPlatformStepDescription(platform, selectedFeatures)
   const BrandIcon = branding.icon
-  const isConnected = connectedPages.length > 0
+  const isConnected = connectedAccounts.length > 0
+  // Only WhatsApp connects inline (popup); the others redirect away to OAuth.
+  const connectLoading = platform.id === 'whatsapp' && connecting
 
   if (isConnected) {
     return (
@@ -710,32 +879,35 @@ function StepConnectPlatform({
         </div>
 
         <div className="flex flex-col gap-2">
-          {connectedPages.map((page) => (
+          {connectedAccounts.map((account) => (
             <div
-              key={page}
+              key={account.id}
               className="flex items-center gap-3 rounded-xl border border-border-default bg-white p-3"
             >
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-lg"
-                style={{ background: `${branding.color}14`, color: branding.color }}
-              >
-                <BrandIcon width={16} height={16} />
+              {/* Page profile picture, falling back to the platform logo */}
+              <Avatar
+                size={32}
+                shape="square"
+                src={account.avatarUrl || undefined}
+                icon={<BrandIcon width={16} height={16} />}
+                style={{ background: `${branding.color}14`, color: branding.color, flexShrink: 0 }}
+              />
+              <div className="flex flex-1 flex-col">
+                <span className="text-sm font-medium text-text-primary">{account.name}</span>
+                {account.description && (
+                  <span className="text-xs text-text-soft">{account.description}</span>
+                )}
               </div>
-              <span className="flex-1 text-sm font-medium text-text-primary">{page}</span>
-              <Tooltip title="Supprimer">
-                <Button
-                  type="text"
-                  danger
-                  size="small"
-                  icon={<Trash2 size={14} />}
-                  onClick={() => onRemovePage(page)}
-                />
-              </Tooltip>
             </div>
           ))}
         </div>
 
-        <Button onClick={onConnect} icon={<Plus size={16} />} className="self-start">
+        <Button
+          onClick={onConnect}
+          icon={<Plus size={16} />}
+          loading={connectLoading}
+          className="self-start"
+        >
           {platform.addMoreLabel}
         </Button>
       </div>
@@ -759,7 +931,13 @@ function StepConnectPlatform({
         <p className="m-0 max-w-sm text-sm text-text-secondary">{description}</p>
       </div>
 
-      <Button type="primary" size="large" icon={<Plus size={16} />} onClick={onConnect}>
+      <Button
+        type="primary"
+        size="large"
+        icon={<Plus size={16} />}
+        loading={connectLoading}
+        onClick={onConnect}
+      >
         {platform.connectButton}
       </Button>
     </div>

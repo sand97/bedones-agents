@@ -50,7 +50,16 @@
     "/auth/whatsapp/send-otp": {
       "post": {
         "operationId": "AuthController_sendWhatsAppOtp",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "accept-language",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -255,20 +264,6 @@
       "patch": {
         "operationId": "AuthController_updateName",
         "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": { "type": "string", "example": "Aminata Diallo" }
-                },
-                "required": ["name"]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "",
@@ -4195,6 +4190,93 @@
           "status"
         ]
       },
+      "SendWhatsAppOtpDto": {
+        "type": "object",
+        "properties": {
+          "countryCode": {
+            "type": "string",
+            "example": "+237",
+            "description": "Country dial code with leading +"
+          },
+          "phone": {
+            "type": "string",
+            "example": "657888690",
+            "description": "Local phone number (digits only)"
+          }
+        },
+        "required": [
+          "countryCode",
+          "phone"
+        ]
+      },
+      "VerifyWhatsAppOtpDto": {
+        "type": "object",
+        "properties": {
+          "countryCode": {
+            "type": "string",
+            "example": "+237"
+          },
+          "phone": {
+            "type": "string",
+            "example": "657888690"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "countryCode",
+          "phone",
+          "code"
+        ]
+      },
+      "WhatsAppLoginUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "phoneCountryCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "phoneLocal": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "phone",
+          "phoneCountryCode",
+          "phoneLocal"
+        ]
+      },
+      "WhatsAppVerifyResponseDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/WhatsAppLoginUserDto"
+          },
+          "isNewUser": {
+            "type": "boolean",
+            "description": "True if the user was just created on this verification"
+          }
+        },
+        "required": [
+          "user",
+          "isNewUser"
+        ]
+      },
       "CookieConsentDto": {
         "type": "object",
         "properties": {
@@ -4264,64 +4346,6 @@
           "authType",
           "status"
         ]
-      },
-      "SendWhatsAppOtpDto": {
-        "type": "object",
-        "properties": {
-          "countryCode": {
-            "type": "string",
-            "example": "+237"
-          },
-          "phone": {
-            "type": "string",
-            "example": "657888690"
-          }
-        },
-        "required": [
-          "countryCode",
-          "phone"
-        ]
-      },
-      "VerifyWhatsAppOtpDto": {
-        "type": "object",
-        "properties": {
-          "countryCode": {
-            "type": "string",
-            "example": "+237"
-          },
-          "phone": {
-            "type": "string",
-            "example": "657888690"
-          },
-          "code": {
-            "type": "string",
-            "example": "123456"
-          }
-        },
-        "required": [
-          "countryCode",
-          "phone",
-          "code"
-        ]
-      },
-      "WhatsAppLoginUserDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string" },
-          "name": { "type": "string" },
-          "phone": { "type": "string", "nullable": true },
-          "phoneCountryCode": { "type": "string", "nullable": true },
-          "phoneLocal": { "type": "string", "nullable": true }
-        },
-        "required": ["id", "name", "phone", "phoneCountryCode", "phoneLocal"]
-      },
-      "WhatsAppVerifyResponseDto": {
-        "type": "object",
-        "properties": {
-          "user": { "$ref": "#/components/schemas/WhatsAppLoginUserDto" },
-          "isNewUser": { "type": "boolean" }
-        },
-        "required": ["user", "isNewUser"]
       },
       "SocialAccountDto": {
         "type": "object",

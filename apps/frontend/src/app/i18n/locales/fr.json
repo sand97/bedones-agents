@@ -64,6 +64,7 @@
   },
 
   "auth": {
+    "title": "Connexion / Inscription",
     "login": "Connexion",
     "login_error": "Erreur de connexion",
     "email": "Email",
