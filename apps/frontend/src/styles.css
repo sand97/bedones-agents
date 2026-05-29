@@ -95,6 +95,41 @@ body {
   background-size: 24px 24px;
 }
 
+.ant-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Login line grid — centered on the form card, opacity fades outward via a radial mask */
+.login-grid-lines {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1600px;
+  height: 1600px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.07) 1px, transparent 1px);
+  background-size: 44px 44px;
+  background-position: center;
+  -webkit-mask-image: radial-gradient(
+    circle 760px at center,
+    #000 0%,
+    rgba(0, 0, 0, 0.45) 45%,
+    transparent 80%
+  );
+  mask-image: radial-gradient(
+    circle 760px at center,
+    #000 0%,
+    rgba(0, 0, 0, 0.45) 45%,
+    transparent 80%
+  );
+}
+
 /* Corner marks — positioned relative to card wrapper */
 .onboarding-corner {
   position: absolute;
@@ -3255,6 +3290,23 @@ a {
   opacity: 0.92;
   transform: translateY(-1px);
 }
+.mk-hero-form .cc {
+  cursor: pointer;
+}
+.mk-hero-cc-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font: inherit;
+  font-weight: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  max-width: 80px;
+}
 .mk-hero-disclaimer {
   font-size: 12.5px;
   color: var(--mk-text-soft);
@@ -6019,4 +6071,50 @@ a {
     animation: none !important;
     opacity: 0.7;
   }
+}
+
+/* ─── Dashboard setup carousel ─── */
+
+.dashboard-setup-card {
+  background: #fff;
+  border: 1px solid var(--color-border-default, #e5e7eb);
+  border-radius: 16px;
+  padding: 32px 24px 0;
+  max-width: 560px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.dashboard-setup-card__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 24px;
+  text-align: center;
+}
+
+.dashboard-setup-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard-setup-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--color-border-subtle, #f1f5f9);
+  padding: 16px 0;
+  margin-top: 8px;
+}
+
+.dashboard-setup-card__count {
+  font-size: 12px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+/* The Carousel container doesn't need its own dots — we have a custom footer */
+.dashboard-setup-card .ant-carousel .slick-dots {
+  display: none !important;
 }

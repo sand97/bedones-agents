@@ -50,7 +50,7 @@ export function clearAuthRedirect() {
  */
 export function buildFacebookOAuthUrl(configId: string): string {
   const appId = import.meta.env.VITE_FACEBOOK_APP_ID
-  const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
+  const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
   const redirectUri = `${apiUrl}/auth/callback/facebook`
 
   const url = new URL('https://www.facebook.com/v21.0/dialog/oauth')
@@ -68,7 +68,7 @@ export function buildFacebookOAuthUrl(configId: string): string {
  */
 export function buildInstagramOAuthUrl(scope: InstagramScope = 'comments'): string {
   const appId = import.meta.env.VITE_INSTAGRAM_APP_ID
-  const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
+  const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
   const redirectUri = `${apiUrl}/auth/callback/instagram`
 
   const scopes = ['instagram_business_basic']
@@ -94,7 +94,7 @@ export function buildInstagramOAuthUrl(scope: InstagramScope = 'comments'): stri
  */
 export function buildTikTokOAuthUrl(scope: TikTokScope = 'comments'): string {
   const clientKey = import.meta.env.VITE_TIKTOK_CLIENT_KEY
-  const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
+  const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
   const redirectUri = `${apiUrl}/auth/callback/tiktok`
 
   const scopes = ['user.info.basic', 'user.info.username', 'user.account.type']

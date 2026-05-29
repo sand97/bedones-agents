@@ -1,20 +1,19 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { I18nContext } from 'nestjs-i18n'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuthService } from '../auth/auth.service'
+import { WhatsAppOtpService } from '../auth/whatsapp-otp.service'
 
 @Injectable()
 export class InvitationService {
-  private readonly logger = new Logger(InvitationService.name)
   private readonly otpStore = new Map<string, { code: string; expiresAt: number }>()
 
   constructor(
     private prisma: PrismaService,
-    private config: ConfigService,
     private jwtService: JwtService,
     private authService: AuthService,
+    private otpService: WhatsAppOtpService,
   ) {}
 
   /**
@@ -68,7 +67,7 @@ export class InvitationService {
     const payload = this.verifyInviteToken(token)
     const key = `${payload.orgId}:${payload.phone}`
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString()
+    const code = this.otpService.generateCode()
 
     this.otpStore.set(key, {
       code,
@@ -76,7 +75,7 @@ export class InvitationService {
     })
 
     const templateLang = lang === 'en' ? 'en' : 'fr'
-    await this.sendWhatsAppOtp(payload.phone, code, templateLang)
+    await this.otpService.sendOtp(payload.phone, code, templateLang, 'TEMPLATE_INVITE_ID')
 
     return {
       message: I18nContext.current()?.t('errors.invitation.otp_sent') ?? 'OTP envoyé avec succès',
@@ -200,57 +199,6 @@ export class InvitationService {
         I18nContext.current()?.t('errors.invitation.invalid_or_expired_link') ??
           "Lien d'invitation invalide ou expiré",
       )
-    }
-  }
-
-  private async sendWhatsAppOtp(phone: string, code: string, lang: string = 'fr') {
-    const phoneNumberId = this.config.get<string>('CORE_WHATSAPP_NUMBER_ID')
-    const templateId = this.config.get<string>('TEMPLATE_INVITE_ID')
-    const accessToken = this.config.get<string>('META_SYSTEM_USER')
-
-    if (!phoneNumberId || !accessToken) {
-      this.logger.warn('WhatsApp Cloud API not configured, OTP not sent')
-      return
-    }
-
-    const url = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: phone.replace('+', ''),
-          type: 'template',
-          template: {
-            name: templateId,
-            language: { code: lang },
-            components: [
-              {
-                type: 'body',
-                parameters: [{ type: 'text', text: code }],
-              },
-              {
-                type: 'button',
-                sub_type: 'url',
-                index: '0',
-                parameters: [{ type: 'text', text: code }],
-              },
-            ],
-          },
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.text()
-        this.logger.error(`WhatsApp OTP send failed: ${error}`)
-      }
-    } catch (error) {
-      this.logger.error('Failed to send WhatsApp OTP', error)
     }
   }
 }
