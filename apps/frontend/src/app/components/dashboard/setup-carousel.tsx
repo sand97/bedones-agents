@@ -140,18 +140,22 @@ export function SetupCarousel({
         </div>
         <div className="flex items-center gap-2">
           {!isFirst && (
-            <Button icon={<ArrowLeft size={14} />} onClick={() => carouselRef.current?.prev()}>
-              {t('common.previous') ?? 'Précédent'}
+            <Button
+              size={'small'}
+              icon={<ArrowLeft size={14} />}
+              onClick={() => carouselRef.current?.prev()}
+            >
+              {t('common.previous')}
             </Button>
           )}
           {!isLast && (
             <Button
-              type="primary"
+              size={'small'}
               iconPosition="end"
               icon={<ArrowRight size={14} />}
               onClick={() => carouselRef.current?.next()}
             >
-              {t('common.next') ?? 'Suivant'}
+              {t('common.next')}
             </Button>
           )}
         </div>
