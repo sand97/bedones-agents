@@ -8,6 +8,7 @@ import { AgentPromptsService } from './prompts/agent-prompts.service'
 import { AgentDbToolsService } from './tools/agent-db-tools.service'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { LlmFactoryService } from '../common/llm/llm-factory.service'
+import { ProductImageIndexingService } from '../image-processing/product-image-indexing.service'
 import { CATALOG_INDEXING_QUEUE } from '../queue/queue.module'
 import type { CatalogIndexingJobData } from '../image-processing/catalog-indexing.processor'
 
@@ -22,6 +23,7 @@ export class AgentService {
     private prompts: AgentPromptsService,
     private dbTools: AgentDbToolsService,
     private llmFactory: LlmFactoryService,
+    private productIndexing: ProductImageIndexingService,
     @InjectQueue(CATALOG_INDEXING_QUEUE) private catalogIndexingQueue: Queue,
   ) {}
 
@@ -40,6 +42,7 @@ export class AgentService {
                 pageName: true,
                 username: true,
                 profilePictureUrl: true,
+                metadata: true,
               },
             },
           },
@@ -64,6 +67,7 @@ export class AgentService {
                 pageAbout: true,
                 username: true,
                 profilePictureUrl: true,
+                metadata: true,
               },
             },
           },
@@ -142,6 +146,20 @@ export class AgentService {
     return this.prisma.agent.delete({ where: { id } })
   }
 
+  async updateSocialAccounts(agentId: string, socialAccountIds: string[]) {
+    const agent = await this.findById(agentId)
+    if (!agent) throw new NotFoundException('Agent introuvable')
+
+    await this.prisma.$transaction([
+      this.prisma.agentSocialAccount.deleteMany({ where: { agentId } }),
+      this.prisma.agentSocialAccount.createMany({
+        data: socialAccountIds.map((socialAccountId) => ({ agentId, socialAccountId })),
+      }),
+    ])
+
+    return this.findById(agentId)
+  }
+
   // ─── Messages ───
 
   async getMessages(agentId: string, limit = 50, before?: string) {
@@ -204,6 +222,7 @@ export class AgentService {
           pageName: sa.pageName,
           pageAbout: sa.pageAbout,
           username: sa.username,
+          metadata: sa.metadata,
         })),
         existingContext: agent.context,
         score: agent.score,
@@ -267,6 +286,36 @@ export class AgentService {
     }
   }
 
+  // ─── Setup (single async entry point) ───
+
+  async startSetup(agentId: string, organisationId: string) {
+    try {
+      // Phase 1: Catalog analysis
+      this.gateway.emitToOrg(organisationId, 'agent:setup-progress', {
+        agentId,
+        phase: 'analyzing-catalogs',
+      })
+
+      await this.analyzeCatalogs(agentId, organisationId)
+
+      // Phase 2: Initial evaluation
+      this.gateway.emitToOrg(organisationId, 'agent:setup-progress', {
+        agentId,
+        phase: 'initializing',
+      })
+
+      await this.performInitialEvaluation(agentId, organisationId)
+
+      // Done — agent:message is emitted by performInitialEvaluation
+    } catch (error) {
+      this.logger.error(`Agent setup failed for ${agentId}: ${error}`)
+      this.gateway.emitToOrg(organisationId, 'agent:setup-error', {
+        agentId,
+        message: 'Une erreur est survenue lors de la configuration. Réessayez.',
+      })
+    }
+  }
+
   // ─── Initial Evaluation (called after catalog analysis) ───
 
   async performInitialEvaluation(agentId: string, organisationId: string) {
@@ -275,25 +324,51 @@ export class AgentService {
     const catalogsData = await this.getAgentCatalogs(agentId)
     const socialAccountsData = agent.socialAccounts.map((sa) => sa.socialAccount)
 
+    // Fetch product samples for each catalog (max 20 per catalog) from Meta API
+    const catalogsWithProducts = await Promise.all(
+      catalogsData.map(async (c) => {
+        try {
+          const metaProducts = await this.productIndexing.fetchAllProducts(c.id)
+          return {
+            name: c.name,
+            description: c.description,
+            productCount: c.productCount || metaProducts.length,
+            products: metaProducts.slice(0, 20).map((p) => ({
+              name: p.name || 'Sans nom',
+              description: p.description,
+            })),
+          }
+        } catch (error) {
+          this.logger.warn(`Failed to fetch products for catalog ${c.id}: ${error}`)
+          return {
+            name: c.name,
+            description: c.description,
+            productCount: c.productCount,
+            products: [],
+          }
+        }
+      }),
+    )
+
     // Build initial prompt
     const prompt = this.prompts.buildInitialEvaluationPrompt({
-      catalogs: catalogsData.map((c) => ({
-        name: c.name,
-        description: c.description,
-        productCount: c.productCount,
-      })),
+      catalogs: catalogsWithProducts,
       socialAccounts: socialAccountsData.map((sa) => ({
         provider: sa.provider,
         pageName: sa.pageName,
         pageAbout: sa.pageAbout,
         username: sa.username,
+        metadata: sa.metadata,
       })),
       existingContext: agent.context,
       score: agent.score,
     })
 
     const model = this.createModel()
-    const result = await model.invoke([new SystemMessage(prompt)])
+    const result = await model.invoke([
+      new SystemMessage(prompt),
+      new HumanMessage("Effectue l'évaluation initiale de cet agent avec les données fournies."),
+    ])
 
     const responseText = typeof result.content === 'string' ? result.content : ''
     const parsed = this.parseAgentResponse(responseText)
@@ -348,11 +423,16 @@ export class AgentService {
       })
 
       try {
-        const products = await this.prisma.product.findMany({
-          where: { catalogId: catalog.id },
-          select: { name: true, description: true },
-          take: 50,
-        })
+        let products: Array<{ name: string; description?: string | null }>
+        try {
+          const metaProducts = await this.productIndexing.fetchAllProducts(catalog.id)
+          products = metaProducts.map((p) => ({
+            name: p.name || 'Sans nom',
+            description: p.description,
+          }))
+        } catch {
+          products = []
+        }
 
         if (products.length === 0) {
           await this.prisma.catalog.update({
@@ -362,7 +442,7 @@ export class AgentService {
           continue
         }
 
-        const prompt = this.prompts.buildCatalogAnalysisPrompt(products)
+        const prompt = this.prompts.buildCatalogAnalysisPrompt(products.slice(0, 50))
         const model = this.createModel()
         const result = await model.invoke([new HumanMessage(prompt)])
         const description = typeof result.content === 'string' ? result.content : ''

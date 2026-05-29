@@ -7,6 +7,10 @@ interface UnreadCounts {
   FACEBOOK: number
   INSTAGRAM: number
   TIKTOK: number
+  WHATSAPP: number
+  INSTAGRAM_DM: number
+  MESSENGER: number
+  TIKTOK_DM: number
   [key: string]: number
 }
 
@@ -15,7 +19,15 @@ interface UnreadContextType {
   refresh: () => void
 }
 
-const defaultCounts: UnreadCounts = { FACEBOOK: 0, INSTAGRAM: 0, TIKTOK: 0 }
+const defaultCounts: UnreadCounts = {
+  FACEBOOK: 0,
+  INSTAGRAM: 0,
+  TIKTOK: 0,
+  WHATSAPP: 0,
+  INSTAGRAM_DM: 0,
+  MESSENGER: 0,
+  TIKTOK_DM: 0,
+}
 
 const UnreadContext = createContext<UnreadContextType>({
   counts: defaultCounts,
@@ -38,7 +50,7 @@ export function UnreadProvider({ children }: { children: ReactNode }) {
     },
   )
 
-  const counts: UnreadCounts = { FACEBOOK: 0, INSTAGRAM: 0, TIKTOK: 0 }
+  const counts: UnreadCounts = { ...defaultCounts }
   if (data) {
     for (const item of data) {
       counts[item.provider] = item.count

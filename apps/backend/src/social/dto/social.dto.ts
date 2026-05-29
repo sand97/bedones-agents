@@ -37,6 +37,13 @@ export class UpdatePageSettingsDto {
 
   @ApiPropertyOptional({ type: [FAQRuleDto] })
   faqRules?: FAQRuleDto[]
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Catalog associated to this page (null to unlink)',
+  })
+  catalogId?: string | null
 }
 
 export class FAQRuleResponseDto {
@@ -68,6 +75,9 @@ export class PageSettingsResponseDto {
 
   @ApiProperty({ type: [FAQRuleResponseDto] })
   faqRules: FAQRuleResponseDto[]
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  catalogId?: string | null
 }
 
 export class CommentResponseDto {
@@ -156,6 +166,9 @@ export class SocialAccountResponseDto {
   @ApiPropertyOptional()
   profilePictureUrl?: string
 
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  metadata?: Record<string, unknown>
+
   @ApiProperty({ type: [String], description: 'Feature scopes (e.g. comments, messages)' })
   scopes: string[]
 
@@ -169,6 +182,11 @@ export class UnreadCountDto {
 
   @ApiProperty()
   count: number
+}
+
+export class TikTokBusinessCheckDto {
+  @ApiProperty()
+  isBusiness: boolean
 }
 
 export class UserStatsResponseDto {

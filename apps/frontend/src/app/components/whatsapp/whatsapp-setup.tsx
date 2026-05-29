@@ -104,7 +104,6 @@ export function WhatsAppSetup() {
 
         <Button
           type="primary"
-          size="large"
           loading={loading}
           disabled={false}
           onClick={handleConnect}

@@ -4,7 +4,15 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Button, Popover, Checkbox } from 'antd'
-import { MessageCircle, Sparkles, ShoppingBag, EllipsisVertical } from 'lucide-react'
+import {
+  FileText,
+  Megaphone,
+  MessageCircle,
+  Sparkles,
+  ShoppingBag,
+  Tag,
+  Wrench,
+} from 'lucide-react'
 import { ConversationList } from './conversation-list'
 import { ChatWindow } from './chat-window'
 import { SocialSetup } from '@app/components/social/social-setup'
@@ -13,13 +21,14 @@ import {
   WhatsAppIcon,
   InstagramIcon,
   MessengerIcon,
+  TikTokIcon,
   LabelBadgeIcon,
 } from '@app/components/icons/social-icons'
 import { ConversationListSkeleton, ChatWindowSkeleton } from './chat-skeleton'
 import { labelApi } from '@app/lib/api/agent-api'
 import type { Conversation } from './mock-data'
 
-type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger'
+type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger' | 'tiktok'
 
 const PROVIDER_EMPTY_STATE: Record<
   ChatProvider,
@@ -52,6 +61,13 @@ const PROVIDER_EMPTY_STATE: Record<
     selectTitleKey: 'chat.select_conversation',
     selectDescKey: 'chat.messenger_select_desc',
   },
+  tiktok: {
+    icon: <TikTokIcon width={40} height={40} />,
+    color: 'var(--color-brand-tiktok)',
+    noConvTitleKey: 'chat.no_messages',
+    selectTitleKey: 'chat.select_conversation',
+    selectDescKey: 'chat.tiktok_select_desc',
+  },
 }
 
 interface ChatLayoutProps {
@@ -68,9 +84,9 @@ interface ChatLayoutProps {
     type: 'image' | 'video' | 'audio' | 'file',
     replyToId?: string,
   ) => Promise<void>
+  /** Called (throttled) when the admin is typing in the input — used to send typing indicator to the customer */
+  onTyping?: () => void
   onSelectConversation?: (convId: string) => void
-  onSync?: () => void
-  syncing?: boolean
   onRetry?: (messageId: string) => void
   /** Called when user clicks anywhere in the chat window area */
   onChatClick?: () => void
@@ -84,6 +100,8 @@ interface ChatLayoutProps {
   onConfigureCatalog?: () => void
   /** Callback when user clicks the Options button */
   onOpenOptions?: () => void
+  onOpenTemplates?: () => void
+  onOpenCampaigns?: () => void
   /** Social account ID used to fetch labels from the database */
   socialAccountId?: string
   /** Whether the current WhatsApp number has a linked catalog for product sending */
@@ -92,6 +110,8 @@ interface ChatLayoutProps {
   onProductClick?: () => void
   /** Called when user clicks the "Send catalog" attachment option */
   onCatalogClick?: () => void
+  onTemplateClick?: () => void
+  onTikTokMessageClick?: () => void
 }
 
 /* ── Labels filter popover ── */
@@ -167,15 +187,95 @@ function useSetupState(
   return null
 }
 
+function WhatsAppToolsPopover({
+  onOpenOptions,
+  onOpenTemplates,
+  onOpenCampaigns,
+  children,
+}: {
+  onOpenOptions?: () => void
+  onOpenTemplates?: () => void
+  onOpenCampaigns?: () => void
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const { t } = useTranslation()
+  const items = [
+    {
+      label: t('chat.tools_catalog'),
+      icon: <ShoppingBag size={18} />,
+      color: 'text-green-500',
+      bgColor: 'bg-green-50',
+      onClick: onOpenOptions,
+    },
+    {
+      label: t('chat.tools_labels'),
+      icon: <Tag size={18} />,
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-50',
+      onClick: onOpenOptions,
+    },
+    {
+      label: t('chat.tools_templates'),
+      icon: <FileText size={18} />,
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-50',
+      onClick: onOpenTemplates,
+    },
+    {
+      label: t('chat.tools_campaigns'),
+      icon: <Megaphone size={18} />,
+      color: 'text-orange-500',
+      bgColor: 'bg-orange-50',
+      onClick: onOpenCampaigns,
+    },
+  ]
+
+  return (
+    <Popover
+      content={
+        <div className="flex w-48 flex-col gap-0.5">
+          {items.map((item) => (
+            <Button
+              key={item.label}
+              type="text"
+              block
+              onClick={() => {
+                setOpen(false)
+                item.onClick?.()
+              }}
+              className="py-2.5!"
+            >
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${item.bgColor} ${item.color}`}
+              >
+                {item.icon}
+              </div>
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      }
+      trigger="click"
+      open={open}
+      onOpenChange={setOpen}
+      placement="bottomRight"
+      overlayClassName="org-switcher-popover"
+      arrow={false}
+    >
+      {children}
+    </Popover>
+  )
+}
+
 export function ChatLayout({
   conversations,
   loading = false,
   provider = 'whatsapp',
   onSend,
   onUploadAndSend,
+  onTyping,
   onSelectConversation,
-  onSync: _onSync,
-  syncing: _syncing,
   onRetry,
   onChatClick,
   hasReadyAgent = false,
@@ -183,10 +283,14 @@ export function ChatLayout({
   onConfigureAgent,
   onConfigureCatalog,
   onOpenOptions,
+  onOpenTemplates,
+  onOpenCampaigns,
   socialAccountId,
   hasCatalogForProducts,
   onProductClick,
   onCatalogClick,
+  onTemplateClick,
+  onTikTokMessageClick,
 }: ChatLayoutProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -317,7 +421,9 @@ export function ChatLayout({
                 ? 'WhatsApp'
                 : provider === 'instagram-dm'
                   ? 'Instagram'
-                  : 'Messenger',
+                  : provider === 'tiktok'
+                    ? 'TikTok'
+                    : 'Messenger',
           })}
           primaryAction={{ title: t('agent.configure'), onClick: () => onConfigureAgent?.() }}
         />
@@ -332,9 +438,6 @@ export function ChatLayout({
       <div
         className={`chat-split__left ${selectedConversation ? 'chat-split__left--hidden-mobile' : ''}`}
       >
-        {/* Mobile: show HeaderHelper if conversations exist + setup needed */}
-        <div className="md:hidden">{renderMobileHeaderHelper()}</div>
-
         {/* Filter bar */}
         <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-3.5">
           <Button
@@ -363,22 +466,29 @@ export function ChatLayout({
               size="small"
               className="comments-filter-btn"
             >
-              Labels{selectedLabelIds.length > 0 ? ` (${selectedLabelIds.length})` : ''}
+              {t('chat.tools_labels')}
+              {selectedLabelIds.length > 0 ? ` (${selectedLabelIds.length})` : ''}
             </Button>
           </LabelsFilterPopover>
           {provider === 'whatsapp' && (
             <div className="ml-auto">
-              <Button
-                type="text"
-                size="small"
-                icon={<EllipsisVertical size={16} />}
-                onClick={onOpenOptions}
-              />
+              <WhatsAppToolsPopover
+                onOpenOptions={onOpenOptions}
+                onOpenTemplates={onOpenTemplates}
+                onOpenCampaigns={onOpenCampaigns}
+              >
+                <Button type="text" size="small" icon={<Wrench size={16} />}>
+                  {t('chat.tools')}
+                </Button>
+              </WhatsAppToolsPopover>
             </div>
           )}
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          {/* Mobile: HeaderHelper scrolls with the list (under the filter bar) */}
+          <div className="md:hidden">{renderMobileHeaderHelper()}</div>
+
           {/* Mobile only: show SocialSetup when no conversations + setup needed */}
           {!hasConversations && setupState ? (
             <div className="md:hidden">
@@ -423,10 +533,13 @@ export function ChatLayout({
             provider={provider}
             onSend={onSend}
             onUploadAndSend={onUploadAndSend}
+            onTyping={onTyping}
             onRetry={onRetry}
             hasCatalog={hasCatalogForProducts}
             onProductClick={onProductClick}
             onCatalogClick={onCatalogClick}
+            onTemplateClick={onTemplateClick}
+            onTikTokMessageClick={onTikTokMessageClick}
           />
         ) : (
           renderDesktopSetup()

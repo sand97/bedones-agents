@@ -197,7 +197,7 @@ export class WhatsappOptinService {
       {},
       {
         repeat: { pattern: tickCron },
-        jobId: 'whatsapp-optin:tick-hourly',
+        jobId: 'whatsapp-optin-tick-hourly',
         removeOnComplete: true,
         removeOnFail: 100,
       },

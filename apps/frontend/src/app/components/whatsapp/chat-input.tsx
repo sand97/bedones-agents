@@ -11,6 +11,8 @@ import {
   X,
   ShoppingBag,
   Store,
+  MessageSquareText,
+  Share2,
 } from 'lucide-react'
 import { AudioRecorder } from './audio-recorder'
 import type { Message } from './mock-data'
@@ -45,6 +47,8 @@ function AttachmentPopover({
   hasCatalog,
   onProductClick,
   onCatalogClick,
+  onTemplateClick,
+  onTikTokMessageClick,
 }: {
   children: React.ReactNode
   onSelectFiles: (files: FileList, type: MediaType) => void
@@ -52,6 +56,8 @@ function AttachmentPopover({
   hasCatalog?: boolean
   onProductClick?: () => void
   onCatalogClick?: () => void
+  onTemplateClick?: () => void
+  onTikTokMessageClick?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const { t } = useTranslation()
@@ -70,7 +76,7 @@ function AttachmentPopover({
         photoInputRef.current?.click()
       },
     },
-    ...(provider !== 'messenger'
+    ...(provider !== 'messenger' && provider !== 'tiktok'
       ? [
           {
             icon: <Video size={18} />,
@@ -84,16 +90,20 @@ function AttachmentPopover({
           },
         ]
       : []),
-    {
-      icon: <FileText size={18} />,
-      label: t('chat.document'),
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-50',
-      onClick: () => {
-        setOpen(false)
-        fileInputRef.current?.click()
-      },
-    },
+    ...(provider !== 'tiktok'
+      ? [
+          {
+            icon: <FileText size={18} />,
+            label: t('chat.document'),
+            color: 'text-blue-500',
+            bgColor: 'bg-blue-50',
+            onClick: () => {
+              setOpen(false)
+              fileInputRef.current?.click()
+            },
+          },
+        ]
+      : []),
     ...(provider === 'whatsapp' && hasCatalog && onProductClick
       ? [
           {
@@ -118,6 +128,34 @@ function AttachmentPopover({
             onClick: () => {
               setOpen(false)
               onCatalogClick()
+            },
+          },
+        ]
+      : []),
+    ...(provider === 'whatsapp' && onTemplateClick
+      ? [
+          {
+            icon: <MessageSquareText size={18} />,
+            label: t('chat.template'),
+            color: 'text-blue-500',
+            bgColor: 'bg-blue-50',
+            onClick: () => {
+              setOpen(false)
+              onTemplateClick()
+            },
+          },
+        ]
+      : []),
+    ...(provider === 'tiktok' && onTikTokMessageClick
+      ? [
+          {
+            icon: <Share2 size={18} />,
+            label: t('chat.tiktok_rich_message'),
+            color: 'text-sky-500',
+            bgColor: 'bg-sky-50',
+            onClick: () => {
+              setOpen(false)
+              onTikTokMessageClick()
             },
           },
         ]
@@ -189,29 +227,47 @@ function AttachmentPopover({
 export function ChatInput({
   onSend,
   onUploadAndSend,
+  onTyping,
   provider,
   replyTo,
   onCancelReply,
   hasCatalog,
   onProductClick,
   onCatalogClick,
+  onTemplateClick,
+  onTikTokMessageClick,
+  windowClosed,
 }: {
   onSend?: (
     message: string,
-    media?: { url: string; type: 'image' | 'video' | 'audio' },
+    media?: { url: string; type: 'image' | 'video' | 'audio' | 'file' },
   ) => Promise<void>
   onUploadAndSend?: (file: File, type: MediaType | 'audio') => Promise<void>
+  onTyping?: () => void
   provider?: string
   replyTo?: Message | null
   onCancelReply?: () => void
   hasCatalog?: boolean
   onProductClick?: () => void
   onCatalogClick?: () => void
+  onTemplateClick?: () => void
+  onTikTokMessageClick?: () => void
+  windowClosed?: boolean
 }) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<InputMode>('text')
   const [inputValue, setInputValue] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const lastTypingAtRef = useRef<number>(0)
+
+  const handleTyping = () => {
+    if (!onTyping) return
+    const now = Date.now()
+    // Throttle to one call per 10s — providers' indicators last ~20s.
+    if (now - lastTypingAtRef.current < 10_000) return
+    lastTypingAtRef.current = now
+    onTyping()
+  }
 
   // Focus input when replyTo changes
   useEffect(() => {
@@ -224,6 +280,7 @@ export function ChatInput({
   }, [replyTo])
 
   const handleSend = () => {
+    if (windowClosed) return
     if (!inputValue.trim()) return
     const msg = inputValue.trim()
     setInputValue('')
@@ -250,6 +307,17 @@ export function ChatInput({
   const handleFileSelect = async (files: FileList, type: MediaType) => {
     if (!onUploadAndSend || files.length === 0) return
     const file = files[0]
+
+    if (provider === 'tiktok') {
+      if (type !== 'image' || !['image/jpeg', 'image/png'].includes(file.type)) {
+        message.error(t('chat.tiktok_image_type_error'))
+        return
+      }
+      if (file.size > 3 * 1024 * 1024) {
+        message.error(t('chat.tiktok_image_size_error'))
+        return
+      }
+    }
 
     // Validate duration for audio/video (3 min max)
     if (type === 'video' || type === 'audio') {
@@ -293,12 +361,15 @@ export function ChatInput({
           hasCatalog={hasCatalog}
           onProductClick={onProductClick}
           onCatalogClick={onCatalogClick}
+          onTemplateClick={onTemplateClick}
+          onTikTokMessageClick={onTikTokMessageClick}
         >
           <Button
             type="text"
             shape="circle"
             icon={<Paperclip size={18} />}
             className="flex-shrink-0"
+            disabled={windowClosed}
           />
         </AttachmentPopover>
 
@@ -306,9 +377,21 @@ export function ChatInput({
           <AudioRecorder onSend={handleAudioSend} onCancel={() => setMode('text')} />
         ) : (
           <Input.TextArea
-            placeholder={t('chat.type_message')}
+            disabled={windowClosed}
+            placeholder={
+              windowClosed
+                ? t(
+                    provider === 'tiktok'
+                      ? 'chat.window_closed_placeholder_tiktok'
+                      : 'chat.window_closed_placeholder_whatsapp',
+                  )
+                : t('chat.type_message')
+            }
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => {
+              setInputValue(e.target.value)
+              if (e.target.value.trim()) handleTyping()
+            }}
             onKeyDown={handleKeyDown}
             autoSize={{ minRows: 1, maxRows: 4 }}
             className="rounded-2xl!"
@@ -316,13 +399,40 @@ export function ChatInput({
         )}
 
         {mode === 'text' &&
-          (inputValue.trim() ? (
+          (windowClosed ? (
+            provider === 'whatsapp' ? (
+              <Button
+                type="text"
+                shape="circle"
+                onClick={onTemplateClick}
+                icon={<MessageSquareText size={18} />}
+                className="flex-shrink-0"
+              />
+            ) : (
+              <Button
+                type="text"
+                shape="circle"
+                icon={<Send size={18} />}
+                className="flex-shrink-0"
+                disabled
+              />
+            )
+          ) : inputValue.trim() ? (
             <Button
               type="text"
               shape="circle"
               onClick={handleSend}
               icon={<Send size={18} />}
               className="flex-shrink-0"
+            />
+          ) : provider === 'tiktok' ? (
+            <Button
+              type="text"
+              shape="circle"
+              onClick={handleSend}
+              icon={<Send size={18} />}
+              className="flex-shrink-0"
+              disabled
             />
           ) : (
             <Button

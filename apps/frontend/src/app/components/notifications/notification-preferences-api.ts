@@ -6,7 +6,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getStoredLocale } from '@app/i18n'
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {

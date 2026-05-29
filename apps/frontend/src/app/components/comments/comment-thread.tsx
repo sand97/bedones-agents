@@ -1,10 +1,11 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Avatar, Button, Input, Popover, Spin, Tooltip, App } from 'antd'
-import { MessageSquare, Send, Eye, EyeOff, Trash2, ExternalLink, Settings } from 'lucide-react'
+import { MessageSquare, Send, Eye, EyeOff, Trash2, ExternalLink } from 'lucide-react'
 import dayjs from 'dayjs'
 import { ImagePlaceholderIcon, OptionsIcon } from '@app/components/icons/social-icons'
 import { $api } from '@app/lib/api/$api'
+import { getAvatarColor } from '@app/lib/avatar-color'
 import type { Comment, Post } from './mock-data'
 
 type Provider = 'facebook' | 'instagram' | 'tiktok'
@@ -114,10 +115,20 @@ function formatDateLabel(timestamp: string, t: (key: string) => string): string 
 }
 
 function buildThreads(comments: Comment[]): Thread[] {
-  const roots = comments.filter((c) => !c.parentId)
+  // Dedupe by id — websocket invalidations + optimistic refetch can deliver
+  // the same comment twice, which then renders as a visible duplicate.
+  const seen = new Set<string>()
+  const unique: Comment[] = []
+  for (const c of comments) {
+    if (seen.has(c.id)) continue
+    seen.add(c.id)
+    unique.push(c)
+  }
+
+  const roots = unique.filter((c) => !c.parentId)
   const replyMap = new Map<string, Comment[]>()
 
-  for (const c of comments) {
+  for (const c of unique) {
     if (c.parentId) {
       const arr = replyMap.get(c.parentId) || []
       arr.push(c)
@@ -129,6 +140,49 @@ function buildThreads(comments: Comment[]): Thread[] {
     root,
     replies: replyMap.get(root.id) || [],
   }))
+}
+
+/** Map fromId → fromName for every comment in a post, used to resolve `@[USER_ID]` mentions. */
+function buildUserNameMap(comments: Comment[]): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const c of comments) {
+    if (c.fromId && c.fromName && !map.has(c.fromId)) {
+      map.set(c.fromId, c.fromName)
+    }
+  }
+  return map
+}
+
+/**
+ * Facebook embeds user tags as `@[USER_ID]` in the raw comment text.
+ * Replace each occurrence with the resolved username (in bold) so the reader
+ * sees a readable name instead of a numeric ID.
+ */
+function renderCommentMessage(message: string, userById: Map<string, string>): ReactNode {
+  if (!message) return null
+  const regex = /@\[([^\]]+)\]/g
+  const parts: ReactNode[] = []
+  let lastIndex = 0
+  let mentionKey = 0
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(message)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(message.slice(lastIndex, match.index))
+    }
+    const userId = match[1]
+    const name = userById.get(userId) ?? userId
+    parts.push(
+      <span key={`mention-${mentionKey++}`} className="font-semibold text-text-primary">
+        @{name}
+      </span>,
+    )
+    lastIndex = regex.lastIndex
+  }
+  if (lastIndex === 0) return message
+  if (lastIndex < message.length) {
+    parts.push(message.slice(lastIndex))
+  }
+  return parts
 }
 
 function groupThreadsByDate(
@@ -315,11 +369,13 @@ function CommentBubble({
   provider,
   accountId,
   isReply,
+  userById,
 }: {
   comment: Comment
   provider: Provider
   accountId: string
   isReply?: boolean
+  userById: Map<string, string>
 }) {
   const { t } = useTranslation()
   const isPage = comment.isPageReply
@@ -333,6 +389,7 @@ function CommentBubble({
       src={comment.fromAvatar}
       size={isReply ? 24 : 32}
       className={`flex-shrink-0 ${isClickable ? 'cursor-pointer' : ''}`}
+      style={{ backgroundColor: getAvatarColor(comment.fromId || comment.fromName) }}
     >
       {comment.fromName?.[0]}
     </Avatar>
@@ -362,7 +419,7 @@ function CommentBubble({
           </div>
         )}
         <div className={`mt-0.5 text-text-primary ${isReply ? 'text-xs' : 'text-sm'}`}>
-          {comment.message}
+          {renderCommentMessage(comment.message, userById)}
           <span className="whitespace-nowrap text-xs text-text-muted">
             {' '}
             · {formatTime(comment.createdTime)}
@@ -399,11 +456,12 @@ function ThreadBlock({
   thread,
   provider,
   accountId,
-  isConfigured,
+  isConfigured: _isConfigured,
   onReplyClick,
   onHide,
   onUnhide,
   onDelete,
+  userById,
 }: {
   thread: Thread
   provider: Provider
@@ -413,6 +471,7 @@ function ThreadBlock({
   onHide?: (commentId: string) => Promise<void>
   onUnhide?: (commentId: string) => Promise<void>
   onDelete?: (commentId: string) => Promise<void>
+  userById: Map<string, string>
 }) {
   const { t } = useTranslation()
   const isRootDeleted = thread.root.status === 'DELETED'
@@ -420,7 +479,12 @@ function ThreadBlock({
 
   return (
     <div className="px-4 py-3">
-      <CommentBubble comment={thread.root} provider={provider} accountId={accountId} />
+      <CommentBubble
+        comment={thread.root}
+        provider={provider}
+        accountId={accountId}
+        userById={userById}
+      />
 
       {hasReplies && (
         <div className="thread-replies">
@@ -429,7 +493,13 @@ function ThreadBlock({
               key={reply.id}
               className={`thread-reply ${i === thread.replies.length - 1 ? 'thread-reply--last' : ''}`}
             >
-              <CommentBubble comment={reply} provider={provider} accountId={accountId} isReply />
+              <CommentBubble
+                comment={reply}
+                provider={provider}
+                accountId={accountId}
+                isReply
+                userById={userById}
+              />
             </div>
           ))}
         </div>
@@ -437,16 +507,14 @@ function ThreadBlock({
 
       {!isRootDeleted && (
         <div className="mt-2 ml-10 flex items-center gap-1">
-          {isConfigured && (
-            <Button
-              type="text"
-              size="small"
-              onClick={() => onReplyClick(thread.root)}
-              icon={<MessageSquare size={12} />}
-            >
-              {t('comments.reply')}
-            </Button>
-          )}
+          <Button
+            type="text"
+            size="small"
+            onClick={() => onReplyClick(thread.root)}
+            icon={<MessageSquare size={12} />}
+          >
+            {t('comments.reply')}
+          </Button>
           <CommentOptionsMenu
             comment={thread.root}
             onHide={onHide}
@@ -504,11 +572,13 @@ export function CommentThread({
   const [inputValue, setInputValue] = useState('')
   const [sending, setSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const { message: messageApi } = App.useApp()
   const { t } = useTranslation()
 
   const threads = useMemo(() => buildThreads(post.comments), [post.comments])
   const groups = useMemo(() => groupThreadsByDate(threads, t), [threads, t])
+  const userById = useMemo(() => buildUserNameMap(post.comments), [post.comments])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -518,6 +588,7 @@ export function CommentThread({
 
   const handleReplyClick = (comment: Comment) => {
     setReplyTo(comment)
+    setTimeout(() => inputRef.current?.focus(), 0)
   }
 
   const clearReply = () => {
@@ -582,6 +653,7 @@ export function CommentThread({
                 onHide={onHide}
                 onUnhide={onUnhide}
                 onDelete={onDelete}
+                userById={userById}
               />
             ))}
           </div>
@@ -590,50 +662,38 @@ export function CommentThread({
 
       {/* Fixed input at bottom */}
       <div className="flex-shrink-0 border-t border-border-subtle px-4 pt-3 pb-6">
-        {!isConfigured ? (
-          <div className="flex items-center gap-2 rounded-lg bg-bg-subtle px-3 py-2.5 text-sm text-text-muted">
-            <Settings size={16} className="flex-shrink-0" />
-            <span>{t('comments.configure_replies')}</span>
+        {replyTo && (
+          <div className="mb-2 flex items-center gap-2 rounded-lg bg-bg-subtle px-3 py-2 text-xs text-text-secondary">
+            <span className="min-w-0 flex-1 truncate">
+              {t('comments.reply_to')}{' '}
+              <strong>{replyTo.fromName || t('comments.a_comment')}</strong> :{' '}
+              {renderCommentMessage(replyTo.message, userById)}
+            </span>
+            <Button type="text" size="small" onClick={clearReply} className="flex-shrink-0 p-0!">
+              ✕
+            </Button>
           </div>
-        ) : (
-          <>
-            {replyTo && (
-              <div className="mb-2 flex items-center gap-2 rounded-lg bg-bg-subtle px-3 py-2 text-xs text-text-secondary">
-                <span className="min-w-0 flex-1 truncate">
-                  {t('comments.reply_to')}{' '}
-                  <strong>{replyTo.fromName || t('comments.a_comment')}</strong> : {replyTo.message}
-                </span>
-                <Button
-                  type="text"
-                  size="small"
-                  onClick={clearReply}
-                  className="flex-shrink-0 p-0!"
-                >
-                  ✕
-                </Button>
-              </div>
-            )}
-            <div className="chat-input-row">
-              <Input.TextArea
-                placeholder={placeholder}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                autoSize={{ minRows: 1, maxRows: 3 }}
-                className="rounded-2xl!"
-              />
-              <Button
-                type="text"
-                shape="circle"
-                onClick={handleSend}
-                disabled={!inputValue.trim()}
-                loading={sending}
-                icon={<Send strokeWidth={1.5} size={18} />}
-                className="flex-shrink-0"
-              />
-            </div>
-          </>
         )}
+        <div className="chat-input-row">
+          <Input.TextArea
+            ref={inputRef}
+            placeholder={placeholder}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            autoSize={{ minRows: 1, maxRows: 3 }}
+            className="rounded-2xl!"
+          />
+          <Button
+            type="text"
+            shape="circle"
+            onClick={handleSend}
+            disabled={!inputValue.trim()}
+            loading={sending}
+            icon={<Send strokeWidth={1.5} size={18} />}
+            className="flex-shrink-0"
+          />
+        </div>
       </div>
     </div>
   )

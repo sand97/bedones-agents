@@ -21,6 +21,7 @@ import {
   setAuthRedirect,
   buildFacebookOAuthUrl,
   buildInstagramOAuthUrl,
+  buildTikTokOAuthUrl,
 } from '@app/lib/auth-redirect'
 
 export const Route = createFileRoute('/create-organisation')({
@@ -99,10 +100,10 @@ const PLATFORMS: PlatformConfig[] = [
     name: 'TikTok',
     icon: TikTokIcon,
     color: 'var(--color-brand-tiktok)',
-    supportedFeatures: ['comments'],
+    supportedFeatures: ['comments', 'messaging'],
     priority: 3,
     description:
-      'Connectez votre compte TikTok Business pour surveiller et répondre aux commentaires de vos vidéos.',
+      'Connectez votre compte TikTok Business pour surveiller les commentaires et répondre aux messages directs.',
     connectButton: 'Connecter un compte TikTok',
     addMoreLabel: 'Connecter un autre compte',
   },
@@ -141,6 +142,7 @@ const FEATURE_CATEGORIES: FeatureCategoryConfig[] = [
       { id: 'whatsapp', label: 'WhatsApp' },
       { id: 'facebook', label: 'Messenger' },
       { id: 'instagram', label: 'Instagram DM' },
+      { id: 'tiktok', label: 'TikTok DM' },
     ],
   },
 ]
@@ -352,11 +354,36 @@ function CreateOrganisationPage() {
       return
     }
 
-    // WhatsApp uses Embedded Signup (handled separately) / TikTok not yet implemented
+    if (platformId === 'tiktok') {
+      const hasComments = selectedFeatures.comments.has('tiktok')
+      const hasMessaging = selectedFeatures.messaging.has('tiktok')
+      const tkScope =
+        hasComments && hasMessaging
+          ? ('comments+messages' as const)
+          : hasMessaging
+            ? ('messages' as const)
+            : ('comments' as const)
+
+      setAuthRedirect({
+        intent: 'onboarding',
+        step: safeCurrentStep,
+        provider: 'tiktok',
+        scopes: [
+          ...(hasComments ? ['comments', 'comment.list', 'comment.list.manage'] : []),
+          ...(hasMessaging
+            ? ['messages', 'message.list.read', 'message.list.send', 'message.list.manage']
+            : []),
+          'video.list',
+        ],
+      })
+      window.location.href = buildTikTokOAuthUrl(tkScope)
+      return
+    }
+
+    // WhatsApp uses Embedded Signup (handled separately)
     // For now keep mock behavior
     const mockPages: Record<string, string[]> = {
       whatsapp: ['+237 691 000 001'],
-      tiktok: ['@mboa_fashion'],
     }
     setConnectedPages((prev) => ({
       ...prev,

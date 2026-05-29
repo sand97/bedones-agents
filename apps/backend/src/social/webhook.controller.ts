@@ -53,18 +53,27 @@ export class WebhookController {
 
   @Post('facebook')
   async facebookEvent(@Req() req: Request, @RawBody() rawBody: Buffer, @Res() res: Response) {
-    // Respond immediately to avoid timeout
-    res.status(200).send('EVENT_RECEIVED')
-
-    // Verify signature
     const signature = req.headers['x-hub-signature-256'] as string
+    const requireSignature =
+      this.configService.get<string>('FACEBOOK_WEBHOOK_REQUIRE_SIGNATURE', 'true') !== 'false'
+
+    if (!signature && requireSignature) {
+      this.logger.error('[Facebook Webhook] Missing signature')
+      return res.status(403).send('MISSING_SIGNATURE')
+    }
+
     if (signature) {
       const valid = await this.webhookService.verifyFacebookSignature(rawBody, signature)
       if (!valid) {
         this.logger.error('[Facebook Webhook] Invalid signature')
-        return
+        return res.status(403).send('INVALID_SIGNATURE')
       }
+    } else {
+      this.logger.warn('[Facebook Webhook] Missing signature; processing because override is set')
     }
+
+    // Respond immediately after signature verification to avoid timeout
+    res.status(200).send('EVENT_RECEIVED')
 
     // Process asynchronously
     try {
@@ -97,18 +106,27 @@ export class WebhookController {
 
   @Post('instagram')
   async instagramEvent(@Req() req: Request, @RawBody() rawBody: Buffer, @Res() res: Response) {
-    // Respond immediately
-    res.status(200).send('EVENT_RECEIVED')
-
-    // Verify signature
     const signature = req.headers['x-hub-signature-256'] as string
+    const requireSignature =
+      this.configService.get<string>('INSTAGRAM_WEBHOOK_REQUIRE_SIGNATURE', 'true') !== 'false'
+
+    if (!signature && requireSignature) {
+      this.logger.error('[Instagram Webhook] Missing signature')
+      return res.status(403).send('MISSING_SIGNATURE')
+    }
+
     if (signature) {
       const valid = await this.webhookService.verifyInstagramSignature(rawBody, signature)
       if (!valid) {
         this.logger.error('[Instagram Webhook] Invalid signature')
-        return
+        return res.status(403).send('INVALID_SIGNATURE')
       }
+    } else {
+      this.logger.warn('[Instagram Webhook] Missing signature; processing because override is set')
     }
+
+    // Respond immediately after signature verification to avoid timeout
+    res.status(200).send('EVENT_RECEIVED')
 
     // Process asynchronously
     try {
@@ -141,18 +159,27 @@ export class WebhookController {
 
   @Post('whatsapp')
   async whatsappEvent(@Req() req: Request, @RawBody() rawBody: Buffer, @Res() res: Response) {
-    // Respond immediately to avoid timeout
-    res.status(200).send('EVENT_RECEIVED')
-
-    // Verify signature
     const signature = req.headers['x-hub-signature-256'] as string
+    const requireSignature =
+      this.configService.get<string>('WHATSAPP_WEBHOOK_REQUIRE_SIGNATURE', 'true') !== 'false'
+
+    if (!signature && requireSignature) {
+      this.logger.error('[WhatsApp Webhook] Missing signature')
+      return res.status(403).send('MISSING_SIGNATURE')
+    }
+
     if (signature) {
       const valid = await this.webhookService.verifyWhatsAppSignature(rawBody, signature)
       if (!valid) {
         this.logger.error('[WhatsApp Webhook] Invalid signature')
-        return
+        return res.status(403).send('INVALID_SIGNATURE')
       }
+    } else {
+      this.logger.warn('[WhatsApp Webhook] Missing signature; processing because override is set')
     }
+
+    // Respond immediately after signature verification to avoid timeout
+    res.status(200).send('EVENT_RECEIVED')
 
     // Process asynchronously
     try {
@@ -166,8 +193,25 @@ export class WebhookController {
   // ─── TikTok webhook events ───
 
   @Post('tiktok')
-  async tiktokEvent(@Req() req: Request, @Res() res: Response) {
-    // Respond immediately to avoid timeout
+  async tiktokEvent(@Req() req: Request, @RawBody() rawBody: Buffer, @Res() res: Response) {
+    const signature = req.headers['tiktok-signature'] as string | undefined
+    const requireSignature =
+      this.configService.get<string>('TIKTOK_WEBHOOK_REQUIRE_SIGNATURE', 'true') !== 'false'
+
+    if (signature) {
+      const valid = await this.webhookService.verifyTikTokSignature(rawBody, signature)
+      if (!valid) {
+        this.logger.error('[TikTok Webhook] Invalid signature')
+        return res.status(403).send('INVALID_SIGNATURE')
+      }
+    } else if (requireSignature) {
+      this.logger.error('[TikTok Webhook] Missing signature')
+      return res.status(403).send('MISSING_SIGNATURE')
+    } else {
+      this.logger.warn('[TikTok Webhook] Missing signature; falling back to client_key check')
+    }
+
+    // Respond immediately after signature verification to avoid timeout
     res.status(200).send('EVENT_RECEIVED')
 
     // Process asynchronously

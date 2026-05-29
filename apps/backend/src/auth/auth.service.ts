@@ -32,18 +32,22 @@ export class AuthService {
     })
 
     if (!user || !user.passwordHash) {
-      throw new UnauthorizedException(
-        I18nContext.current()?.t('errors.auth.invalid_credentials') ??
+      throw new UnauthorizedException({
+        code: 'AUTH_INVALID_CREDENTIALS',
+        message:
+          I18nContext.current()?.t('errors.auth.invalid_credentials') ??
           'Email ou mot de passe incorrect',
-      )
+      })
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) {
-      throw new UnauthorizedException(
-        I18nContext.current()?.t('errors.auth.invalid_credentials') ??
+      throw new UnauthorizedException({
+        code: 'AUTH_INVALID_CREDENTIALS',
+        message:
+          I18nContext.current()?.t('errors.auth.invalid_credentials') ??
           'Email ou mot de passe incorrect',
-      )
+      })
     }
 
     return this.createSessionForUser(user.id)

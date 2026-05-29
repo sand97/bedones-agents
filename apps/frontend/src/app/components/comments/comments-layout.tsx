@@ -2,14 +2,16 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Button } from 'antd'
-import { Settings } from 'lucide-react'
+import { CheckCircle, MessageSquare, Settings, Wrench } from 'lucide-react'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { CommentsIcon } from '@app/components/icons/social-icons'
+import { useLayout } from '@app/contexts/layout-context'
 import { PostList } from './post-list'
 import { CommentThread } from './comment-thread'
 import { CommentsConfigModal } from './comments-config'
 import { PostListSkeleton, CommentThreadSkeleton } from './comments-skeleton'
 import type { Post } from './mock-data'
+import type { PageSettingsResponse } from '@app/lib/api'
 
 const EMPTY_ICON_SIZE = 40
 
@@ -19,8 +21,11 @@ interface CommentsLayoutProps {
   loading?: boolean
   pageName?: string
   accountId?: string
+  organisationId?: string
   /** Whether the page settings have been configured by the user */
   isConfigured?: boolean
+  /** Pre-loaded settings to populate the config modal */
+  initialSettings?: PageSettingsResponse
   onReply?: (commentId: string, message: string) => Promise<void>
   onComment?: (postId: string, message: string) => Promise<void>
   onHide?: (commentId: string) => Promise<void>
@@ -36,7 +41,9 @@ export function CommentsLayout({
   loading = false,
   pageName,
   accountId,
+  organisationId,
   isConfigured = false,
+  initialSettings,
   onReply,
   onComment,
   onHide,
@@ -47,8 +54,10 @@ export function CommentsLayout({
 }: CommentsLayoutProps) {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const { isDesktop } = useLayout()
   const search = useSearch({ strict: false }) as { post?: string }
   const [configOpen, setConfigOpen] = useState(false)
+  const [mobileShowComments, setMobileShowComments] = useState(false)
   const selectedPostId = search.post
   const filter =
     (search as { filter?: string }).filter === 'unread' ? ('unread' as const) : ('all' as const)
@@ -90,6 +99,40 @@ export function CommentsLayout({
     )
   }
 
+  // On mobile, when not configured and user hasn't asked to see comments, show config setup
+  const showMobileConfigSetup = !isDesktop && !isConfigured && !mobileShowComments && !selectedPost
+
+  if (showMobileConfigSetup) {
+    return (
+      <>
+        <SocialSetup
+          icon={<CheckCircle size={EMPTY_ICON_SIZE} strokeWidth={1.5} />}
+          color="var(--color-text-muted)"
+          title={t('comments.setup_description')}
+          description=""
+          buttonLabel={t('comments.setup_button')}
+          buttonIcon={<Settings size={18} />}
+          onAction={() => setConfigOpen(true)}
+          secondaryButtonLabel={posts.length > 0 ? t('comments.view_comments') : undefined}
+          secondaryButtonIcon={<MessageSquare size={18} />}
+          onSecondaryAction={() => setMobileShowComments(true)}
+          actionsLayout="stack"
+        />
+        {pageName && accountId && (
+          <CommentsConfigModal
+            pageName={pageName}
+            accountId={accountId}
+            organisationId={organisationId}
+            open={configOpen}
+            onClose={() => setConfigOpen(false)}
+            onSaved={onSettingsSaved}
+            initialSettings={initialSettings}
+          />
+        )}
+      </>
+    )
+  }
+
   return (
     <div className="comments-split">
       {/* Left: post list */}
@@ -113,13 +156,23 @@ export function CommentsLayout({
           >
             {t('comments.unread')}
           </Button>
+          <div className="ml-auto">
+            <Button
+              type="text"
+              size="small"
+              icon={<Wrench size={16} />}
+              onClick={() => setConfigOpen(true)}
+            >
+              {t('chat.tools')}
+            </Button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           <PostList posts={filteredPosts} selectedPostId={selectedPostId} onSelect={selectPost} />
         </div>
       </div>
 
-      {/* Right: comment thread or empty */}
+      {/* Right: comment thread or config setup */}
       <div
         className={`comments-split__right ${selectedPost ? 'comments-split__right--visible' : ''}`}
       >
@@ -129,11 +182,21 @@ export function CommentsLayout({
             provider={provider}
             accountId={accountId || ''}
             isConfigured={isConfigured}
-            onReply={isConfigured ? onReply : undefined}
-            onComment={isConfigured ? onComment : undefined}
+            onReply={onReply}
+            onComment={onComment}
             onHide={onHide}
             onUnhide={onUnhide}
             onDelete={onDelete}
+          />
+        ) : !isConfigured ? (
+          <SocialSetup
+            icon={<CheckCircle size={EMPTY_ICON_SIZE} strokeWidth={1.5} />}
+            color="var(--color-text-muted)"
+            title={t('comments.setup_description')}
+            description=""
+            buttonLabel={t('comments.setup_button')}
+            buttonIcon={<Settings size={18} />}
+            onAction={() => setConfigOpen(true)}
           />
         ) : (
           <SocialSetup
@@ -153,9 +216,11 @@ export function CommentsLayout({
         <CommentsConfigModal
           pageName={pageName}
           accountId={accountId}
+          organisationId={organisationId}
           open={configOpen}
           onClose={() => setConfigOpen(false)}
           onSaved={onSettingsSaved}
+          initialSettings={initialSettings}
         />
       )}
     </div>

@@ -7,7 +7,12 @@ import { App, Button, Progress } from 'antd'
 import { ArrowLeft, CheckCircle, MessageSquareOff, Settings } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { SocialSetup } from '@app/components/social/social-setup'
-import { AccountSwitcher, type SocialAccount } from '@app/components/social/account-switcher'
+import {
+  AccountSwitcher,
+  formatSocialAccountDescription,
+  formatSocialAccountName,
+  type SocialAccount,
+} from '@app/components/social/account-switcher'
 import { CommentsLayout } from '@app/components/comments/comments-layout'
 import { CommentsConfigModal } from '@app/components/comments/comments-config'
 import { FacebookIcon, InstagramIcon, TikTokIcon } from '@app/components/icons/social-icons'
@@ -332,7 +337,7 @@ function CommentsPage() {
       intent: 'connect_pages',
       orgId: orgSlug,
       provider: id as 'facebook' | 'instagram' | 'tiktok',
-      scopes: ['comments'],
+      scopes: id === 'tiktok' ? ['comments', 'video.list'] : ['comments'],
     })
 
     if (id === 'facebook') {
@@ -403,7 +408,8 @@ function CommentsPage() {
   // ─── Build account switcher items ───
   const accountSwitcherItems: SocialAccount[] = accounts.map((a) => ({
     id: a.id,
-    name: a.pageName || a.username || a.providerAccountId,
+    name: formatSocialAccountName(a),
+    description: formatSocialAccountDescription(a),
     avatarUrl: a.profilePictureUrl ?? undefined,
   }))
 
@@ -420,8 +426,8 @@ function CommentsPage() {
     />
   )
 
-  // ─── Account connected but no settings configured → Config prompt ───
-  if (!isConfigured || configJustConnected) {
+  // ─── Just connected → show config prompt (one-time) ───
+  if (configJustConnected) {
     return (
       <div className="flex min-h-screen flex-col">
         <DashboardHeader
@@ -442,12 +448,14 @@ function CommentsPage() {
           <CommentsConfigModal
             pageName={currentSwitcherItem.name}
             accountId={currentAccountId}
+            organisationId={orgSlug}
             open={configOpen}
             onClose={() => setConfigOpen(false)}
             onSaved={() => {
               setConfigJustConnected(false)
               invalidateAccounts()
             }}
+            initialSettings={currentAccount?.settings ?? undefined}
           />
         )}
       </div>
@@ -477,6 +485,7 @@ function CommentsPage() {
           <CommentsConfigModal
             pageName={currentSwitcherItem.name}
             accountId={currentAccountId}
+            organisationId={orgSlug}
             open={configOpen}
             onClose={() => setConfigOpen(false)}
             onSaved={() => invalidateAccounts()}
@@ -515,7 +524,9 @@ function CommentsPage() {
         loading={postsQuery.isLoading}
         pageName={currentSwitcherItem.name}
         accountId={currentAccountId || undefined}
+        organisationId={orgSlug}
         isConfigured={isConfigured}
+        initialSettings={currentAccount?.settings ?? undefined}
         onReply={handleReply}
         onComment={handleComment}
         onHide={handleHide}

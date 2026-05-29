@@ -2,13 +2,15 @@ import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { App, Button, Card, Form, Input, Modal, Select } from 'antd'
-import { ShieldAlert, ShieldBan, Plus, Trash2 } from 'lucide-react'
+import { ShieldAlert, ShieldBan, Plus, Trash2, ShoppingBag } from 'lucide-react'
 import { updatePageSettings } from '@app/lib/api'
 import type { PageSettingsResponse } from '@app/lib/api'
+import { $api } from '@app/lib/api/$api'
 
 interface CommentsConfigModalProps {
   pageName: string
   accountId: string
+  organisationId?: string
   open: boolean
   onClose: () => void
   onSaved?: () => void
@@ -21,6 +23,7 @@ interface FormValues {
   spamAction: string
   quickReplies: { question: string; answer: string }[]
   customInstructions: string
+  catalogId: string | null
 }
 
 function useModerationOptions() {
@@ -65,11 +68,46 @@ function ConfigTitle({ pageName }: { pageName: string }) {
   )
 }
 
-function ConfigForm({ form }: { form: ReturnType<typeof Form.useForm<FormValues>>[0] }): ReactNode {
+interface CatalogOption {
+  value: string
+  label: string
+}
+
+function ConfigForm({
+  form,
+  catalogOptions,
+  catalogLoading,
+}: {
+  form: ReturnType<typeof Form.useForm<FormValues>>[0]
+  catalogOptions: CatalogOption[]
+  catalogLoading: boolean
+}): ReactNode {
   const { t } = useTranslation()
   const moderationOptions = useModerationOptions()
   return (
     <Form form={form} layout="vertical" className="flex flex-col gap-5">
+      {/* Catalogue associé */}
+      <Card size="small">
+        <div className="mb-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <ShoppingBag size={14} />
+            {t('comments_config.catalog_title')}
+          </div>
+          <div className="mt-1 text-xs text-text-muted">
+            {t('comments_config.catalog_description')}
+          </div>
+        </div>
+        <Form.Item name="catalogId" noStyle>
+          <Select
+            className="w-full"
+            placeholder={t('comments_config.catalog_placeholder')}
+            options={catalogOptions}
+            loading={catalogLoading}
+            allowClear
+          />
+        </Form.Item>
+      </Card>
+
       {/* Commentaires indésirables */}
       <Card size="small">
         <div className="mb-3">
@@ -169,6 +207,7 @@ function ConfigForm({ form }: { form: ReturnType<typeof Form.useForm<FormValues>
 export function CommentsConfigModal({
   pageName,
   accountId,
+  organisationId,
   open,
   onClose,
   onSaved,
@@ -178,6 +217,19 @@ export function CommentsConfigModal({
   const [saving, setSaving] = useState(false)
   const { message: messageApi } = App.useApp()
   const { t } = useTranslation()
+
+  const catalogsQuery = $api.useQuery(
+    'get',
+    '/catalog/org/{organisationId}',
+    { params: { path: { organisationId: organisationId! } } },
+    { enabled: !!organisationId && open },
+  )
+
+  const catalogs = (catalogsQuery.data ?? []) as { id: string; name: string }[]
+  const catalogOptions: CatalogOption[] = catalogs.map((c) => ({
+    value: c.id,
+    label: c.name,
+  }))
 
   // Load existing settings when modal opens
   useEffect(() => {
@@ -192,6 +244,7 @@ export function CommentsConfigModal({
           ? initialSettings.faqRules.map((r) => ({ question: r.question, answer: r.answer }))
           : [],
         customInstructions: initialSettings.customInstructions || '',
+        catalogId: initialSettings.catalogId ?? null,
       })
       return
     }
@@ -217,6 +270,7 @@ export function CommentsConfigModal({
         spamAction: values.spamAction as 'hide' | 'delete' | 'none',
         customInstructions: values.customInstructions || undefined,
         faqRules: faqRules.length > 0 ? faqRules : undefined,
+        catalogId: values.catalogId ?? null,
       })
 
       messageApi.success(t('comments_config.saved'))
@@ -248,7 +302,11 @@ export function CommentsConfigModal({
       width={520}
       destroyOnHidden
     >
-      <ConfigForm form={form} />
+      <ConfigForm
+        form={form}
+        catalogOptions={catalogOptions}
+        catalogLoading={catalogsQuery.isLoading}
+      />
     </Modal>
   )
 }

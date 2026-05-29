@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
 
 /**
  * Typed API client for Agent, Catalog, Ticket, Promotion endpoints.
@@ -30,6 +30,7 @@ export interface AgentSocialAccount {
     pageAbout?: string
     username?: string
     profilePictureUrl?: string
+    metadata?: Record<string, unknown>
   }
 }
 
@@ -86,6 +87,11 @@ export const agentApi = {
       method: 'POST',
     }),
 
+  startSetup: (id: string, organisationId: string) =>
+    fetchJson<{ status: string }>(`/agent/${id}/start-setup?organisationId=${organisationId}`, {
+      method: 'POST',
+    }),
+
   areCatalogsAnalyzed: (id: string) =>
     fetchJson<{ analyzed: boolean }>(`/agent/${id}/catalogs-analyzed`),
 
@@ -103,6 +109,12 @@ export const agentApi = {
     }),
 
   deactivate: (id: string) => fetchJson<Agent>(`/agent/${id}/deactivate`, { method: 'PUT' }),
+
+  updateSocialAccounts: (id: string, socialAccountIds: string[]) =>
+    fetchJson<Agent>(`/agent/${id}/social-accounts`, {
+      method: 'PUT',
+      body: JSON.stringify({ socialAccountIds }),
+    }),
 
   getLabels: (id: string) => fetchJson<LabelItem[]>(`/agent/${id}/labels`),
 }

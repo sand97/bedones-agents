@@ -919,6 +919,36 @@
         ]
       }
     },
+    "/social/tiktok/{accountId}/check-business": {
+      "get": {
+        "operationId": "SocialController_checkTikTokBusiness",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TikTokBusinessCheckDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
     "/social/tiktok/{accountId}/sync-comments/{videoId}": {
       "post": {
         "operationId": "SocialController_syncTikTokComments",
@@ -1005,6 +1035,30 @@
         ]
       }
     },
+    "/webhooks/tiktok/setup-direct-messages": {
+      "post": {
+        "operationId": "TikTokWebhookController_setupDirectMessages",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "query",
+            "description": "Admin token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Register the DIRECT_MESSAGE webhook on TikTok Business API"
+          }
+        },
+        "tags": [
+          "TikTok Webhooks"
+        ]
+      }
+    },
     "/webhooks/tiktok/list": {
       "get": {
         "operationId": "TikTokWebhookController_list",
@@ -1045,7 +1099,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Delete the COMMENT webhook from TikTok Business API"
+            "description": "Delete the COMMENT, DIRECT_MESSAGE webhooks from TikTok Business API"
           }
         },
         "tags": [
@@ -1181,6 +1235,61 @@
         ]
       }
     },
+    "/messaging/send-template": {
+      "post": {
+        "operationId": "MessagingController_sendTemplateMessage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendTemplateMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectMessageResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
+    "/messaging/send-reaction": {
+      "post": {
+        "operationId": "MessagingController_sendReaction",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendReactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
     "/messaging/mark-read": {
       "post": {
         "operationId": "MessagingController_markRead",
@@ -1195,6 +1304,29 @@
             }
           }
         },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
+    "/messaging/typing/{conversationId}": {
+      "post": {
+        "operationId": "MessagingController_sendTyping",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "201": {
             "description": ""
@@ -2351,6 +2483,39 @@
         ]
       }
     },
+    "/agent/{id}/social-accounts": {
+      "put": {
+        "operationId": "AgentController_updateSocialAccounts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentSocialAccountsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
     "/agent/{id}/messages": {
       "get": {
         "operationId": "AgentController_getMessages",
@@ -2419,6 +2584,37 @@
             }
           }
         },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/agent/{id}/start-setup": {
+      "post": {
+        "operationId": "AgentController_startSetup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "201": {
             "description": ""
@@ -3128,6 +3324,600 @@
         ]
       }
     },
+    "/loyalty/contacts/account/{socialAccountId}": {
+      "get": {
+        "operationId": "LoyaltyController_listContacts",
+        "parameters": [
+          {
+            "name": "socialAccountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/contacts": {
+      "post": {
+        "operationId": "LoyaltyController_createContact",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLoyaltyContactDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/contacts/{id}": {
+      "patch": {
+        "operationId": "LoyaltyController_updateContact",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLoyaltyContactDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      },
+      "delete": {
+        "operationId": "LoyaltyController_removeContact",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/bonuses/account/{socialAccountId}": {
+      "get": {
+        "operationId": "LoyaltyController_listBonuses",
+        "parameters": [
+          {
+            "name": "socialAccountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/bonuses/{id}": {
+      "get": {
+        "operationId": "LoyaltyController_getBonus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      },
+      "patch": {
+        "operationId": "LoyaltyController_updateBonus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLoyaltyBonusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      },
+      "delete": {
+        "operationId": "LoyaltyController_removeBonus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/bonuses": {
+      "post": {
+        "operationId": "LoyaltyController_createBonus",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLoyaltyBonusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/templates/account/{socialAccountId}": {
+      "get": {
+        "operationId": "LoyaltyController_listTemplates",
+        "parameters": [
+          {
+            "name": "socialAccountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/templates": {
+      "post": {
+        "operationId": "LoyaltyController_createTemplate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLoyaltyTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/templates/account/{socialAccountId}/{templateId}": {
+      "patch": {
+        "operationId": "LoyaltyController_updateTemplate",
+        "parameters": [
+          {
+            "name": "socialAccountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "templateId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLoyaltyTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/templates/account/{socialAccountId}/by-name/{name}": {
+      "delete": {
+        "operationId": "LoyaltyController_removeTemplate",
+        "parameters": [
+          {
+            "name": "socialAccountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/campaigns/account/{socialAccountId}": {
+      "get": {
+        "operationId": "LoyaltyController_listCampaigns",
+        "parameters": [
+          {
+            "name": "socialAccountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "origin",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/campaigns/account/{socialAccountId}/preview-count": {
+      "get": {
+        "operationId": "LoyaltyController_previewCampaignCount",
+        "parameters": [
+          {
+            "name": "socialAccountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "minSpend",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "minOrders",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/campaigns/account/{socialAccountId}/audience-preview": {
+      "post": {
+        "operationId": "LoyaltyController_previewCampaignAudience",
+        "parameters": [
+          {
+            "name": "socialAccountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignAudiencePreviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/campaigns/{id}/details": {
+      "get": {
+        "operationId": "LoyaltyController_getCampaignDetails",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/campaigns": {
+      "post": {
+        "operationId": "LoyaltyController_createCampaign",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLoyaltyCampaignDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
+    "/loyalty/campaigns/{id}": {
+      "patch": {
+        "operationId": "LoyaltyController_updateCampaign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLoyaltyCampaignDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      },
+      "delete": {
+        "operationId": "LoyaltyController_removeCampaign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Loyalty"
+        ]
+      }
+    },
     "/notification-preferences/org/{organisationId}": {
       "get": {
         "operationId": "NotificationPreferenceController_getForOrg",
@@ -3652,7 +4442,7 @@
           },
           "logoUrl": {
             "type": "string",
-            "example": "https://minio.bedones.local/logos/logo.png"
+            "example": "https://minio.bedones.test/logos/logo.png"
           },
           "timezone": {
             "type": "string",
@@ -3665,7 +4455,7 @@
         "properties": {
           "url": {
             "type": "string",
-            "example": "https://minio.bedones.local/logos/abc123.png"
+            "example": "https://minio.bedones.test/logos/abc123.png"
           }
         },
         "required": [
@@ -3740,6 +4530,10 @@
             "items": {
               "$ref": "#/components/schemas/FAQRuleResponseDto"
             }
+          },
+          "catalogId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -3776,6 +4570,10 @@
           },
           "profilePictureUrl": {
             "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
           },
           "scopes": {
             "description": "Feature scopes (e.g. comments, messages)",
@@ -3958,6 +4756,11 @@
             "items": {
               "$ref": "#/components/schemas/FAQRuleDto"
             }
+          },
+          "catalogId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Catalog associated to this page (null to unlink)"
           }
         }
       },
@@ -4066,6 +4869,17 @@
           "code"
         ]
       },
+      "TikTokBusinessCheckDto": {
+        "type": "object",
+        "properties": {
+          "isBusiness": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "isBusiness"
+        ]
+      },
       "ConversationResponseDto": {
         "type": "object",
         "properties": {
@@ -4084,8 +4898,20 @@
           "participantName": {
             "type": "string"
           },
+          "participantUsername": {
+            "type": "string"
+          },
           "participantAvatar": {
             "type": "string"
+          },
+          "languageCode": {
+            "type": "string"
+          },
+          "languageSource": {
+            "type": "string"
+          },
+          "languageConfidence": {
+            "type": "number"
           },
           "lastMessageText": {
             "type": "string"
@@ -4256,6 +5082,34 @@
           "replyToId": {
             "type": "string",
             "description": "ID of the message to reply to"
+          },
+          "tiktokMessageType": {
+            "type": "string",
+            "description": "TikTok message type. When omitted, the backend infers TEXT, IMAGE, SHARE_POST, TEMPLATE or SENDER_ACTION from the provided fields.",
+            "enum": [
+              "TEXT",
+              "IMAGE",
+              "SHARE_POST",
+              "TEMPLATE",
+              "SENDER_ACTION"
+            ]
+          },
+          "tiktokSharePostId": {
+            "type": "string",
+            "description": "TikTok post item_id for SHARE_POST messages"
+          },
+          "tiktokTemplate": {
+            "type": "object",
+            "description": "TikTok Q&A template payload. Supports type QA_BUTTON_CARD or QA_LINK_CARD with 1-3 REPLY buttons.",
+            "additionalProperties": true
+          },
+          "tiktokSenderAction": {
+            "type": "string",
+            "description": "TikTok sender action for SENDER_ACTION messages",
+            "enum": [
+              "TYPING",
+              "MARK_READ"
+            ]
           }
         },
         "required": [
@@ -4307,6 +5161,52 @@
           "productRetailerIds",
           "catalogId",
           "format"
+        ]
+      },
+      "SendTemplateMessageDto": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "metaTemplateName": {
+            "type": "string"
+          },
+          "metaTemplateLanguage": {
+            "type": "string"
+          },
+          "metaTemplateId": {
+            "type": "string"
+          },
+          "renderedBody": {
+            "type": "string"
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "conversationId",
+          "metaTemplateName",
+          "metaTemplateLanguage"
+        ]
+      },
+      "SendReactionDto": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "description": "ID of the message to react to"
+          },
+          "emoji": {
+            "type": "string",
+            "description": "Emoji to react with. Pass an empty string to remove the current reaction."
+          }
+        },
+        "required": [
+          "messageId",
+          "emoji"
         ]
       },
       "MarkConversationReadDto": {
@@ -4718,6 +5618,20 @@
         },
         "required": [
           "organisationId",
+          "socialAccountIds"
+        ]
+      },
+      "UpdateAgentSocialAccountsDto": {
+        "type": "object",
+        "properties": {
+          "socialAccountIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
           "socialAccountIds"
         ]
       },
@@ -5135,6 +6049,554 @@
           },
           "stackable": {
             "type": "boolean"
+          }
+        }
+      },
+      "CreateLoyaltyContactDto": {
+        "type": "object",
+        "properties": {
+          "socialAccountId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "totalSpent": {
+            "type": "number"
+          },
+          "orderCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "socialAccountId",
+          "name",
+          "phone"
+        ]
+      },
+      "UpdateLoyaltyContactDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "totalSpent": {
+            "type": "number"
+          },
+          "orderCount": {
+            "type": "number"
+          }
+        }
+      },
+      "CreateLoyaltyBonusDto": {
+        "type": "object",
+        "properties": {
+          "socialAccountId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "stackable": {
+            "type": "boolean"
+          },
+          "targetSpend": {
+            "type": "number"
+          },
+          "targetOrderCount": {
+            "type": "number"
+          },
+          "targetProductsCount": {
+            "type": "number"
+          },
+          "triggerProductIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rewardType": {
+            "type": "string",
+            "enum": [
+              "PRODUCTS",
+              "CREDIT",
+              "PERCENT"
+            ]
+          },
+          "rewardCredit": {
+            "type": "number"
+          },
+          "rewardPercent": {
+            "type": "number"
+          },
+          "rewardProductIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "socialAccountId",
+          "name",
+          "rewardType"
+        ]
+      },
+      "UpdateLoyaltyBonusDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "PAUSED",
+              "EXPIRED"
+            ]
+          },
+          "stackable": {
+            "type": "boolean"
+          },
+          "targetSpend": {
+            "type": "number"
+          },
+          "targetOrderCount": {
+            "type": "number"
+          },
+          "targetProductsCount": {
+            "type": "number"
+          },
+          "triggerProductIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rewardType": {
+            "type": "string",
+            "enum": [
+              "PRODUCTS",
+              "CREDIT",
+              "PERCENT"
+            ]
+          },
+          "rewardCredit": {
+            "type": "number"
+          },
+          "rewardPercent": {
+            "type": "number"
+          },
+          "rewardProductIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
+          }
+        }
+      },
+      "LoyaltyTemplateButtonDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "QUICK_REPLY",
+              "URL",
+              "PHONE_NUMBER",
+              "CATALOG",
+              "MPM"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "phoneNumber": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ]
+      },
+      "CreateLoyaltyTemplateDto": {
+        "type": "object",
+        "properties": {
+          "socialAccountId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "MARKETING",
+              "UTILITY",
+              "AUTHENTICATION"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "variables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "headerType": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "TEXT",
+              "IMAGE",
+              "VIDEO"
+            ]
+          },
+          "headerText": {
+            "type": "string"
+          },
+          "headerMediaUrl": {
+            "type": "string"
+          },
+          "footerText": {
+            "type": "string"
+          },
+          "buttons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LoyaltyTemplateButtonDto"
+            }
+          }
+        },
+        "required": [
+          "socialAccountId",
+          "name",
+          "body"
+        ]
+      },
+      "UpdateLoyaltyTemplateDto": {
+        "type": "object",
+        "properties": {
+          "socialAccountId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "MARKETING",
+              "UTILITY",
+              "AUTHENTICATION"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "variables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "headerType": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "TEXT",
+              "IMAGE",
+              "VIDEO"
+            ]
+          },
+          "headerText": {
+            "type": "string"
+          },
+          "headerMediaUrl": {
+            "type": "string"
+          },
+          "footerText": {
+            "type": "string"
+          },
+          "buttons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LoyaltyTemplateButtonDto"
+            }
+          }
+        }
+      },
+      "CampaignAudiencePreviewDto": {
+        "type": "object",
+        "properties": {
+          "audienceType": {
+            "type": "string",
+            "enum": [
+              "RECENT_CONTACTS",
+              "PRODUCT_INTEREST",
+              "TICKET_STATUS"
+            ]
+          },
+          "audienceCriteria": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "audienceLimit": {
+            "type": "number"
+          },
+          "marketingTopic": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "audienceType"
+        ]
+      },
+      "CampaignTemplateSelectionDto": {
+        "type": "object",
+        "properties": {
+          "languageCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allLanguages": {
+            "type": "boolean"
+          },
+          "metaTemplateId": {
+            "type": "string"
+          },
+          "metaTemplateName": {
+            "type": "string"
+          },
+          "metaTemplateLanguage": {
+            "type": "string"
+          },
+          "metaTemplateCategory": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "variableValues": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "mpmProductRetailerIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mpmSectionTitle": {
+            "type": "string"
+          },
+          "mpmThumbnailProductRetailerId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "metaTemplateId",
+          "metaTemplateName",
+          "metaTemplateLanguage"
+        ]
+      },
+      "CreateLoyaltyCampaignDto": {
+        "type": "object",
+        "properties": {
+          "socialAccountId": {
+            "type": "string"
+          },
+          "bonusId": {
+            "type": "string"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "LOYALTY",
+              "GENERAL"
+            ]
+          },
+          "metaTemplateId": {
+            "type": "string",
+            "description": "Meta WhatsApp template id"
+          },
+          "metaTemplateName": {
+            "type": "string",
+            "description": "Meta WhatsApp template name"
+          },
+          "metaTemplateLanguage": {
+            "type": "string",
+            "description": "Meta WhatsApp template language"
+          },
+          "name": {
+            "type": "string"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "ONCE",
+              "DAILY",
+              "WEEKLY",
+              "MONTHLY"
+            ]
+          },
+          "marketingTopic": {
+            "type": "string"
+          },
+          "segmentCriteria": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "audienceType": {
+            "type": "string",
+            "enum": [
+              "RECENT_CONTACTS",
+              "PRODUCT_INTEREST",
+              "TICKET_STATUS"
+            ]
+          },
+          "audienceCriteria": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "audienceLimit": {
+            "type": "number"
+          },
+          "templateAssignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampaignTemplateSelectionDto"
+            }
+          },
+          "variableValues": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "socialAccountId",
+          "name"
+        ]
+      },
+      "UpdateLoyaltyCampaignDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "metaTemplateId": {
+            "type": "string"
+          },
+          "metaTemplateName": {
+            "type": "string"
+          },
+          "metaTemplateLanguage": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "SCHEDULED",
+              "RUNNING",
+              "COMPLETED",
+              "PAUSED",
+              "CANCELLED",
+              "FAILED"
+            ]
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "ONCE",
+              "DAILY",
+              "WEEKLY",
+              "MONTHLY"
+            ]
+          },
+          "marketingTopic": {
+            "type": "string"
+          },
+          "segmentCriteria": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "audienceType": {
+            "type": "string",
+            "enum": [
+              "RECENT_CONTACTS",
+              "PRODUCT_INTEREST",
+              "TICKET_STATUS"
+            ]
+          },
+          "audienceCriteria": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "audienceLimit": {
+            "type": "number"
+          },
+          "templateAssignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampaignTemplateSelectionDto"
+            }
+          },
+          "variableValues": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
           }
         }
       },

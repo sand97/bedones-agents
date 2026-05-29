@@ -11,6 +11,7 @@ import {
   FileText,
   RotateCcw,
   Reply,
+  Smile,
   Sparkles,
   BotOff,
 } from 'lucide-react'
@@ -19,13 +20,14 @@ import { useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { DoubleCheckIcon, SingleCheckIcon, OptionsIcon } from '@app/components/icons/social-icons'
 import { $api } from '@app/lib/api/$api'
+import { getAvatarColor } from '@app/lib/avatar-color'
 import type { Conversation, Message } from './mock-data'
 import { TicketCard } from './ticket-card'
 import { TicketDrawer, type RealTicket } from './ticket-drawer'
 import { ChatInput } from './chat-input'
 import { FeedbackModal, type FeedbackSubmitResult, type FeedbackTurn } from './feedback-modal'
 
-type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger'
+type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger' | 'tiktok'
 
 interface ChatWindowProps {
   conversation: Conversation
@@ -40,10 +42,13 @@ interface ChatWindowProps {
     type: 'image' | 'video' | 'audio' | 'file',
     replyToId?: string,
   ) => Promise<void>
+  onTyping?: () => void
   onRetry?: (messageId: string) => void
   hasCatalog?: boolean
   onProductClick?: () => void
   onCatalogClick?: () => void
+  onTemplateClick?: () => void
+  onTikTokMessageClick?: () => void
 }
 
 function formatTime(timestamp: string): string {
@@ -77,6 +82,48 @@ function groupMessagesByDate(
   }
 
   return groups
+}
+
+/* ── Lazy video player ──
+   Avoids pre-buffering: shows a placeholder with a play button. The <video>
+   element is mounted only on click, so the network request happens at user
+   intent rather than at render time. */
+
+function LazyVideo({ src, onPlay }: { src?: string; onPlay?: () => void }) {
+  const [active, setActive] = useState(false)
+
+  if (!active) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setActive(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setActive(true)
+          }
+        }}
+        aria-label="Lire la vidéo"
+        className="chat-video-placeholder"
+      >
+        <span className="chat-video-placeholder__play">
+          <Play size={20} />
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <video
+      src={src}
+      controls
+      autoPlay
+      preload="auto"
+      className="w-full rounded-control aspect-video bg-bg-muted"
+      onLoadedMetadata={onPlay}
+    />
+  )
 }
 
 /* ── Audio message player ── */
@@ -230,6 +277,51 @@ function ReplyContextBubble({
   )
 }
 
+/* ── Reaction picker ── */
+
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢'] as const
+
+function ReactionPicker({
+  onPick,
+  children,
+}: {
+  onPick: (emoji: string) => void
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Popover
+      content={
+        <div className="flex items-center gap-1">
+          {REACTION_EMOJIS.map((emoji) => (
+            <Button
+              key={emoji}
+              type="text"
+              shape="circle"
+              size="large"
+              onClick={() => {
+                onPick(emoji)
+                setOpen(false)
+              }}
+              className="!text-xl !leading-none"
+            >
+              {emoji}
+            </Button>
+          ))}
+        </div>
+      }
+      trigger="click"
+      open={open}
+      onOpenChange={setOpen}
+      placement="top"
+      arrow={false}
+    >
+      {children}
+    </Popover>
+  )
+}
+
 /* ── Message bubble ── */
 
 function formatFileSize(bytes: number): string {
@@ -296,8 +388,10 @@ function MessageBubble({
   onScrollToMessage,
   onRetry,
   onReply,
+  onReact,
   onImprove,
   onMediaLoad,
+  windowClosed = false,
 }: {
   message: Message
   position: 'first' | 'middle' | 'last' | 'single'
@@ -305,13 +399,22 @@ function MessageBubble({
   onScrollToMessage?: (id: string) => void
   onRetry?: (messageId: string) => void
   onReply?: (message: Message) => void
+  onReact?: (message: Message, emoji: string) => void
   onImprove?: (message: Message) => void
   onMediaLoad?: () => void
+  windowClosed?: boolean
 }) {
   const { t } = useTranslation()
   const isOutgoing = message.from === 'business'
   const isSending = message.status === 'sending'
   const isError = message.status === 'error'
+  const windowClosedTooltip = windowClosed
+    ? t(
+        provider === 'tiktok'
+          ? 'chat.window_closed_tooltip_tiktok'
+          : 'chat.window_closed_tooltip_whatsapp',
+      )
+    : null
   const hasMedia =
     message.type === 'image' ||
     message.type === 'video' ||
@@ -430,13 +533,7 @@ function MessageBubble({
       case 'video':
         return (
           <div>
-            <video
-              src={message.videoUrl || message.videoThumbnail}
-              controls
-              preload="metadata"
-              className="w-full rounded-control aspect-video bg-bg-muted"
-              onLoadedMetadata={onMediaLoad}
-            />
+            <LazyVideo src={message.videoUrl || message.videoThumbnail} onPlay={onMediaLoad} />
             {message.text && <p className="m-0 mt-2 text-sm text-text-primary">{message.text}</p>}
           </div>
         )
@@ -614,14 +711,46 @@ function MessageBubble({
           />
         </Tooltip>
       )}
+      {isOutgoing &&
+        onReact &&
+        !isSending &&
+        !isError &&
+        (windowClosed ? (
+          <Tooltip title={windowClosedTooltip} placement="top">
+            <Button
+              variant="text"
+              size="small"
+              shape="circle"
+              icon={<Smile size={14} />}
+              disabled
+              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            />
+          </Tooltip>
+        ) : (
+          <ReactionPicker onPick={(emoji) => onReact(message, emoji)}>
+            <Tooltip title={t('chat.react_tooltip')} placement="top">
+              <Button
+                variant="text"
+                size="small"
+                shape="circle"
+                icon={<Smile size={14} />}
+                className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              />
+            </Tooltip>
+          </ReactionPicker>
+        ))}
       {isOutgoing && onReply && !isSending && !isError && (
-        <Tooltip title={t('chat.reply_tooltip')} placement="top">
+        <Tooltip
+          title={windowClosed ? windowClosedTooltip : t('chat.reply_tooltip')}
+          placement="top"
+        >
           <Button
             variant="text"
             size="small"
             shape="circle"
             icon={<Reply size={14} />}
             onClick={() => onReply(message)}
+            disabled={windowClosed}
             className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
           />
         </Tooltip>
@@ -676,19 +805,51 @@ function MessageBubble({
           </div>
         )}
       </div>
-      {/* Reply button — right of incoming messages */}
+      {/* Reply + reaction buttons — right of incoming messages */}
       {!isOutgoing && onReply && !isSending && !isError && (
-        <Tooltip title={t('chat.reply_tooltip')} placement="top">
+        <Tooltip
+          title={windowClosed ? windowClosedTooltip : t('chat.reply_tooltip')}
+          placement="top"
+        >
           <Button
             variant="text"
             size="small"
             shape="circle"
             icon={<Reply size={14} />}
             onClick={() => onReply(message)}
+            disabled={windowClosed}
             className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
           />
         </Tooltip>
       )}
+      {!isOutgoing &&
+        onReact &&
+        !isSending &&
+        !isError &&
+        (windowClosed ? (
+          <Tooltip title={windowClosedTooltip} placement="top">
+            <Button
+              variant="text"
+              size="small"
+              shape="circle"
+              icon={<Smile size={14} />}
+              disabled
+              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            />
+          </Tooltip>
+        ) : (
+          <ReactionPicker onPick={(emoji) => onReact(message, emoji)}>
+            <Tooltip title={t('chat.react_tooltip')} placement="top">
+              <Button
+                variant="text"
+                size="small"
+                shape="circle"
+                icon={<Smile size={14} />}
+                className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              />
+            </Tooltip>
+          </ReactionPicker>
+        ))}
     </div>
   )
 }
@@ -717,9 +878,14 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
   const isAgentReady =
     !!agent && agent.score >= 80 && agent.status !== 'DRAFT' && agent.status !== 'CONFIGURING'
   const isActive = agentStatus?.isActive === true
+  const hasHeaderActions = Boolean(
+    conversation.contact.phone || conversation.contact.username || isAgentReady,
+  )
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(conversation.contact.phone)
+    await navigator.clipboard.writeText(
+      conversation.contact.phone || conversation.contact.username || '',
+    )
     setCopied(true)
     setTimeout(() => {
       setCopied(false)
@@ -752,56 +918,75 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
 
   return (
     <div className="flex items-center gap-3 border-b border-border-subtle px-4 py-2.5">
-      <Avatar src={conversation.contact.avatarUrl} size={36} className="flex-shrink-0">
+      <Avatar
+        src={conversation.contact.avatarUrl}
+        size={36}
+        className="flex-shrink-0"
+        style={{
+          backgroundColor: getAvatarColor(conversation.contact.id || conversation.contact.name),
+        }}
+      >
         {conversation.contact.name[0]}
       </Avatar>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-text-primary">{conversation.contact.name}</div>
-        <div className="text-xs text-text-muted">{conversation.contact.phone}</div>
+        {conversation.contact.username && (
+          <div className="text-xs text-text-muted">{conversation.contact.username}</div>
+        )}
+        {!conversation.contact.username && conversation.contact.phone && (
+          <div className="text-xs text-text-muted">{conversation.contact.phone}</div>
+        )}
       </div>
 
-      {/* Options menu */}
-      <Popover
-        content={
-          <div className="w-56">
-            <Button
-              type="text"
-              block
-              onClick={handleCopy}
-              icon={copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-              className="py-2.5!"
-            >
-              {copied
-                ? t('common.copied')
-                : t('chat.copy_phone', { phone: conversation.contact.phone })}
-            </Button>
-            {isAgentReady && (
-              <Button
-                type="text"
-                block
-                onClick={handleToggleAgent}
-                loading={setOverrideMutation.isPending}
-                icon={isActive ? <BotOff size={14} /> : <Sparkles size={14} />}
-                className="py-2.5!"
-              >
-                {isActive ? t('chat.deactivate_agent') : t('chat.activate_agent')}
-              </Button>
-            )}
-          </div>
-        }
-        trigger="click"
-        open={optionsOpen}
-        onOpenChange={setOptionsOpen}
-        placement="bottomRight"
-        overlayClassName="org-switcher-popover"
-        arrow={false}
-      >
-        <Button
-          type="text"
-          icon={<OptionsIcon width={18} height={18} />}
-          className="flex-shrink-0"
-        />
-      </Popover>
+      {hasHeaderActions && (
+        <Popover
+          content={
+            <div className="w-56">
+              {(conversation.contact.phone || conversation.contact.username) && (
+                <Button
+                  type="text"
+                  block
+                  onClick={handleCopy}
+                  icon={
+                    copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />
+                  }
+                  className="py-2.5!"
+                >
+                  {copied
+                    ? t('common.copied')
+                    : conversation.contact.phone
+                      ? t('chat.copy_phone', { phone: conversation.contact.phone })
+                      : conversation.contact.username}
+                </Button>
+              )}
+              {isAgentReady && (
+                <Button
+                  type="text"
+                  block
+                  onClick={handleToggleAgent}
+                  loading={setOverrideMutation.isPending}
+                  icon={isActive ? <BotOff size={14} /> : <Sparkles size={14} />}
+                  className="py-2.5!"
+                >
+                  {isActive ? t('chat.deactivate_agent') : t('chat.activate_agent')}
+                </Button>
+              )}
+            </div>
+          }
+          trigger="click"
+          open={optionsOpen}
+          onOpenChange={setOptionsOpen}
+          placement="bottomRight"
+          overlayClassName="org-switcher-popover"
+          arrow={false}
+        >
+          <Button
+            type="text"
+            icon={<OptionsIcon width={18} height={18} />}
+            className="flex-shrink-0"
+          />
+        </Popover>
+      )}
     </div>
   )
 }
@@ -813,10 +998,13 @@ export function ChatWindow({
   provider = 'whatsapp',
   onSend,
   onUploadAndSend,
+  onTyping,
   onRetry,
   hasCatalog,
   onProductClick,
   onCatalogClick,
+  onTemplateClick,
+  onTikTokMessageClick,
 }: ChatWindowProps) {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -826,6 +1014,22 @@ export function ChatWindow({
   const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null)
 
   const feedbackMutation = $api.useMutation('post', '/agent/feedback/{messageId}')
+  const reactionMutation = $api.useMutation('post', '/messaging/send-reaction')
+
+  const handleReact = useCallback(
+    async (message: Message, emoji: string) => {
+      // Strip the optimistic prefix — backend only knows real message IDs.
+      if (message.id.startsWith('optimistic-')) return
+      try {
+        await reactionMutation.mutateAsync({
+          body: { messageId: message.id, emoji },
+        })
+      } catch (err) {
+        antdMessage.error(err instanceof Error ? err.message : t('chat.react_error'))
+      }
+    },
+    [reactionMutation, t],
+  )
 
   const handleFeedbackSubmit = useCallback(
     async (params: {
@@ -924,6 +1128,16 @@ export function ChatWindow({
     return active.length > 0 ? active[active.length - 1] : null
   }, [tickets])
 
+  // Customer-service window. WhatsApp closes after 24h since the last inbound
+  // message; TikTok Business Messaging closes after 48h.
+  const windowClosed = useMemo(() => {
+    if (provider !== 'whatsapp' && provider !== 'tiktok') return false
+    const lastInbound = [...conversation.messages].reverse().find((msg) => msg.from === 'customer')
+    if (!lastInbound) return false
+    const limitHours = provider === 'tiktok' ? 48 : 24
+    return dayjs().diff(dayjs(lastInbound.timestamp), 'hour', true) > limitHours
+  }, [conversation.messages, provider])
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <ChatHeader conversation={conversation} />
@@ -955,8 +1169,10 @@ export function ChatWindow({
                   onScrollToMessage={scrollToMessage}
                   onRetry={onRetry}
                   onReply={provider !== 'instagram-dm' ? setReplyTo : undefined}
+                  onReact={provider === 'whatsapp' ? handleReact : undefined}
                   onImprove={setFeedbackMessage}
                   onMediaLoad={scrollToBottom}
+                  windowClosed={windowClosed}
                 />
               )
             })}
@@ -984,12 +1200,16 @@ export function ChatWindow({
               }
             : undefined
         }
+        onTyping={onTyping}
         provider={provider}
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
         hasCatalog={hasCatalog}
         onProductClick={onProductClick}
         onCatalogClick={onCatalogClick}
+        onTemplateClick={onTemplateClick}
+        onTikTokMessageClick={onTikTokMessageClick}
+        windowClosed={windowClosed}
       />
 
       {/* Ticket drawer */}

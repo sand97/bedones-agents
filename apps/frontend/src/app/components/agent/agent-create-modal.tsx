@@ -16,14 +16,17 @@ interface AgentCreateModalProps {
   catalogs: Array<{ socialAccounts: Array<{ socialAccount: { id: string } }> }>
   loading?: boolean
   orgSlug: string
+  /** When set, the modal becomes an "edit resources" modal for this agent. */
+  editAgent?: Agent | null
 }
 
-const SUPPORTED_PROVIDERS = ['WHATSAPP', 'INSTAGRAM', 'FACEBOOK']
+const SUPPORTED_PROVIDERS = ['WHATSAPP', 'INSTAGRAM', 'FACEBOOK', 'TIKTOK']
 
 const PROVIDER_LABELS: Record<string, string> = {
   WHATSAPP: 'WhatsApp',
   FACEBOOK: 'Messenger',
   INSTAGRAM: 'Instagram',
+  TIKTOK: 'TikTok',
 }
 
 export function AgentCreateModal({
@@ -35,31 +38,40 @@ export function AgentCreateModal({
   catalogs,
   loading,
   orgSlug,
+  editAgent,
 }: AgentCreateModalProps) {
   const { t } = useTranslation()
   const [name, setName] = useState('')
   const [selected, setSelected] = useState<string[]>([])
 
+  const isEditMode = !!editAgent
+
   useEffect(() => {
     if (open) {
-      setSelected([])
-      setName('')
+      if (editAgent) {
+        setSelected(editAgent.socialAccounts.map((sa) => sa.socialAccount.id))
+        setName(editAgent.name || '')
+      } else {
+        setSelected([])
+        setName('')
+      }
     }
-  }, [open])
+  }, [open, editAgent])
 
   // Show all messaging-capable accounts (WhatsApp, Instagram DM, Messenger)
   const availableAccounts = socialAccounts.filter((a) => SUPPORTED_PROVIDERS.includes(a.provider))
 
-  // Build a map of socialAccountId -> agentId
+  // Build a map of socialAccountId -> agentId (exclude the agent being edited)
   const accountToAgent = useMemo(() => {
     const map = new Map<string, Agent>()
     for (const agent of existingAgents) {
+      if (editAgent && agent.id === editAgent.id) continue
       for (const sa of agent.socialAccounts) {
         map.set(sa.socialAccount.id, agent)
       }
     }
     return map
-  }, [existingAgents])
+  }, [existingAgents, editAgent])
 
   // Build a set of WhatsApp social accounts linked to at least one catalog
   const whatsappAccountsWithCatalog = useMemo(() => {
@@ -84,25 +96,27 @@ export function AgentCreateModal({
 
   return (
     <Modal
-      title={t('agent.create_modal_title')}
+      title={isEditMode ? t('agent.edit_resources_modal_title') : t('agent.create_modal_title')}
       open={open}
       onCancel={onClose}
       onOk={() => onSubmit(name.trim(), selected)}
-      okText={t('agent.create_modal_ok')}
+      okText={isEditMode ? t('agent.edit_resources_modal_ok') : t('agent.create_modal_ok')}
       cancelText={t('agent.create_modal_cancel')}
       okButtonProps={{ disabled: selected.length === 0, loading }}
     >
-      <div className="mb-4">
-        <label className="mb-1.5 block text-sm font-medium text-text-primary">
-          {t('agent.name_label')}
-        </label>
-        <Input
-          placeholder={t('agent.name_placeholder')}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <Alert type="info" showIcon className="mt-2!" message={t('agent.name_info')} />
-      </div>
+      {!isEditMode && (
+        <div className="mb-4">
+          <label className="mb-1.5 block text-sm font-medium text-text-primary">
+            {t('agent.name_label')}
+          </label>
+          <Input
+            placeholder={t('agent.name_placeholder')}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <Alert type="info" showIcon className="mt-2!" message={t('agent.name_info')} />
+        </div>
+      )}
 
       <label className="mb-1.5 block text-sm font-medium text-text-primary">
         {t('agent.accounts_label')}

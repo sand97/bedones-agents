@@ -1,4 +1,7 @@
+import { Button } from 'antd'
+import { Settings } from 'lucide-react'
 import { SocialBadge } from '@app/components/shared/social-badge'
+import { AgentActionsPopover } from '@app/components/agent/agent-actions-popover'
 import type { SocialNetwork } from '@app/components/whatsapp/mock-data'
 import type { Agent } from '@app/lib/api/agent-api'
 
@@ -6,9 +9,19 @@ interface AgentListItemProps {
   agent: Agent
   isActive: boolean
   onClick: () => void
+  onEditResources: () => void
+  onDeactivate: () => void
+  onDelete: () => void
 }
 
-export function AgentListItem({ agent, isActive, onClick }: AgentListItemProps) {
+export function AgentListItem({
+  agent,
+  isActive,
+  onClick,
+  onEditResources,
+  onDeactivate,
+  onDelete,
+}: AgentListItemProps) {
   const socialNames = agent.socialAccounts
     .map(
       (sa) => sa.socialAccount.pageName || sa.socialAccount.username || sa.socialAccount.provider,
@@ -36,15 +49,20 @@ export function AgentListItem({ agent, isActive, onClick }: AgentListItemProps) 
           <span className="flex-1 truncate text-sm font-medium text-text-primary">
             {agent.name || socialNames}
           </span>
-          <span
-            className="flex-shrink-0 text-xs"
-            style={{
-              color:
-                agent.score >= 80 ? 'var(--ant-color-success)' : 'var(--ant-color-text-secondary)',
-            }}
+          <AgentActionsPopover
+            agent={agent}
+            onEditResources={onEditResources}
+            onDeactivate={onDeactivate}
+            onDelete={onDelete}
           >
-            {agent.score}/100
-          </span>
+            <Button
+              type="text"
+              size="small"
+              icon={<Settings size={16} />}
+              onClick={(e) => e.stopPropagation()}
+              className="text-text-muted"
+            />
+          </AgentActionsPopover>
         </div>
         {agent.name && <span className="truncate text-xs text-text-muted">{socialNames}</span>}
       </div>

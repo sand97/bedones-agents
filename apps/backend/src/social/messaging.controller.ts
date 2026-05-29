@@ -9,6 +9,8 @@ import {
   DirectMessageResponseDto,
   SendMessageDto,
   SendProductMessageDto,
+  SendReactionDto,
+  SendTemplateMessageDto,
   MarkConversationReadDto,
   SetConversationAgentOverrideDto,
 } from './dto/messaging.dto'
@@ -56,6 +58,10 @@ export class MessagingController {
       body.fileName,
       body.fileSize,
       body.replyToId,
+      body.tiktokMessageType,
+      body.tiktokSharePostId,
+      body.tiktokTemplate,
+      body.tiktokSenderAction,
     )
   }
 
@@ -80,12 +86,49 @@ export class MessagingController {
     )
   }
 
+  @Post('send-template')
+  @ApiBody({ type: SendTemplateMessageDto })
+  @ApiCreatedResponse({ type: DirectMessageResponseDto })
+  async sendTemplateMessage(
+    @CurrentUser() user: { id: string },
+    @Body() body: SendTemplateMessageDto,
+  ) {
+    return this.messagingService.sendTemplateMessage(
+      user.id,
+      body.conversationId,
+      body.metaTemplateName,
+      body.metaTemplateLanguage,
+      body.variables,
+      body.renderedBody,
+      body.metaTemplateId,
+    )
+  }
+
+  // ─── Send a reaction (WhatsApp) ───
+
+  @Post('send-reaction')
+  @ApiBody({ type: SendReactionDto })
+  async sendReaction(@CurrentUser() user: { id: string }, @Body() body: SendReactionDto) {
+    return this.messagingService.sendReaction(user.id, body.messageId, body.emoji)
+  }
+
   // ─── Mark conversation as read ───
 
   @Post('mark-read')
   @ApiBody({ type: MarkConversationReadDto })
   async markRead(@CurrentUser() user: { id: string }, @Body() body: MarkConversationReadDto) {
     return this.messagingService.markConversationAsRead(user.id, body.conversationId)
+  }
+
+  // ─── Send typing indicator (best-effort) ───
+
+  @Post('typing/:conversationId')
+  async sendTyping(
+    @CurrentUser() user: { id: string },
+    @Param('conversationId') conversationId: string,
+  ) {
+    await this.messagingService.sendTypingIndicator(conversationId, user.id)
+    return { ok: true }
   }
 
   // ─── Sync conversations from platform ───

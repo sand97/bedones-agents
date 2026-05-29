@@ -117,6 +117,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/me/locale": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["AuthController_updateLocale"];
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;
@@ -469,6 +485,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/social/tiktok/{accountId}/check-business": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SocialController_checkTikTokBusiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/social/tiktok/{accountId}/sync-comments/{videoId}": {
         parameters: {
             query?: never;
@@ -511,6 +543,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["TikTokWebhookController_setup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks/tiktok/setup-direct-messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TikTokWebhookController_setupDirectMessages"];
         delete?: never;
         options?: never;
         head?: never;
@@ -613,6 +661,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/messaging/send-template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MessagingController_sendTemplateMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messaging/send-reaction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MessagingController_sendReaction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/messaging/mark-read": {
         parameters: {
             query?: never;
@@ -623,6 +703,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["MessagingController_markRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messaging/typing/{conversationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MessagingController_sendTyping"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1109,6 +1205,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agent/{id}/social-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["AgentController_updateSocialAccounts"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agent/{id}/messages": {
         parameters: {
             query?: never;
@@ -1119,6 +1231,22 @@ export interface paths {
         get: operations["AgentController_getMessages"];
         put?: never;
         post: operations["AgentController_sendMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/{id}/start-setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AgentController_startSetup"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1397,6 +1525,342 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/loyalty/contacts/account/{socialAccountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoyaltyController_listContacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoyaltyController_createContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty/contacts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["LoyaltyController_removeContact"];
+        options?: never;
+        head?: never;
+        patch: operations["LoyaltyController_updateContact"];
+        trace?: never;
+    };
+    "/loyalty/bonuses/account/{socialAccountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoyaltyController_listBonuses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty/bonuses/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoyaltyController_getBonus"];
+        put?: never;
+        post?: never;
+        delete: operations["LoyaltyController_removeBonus"];
+        options?: never;
+        head?: never;
+        patch: operations["LoyaltyController_updateBonus"];
+        trace?: never;
+    };
+    "/loyalty/bonuses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoyaltyController_createBonus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty/templates/account/{socialAccountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoyaltyController_listTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoyaltyController_createTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty/templates/account/{socialAccountId}/{templateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["LoyaltyController_updateTemplate"];
+        trace?: never;
+    };
+    "/loyalty/templates/account/{socialAccountId}/by-name/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["LoyaltyController_removeTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty/campaigns/account/{socialAccountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoyaltyController_listCampaigns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty/campaigns/account/{socialAccountId}/preview-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoyaltyController_previewCampaignCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty/campaigns/account/{socialAccountId}/audience-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoyaltyController_previewCampaignAudience"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty/campaigns/{id}/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoyaltyController_getCampaignDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty/campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoyaltyController_createCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty/campaigns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["LoyaltyController_removeCampaign"];
+        options?: never;
+        head?: never;
+        patch: operations["LoyaltyController_updateCampaign"];
+        trace?: never;
+    };
+    "/notification-preferences/org/{organisationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["NotificationPreferenceController_getForOrg"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notification-preferences/org/{organisationId}/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["NotificationPreferenceController_bulkUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp-optin/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["WhatsappOptinController_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp-optin/template/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WhatsappOptinController_sendTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp-optin/tick": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WhatsappOptinController_tick"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1461,6 +1925,11 @@ export interface components {
         CreateOrganisationDto: {
             /** @example Mon entreprise */
             name: string;
+            /**
+             * @description IANA timezone
+             * @example Africa/Douala
+             */
+            timezone?: string;
         };
         OrgSocialAccountDto: {
             id: string;
@@ -1498,11 +1967,13 @@ export interface components {
         UpdateOrganisationDto: {
             /** @example Nouveau nom */
             name?: string;
-            /** @example https://minio.bedones.local/logos/logo.png */
+            /** @example https://minio.bedones.test/logos/logo.png */
             logoUrl?: string;
+            /** @example Africa/Douala */
+            timezone?: string;
         };
         UploadResponseDto: {
-            /** @example https://minio.bedones.local/logos/abc123.png */
+            /** @example https://minio.bedones.test/logos/abc123.png */
             url: string;
         };
         ConnectPagesDto: {
@@ -1524,6 +1995,7 @@ export interface components {
             spamAction: string;
             customInstructions?: string;
             faqRules: components["schemas"]["FAQRuleResponseDto"][];
+            catalogId?: string | null;
         };
         SocialAccountResponseDto: {
             id: string;
@@ -1533,6 +2005,9 @@ export interface components {
             pageName?: string;
             username?: string;
             profilePictureUrl?: string;
+            metadata?: {
+                [key: string]: unknown;
+            };
             /** @description Feature scopes (e.g. comments, messages) */
             scopes: string[];
             settings?: components["schemas"]["PageSettingsResponseDto"];
@@ -1580,6 +2055,8 @@ export interface components {
             spamAction?: "hide" | "delete" | "none";
             customInstructions?: string;
             faqRules?: components["schemas"]["FAQRuleDto"][];
+            /** @description Catalog associated to this page (null to unlink) */
+            catalogId?: string | null;
         };
         UserStatsResponseDto: {
             fromId: string;
@@ -1611,13 +2088,20 @@ export interface components {
             /** @description Phone Number ID from Embedded Signup session info */
             phoneNumberId?: string;
         };
+        TikTokBusinessCheckDto: {
+            isBusiness: boolean;
+        };
         ConversationResponseDto: {
             id: string;
             socialAccountId: string;
             platformThreadId?: string;
             participantId: string;
             participantName: string;
+            participantUsername?: string;
             participantAvatar?: string;
+            languageCode?: string;
+            languageSource?: string;
+            languageConfidence?: number;
             lastMessageText?: string;
             /** Format: date-time */
             lastMessageAt?: string;
@@ -1672,6 +2156,22 @@ export interface components {
             fileSize?: number;
             /** @description ID of the message to reply to */
             replyToId?: string;
+            /**
+             * @description TikTok message type. When omitted, the backend infers TEXT, IMAGE, SHARE_POST, TEMPLATE or SENDER_ACTION from the provided fields.
+             * @enum {string}
+             */
+            tiktokMessageType?: "TEXT" | "IMAGE" | "SHARE_POST" | "TEMPLATE" | "SENDER_ACTION";
+            /** @description TikTok post item_id for SHARE_POST messages */
+            tiktokSharePostId?: string;
+            /** @description TikTok Q&A template payload. Supports type QA_BUTTON_CARD or QA_LINK_CARD with 1-3 REPLY buttons. */
+            tiktokTemplate?: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description TikTok sender action for SENDER_ACTION messages
+             * @enum {string}
+             */
+            tiktokSenderAction?: "TYPING" | "MARK_READ";
         };
         SendProductMessageDto: {
             conversationId: string;
@@ -1691,8 +2191,23 @@ export interface components {
             /** @description Footer text (max 60 chars). Supported by "product", "product_list" and "catalog_message". Not supported by "carousel". */
             footerText?: string;
         };
+        SendTemplateMessageDto: {
+            conversationId: string;
+            metaTemplateName: string;
+            metaTemplateLanguage: string;
+            metaTemplateId?: string;
+            renderedBody?: string;
+            variables?: {
+                [key: string]: unknown;
+            };
+        };
         MarkConversationReadDto: {
             conversationId: string;
+        };
+        SendReactionDto: {
+            messageId: string;
+            /** @description Emoji to react with. Pass an empty string to remove the current reaction. */
+            emoji: string;
         };
         ConversationAgentSummaryDto: {
             id: string;
@@ -1810,6 +2325,9 @@ export interface components {
             organisationId: string;
             socialAccountIds: string[];
             name?: string;
+        };
+        UpdateAgentSocialAccountsDto: {
+            socialAccountIds: string[];
         };
         SendAgentMessageDto: {
             content: string;
@@ -1932,6 +2450,181 @@ export interface components {
             productIds?: string[];
             stackable?: boolean;
         };
+        CreateLoyaltyContactDto: {
+            socialAccountId: string;
+            name: string;
+            phone: string;
+            totalSpent?: number;
+            orderCount?: number;
+        };
+        UpdateLoyaltyContactDto: {
+            name?: string;
+            phone?: string;
+            totalSpent?: number;
+            orderCount?: number;
+        };
+        CreateLoyaltyBonusDto: {
+            socialAccountId: string;
+            name: string;
+            description?: string;
+            stackable?: boolean;
+            targetSpend?: number;
+            targetOrderCount?: number;
+            targetProductsCount?: number;
+            triggerProductIds?: string[];
+            /** @enum {string} */
+            rewardType: "PRODUCTS" | "CREDIT" | "PERCENT";
+            rewardCredit?: number;
+            rewardPercent?: number;
+            rewardProductIds?: string[];
+            startDate?: string;
+            endDate?: string;
+        };
+        UpdateLoyaltyBonusDto: {
+            name?: string;
+            description?: string;
+            /** @enum {string} */
+            status?: "DRAFT" | "ACTIVE" | "PAUSED" | "EXPIRED";
+            stackable?: boolean;
+            targetSpend?: number;
+            targetOrderCount?: number;
+            targetProductsCount?: number;
+            triggerProductIds?: string[];
+            /** @enum {string} */
+            rewardType?: "PRODUCTS" | "CREDIT" | "PERCENT";
+            rewardCredit?: number;
+            rewardPercent?: number;
+            rewardProductIds?: string[];
+            startDate?: string;
+            endDate?: string;
+        };
+        LoyaltyTemplateButtonDto: {
+            /** @enum {string} */
+            type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "CATALOG" | "MPM";
+            text: string;
+            url?: string;
+            phoneNumber?: string;
+        };
+        CreateLoyaltyTemplateDto: {
+            socialAccountId: string;
+            name: string;
+            language?: string;
+            /** @enum {string} */
+            category?: "MARKETING" | "UTILITY" | "AUTHENTICATION";
+            body: string;
+            variables?: string[];
+            /** @enum {string} */
+            headerType?: "NONE" | "TEXT" | "IMAGE" | "VIDEO";
+            headerText?: string;
+            headerMediaUrl?: string;
+            footerText?: string;
+            buttons?: components["schemas"]["LoyaltyTemplateButtonDto"][];
+        };
+        UpdateLoyaltyTemplateDto: {
+            socialAccountId?: string;
+            name?: string;
+            language?: string;
+            /** @enum {string} */
+            category?: "MARKETING" | "UTILITY" | "AUTHENTICATION";
+            body?: string;
+            variables?: string[];
+            /** @enum {string} */
+            headerType?: "NONE" | "TEXT" | "IMAGE" | "VIDEO";
+            headerText?: string;
+            headerMediaUrl?: string;
+            footerText?: string;
+            buttons?: components["schemas"]["LoyaltyTemplateButtonDto"][];
+        };
+        CampaignAudiencePreviewDto: {
+            /** @enum {string} */
+            audienceType: "RECENT_CONTACTS" | "PRODUCT_INTEREST" | "TICKET_STATUS";
+            audienceCriteria?: {
+                [key: string]: unknown;
+            };
+            audienceLimit?: number;
+            marketingTopic?: string;
+        };
+        CampaignTemplateSelectionDto: {
+            languageCodes?: string[];
+            allLanguages?: boolean;
+            metaTemplateId: string;
+            metaTemplateName: string;
+            metaTemplateLanguage: string;
+            metaTemplateCategory?: string;
+            body?: string;
+            variableValues?: {
+                [key: string]: unknown;
+            };
+            mpmProductRetailerIds?: string[];
+            mpmSectionTitle?: string;
+            mpmThumbnailProductRetailerId?: string;
+        };
+        CreateLoyaltyCampaignDto: {
+            socialAccountId: string;
+            bonusId?: string;
+            /** @enum {string} */
+            origin?: "LOYALTY" | "GENERAL";
+            /** @description Meta WhatsApp template id */
+            metaTemplateId?: string;
+            /** @description Meta WhatsApp template name */
+            metaTemplateName?: string;
+            /** @description Meta WhatsApp template language */
+            metaTemplateLanguage?: string;
+            name: string;
+            /** @enum {string} */
+            frequency?: "ONCE" | "DAILY" | "WEEKLY" | "MONTHLY";
+            marketingTopic?: string;
+            segmentCriteria?: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            audienceType?: "RECENT_CONTACTS" | "PRODUCT_INTEREST" | "TICKET_STATUS";
+            audienceCriteria?: {
+                [key: string]: unknown;
+            };
+            audienceLimit?: number;
+            templateAssignments?: components["schemas"]["CampaignTemplateSelectionDto"][];
+            variableValues?: {
+                [key: string]: unknown;
+            };
+            startDate?: string;
+            endDate?: string;
+        };
+        UpdateLoyaltyCampaignDto: {
+            name?: string;
+            metaTemplateId?: string;
+            metaTemplateName?: string;
+            metaTemplateLanguage?: string;
+            /** @enum {string} */
+            status?: "DRAFT" | "SCHEDULED" | "RUNNING" | "COMPLETED" | "PAUSED" | "CANCELLED" | "FAILED";
+            /** @enum {string} */
+            frequency?: "ONCE" | "DAILY" | "WEEKLY" | "MONTHLY";
+            marketingTopic?: string;
+            segmentCriteria?: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            audienceType?: "RECENT_CONTACTS" | "PRODUCT_INTEREST" | "TICKET_STATUS";
+            audienceCriteria?: {
+                [key: string]: unknown;
+            };
+            audienceLimit?: number;
+            templateAssignments?: components["schemas"]["CampaignTemplateSelectionDto"][];
+            variableValues?: {
+                [key: string]: unknown;
+            };
+            startDate?: string;
+            endDate?: string;
+        };
+        BulkUpdateNotificationPreferenceDto: {
+            /** @description Organisation members user IDs to apply the change to */
+            userIds: string[];
+            socialAccountId: string;
+            /** @enum {string} */
+            type: "COMMENT_TO_READ" | "COMMENT_AI_SUGGESTION" | "COMMENT_DAILY_SUMMARY" | "MESSAGE_TO_READ" | "MESSAGE_AI_SUGGESTION" | "MESSAGE_TICKET_CREATED" | "MESSAGE_TICKET_CLOSED" | "MESSAGE_DAILY_SUMMARY";
+            enabled: boolean;
+        };
+        SendTemplateBody: Record<string, never>;
     };
     responses: never;
     parameters: never;
@@ -2076,6 +2769,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponseDto"];
+                };
+            };
+        };
+    };
+    AuthController_updateLocale: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusResponseDto"];
                 };
             };
         };
@@ -2599,6 +3311,27 @@ export interface operations {
             };
         };
     };
+    SocialController_checkTikTokBusiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TikTokBusinessCheckDto"];
+                };
+            };
+        };
+    };
     SocialController_syncTikTokComments: {
         parameters: {
             query?: never;
@@ -2663,6 +3396,27 @@ export interface operations {
             };
         };
     };
+    TikTokWebhookController_setupDirectMessages: {
+        parameters: {
+            query: {
+                /** @description Admin token */
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Register the DIRECT_MESSAGE webhook on TikTok Business API */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     TikTokWebhookController_list: {
         parameters: {
             query: {
@@ -2696,7 +3450,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Delete the COMMENT webhook from TikTok Business API */
+            /** @description Delete the COMMENT, DIRECT_MESSAGE webhooks from TikTok Business API */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2793,6 +3547,50 @@ export interface operations {
             };
         };
     };
+    MessagingController_sendTemplateMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendTemplateMessageDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectMessageResponseDto"];
+                };
+            };
+        };
+    };
+    MessagingController_sendReaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendReactionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     MessagingController_markRead: {
         parameters: {
             query?: never;
@@ -2805,6 +3603,25 @@ export interface operations {
                 "application/json": components["schemas"]["MarkConversationReadDto"];
             };
         };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MessagingController_sendTyping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             201: {
                 headers: {
@@ -3639,6 +4456,29 @@ export interface operations {
             };
         };
     };
+    AgentController_updateSocialAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentSocialAccountsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AgentController_getMessages: {
         parameters: {
             query: {
@@ -3677,6 +4517,27 @@ export interface operations {
                 "application/json": components["schemas"]["SendAgentMessageDto"];
             };
         };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AgentController_startSetup: {
+        parameters: {
+            query: {
+                organisationId: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             201: {
                 headers: {
@@ -4147,6 +5008,532 @@ export interface operations {
                 "application/json": components["schemas"]["CreatePromotionDto"];
             };
         };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_listContacts: {
+        parameters: {
+            query: {
+                search: string;
+            };
+            header?: never;
+            path: {
+                socialAccountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_createContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLoyaltyContactDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_removeContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_updateContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLoyaltyContactDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_listBonuses: {
+        parameters: {
+            query: {
+                search: string;
+                status: string;
+            };
+            header?: never;
+            path: {
+                socialAccountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_getBonus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_removeBonus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_updateBonus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLoyaltyBonusDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_createBonus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLoyaltyBonusDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_listTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                socialAccountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_createTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLoyaltyTemplateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_updateTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                socialAccountId: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLoyaltyTemplateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_removeTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                socialAccountId: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_listCampaigns: {
+        parameters: {
+            query: {
+                origin: string;
+            };
+            header?: never;
+            path: {
+                socialAccountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_previewCampaignCount: {
+        parameters: {
+            query: {
+                minSpend: string;
+                minOrders: string;
+            };
+            header?: never;
+            path: {
+                socialAccountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_previewCampaignAudience: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                socialAccountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignAudiencePreviewDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_getCampaignDetails: {
+        parameters: {
+            query: {
+                bucket: string;
+                page: string;
+                pageSize: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_createCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLoyaltyCampaignDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_removeCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoyaltyController_updateCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLoyaltyCampaignDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationPreferenceController_getForOrg: {
+        parameters: {
+            query: {
+                userIds: string;
+            };
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationPreferenceController_bulkUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUpdateNotificationPreferenceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WhatsappOptinController_status: {
+        parameters: {
+            query: {
+                userId: string;
+                organisationId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WhatsappOptinController_sendTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendTemplateBody"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WhatsappOptinController_tick: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             201: {
                 headers: {

@@ -16,6 +16,13 @@ export class TikTokWebhookController {
     return this.socialService.setupTikTokWebhook()
   }
 
+  @Post('setup-direct-messages')
+  @ApiQuery({ name: 'token', required: true, description: 'Admin token' })
+  @ApiOkResponse({ description: 'Register the DIRECT_MESSAGE webhook on TikTok Business API' })
+  async setupDirectMessages(@Query('token') _token: string) {
+    return this.socialService.setupTikTokDirectMessageWebhook()
+  }
+
   @Get('list')
   @ApiQuery({ name: 'token', required: true, description: 'Admin token' })
   @ApiOkResponse({ description: 'List registered TikTok webhooks' })
@@ -25,7 +32,9 @@ export class TikTokWebhookController {
 
   @Delete('delete')
   @ApiQuery({ name: 'token', required: true, description: 'Admin token' })
-  @ApiOkResponse({ description: 'Delete the COMMENT webhook from TikTok Business API' })
+  @ApiOkResponse({
+    description: 'Delete the COMMENT, DIRECT_MESSAGE webhooks from TikTok Business API',
+  })
   async delete(@Query('token') _token: string) {
     return this.socialService.deleteTikTokWebhook()
   }

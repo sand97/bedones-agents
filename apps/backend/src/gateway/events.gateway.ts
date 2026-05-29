@@ -20,7 +20,7 @@ import { Server, Socket } from 'socket.io'
  */
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL || 'https://moderator.bedones.local',
+    origin: process.env.FRONTEND_URL || 'https://moderator.bedones.test',
     credentials: true,
   },
 })

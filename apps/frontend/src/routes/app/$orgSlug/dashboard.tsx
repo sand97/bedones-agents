@@ -65,6 +65,13 @@ const MESSAGING_PROVIDERS = [
     color: 'var(--color-brand-messenger)',
     path: 'chats/messenger',
   },
+  {
+    key: 'TIKTOK_DM',
+    label: 'TikTok',
+    Icon: TikTokIcon,
+    color: 'var(--color-brand-tiktok)',
+    path: 'chats/tiktok',
+  },
 ] as const
 
 function DashboardPage() {
@@ -83,6 +90,7 @@ function DashboardPage() {
       if (account.scopes?.includes('messages')) {
         if (account.provider === 'FACEBOOK') set.add('MESSENGER')
         if (account.provider === 'INSTAGRAM') set.add('INSTAGRAM_DM')
+        if (account.provider === 'TIKTOK') set.add('TIKTOK_DM')
       }
       if (account.provider === 'WHATSAPP') set.add('WHATSAPP')
     }
@@ -91,6 +99,7 @@ function DashboardPage() {
 
   const isConnected = (provider: string) => {
     if (provider === 'MESSENGER') return connectedProviders.has('MESSENGER')
+    if (provider === 'TIKTOK_DM') return connectedProviders.has('TIKTOK_DM')
     if (provider === 'WHATSAPP') return connectedProviders.has('WHATSAPP')
     return connectedProviders.has(provider)
   }

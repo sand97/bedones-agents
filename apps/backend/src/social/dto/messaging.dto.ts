@@ -17,7 +17,19 @@ export class ConversationResponseDto {
   participantName: string
 
   @ApiPropertyOptional()
+  participantUsername?: string
+
+  @ApiPropertyOptional()
   participantAvatar?: string
+
+  @ApiPropertyOptional()
+  languageCode?: string
+
+  @ApiPropertyOptional()
+  languageSource?: string
+
+  @ApiPropertyOptional()
+  languageConfidence?: number
 
   @ApiPropertyOptional()
   lastMessageText?: string
@@ -129,6 +141,34 @@ export class SendMessageDto {
 
   @ApiPropertyOptional({ description: 'ID of the message to reply to' })
   replyToId?: string
+
+  @ApiPropertyOptional({
+    description:
+      'TikTok message type. When omitted, the backend infers TEXT, IMAGE, SHARE_POST, TEMPLATE or SENDER_ACTION from the provided fields.',
+    enum: ['TEXT', 'IMAGE', 'SHARE_POST', 'TEMPLATE', 'SENDER_ACTION'],
+  })
+  tiktokMessageType?: 'TEXT' | 'IMAGE' | 'SHARE_POST' | 'TEMPLATE' | 'SENDER_ACTION'
+
+  @ApiPropertyOptional({ description: 'TikTok post item_id for SHARE_POST messages' })
+  tiktokSharePostId?: string
+
+  @ApiPropertyOptional({
+    description:
+      'TikTok Q&A template payload. Supports type QA_BUTTON_CARD or QA_LINK_CARD with 1-3 REPLY buttons.',
+    type: 'object',
+    additionalProperties: true,
+  })
+  tiktokTemplate?: {
+    type: 'QA_BUTTON_CARD' | 'QA_LINK_CARD'
+    title: string
+    buttons: Array<{ type?: 'REPLY'; title: string; id?: string }>
+  }
+
+  @ApiPropertyOptional({
+    description: 'TikTok sender action for SENDER_ACTION messages',
+    enum: ['TYPING', 'MARK_READ'],
+  })
+  tiktokSenderAction?: 'TYPING' | 'MARK_READ'
 }
 
 export class SendProductMessageDto {
@@ -168,9 +208,39 @@ export class SendProductMessageDto {
   footerText?: string
 }
 
+export class SendTemplateMessageDto {
+  @ApiProperty()
+  conversationId: string
+
+  @ApiProperty()
+  metaTemplateName: string
+
+  @ApiProperty()
+  metaTemplateLanguage: string
+
+  @ApiPropertyOptional()
+  metaTemplateId?: string
+
+  @ApiPropertyOptional()
+  renderedBody?: string
+
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  variables?: Record<string, string>
+}
+
 export class MarkConversationReadDto {
   @ApiProperty()
   conversationId: string
+}
+
+export class SendReactionDto {
+  @ApiProperty({ description: 'ID of the message to react to' })
+  messageId: string
+
+  @ApiProperty({
+    description: 'Emoji to react with. Pass an empty string to remove the current reaction.',
+  })
+  emoji: string
 }
 
 export class ConversationAgentSummaryDto {

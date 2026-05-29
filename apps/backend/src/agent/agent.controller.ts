@@ -3,7 +3,12 @@ import { ApiTags, ApiOkResponse } from '@nestjs/swagger'
 import { AuthGuard } from '../auth/auth.guard'
 import { AgentService } from './agent.service'
 import { AgentFeedbackService } from './feedback.service'
-import { ActivateAgentDto, CreateAgentDto, SendAgentMessageDto } from './dto/agent.dto'
+import {
+  ActivateAgentDto,
+  CreateAgentDto,
+  SendAgentMessageDto,
+  UpdateAgentSocialAccountsDto,
+} from './dto/agent.dto'
 import { AgentFeedbackRequestDto, AgentFeedbackResponseDto } from './dto/feedback.dto'
 
 @ApiTags('Agent')
@@ -35,6 +40,11 @@ export class AgentController {
     return this.agentService.remove(id)
   }
 
+  @Put(':id/social-accounts')
+  async updateSocialAccounts(@Param('id') id: string, @Body() dto: UpdateAgentSocialAccountsDto) {
+    return this.agentService.updateSocialAccounts(id, dto.socialAccountIds)
+  }
+
   // ─── Messages ───
 
   @Get(':id/messages')
@@ -56,6 +66,13 @@ export class AgentController {
   }
 
   // ─── Onboarding ───
+
+  @Post(':id/start-setup')
+  async startSetup(@Param('id') id: string, @Query('organisationId') organisationId: string) {
+    // Fire and forget — progress comes via WebSocket
+    this.agentService.startSetup(id, organisationId)
+    return { status: 'setup-started' }
+  }
 
   @Post(':id/analyze-catalogs')
   async analyzeCatalogs(@Param('id') id: string, @Query('organisationId') organisationId: string) {

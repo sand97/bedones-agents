@@ -7,13 +7,14 @@ import { EncryptionService } from '../auth/encryption.service'
 import { UploadService } from '../upload/upload.service'
 import { AIService, type AIAnalysisResult } from './ai.service'
 import { MessagingService } from './messaging.service'
+import { CatalogService } from '../catalog/catalog.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
 
 export interface IncomingMessageEvent {
   conversationId: string
   socialAccountId: string
-  provider: 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK'
+  provider: 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK' | 'TIKTOK'
   orgId: string
   message: {
     text: string
@@ -38,6 +39,7 @@ export class WebhookService {
     private uploadService: UploadService,
     private aiService: AIService,
     private messagingService: MessagingService,
+    private catalogService: CatalogService,
     private eventsGateway: EventsGateway,
     private eventEmitter: EventEmitter2,
   ) {
@@ -58,6 +60,65 @@ export class WebhookService {
 
   async verifyWhatsAppSignature(rawBody: Buffer, signature: string): Promise<boolean> {
     return this.verifySignature(rawBody, signature, this.whatsappAppSecret)
+  }
+
+  async verifyTikTokSignature(rawBody: Buffer, signature: string): Promise<boolean> {
+    const parsed = this.parseTikTokSignature(signature)
+    if (!parsed) return false
+
+    const configuredToleranceSeconds = Number(
+      this.configService.get<string>('TIKTOK_WEBHOOK_SIGNATURE_TOLERANCE_SECONDS', '300'),
+    )
+    const toleranceSeconds = Number.isFinite(configuredToleranceSeconds)
+      ? configuredToleranceSeconds
+      : 300
+    const now = Math.floor(Date.now() / 1000)
+    if (Math.abs(now - parsed.timestamp) > toleranceSeconds) {
+      this.logger.warn('[TikTok Webhook] Signature timestamp outside tolerance')
+      return false
+    }
+
+    const clientSecret = this.configService.getOrThrow<string>('TIKTOK_CLIENT_SECRET')
+    const signedPayload = `${parsed.timestamp}.${rawBody.toString('utf8')}`
+    const encoder = new TextEncoder()
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(clientSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    )
+    const signed = await crypto.subtle.sign('HMAC', key, encoder.encode(signedPayload))
+    const computedSignature = Array.from(new Uint8Array(signed))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+
+    return this.safeEqualHex(computedSignature, parsed.signature)
+  }
+
+  private parseTikTokSignature(signature: string): { timestamp: number; signature: string } | null {
+    const parts = new Map(
+      signature.split(',').map((part) => {
+        const [key, ...value] = part.trim().split('=')
+        return [key, value.join('=')] as const
+      }),
+    )
+    const timestamp = Number(parts.get('t'))
+    const signed = parts.get('s')
+    if (!Number.isFinite(timestamp) || !signed) return null
+    return { timestamp, signature: signed }
+  }
+
+  private safeEqualHex(left: string, right: string): boolean {
+    if (!/^[a-f0-9]+$/i.test(left) || !/^[a-f0-9]+$/i.test(right)) return false
+    const leftBytes = new Uint8Array(left.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) ?? [])
+    const rightBytes = new Uint8Array(right.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) ?? [])
+    if (leftBytes.length !== rightBytes.length) return false
+    let diff = 0
+    for (let i = 0; i < leftBytes.length; i++) {
+      diff |= leftBytes[i] ^ rightBytes[i]
+    }
+    return diff === 0
   }
 
   private async verifySignature(
@@ -618,6 +679,7 @@ export class WebhookService {
       fileSize,
       message.reply_to?.mid || null,
     )
+    if (!conversation) return
 
     this.logger.log(
       `[Messenger] New message from ${senderName} (${senderId}): "${message.text?.substring(0, 50) || '[media]'}"`,
@@ -775,6 +837,7 @@ export class WebhookService {
       fileSize,
       message.reply_to?.mid || null,
     )
+    if (!conversation) return
 
     this.logger.log(
       `[Instagram DM] New message from ${senderName} (${senderId}): "${message.text?.substring(0, 50) || '[media]'}"`,
@@ -843,8 +906,73 @@ export class WebhookService {
       data: { reactions: updated },
     })
 
+    if (reaction.action === 'react' && reaction.emoji) {
+      await this.prisma.conversation.update({
+        where: { id: targetMessage.conversationId },
+        data: {
+          lastMessageText: `[reaction:${reaction.emoji}]`,
+          lastMessageAt: new Date(),
+        },
+      })
+    }
+
     this.logger.log(
       `[${provider} Reaction] ${reaction.action} "${reaction.emoji || ''}" on message ${targetMsgId} by ${senderId}`,
+    )
+
+    this.eventsGateway.emitToOrg(orgId, 'message:reaction', {
+      conversationId: targetMessage.conversationId,
+      messageId: targetMessage.id,
+      reactions: updated,
+    })
+  }
+
+  // ─── WhatsApp reaction handling ───
+  // WhatsApp sends reactions as a `messages` entry with `type: "reaction"`.
+  // An empty emoji string means the user removed their reaction.
+  private async handleWhatsAppReaction(msg: WhatsAppMessage, senderId: string, orgId: string) {
+    const targetMsgId = msg.reaction?.message_id
+    if (!targetMsgId) return
+
+    const emoji = msg.reaction?.emoji ?? ''
+
+    const targetMessage = await this.prisma.directMessage.findUnique({
+      where: { platformMsgId: targetMsgId },
+      select: { id: true, conversationId: true, reactions: true },
+    })
+
+    if (!targetMessage) {
+      this.logger.warn(
+        `[WhatsApp Reaction] Message ${targetMsgId} not found in DB, skipping reaction`,
+      )
+      return
+    }
+
+    const existing = (targetMessage.reactions as { senderId: string; emoji: string }[]) || []
+
+    // WhatsApp only allows a single reaction per user — replace any previous one.
+    const updated = existing.filter((r) => r.senderId !== senderId)
+    if (emoji) {
+      updated.push({ senderId, emoji })
+    }
+
+    await this.prisma.directMessage.update({
+      where: { id: targetMessage.id },
+      data: { reactions: updated },
+    })
+
+    if (emoji) {
+      await this.prisma.conversation.update({
+        where: { id: targetMessage.conversationId },
+        data: {
+          lastMessageText: `[reaction:${emoji}]`,
+          lastMessageAt: new Date(),
+        },
+      })
+    }
+
+    this.logger.log(
+      `[WhatsApp Reaction] ${emoji ? 'react' : 'unreact'} "${emoji}" on message ${targetMsgId} by ${senderId}`,
     )
 
     this.eventsGateway.emitToOrg(orgId, 'message:reaction', {
@@ -859,7 +987,9 @@ export class WebhookService {
   async processWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
     for (const entry of payload.entry || []) {
       for (const change of entry.changes || []) {
-        if (change.field !== 'messages') continue
+        const isMessageField = change.field === 'messages'
+        const isMessageEchoField = change.field === 'smb_message_echoes'
+        if (!isMessageField && !isMessageEchoField) continue
 
         const value = change.value
         if (!value?.metadata?.phone_number_id) continue
@@ -870,9 +1000,9 @@ export class WebhookService {
         // SocialAccount. These are replies from members on the daily opt-in
         // template. Emit so WhatsappOptinService can refresh their window.
         const coreNumberId = process.env.CORE_WHATSAPP_NUMBER_ID
-        if (coreNumberId && phoneNumberId === coreNumberId) {
+        if (isMessageField && coreNumberId && phoneNumberId === coreNumberId) {
           for (const msg of value.messages || []) {
-            const reply = msg.interactive?.button_reply ?? msg.interactive?.list_reply
+            const reply = this.extractWhatsAppButtonReply(msg)
             this.eventEmitter.emit('whatsapp.core.inbound', {
               senderPhone: msg.from,
               buttonId: reply?.id,
@@ -910,6 +1040,18 @@ export class WebhookService {
             orgId,
           )
         }
+
+        // Handle messages sent from the WhatsApp Business app. Meta sends
+        // those as "smb_message_echoes" instead of regular inbound messages.
+        for (const msg of value.message_echoes || []) {
+          await this.handleWhatsAppMessageEcho(
+            socialAccount.id,
+            phoneNumberId,
+            msg,
+            value.contacts,
+            orgId,
+          )
+        }
       }
     }
   }
@@ -939,6 +1081,11 @@ export class WebhookService {
 
     if (msg.context?.id) {
       replyToMid = msg.context.id
+    }
+
+    if (msg.type === 'reaction') {
+      await this.handleWhatsAppReaction(msg, senderId, orgId)
+      return
     }
 
     switch (msg.type) {
@@ -987,7 +1134,8 @@ export class WebhookService {
           }
         >
         if (order?.catalog_id) {
-          const hydrated = await this.messagingService.buildEnrichedItems(
+          const hydrated = await this.messagingService.buildEnrichedItemsForSocialAccount(
+            socialAccountId,
             order.catalog_id,
             rawItems.map((i) => i.productRetailerId),
           )
@@ -1013,6 +1161,35 @@ export class WebhookService {
         messageText = order?.text || ''
         break
       }
+      case 'interactive': {
+        const reply = this.extractWhatsAppButtonReply(msg)
+        if (reply) {
+          messageText = reply.title
+          metadata = {
+            kind: reply.kind,
+            replyId: reply.id,
+            replyTitle: reply.title,
+            ...(reply.description ? { replyDescription: reply.description } : {}),
+          }
+        } else {
+          messageText = '[interactive]'
+        }
+        break
+      }
+      case 'button': {
+        const reply = this.extractWhatsAppButtonReply(msg)
+        if (reply) {
+          messageText = reply.title
+          metadata = {
+            kind: reply.kind,
+            replyId: reply.id,
+            replyTitle: reply.title,
+          }
+        } else {
+          messageText = '[button]'
+        }
+        break
+      }
       default:
         messageText = `[${msg.type}]`
     }
@@ -1033,6 +1210,9 @@ export class WebhookService {
       replyToMid,
       metadata,
     )
+    if (!conversation) return
+
+    await this.markOutboundMessagesAsRead(conversation.id, orgId, timestamp)
 
     this.logger.log(
       `[WhatsApp] New message from ${senderName} (${senderId}): "${messageText?.substring(0, 50) || '[media]'}"`,
@@ -1053,6 +1233,170 @@ export class WebhookService {
     } satisfies IncomingMessageEvent)
   }
 
+  private async handleWhatsAppMessageEcho(
+    socialAccountId: string,
+    phoneNumberId: string,
+    msg: WhatsAppMessageEcho,
+    contacts: WhatsAppContact[] | undefined,
+    orgId: string,
+  ) {
+    const recipientId = msg.to || contacts?.[0]?.wa_id
+    if (!recipientId) return
+
+    const timestamp = new Date(parseInt(msg.timestamp) * 1000)
+    const platformMsgId = msg.id
+    const contact = contacts?.find((c) => c.wa_id === recipientId)
+    const recipientName = contact?.profile?.name || null
+
+    let messageText = ''
+    let mediaUrl: string | null = null
+    let mediaType: string | null = null
+    let fileName: string | null = null
+    let metadata: Record<string, unknown> | null = null
+
+    if (msg.type === 'reaction') {
+      // Echo on the business side = the owner reacted from the mobile app.
+      // The sender of the reaction is the business phone number.
+      await this.handleWhatsAppReaction(msg, phoneNumberId, orgId)
+      return
+    }
+
+    switch (msg.type) {
+      case 'text':
+        messageText = msg.text?.body || ''
+        break
+      case 'image':
+        mediaType = 'image'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.image?.id)
+        messageText = msg.image?.caption || ''
+        break
+      case 'video':
+        mediaType = 'video'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.video?.id)
+        messageText = msg.video?.caption || ''
+        break
+      case 'audio':
+        mediaType = 'audio'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.audio?.id)
+        break
+      case 'document':
+        mediaType = 'file'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.document?.id)
+        fileName = msg.document?.filename || null
+        break
+      case 'sticker':
+        mediaType = 'image'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.sticker?.id)
+        break
+      case 'interactive': {
+        const reply = this.extractWhatsAppButtonReply(msg)
+        if (reply) {
+          messageText = reply.title
+          metadata = {
+            kind: reply.kind,
+            replyId: reply.id,
+            replyTitle: reply.title,
+            ...(reply.description ? { replyDescription: reply.description } : {}),
+          }
+        } else {
+          messageText = '[interactive]'
+        }
+        break
+      }
+      case 'button': {
+        const reply = this.extractWhatsAppButtonReply(msg)
+        if (reply) {
+          messageText = reply.title
+          metadata = {
+            kind: reply.kind,
+            replyId: reply.id,
+            replyTitle: reply.title,
+          }
+        } else {
+          messageText = '[button]'
+        }
+        break
+      }
+      default:
+        messageText = `[${msg.type}]`
+    }
+
+    const saved = await this.messagingService.handleEchoMessage(
+      socialAccountId,
+      recipientId,
+      messageText,
+      platformMsgId,
+      timestamp,
+      mediaUrl,
+      mediaType,
+      fileName,
+      null,
+      {
+        createConversation: true,
+        recipientName,
+        senderId: msg.from || phoneNumberId,
+        senderName: 'WhatsApp',
+        deliveryStatus: 'sent',
+        metadata,
+      },
+    )
+
+    if (!saved) return
+
+    // Reply sent from the WhatsApp Business mobile app implies the owner
+    // has read the inbound messages up to that point. Clear the badge.
+    await this.markInboundMessagesAsRead(saved.conversationId, orgId, timestamp)
+
+    this.logger.log(
+      `[WhatsApp Echo] New outbound message to ${recipientName || recipientId}: "${messageText?.substring(0, 50) || '[media]'}"`,
+    )
+
+    this.eventsGateway.emitToOrg(orgId, 'message:new', {
+      conversationId: saved.conversationId,
+      socialAccountId,
+      provider: 'WHATSAPP',
+      isFromPage: true,
+    })
+  }
+
+  private extractWhatsAppButtonReply(msg: WhatsAppMessage): {
+    id: string
+    title: string
+    description?: string
+    kind: 'whatsapp_button_reply' | 'whatsapp_list_reply' | 'whatsapp_template_button_reply'
+  } | null {
+    if (msg.interactive?.button_reply) {
+      const reply = msg.interactive.button_reply
+      return {
+        id: reply.id,
+        title: reply.title,
+        kind: 'whatsapp_button_reply',
+      }
+    }
+
+    if (msg.interactive?.list_reply) {
+      const reply = msg.interactive.list_reply
+      return {
+        id: reply.id,
+        title: reply.title,
+        description: reply.description,
+        kind: 'whatsapp_list_reply',
+      }
+    }
+
+    if (msg.button) {
+      const title = msg.button.text || msg.button.payload || ''
+      if (!title) return null
+      return {
+        id: msg.button.payload || title,
+        title,
+        kind: 'whatsapp_template_button_reply',
+      }
+    }
+
+    return null
+  }
+
   private async handleWhatsAppStatus(
     status: { id: string; status: string; timestamp: string; recipient_id: string },
     orgId: string,
@@ -1065,10 +1409,24 @@ export class WebhookService {
     // Find the message by platformMsgId
     const message = await this.prisma.directMessage.findUnique({
       where: { platformMsgId: status.id },
-      select: { id: true, conversationId: true, deliveryStatus: true },
+      select: {
+        id: true,
+        conversationId: true,
+        deliveryStatus: true,
+        isFromPage: true,
+        createdTime: true,
+      },
     })
 
     if (!message) return
+
+    // Read receipt on an inbound message → business owner read it from a
+    // linked device (e.g. WhatsApp Business mobile app). Mark all earlier
+    // inbound messages as read and refresh the conversation unread count.
+    if (status.status === 'read' && !message.isFromPage) {
+      await this.markInboundMessagesAsRead(message.conversationId, orgId, message.createdTime)
+      return
+    }
 
     // Only upgrade status: sent → delivered → read (never downgrade)
     const statusOrder = { sent: 1, delivered: 2, read: 3 }
@@ -1088,6 +1446,65 @@ export class WebhookService {
       platformMsgId: status.id,
       deliveryStatus: status.status,
     })
+
+    this.eventEmitter.emit('campaign.whatsapp.status', {
+      platformMsgId: status.id,
+      status: status.status,
+    })
+  }
+
+  private async markInboundMessagesAsRead(conversationId: string, orgId: string, readAt: Date) {
+    const result = await this.prisma.directMessage.updateMany({
+      where: {
+        conversationId,
+        isFromPage: false,
+        isRead: false,
+        createdTime: { lte: readAt },
+      },
+      data: { isRead: true },
+    })
+    if (result.count === 0) return
+
+    const unreadCount = await this.prisma.directMessage.count({
+      where: { conversationId, isFromPage: false, isRead: false },
+    })
+
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { unreadCount },
+    })
+
+    this.eventsGateway.emitToOrg(orgId, 'conversation:read', {
+      conversationId,
+      unreadCount,
+    })
+  }
+
+  private async markOutboundMessagesAsRead(conversationId: string, orgId: string, readAt: Date) {
+    const messages = await this.prisma.directMessage.findMany({
+      where: {
+        conversationId,
+        isFromPage: true,
+        createdTime: { lte: readAt },
+        OR: [{ deliveryStatus: null }, { deliveryStatus: { not: 'read' } }],
+      },
+      select: { id: true, platformMsgId: true },
+    })
+    if (messages.length === 0) return
+
+    await this.prisma.directMessage.updateMany({
+      where: { id: { in: messages.map((message) => message.id) } },
+      data: { deliveryStatus: 'read' },
+    })
+
+    for (const message of messages) {
+      this.eventsGateway.emitToOrg(orgId, 'message:status', {
+        conversationId,
+        messageId: message.id,
+        platformMsgId: message.platformMsgId,
+        deliveryStatus: 'read',
+      })
+    }
   }
 
   private async downloadWhatsAppMedia(
@@ -1139,6 +1556,25 @@ export class WebhookService {
   async processTikTokWebhook(payload: TikTokWebhookPayload) {
     const { event } = payload
 
+    // Ignore webhooks from other apps (e.g. old app still sending events)
+    const expectedClientKey = this.configService.getOrThrow<string>('TIKTOK_CLIENT_KEY')
+    if (payload.client_key && payload.client_key !== expectedClientKey) {
+      this.logger.log(
+        `[TikTok Webhook] Ignoring event from unknown client_key ${payload.client_key}`,
+      )
+      return
+    }
+
+    if (event === 'im_receive_msg' || event === 'im_send_msg') {
+      await this.handleTikTokDirectMessage(payload)
+      return
+    }
+
+    if (event === 'im_mark_read_msg') {
+      await this.handleTikTokReadReceipt(payload)
+      return
+    }
+
     if (event !== 'comment.update') {
       this.logger.log(`[TikTok Webhook] Ignoring event type: ${event}`)
       return
@@ -1155,6 +1591,20 @@ export class WebhookService {
     const timestampMatch = rawContent.match(/"timestamp"\s*:\s*(\d+)/)
 
     const commentAction = actionMatch?.[1] || ''
+
+    // Handle comment deletion
+    if (commentAction === 'delete') {
+      const deletedCommentId = commentIdMatch?.[1] || ''
+      if (deletedCommentId) {
+        const deleted = await this.prisma.comment.deleteMany({
+          where: { id: deletedCommentId },
+        })
+        if (deleted.count > 0) {
+          this.logger.log(`[TikTok Webhook] Deleted comment ${deletedCommentId} from DB`)
+        }
+      }
+      return
+    }
 
     // Only process new comments becoming public
     if (commentAction !== 'set_to_public') {
@@ -1174,6 +1624,7 @@ export class WebhookService {
       select: {
         id: true,
         organisationId: true,
+        username: true,
         accessToken: true,
         refreshToken: true,
         tokenExpiresAt: true,
@@ -1201,28 +1652,34 @@ export class WebhookService {
 
     const commentData = await this.fetchTikTokComment(accessToken, openId, videoId, commentId)
 
-    // Fetch video details if we don't have them yet
+    // Fetch video details if we don't have them yet, or if the stored cover is
+    // still a temporary TikTok URL that must be mirrored to our own storage.
     const existingPost = await this.prisma.post.findUnique({ where: { id: videoId } })
-    const needsVideoFetch = !existingPost || !existingPost.imageUrl
+    const hasStoredCover = this.uploadService.isOwnUrl(existingPost?.imageUrl)
+    const needsVideoFetch =
+      !existingPost || !existingPost.message || !existingPost.imageUrl || !hasStoredCover
 
     let postMessage = existingPost?.message || null
     let postImageUrl = existingPost?.imageUrl || null
     let postPermalinkUrl = existingPost?.permalinkUrl || null
 
     if (needsVideoFetch) {
-      const videoData = await this.fetchTikTokVideo(accessToken, openId, videoId)
+      const videoData = await this.fetchTikTokVideo(
+        videoId,
+        accessToken,
+        openId,
+        socialAccount.username,
+      )
       if (videoData) {
-        postMessage = videoData.title || postMessage
-        postImageUrl = videoData.cover_image_url || postImageUrl
+        postMessage = videoData.video_description || postMessage
         postPermalinkUrl = videoData.share_url || postPermalinkUrl
 
-        // Upload cover image to our storage
-        if (videoData.cover_image_url && !existingPost?.imageUrl) {
+        if (videoData.cover_image_url && !this.uploadService.isOwnUrl(postImageUrl)) {
           const uploaded = await this.uploadService.uploadFromUrl(
             videoData.cover_image_url,
             'posts',
           )
-          if (uploaded) postImageUrl = uploaded
+          postImageUrl = uploaded || videoData.cover_image_url
         }
       }
     }
@@ -1340,6 +1797,425 @@ export class WebhookService {
       fromName,
       fromId,
     })
+  }
+
+  private async handleTikTokDirectMessage(payload: TikTokWebhookPayload) {
+    const content = this.parseTikTokDirectMessageContent(payload.content)
+    if (!content) {
+      this.logger.warn('[TikTok DM Webhook] Invalid direct message content')
+      return
+    }
+
+    const businessUserId = this.getTikTokBusinessUserId(content) || payload.user_openid
+    if (!businessUserId) {
+      this.logger.warn('[TikTok DM Webhook] Missing business user id')
+      return
+    }
+
+    const socialAccount = await this.prisma.socialAccount.findFirst({
+      where: {
+        provider: 'TIKTOK',
+        providerAccountId: businessUserId,
+      },
+      select: {
+        id: true,
+        organisationId: true,
+        providerAccountId: true,
+        accessToken: true,
+        refreshToken: true,
+        tokenExpiresAt: true,
+      },
+    })
+
+    if (!socialAccount) {
+      this.logger.warn(
+        `[TikTok DM Webhook] No social account found for business_id ${businessUserId}`,
+      )
+      return
+    }
+
+    const personalUser = this.getTikTokPersonalUser(content)
+    const participantId =
+      personalUser?.id ||
+      (this.isTikTokBusinessRole(content.from_user?.role)
+        ? content.to_user?.id
+        : content.from_user?.id) ||
+      content.unique_identifier ||
+      content.conversation_id
+    if (!participantId) {
+      this.logger.warn('[TikTok DM Webhook] Missing participant id')
+      return
+    }
+
+    const timestamp = this.parseTikTokTimestamp(content.timestamp ?? payload.create_time)
+    const messageType = this.normalizeTikTokMessageType(content.message_type || content.type)
+    const accessToken = await this.getTikTokAccessToken(socialAccount)
+    const isFromPage = this.isTikTokBusinessRole(content.from_user?.role)
+    const participantProfile =
+      await this.messagingService.fetchTikTokDirectMessageParticipantProfile(
+        socialAccount.providerAccountId,
+        accessToken,
+        content.conversation_id,
+        participantId,
+      )
+    const participantAvatar = await this.messagingService.mirrorTikTokParticipantAvatar(
+      socialAccount.id,
+      participantId,
+      participantProfile?.profileImage ||
+        personalUser?.profile_image ||
+        personalUser?.avatar_url ||
+        null,
+    )
+    const senderName = isFromPage
+      ? 'Page'
+      : personalUser?.display_name ||
+        participantProfile?.displayName ||
+        content.from ||
+        'Utilisateur TikTok'
+    const participantUsername = isFromPage ? content.to || null : content.from || null
+    const mapped = await this.messagingService.mapTikTokMessageForStorage(
+      socialAccount.providerAccountId,
+      accessToken,
+      content.conversation_id,
+      {
+        message_id: content.message_id,
+        message_type: messageType,
+        text: content.text,
+        image: content.image,
+        video: content.video,
+        share_post: content.share_post,
+        template: content.template,
+        reactions: content.reactions,
+      },
+    )
+
+    if (isFromPage) {
+      await this.handleTikTokSentMessage({
+        socialAccountId: socialAccount.id,
+        orgId: socialAccount.organisationId,
+        participantId,
+        participantName:
+          personalUser?.display_name ||
+          participantProfile?.displayName ||
+          content.to ||
+          participantId,
+        participantUsername,
+        participantAvatar,
+        platformThreadId: content.conversation_id,
+        platformMsgId: content.message_id || null,
+        message: mapped.message,
+        timestamp,
+        mediaUrl: mapped.mediaUrl,
+        mediaType: mapped.mediaType,
+        fileName: mapped.fileName,
+        fileSize: mapped.fileSize,
+        metadata: (mapped.metadata as Record<string, unknown> | undefined) ?? null,
+      })
+      return
+    }
+
+    const conversation = await this.messagingService.handleIncomingMessage(
+      socialAccount.id,
+      participantId,
+      senderName,
+      mapped.message,
+      content.message_id || null,
+      mapped.mediaUrl,
+      mapped.mediaType,
+      timestamp,
+      socialAccount.organisationId,
+      participantAvatar,
+      mapped.fileName,
+      mapped.fileSize,
+      content.referenced_message_info?.referenced_message_id || null,
+      (mapped.metadata as Record<string, unknown> | undefined) ?? null,
+      content.conversation_id,
+      participantUsername,
+    )
+    if (!conversation) return
+
+    this.logger.log(
+      `[TikTok DM] New message from ${senderName} (${participantId}): "${
+        mapped.message?.substring(0, 50) || mapped.mediaType || '[message]'
+      }"`,
+    )
+
+    this.eventsGateway.emitToOrg(socialAccount.organisationId, 'message:new', {
+      conversationId: conversation.id,
+      socialAccountId: socialAccount.id,
+      provider: 'TIKTOK',
+    })
+
+    this.eventEmitter.emit('message.incoming', {
+      conversationId: conversation.id,
+      socialAccountId: socialAccount.id,
+      provider: 'TIKTOK',
+      orgId: socialAccount.organisationId,
+      message: {
+        text: mapped.message,
+        mediaUrl: mapped.mediaUrl,
+        mediaType: mapped.mediaType,
+        senderId: participantId,
+        senderName,
+      },
+    } satisfies IncomingMessageEvent)
+  }
+
+  private async handleTikTokSentMessage(params: {
+    socialAccountId: string
+    orgId: string
+    participantId: string
+    participantName: string
+    participantUsername: string | null
+    participantAvatar: string | null
+    platformThreadId: string
+    platformMsgId: string | null
+    message: string
+    timestamp: Date
+    mediaUrl: string | null
+    mediaType: string | null
+    fileName: string | null
+    fileSize: number | null
+    metadata: Record<string, unknown> | null
+  }) {
+    if (params.platformMsgId) {
+      const existing = await this.prisma.directMessage.findUnique({
+        where: { platformMsgId: params.platformMsgId },
+        select: { id: true, conversationId: true, deliveryStatus: true },
+      })
+
+      if (existing) {
+        if (existing.deliveryStatus !== 'read' && existing.deliveryStatus !== 'delivered') {
+          await this.prisma.directMessage.update({
+            where: { id: existing.id },
+            data: { deliveryStatus: 'delivered' },
+          })
+        }
+
+        this.eventsGateway.emitToOrg(params.orgId, 'message:status', {
+          conversationId: existing.conversationId,
+          messageId: existing.id,
+          platformMsgId: params.platformMsgId,
+          deliveryStatus: existing.deliveryStatus === 'read' ? 'read' : 'delivered',
+        })
+        return
+      }
+    }
+
+    const displayText = params.message || (params.mediaType ? `[${params.mediaType}]` : '')
+    const conversation = await this.prisma.conversation.upsert({
+      where: {
+        socialAccountId_participantId: {
+          socialAccountId: params.socialAccountId,
+          participantId: params.participantId,
+        },
+      },
+      create: {
+        socialAccountId: params.socialAccountId,
+        platformThreadId: params.platformThreadId,
+        participantId: params.participantId,
+        participantName: params.participantName,
+        participantUsername: params.participantUsername,
+        participantAvatar: params.participantAvatar,
+        lastMessageText: displayText,
+        lastMessageAt: params.timestamp,
+        unreadCount: 0,
+      },
+      update: {
+        platformThreadId: params.platformThreadId,
+        participantName: params.participantName,
+        ...(params.participantUsername ? { participantUsername: params.participantUsername } : {}),
+        ...(params.participantAvatar ? { participantAvatar: params.participantAvatar } : {}),
+        lastMessageText: displayText,
+        lastMessageAt: params.timestamp,
+      },
+    })
+
+    await this.prisma.directMessage.create({
+      data: {
+        conversationId: conversation.id,
+        platformMsgId: params.platformMsgId,
+        message: params.message,
+        senderId: 'page',
+        senderName: 'Page',
+        isFromPage: true,
+        isRead: true,
+        mediaUrl: params.mediaUrl,
+        mediaType: params.mediaType,
+        fileName: params.fileName,
+        fileSize: params.fileSize,
+        metadata: (params.metadata as Prisma.InputJsonValue | undefined) ?? Prisma.JsonNull,
+        deliveryStatus: 'delivered',
+        createdTime: params.timestamp,
+      },
+    })
+
+    this.eventsGateway.emitToOrg(params.orgId, 'message:new', {
+      conversationId: conversation.id,
+      socialAccountId: params.socialAccountId,
+      provider: 'TIKTOK',
+    })
+  }
+
+  private async handleTikTokReadReceipt(payload: TikTokWebhookPayload) {
+    const content = this.parseTikTokDirectMessageContent(payload.content)
+    if (!content) {
+      this.logger.warn('[TikTok Read Webhook] Invalid read receipt content')
+      return
+    }
+
+    const businessUserId = this.getTikTokBusinessUserId(content) || payload.user_openid
+    if (!businessUserId) {
+      this.logger.warn('[TikTok Read Webhook] Missing business user id')
+      return
+    }
+
+    const socialAccount = await this.prisma.socialAccount.findFirst({
+      where: { provider: 'TIKTOK', providerAccountId: businessUserId },
+      select: { id: true, organisationId: true },
+    })
+    if (!socialAccount) {
+      this.logger.warn(
+        `[TikTok Read Webhook] No social account found for business_id ${businessUserId}`,
+      )
+      return
+    }
+
+    const personalUser = this.getTikTokPersonalUser(content)
+    const participantId =
+      personalUser?.id ||
+      (this.isTikTokBusinessRole(content.from_user?.role)
+        ? content.to_user?.id
+        : content.from_user?.id) ||
+      content.unique_identifier
+
+    const conversation = await this.prisma.conversation.findFirst({
+      where: {
+        socialAccountId: socialAccount.id,
+        OR: [
+          { platformThreadId: content.conversation_id },
+          ...(participantId ? [{ participantId }] : []),
+        ],
+      },
+      select: { id: true },
+    })
+
+    if (!conversation) {
+      this.logger.warn(`[TikTok Read Webhook] Conversation not found: ${content.conversation_id}`)
+      return
+    }
+
+    const lastReadAt = this.parseTikTokTimestamp(this.getTikTokLastReadTimestamp(content))
+    const readerIsBusiness = this.isTikTokBusinessRole(content.from_user?.role)
+
+    if (readerIsBusiness) {
+      await this.prisma.directMessage.updateMany({
+        where: {
+          conversationId: conversation.id,
+          isFromPage: false,
+          createdTime: { lte: lastReadAt },
+        },
+        data: { isRead: true },
+      })
+      const unreadCount = await this.prisma.directMessage.count({
+        where: { conversationId: conversation.id, isFromPage: false, isRead: false },
+      })
+      await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { unreadCount },
+      })
+      return
+    }
+
+    const messages = await this.prisma.directMessage.findMany({
+      where: {
+        conversationId: conversation.id,
+        isFromPage: true,
+        createdTime: { lte: lastReadAt },
+        NOT: { deliveryStatus: 'read' },
+      },
+      select: { id: true, platformMsgId: true },
+    })
+
+    if (messages.length === 0) return
+
+    await this.prisma.directMessage.updateMany({
+      where: { id: { in: messages.map((message) => message.id) } },
+      data: { deliveryStatus: 'read' },
+    })
+
+    for (const message of messages) {
+      this.eventsGateway.emitToOrg(socialAccount.organisationId, 'message:status', {
+        conversationId: conversation.id,
+        messageId: message.id,
+        platformMsgId: message.platformMsgId,
+        deliveryStatus: 'read',
+      })
+    }
+  }
+
+  private parseTikTokDirectMessageContent(
+    rawContent: TikTokWebhookPayload['content'],
+  ): TikTokDirectMessageContent | null {
+    if (typeof rawContent !== 'string') {
+      return this.isTikTokDirectMessageContent(rawContent) ? rawContent : null
+    }
+
+    try {
+      const parsed = JSON.parse(rawContent) as unknown
+      return this.isTikTokDirectMessageContent(parsed) ? parsed : null
+    } catch (error) {
+      this.logger.warn(
+        `[TikTok DM Webhook] Failed to parse content: ${error instanceof Error ? error.message : error}`,
+      )
+      return null
+    }
+  }
+
+  private isTikTokDirectMessageContent(value: unknown): value is TikTokDirectMessageContent {
+    if (!value || typeof value !== 'object') return false
+    const candidate = value as Partial<TikTokDirectMessageContent>
+    return typeof candidate.conversation_id === 'string'
+  }
+
+  private getTikTokBusinessUserId(content: TikTokDirectMessageContent): string | null {
+    if (this.isTikTokBusinessRole(content.to_user?.role) && content.to_user?.id) {
+      return content.to_user.id
+    }
+    if (this.isTikTokBusinessRole(content.from_user?.role) && content.from_user?.id) {
+      return content.from_user.id
+    }
+    return null
+  }
+
+  private getTikTokPersonalUser(content: TikTokDirectMessageContent) {
+    if (this.isTikTokPersonalRole(content.from_user?.role)) return content.from_user
+    if (this.isTikTokPersonalRole(content.to_user?.role)) return content.to_user
+    return null
+  }
+
+  private isTikTokBusinessRole(role?: string) {
+    return role?.toUpperCase() === 'BUSINESS_ACCOUNT'
+  }
+
+  private isTikTokPersonalRole(role?: string) {
+    return role?.toUpperCase() === 'PERSONAL_ACCOUNT'
+  }
+
+  private normalizeTikTokMessageType(type?: string): string {
+    return (type || 'text').replace(/-/g, '_').toUpperCase()
+  }
+
+  private parseTikTokTimestamp(timestamp?: string | number | null): Date {
+    const value = Number(timestamp)
+    if (!Number.isFinite(value) || value <= 0) return new Date()
+    return new Date(value > 1_000_000_000_000 ? value : value * 1000)
+  }
+
+  private getTikTokLastReadTimestamp(content: TikTokDirectMessageContent): string | number | null {
+    if (!content.read) return content.timestamp ?? null
+    const entry = Object.entries(content.read).find(([key]) => key.trim() === 'last_read_timestamp')
+    return entry?.[1] ?? content.timestamp ?? null
   }
 
   private async getTikTokAccessToken(account: {
@@ -1470,68 +2346,94 @@ export class WebhookService {
   }
 
   private async fetchTikTokVideo(
-    accessToken: string,
-    _openId: string,
     videoId: string,
+    accessToken: string,
+    businessId: string,
+    username?: string | null,
   ): Promise<{
-    title?: string
+    video_description?: string
     cover_image_url?: string
     share_url?: string
+    strategy: 'business_api' | 'oembed'
   } | null> {
+    // Try Business API first
     try {
-      const url =
-        'https://open.tiktokapis.com/v2/video/query/?fields=id,title,cover_image_url,share_url,video_description'
+      const params = new URLSearchParams({
+        business_id: businessId,
+        filters: JSON.stringify({ video_ids: [videoId] }),
+        fields: JSON.stringify(['item_id', 'caption', 'thumbnail_url', 'share_url']),
+      })
+      const url = `https://business-api.tiktok.com/open_api/v1.3/business/video/list/?${params}`
 
+      this.logger.log(`[TikTok Webhook] Fetching video via Business API`)
       const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filters: { video_ids: [videoId] },
-        }),
+        headers: { 'Access-Token': accessToken },
       })
 
-      if (!response.ok) {
-        this.logger.error(`[TikTok Webhook] Fetch video failed: ${await response.text()}`)
-        return null
-      }
-
       const body = (await response.json()) as {
-        data: {
-          videos: Array<{
-            id: string
-            title?: string
-            video_description?: string
-            cover_image_url?: string
+        code: number
+        message: string
+        data?: {
+          videos?: Array<{
+            item_id: string
+            caption?: string
+            thumbnail_url?: string
             share_url?: string
           }>
         }
-        error: { code: string; message: string }
       }
 
-      if (body.error?.code !== 'ok') {
-        this.logger.error(
-          `[TikTok Webhook] Fetch video error: ${body.error?.code} — ${body.error?.message}`,
+      if (body.code === 0 && body.data?.videos?.[0]) {
+        const video = body.data.videos[0]
+        this.logger.log(
+          `[TikTok Webhook] ✓ Video fetched via Business API — title="${video.caption}", cover=${video.thumbnail_url ? 'yes' : 'no'}`,
         )
+        return {
+          video_description: video.caption,
+          cover_image_url: video.thumbnail_url,
+          share_url: video.share_url,
+          strategy: 'business_api',
+        }
+      }
+
+      this.logger.warn(
+        `[TikTok Webhook] Business API failed (code=${body.code}): ${body.message}, falling back to oEmbed`,
+      )
+    } catch (error) {
+      this.logger.warn(`[TikTok Webhook] Business API error: ${error}, falling back to oEmbed`)
+    }
+
+    // Fallback to oEmbed
+    try {
+      const handle = username ? `@${username}` : '@_'
+      const videoUrl = `https://www.tiktok.com/${handle}/video/${videoId}`
+      const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`
+
+      this.logger.log(`[TikTok Webhook] Trying oEmbed fallback`)
+      const response = await fetch(oembedUrl)
+
+      if (!response.ok) {
+        this.logger.error(`[TikTok Webhook] oEmbed failed (HTTP ${response.status})`)
         return null
       }
 
-      const found = body.data?.videos?.[0]
-      if (!found) {
-        this.logger.warn(`[TikTok Webhook] Video ${videoId} not found`)
-        return null
+      const data = (await response.json()) as {
+        title?: string
+        thumbnail_url?: string
       }
 
-      this.logger.log(`[TikTok Webhook] Fetched video: ${JSON.stringify(found)}`)
+      this.logger.log(
+        `[TikTok Webhook] ✓ Video fetched via oEmbed — title="${data.title}", thumbnail=${data.thumbnail_url ? 'yes' : 'no'}`,
+      )
+
       return {
-        title: found.title || found.video_description,
-        cover_image_url: found.cover_image_url,
-        share_url: found.share_url,
+        video_description: data.title,
+        cover_image_url: data.thumbnail_url,
+        share_url: `https://www.tiktok.com/${handle}/video/${videoId}`,
+        strategy: 'oembed',
       }
     } catch (error) {
-      this.logger.error(`[TikTok Webhook] Error fetching video: ${error}`)
+      this.logger.error(`[TikTok Webhook] oEmbed fetch error: ${error}`)
       return null
     }
   }
@@ -1557,28 +2459,13 @@ export class WebhookService {
         return
       }
 
-      // Resolve access token once — used for the thread fetch and (later) for the action.
-      const account = await this.prisma.socialAccount.findUnique({
-        where: { id: socialAccountId },
-        select: { accessToken: true, providerAccountId: true },
-      })
-      if (!account) throw new NotFoundException('Social account not found')
-      const accessToken = await this.encryptionService.decrypt(account.accessToken)
-
-      // Pull the parent reply chain from the platform so the agent can see what was
-      // already said and avoid repeating the same canned answer.
-      const { post, thread } = await this.fetchCommentThread({
-        commentId,
-        provider,
-        socialAccountId,
-        pageId: account.providerAccountId,
-        accessToken,
-      })
+      if (!settings.isConfigured) {
+        this.logger.log(`[AI] AI not configured for account ${socialAccountId}, skipping`)
+        return
+      }
 
       const result = await this.aiService.analyzeComment({
         comment,
-        post,
-        thread,
         pageSettings: {
           undesiredCommentsAction: settings.undesiredCommentsAction,
           spamAction: settings.spamAction,
@@ -1593,6 +2480,14 @@ export class WebhookService {
       this.logger.log(`[AI] Comment ${commentId}: action=${result.action}, reason=${result.reason}`)
 
       if (result.action === 'none') return
+
+      // Get access token for API calls
+      const account = await this.prisma.socialAccount.findUnique({
+        where: { id: socialAccountId },
+        select: { accessToken: true },
+      })
+      if (!account) throw new NotFoundException('Social account not found')
+      const accessToken = await this.encryptionService.decrypt(account.accessToken)
 
       await this.executeAIAction(
         commentId,
@@ -1838,6 +2733,89 @@ export class WebhookService {
     return chain
   }
 
+  // ─── Product codes referenced in the post ───
+
+  /**
+   * When a catalog is linked to the commented page, scan the post caption for product
+   * codes (merchant/retailer IDs) and resolve them against Meta so the agent can answer
+   * with the real product name/price instead of replying generically. Returns [] when
+   * no catalog is linked, no code is found, or nothing matches.
+   *
+   * Meta lets us look products up by `retailer_id` directly (no full-catalog scan), and
+   * the lookup is cached in CatalogService so repeated comments on the same post don't
+   * hammer the Graph API.
+   */
+  private async resolvePostProducts(args: {
+    catalogId: string | null
+    postMessage: string | null
+    accessToken: string
+  }): Promise<
+    Array<{
+      retailerId: string
+      name: string | null
+      price: number | null
+      currency: string | null
+    }>
+  > {
+    if (!args.catalogId || !args.postMessage) return []
+
+    const codes = this.extractProductCodes(args.postMessage)
+    if (codes.length === 0) return []
+
+    const catalog = await this.prisma.catalog.findUnique({
+      where: { id: args.catalogId },
+      select: { providerId: true },
+    })
+    if (!catalog?.providerId) return []
+
+    try {
+      const hydrated = await this.catalogService.hydrateProductsByRetailerIdsWithAccessToken(
+        catalog.providerId,
+        codes,
+        args.accessToken,
+      )
+      // Keep only entries Meta actually resolved (a real product name means it matched).
+      return hydrated
+        .filter((p) => p.name)
+        .map((p) => ({
+          retailerId: p.retailerId,
+          name: p.name,
+          price: p.price,
+          currency: p.currency,
+        }))
+    } catch (error) {
+      this.logger.warn(
+        `[AI] Product code resolution failed: ${error instanceof Error ? error.message : error}`,
+      )
+      return []
+    }
+  }
+
+  /**
+   * Extract candidate product codes from a post caption. We look for codes that follow
+   * a keyword (ref / réf / code / sku / art / article / produit / product) and for
+   * hashtag-style tokens. Meta does the final matching against real retailer IDs, so
+   * over-extracting a few extra candidates is harmless — we just cap the count.
+   */
+  private extractProductCodes(text: string): string[] {
+    const codes = new Set<string>()
+
+    const keywordRegex =
+      /\b(?:r[ée]f(?:[ée]rence)?|code|sku|art(?:icle)?|produit|product)\s*(?:n[°o]\s*)?[:#-]?\s*([A-Za-z0-9][A-Za-z0-9_-]{1,40})/gi
+    const hashtagRegex = /#([A-Za-z0-9][A-Za-z0-9_-]{1,40})/g
+
+    let match: RegExpExecArray | null
+    while ((match = keywordRegex.exec(text)) !== null) {
+      if (match[1]) codes.add(match[1])
+    }
+    while ((match = hashtagRegex.exec(text)) !== null) {
+      if (match[1]) codes.add(match[1])
+    }
+
+    // Cap to keep the Meta filter payload bounded.
+    return Array.from(codes).slice(0, 15)
+  }
+
   private async executeAIAction(
     commentId: string,
     provider: 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK',
@@ -1985,13 +2963,50 @@ export class WebhookService {
   ) {
     const provider = 'TIKTOK' as const
 
-    // TikTok: hide is not supported via API, mark locally only
+    // TikTok: hide via Business API
     if (result.action === 'hide') {
+      const comment = await this.prisma.comment.findUnique({
+        where: { id: commentId },
+        select: { postId: true },
+      })
+      if (!comment) return
+
+      const account = await this.prisma.socialAccount.findUnique({
+        where: { id: socialAccountId },
+        select: { providerAccountId: true },
+      })
+      if (!account) return
+
+      try {
+        const hideResponse = await fetch(
+          'https://business-api.tiktok.com/open_api/v1.3/business/comment/hide/',
+          {
+            method: 'POST',
+            headers: {
+              'Access-Token': accessToken,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              business_id: account.providerAccountId,
+              video_id: comment.postId,
+              comment_id: commentId,
+              action: 'HIDE',
+            }),
+          },
+        )
+        const hideBody = (await hideResponse.json()) as { code: number; message: string }
+        if (hideBody.code !== 0) {
+          this.logger.error(`[AI] TikTok hide failed: ${hideBody.code} — ${hideBody.message}`)
+        }
+      } catch (error) {
+        this.logger.error(`[AI] TikTok hide error: ${error}`)
+      }
+
       await this.prisma.comment.update({
         where: { id: commentId },
         data: { status: 'HIDDEN', action: 'HIDE', actionReason: result.reason, isRead: true },
       })
-      this.logger.log(`[AI] Marked TikTok comment ${commentId} as hidden (local only)`)
+      this.logger.log(`[AI] Hidden TikTok comment ${commentId}`)
       this.eventsGateway.emitToOrg(orgId, 'comment:updated', {
         commentId,
         socialAccountId,
@@ -2000,13 +3015,44 @@ export class WebhookService {
       })
     }
 
-    // TikTok: delete is not supported for comments via API, mark locally only
+    // TikTok: delete via Business API
     if (result.action === 'delete') {
-      await this.prisma.comment.update({
-        where: { id: commentId },
-        data: { status: 'DELETED', action: 'DELETE', actionReason: result.reason, isRead: true },
+      const account = await this.prisma.socialAccount.findUnique({
+        where: { id: socialAccountId },
+        select: { providerAccountId: true },
       })
-      this.logger.log(`[AI] Marked TikTok comment ${commentId} as deleted (local only)`)
+
+      if (account) {
+        try {
+          const deleteResponse = await fetch(
+            'https://business-api.tiktok.com/open_api/v1.3/business/comment/delete/',
+            {
+              method: 'POST',
+              headers: {
+                'Access-Token': accessToken,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                business_id: account.providerAccountId,
+                comment_id: commentId,
+              }),
+            },
+          )
+          const deleteBody = (await deleteResponse.json()) as { code: number; message: string }
+          if (deleteBody.code !== 0) {
+            this.logger.error(
+              `[AI] TikTok delete failed: ${deleteBody.code} — ${deleteBody.message}`,
+            )
+          }
+        } catch (error) {
+          this.logger.error(`[AI] TikTok delete error: ${error}`)
+        }
+      }
+
+      await this.prisma.comment.delete({
+        where: { id: commentId },
+      })
+      this.logger.log(`[AI] Deleted TikTok comment ${commentId}`)
       this.eventsGateway.emitToOrg(orgId, 'comment:updated', {
         commentId,
         socialAccountId,
@@ -2208,6 +3254,7 @@ interface WhatsAppWebhookValue {
   }
   contacts?: WhatsAppContact[]
   messages?: WhatsAppMessage[]
+  message_echoes?: WhatsAppMessageEcho[]
   statuses?: Array<{
     id: string
     status: string
@@ -2218,6 +3265,7 @@ interface WhatsAppWebhookValue {
 
 interface WhatsAppContact {
   wa_id: string
+  user_id?: string
   profile?: { name?: string }
 }
 
@@ -2247,7 +3295,15 @@ interface WhatsAppMessage {
     button_reply?: { id: string; title: string }
     list_reply?: { id: string; title: string; description?: string }
   }
+  button?: { payload?: string; text?: string }
+  reaction?: { message_id: string; emoji: string }
   context?: { id?: string; from?: string }
+}
+
+interface WhatsAppMessageEcho extends WhatsAppMessage {
+  to?: string
+  to_user_id?: string
+  from_user_id?: string
 }
 
 // ─── TikTok webhook payload types ───
@@ -2257,7 +3313,7 @@ interface TikTokWebhookPayload {
   event: string
   create_time: number
   user_openid: string
-  content: string | TikTokCommentContent
+  content: string | TikTokCommentContent | TikTokDirectMessageContent
 }
 
 interface TikTokCommentContent {
@@ -2268,4 +3324,40 @@ interface TikTokCommentContent {
   comment_action: string // 'insert' | 'set_to_public' | 'delete' | etc.
   timestamp: number
   unique_identifier: string
+}
+
+interface TikTokDirectMessageContent {
+  timestamp?: number | string
+  unique_identifier?: string
+  conversation_id: string
+  message_id?: string
+  message_type?: string
+  type?: string
+  from?: string
+  to?: string
+  from_user?: TikTokDirectMessageUser
+  to_user?: TikTokDirectMessageUser
+  text?: { body?: string }
+  image?: { media_id?: string }
+  video?: { media_id?: string }
+  share_post?: { item_id?: string; embed_url?: string }
+  template?: {
+    type: 'QA_BUTTON_CARD' | 'QA_LINK_CARD'
+    title: string
+    buttons: Array<{ type?: 'REPLY'; title: string; id?: string }>
+  }
+  referenced_message_info?: { referenced_message_id?: string }
+  reactions?: Array<{ sender_id?: string; emoji?: string }>
+  read?: Record<string, string | number | undefined>
+  scene_type?: number
+  is_follower?: boolean
+  message_tag?: Record<string, unknown>
+}
+
+interface TikTokDirectMessageUser {
+  id?: string
+  role?: string
+  display_name?: string
+  profile_image?: string
+  avatar_url?: string
 }

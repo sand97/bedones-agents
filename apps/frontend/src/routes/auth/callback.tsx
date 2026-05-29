@@ -9,7 +9,13 @@ import {
   connectInstagram,
   connectTikTok,
 } from '@app/lib/api'
-import { getAuthRedirect, clearAuthRedirect } from '@app/lib/auth-redirect'
+import {
+  getAuthRedirect,
+  clearAuthRedirect,
+  setAuthRedirect,
+  buildTikTokOAuthUrl,
+} from '@app/lib/auth-redirect'
+import { TikTokBusinessGuideModal } from '@app/components/tiktok/tiktok-business-guide-modal'
 import i18n from '@app/i18n'
 
 const { Text } = Typography
@@ -30,6 +36,11 @@ function AuthCallbackPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [loadingMessage, setLoadingMessage] = useState(i18n.t('auth.connecting'))
   const [returnTo, setReturnTo] = useState<string | null>(null)
+  const [showBusinessGuide, setShowBusinessGuide] = useState(false)
+  const [tiktokRetryContext, setTiktokRetryContext] = useState<{
+    orgId: string
+    scopes: string[]
+  } | null>(null)
   const handledRef = useRef(false)
 
   useEffect(() => {
@@ -54,7 +65,7 @@ function AuthCallbackPage() {
       setLoadingMessage(i18n.t('auth.finalizing_connection'))
 
       const provider = redirect.provider || 'facebook'
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
       const redirectUri = `${apiUrl}/auth/callback/${provider}`
 
       const featureScopes = redirect.scopes
@@ -84,9 +95,15 @@ function AuthCallbackPage() {
           }
         })
         .catch((err) => {
+          const msg = err instanceof Error ? err.message : ''
+          if (msg.includes('tiktok_not_business_account')) {
+            setTiktokRetryContext({ orgId: redirect.orgId!, scopes: featureScopes || [] })
+            setShowBusinessGuide(true)
+            return
+          }
           if (returnPath) setReturnTo(returnPath)
           clearAuthRedirect()
-          setErrorMessage(err instanceof Error ? err.message : i18n.t('auth.page_connect_error'))
+          setErrorMessage(msg || i18n.t('auth.page_connect_error'))
         })
       return
     }
@@ -137,6 +154,37 @@ function AuthCallbackPage() {
     clearAuthRedirect()
     setErrorMessage(i18n.t('auth.oauth_no_action'))
   }, [status, error, code, navigate])
+
+  if (showBusinessGuide) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <TikTokBusinessGuideModal
+          open
+          onClose={() => {
+            setShowBusinessGuide(false)
+            if (returnTo) {
+              navigate({ to: returnTo } as never)
+            } else {
+              navigate({ to: '/auth/login' })
+            }
+          }}
+          onRetry={() => {
+            if (tiktokRetryContext) {
+              setAuthRedirect({
+                intent: 'connect_pages',
+                orgId: tiktokRetryContext.orgId,
+                provider: 'tiktok',
+                pageId: 'tiktok',
+                scopes: tiktokRetryContext.scopes,
+                returnTo: returnTo || undefined,
+              })
+              window.location.href = buildTikTokOAuthUrl('messages')
+            }
+          }}
+        />
+      </div>
+    )
+  }
 
   if (errorMessage) {
     return (

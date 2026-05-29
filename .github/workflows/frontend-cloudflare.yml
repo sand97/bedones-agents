@@ -17,14 +17,6 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
-  pull_request:
-    paths:
-      - '.github/workflows/frontend-cloudflare.yml'
-      - 'apps/frontend/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-  workflow_dispatch:
 
 jobs:
   build:

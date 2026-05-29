@@ -41,6 +41,18 @@ interface CommentContext {
     message: string
     isPageReply: boolean
   }>
+  /**
+   * Products referenced by the post (resolved from product codes found in the post
+   * caption against the catalog linked to the page). Lets the agent answer
+   * price / availability questions on the commented product instead of replying
+   * generically.
+   */
+  products?: Array<{
+    retailerId: string
+    name: string | null
+    price: number | null
+    currency: string | null
+  }>
 }
 
 @Injectable()
@@ -55,7 +67,12 @@ export class AIService {
    */
   async analyzeComment(context: CommentContext): Promise<AIAnalysisResult> {
     const systemPrompt = this.buildSystemPrompt(context.pageSettings)
-    const userMessage = this.buildUserMessage(context.comment, context.post, context.thread)
+    const userMessage = this.buildUserMessage(
+      context.comment,
+      context.post,
+      context.thread,
+      context.products,
+    )
     const messages = [new SystemMessage(systemPrompt), new HumanMessage(userMessage)]
 
     try {
@@ -147,11 +164,25 @@ Guidelines:
     comment: CommentContext['comment'],
     post?: CommentContext['post'],
     thread?: CommentContext['thread'],
+    products?: CommentContext['products'],
   ): string {
     const sections: string[] = []
 
     if (post?.message) {
       sections.push(`Original post:\n"""\n${post.message}\n"""`)
+    }
+
+    if (products && products.length > 0) {
+      const productText = products
+        .map((p) => {
+          const price =
+            p.price != null ? ` — ${p.price}${p.currency ? ` ${p.currency}` : ''}` : ''
+          return `- ${p.name || p.retailerId} (code: ${p.retailerId})${price}`
+        })
+        .join('\n')
+      sections.push(
+        `Products referenced in the post (use these exact details for price/availability questions; do not invent prices):\n${productText}`,
+      )
     }
 
     if (thread && thread.length > 0) {

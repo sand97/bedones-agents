@@ -15,13 +15,26 @@ export type PageSettingsResponse = components['schemas']['PageSettingsResponseDt
 export type UnreadCount = components['schemas']['UnreadCountDto']
 
 interface ApiError {
-  message?: string
+  message?: string | string[]
   error?: string
   statusCode?: number
+  code?: string
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
   const apiError = error as ApiError
+
+  // 1) Prefer a backend-supplied error code translated by the frontend i18n.
+  //    This guarantees the displayed locale always matches the user's UI locale,
+  //    regardless of how Accept-Language was resolved server-side.
+  if (apiError?.code) {
+    const key = `errors.${apiError.code}`
+    const translated = i18n.t(key)
+    if (translated && translated !== key) return translated
+  }
+
+  // 2) Fall back to the backend-translated message (string or class-validator array).
+  if (Array.isArray(apiError?.message)) return apiError.message.join(', ') || fallback
   return apiError?.message || fallback
 }
 
@@ -142,7 +155,7 @@ export async function connectFacebookCatalog(
   redirectUri: string,
   scopes?: string[],
 ): Promise<unknown> {
-  const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
   const res = await fetch(`${API_URL}/social/connect/facebook-catalog`, {
     method: 'POST',
     credentials: 'include',
@@ -223,6 +236,7 @@ export async function updatePageSettings(
     spamAction?: 'hide' | 'delete' | 'none'
     customInstructions?: string
     faqRules?: { question: string; answer: string }[]
+    catalogId?: string | null
   },
 ): Promise<PageSettingsResponse> {
   const { data, error } = await apiClient.PATCH('/social/accounts/{accountId}/settings', {

@@ -5,6 +5,7 @@ import {
   Ticket,
   ShoppingBag,
   BadgePercent,
+  Gift,
   Users,
   BarChart3,
   CreditCard,
@@ -68,6 +69,12 @@ const mainGroups: NavGroup[] = [
         icon: <BadgePercent size={ICON_SIZE} strokeWidth={STROKE} />,
         path: 'promotions',
       },
+      {
+        key: 'loyalty',
+        labelKey: 'sidebar.loyalty',
+        icon: <Gift size={ICON_SIZE} strokeWidth={STROKE} />,
+        path: 'loyalty',
+      },
     ],
   },
   {
@@ -108,6 +115,18 @@ const mainGroups: NavGroup[] = [
         ),
         path: 'chats/messenger',
         unreadProvider: 'MESSENGER',
+      },
+      {
+        key: 'tiktok-dm',
+        labelKey: 'sidebar.tiktok_dm',
+        icon: (
+          <span
+            className="sidebar__social-dot"
+            style={{ background: 'var(--color-brand-tiktok)' }}
+          />
+        ),
+        path: 'chats/tiktok',
+        unreadProvider: 'TIKTOK_DM',
       },
     ],
   },

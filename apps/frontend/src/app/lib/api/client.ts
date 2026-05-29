@@ -2,7 +2,7 @@ import createClient, { type Middleware } from 'openapi-fetch'
 import type { paths } from './v1'
 import { getStoredLocale } from '@app/i18n'
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
 
 const apiClient = createClient<paths>({
   baseUrl: API_URL,

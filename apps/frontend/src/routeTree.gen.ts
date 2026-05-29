@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as OrganisationsRouteImport } from './routes/organisations'
 import { Route as InvitationRouteImport } from './routes/invitation'
 import { Route as CreateOrganisationRouteImport } from './routes/create-organisation'
@@ -32,13 +33,20 @@ import { Route as AppOrgSlugSettingsRouteImport } from './routes/app/$orgSlug/se
 import { Route as AppOrgSlugPromotionsRouteImport } from './routes/app/$orgSlug/promotions'
 import { Route as AppOrgSlugPlanRouteImport } from './routes/app/$orgSlug/plan'
 import { Route as AppOrgSlugMembersRouteImport } from './routes/app/$orgSlug/members'
+import { Route as AppOrgSlugLoyaltyRouteImport } from './routes/app/$orgSlug/loyalty'
 import { Route as AppOrgSlugLegalRouteImport } from './routes/app/$orgSlug/legal'
 import { Route as AppOrgSlugDashboardRouteImport } from './routes/app/$orgSlug/dashboard'
 import { Route as AppOrgSlugCatalogRouteImport } from './routes/app/$orgSlug/catalog'
 import { Route as AppOrgSlugAgentsRouteImport } from './routes/app/$orgSlug/agents'
 import { Route as AppOrgSlugCommentsIdRouteImport } from './routes/app/$orgSlug/comments/$id'
 import { Route as AppOrgSlugChatsIdRouteImport } from './routes/app/$orgSlug/chats/$id'
+import { Route as AppOrgSlugSocialAccountIdCampaignsRouteImport } from './routes/app/$orgSlug/$socialAccountId/campaigns'
 
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrganisationsRoute = OrganisationsRouteImport.update({
   id: '/organisations',
   path: '/organisations',
@@ -154,6 +162,11 @@ const AppOrgSlugMembersRoute = AppOrgSlugMembersRouteImport.update({
   path: '/members',
   getParentRoute: () => AppOrgSlugRouteRoute,
 } as any)
+const AppOrgSlugLoyaltyRoute = AppOrgSlugLoyaltyRouteImport.update({
+  id: '/loyalty',
+  path: '/loyalty',
+  getParentRoute: () => AppOrgSlugRouteRoute,
+} as any)
 const AppOrgSlugLegalRoute = AppOrgSlugLegalRouteImport.update({
   id: '/legal',
   path: '/legal',
@@ -184,12 +197,19 @@ const AppOrgSlugChatsIdRoute = AppOrgSlugChatsIdRouteImport.update({
   path: '/chats/$id',
   getParentRoute: () => AppOrgSlugRouteRoute,
 } as any)
+const AppOrgSlugSocialAccountIdCampaignsRoute =
+  AppOrgSlugSocialAccountIdCampaignsRouteImport.update({
+    id: '/$socialAccountId/campaigns',
+    path: '/$socialAccountId/campaigns',
+    getParentRoute: () => AppOrgSlugRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/create-organisation': typeof CreateOrganisationRoute
   '/invitation': typeof InvitationRoute
   '/organisations': typeof OrganisationsRoute
+  '/pricing': typeof PricingRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
@@ -202,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
   '/app/$orgSlug/dashboard': typeof AppOrgSlugDashboardRoute
   '/app/$orgSlug/legal': typeof AppOrgSlugLegalRoute
+  '/app/$orgSlug/loyalty': typeof AppOrgSlugLoyaltyRoute
   '/app/$orgSlug/members': typeof AppOrgSlugMembersRoute
   '/app/$orgSlug/plan': typeof AppOrgSlugPlanRoute
   '/app/$orgSlug/promotions': typeof AppOrgSlugPromotionsRoute
@@ -213,6 +234,7 @@ export interface FileRoutesByFullPath {
   '/legal/en/privacy': typeof LegalEnPrivacyRoute
   '/legal/fr/conditions': typeof LegalFrConditionsRoute
   '/legal/fr/privacy': typeof LegalFrPrivacyRoute
+  '/app/$orgSlug/$socialAccountId/campaigns': typeof AppOrgSlugSocialAccountIdCampaignsRoute
   '/app/$orgSlug/chats/$id': typeof AppOrgSlugChatsIdRoute
   '/app/$orgSlug/comments/$id': typeof AppOrgSlugCommentsIdRoute
 }
@@ -221,6 +243,7 @@ export interface FileRoutesByTo {
   '/create-organisation': typeof CreateOrganisationRoute
   '/invitation': typeof InvitationRoute
   '/organisations': typeof OrganisationsRoute
+  '/pricing': typeof PricingRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
@@ -233,6 +256,7 @@ export interface FileRoutesByTo {
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
   '/app/$orgSlug/dashboard': typeof AppOrgSlugDashboardRoute
   '/app/$orgSlug/legal': typeof AppOrgSlugLegalRoute
+  '/app/$orgSlug/loyalty': typeof AppOrgSlugLoyaltyRoute
   '/app/$orgSlug/members': typeof AppOrgSlugMembersRoute
   '/app/$orgSlug/plan': typeof AppOrgSlugPlanRoute
   '/app/$orgSlug/promotions': typeof AppOrgSlugPromotionsRoute
@@ -244,6 +268,7 @@ export interface FileRoutesByTo {
   '/legal/en/privacy': typeof LegalEnPrivacyRoute
   '/legal/fr/conditions': typeof LegalFrConditionsRoute
   '/legal/fr/privacy': typeof LegalFrPrivacyRoute
+  '/app/$orgSlug/$socialAccountId/campaigns': typeof AppOrgSlugSocialAccountIdCampaignsRoute
   '/app/$orgSlug/chats/$id': typeof AppOrgSlugChatsIdRoute
   '/app/$orgSlug/comments/$id': typeof AppOrgSlugCommentsIdRoute
 }
@@ -253,6 +278,7 @@ export interface FileRoutesById {
   '/create-organisation': typeof CreateOrganisationRoute
   '/invitation': typeof InvitationRoute
   '/organisations': typeof OrganisationsRoute
+  '/pricing': typeof PricingRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
@@ -265,6 +291,7 @@ export interface FileRoutesById {
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
   '/app/$orgSlug/dashboard': typeof AppOrgSlugDashboardRoute
   '/app/$orgSlug/legal': typeof AppOrgSlugLegalRoute
+  '/app/$orgSlug/loyalty': typeof AppOrgSlugLoyaltyRoute
   '/app/$orgSlug/members': typeof AppOrgSlugMembersRoute
   '/app/$orgSlug/plan': typeof AppOrgSlugPlanRoute
   '/app/$orgSlug/promotions': typeof AppOrgSlugPromotionsRoute
@@ -276,6 +303,7 @@ export interface FileRoutesById {
   '/legal/en/privacy': typeof LegalEnPrivacyRoute
   '/legal/fr/conditions': typeof LegalFrConditionsRoute
   '/legal/fr/privacy': typeof LegalFrPrivacyRoute
+  '/app/$orgSlug/$socialAccountId/campaigns': typeof AppOrgSlugSocialAccountIdCampaignsRoute
   '/app/$orgSlug/chats/$id': typeof AppOrgSlugChatsIdRoute
   '/app/$orgSlug/comments/$id': typeof AppOrgSlugCommentsIdRoute
 }
@@ -286,6 +314,7 @@ export interface FileRouteTypes {
     | '/create-organisation'
     | '/invitation'
     | '/organisations'
+    | '/pricing'
     | '/app/$orgSlug'
     | '/auth/callback'
     | '/auth/login'
@@ -298,6 +327,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/catalog'
     | '/app/$orgSlug/dashboard'
     | '/app/$orgSlug/legal'
+    | '/app/$orgSlug/loyalty'
     | '/app/$orgSlug/members'
     | '/app/$orgSlug/plan'
     | '/app/$orgSlug/promotions'
@@ -309,6 +339,7 @@ export interface FileRouteTypes {
     | '/legal/en/privacy'
     | '/legal/fr/conditions'
     | '/legal/fr/privacy'
+    | '/app/$orgSlug/$socialAccountId/campaigns'
     | '/app/$orgSlug/chats/$id'
     | '/app/$orgSlug/comments/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -317,6 +348,7 @@ export interface FileRouteTypes {
     | '/create-organisation'
     | '/invitation'
     | '/organisations'
+    | '/pricing'
     | '/app/$orgSlug'
     | '/auth/callback'
     | '/auth/login'
@@ -329,6 +361,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/catalog'
     | '/app/$orgSlug/dashboard'
     | '/app/$orgSlug/legal'
+    | '/app/$orgSlug/loyalty'
     | '/app/$orgSlug/members'
     | '/app/$orgSlug/plan'
     | '/app/$orgSlug/promotions'
@@ -340,6 +373,7 @@ export interface FileRouteTypes {
     | '/legal/en/privacy'
     | '/legal/fr/conditions'
     | '/legal/fr/privacy'
+    | '/app/$orgSlug/$socialAccountId/campaigns'
     | '/app/$orgSlug/chats/$id'
     | '/app/$orgSlug/comments/$id'
   id:
@@ -348,6 +382,7 @@ export interface FileRouteTypes {
     | '/create-organisation'
     | '/invitation'
     | '/organisations'
+    | '/pricing'
     | '/app/$orgSlug'
     | '/auth/callback'
     | '/auth/login'
@@ -360,6 +395,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/catalog'
     | '/app/$orgSlug/dashboard'
     | '/app/$orgSlug/legal'
+    | '/app/$orgSlug/loyalty'
     | '/app/$orgSlug/members'
     | '/app/$orgSlug/plan'
     | '/app/$orgSlug/promotions'
@@ -371,6 +407,7 @@ export interface FileRouteTypes {
     | '/legal/en/privacy'
     | '/legal/fr/conditions'
     | '/legal/fr/privacy'
+    | '/app/$orgSlug/$socialAccountId/campaigns'
     | '/app/$orgSlug/chats/$id'
     | '/app/$orgSlug/comments/$id'
   fileRoutesById: FileRoutesById
@@ -380,6 +417,7 @@ export interface RootRouteChildren {
   CreateOrganisationRoute: typeof CreateOrganisationRoute
   InvitationRoute: typeof InvitationRoute
   OrganisationsRoute: typeof OrganisationsRoute
+  PricingRoute: typeof PricingRoute
   AppOrgSlugRouteRoute: typeof AppOrgSlugRouteRouteWithChildren
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthLoginRoute: typeof AuthLoginRoute
@@ -396,6 +434,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/organisations': {
       id: '/organisations'
       path: '/organisations'
@@ -557,6 +602,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugMembersRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
+    '/app/$orgSlug/loyalty': {
+      id: '/app/$orgSlug/loyalty'
+      path: '/loyalty'
+      fullPath: '/app/$orgSlug/loyalty'
+      preLoaderRoute: typeof AppOrgSlugLoyaltyRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
     '/app/$orgSlug/legal': {
       id: '/app/$orgSlug/legal'
       path: '/legal'
@@ -599,6 +651,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugChatsIdRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
+    '/app/$orgSlug/$socialAccountId/campaigns': {
+      id: '/app/$orgSlug/$socialAccountId/campaigns'
+      path: '/$socialAccountId/campaigns'
+      fullPath: '/app/$orgSlug/$socialAccountId/campaigns'
+      preLoaderRoute: typeof AppOrgSlugSocialAccountIdCampaignsRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
   }
 }
 
@@ -607,6 +666,7 @@ interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugCatalogRoute: typeof AppOrgSlugCatalogRoute
   AppOrgSlugDashboardRoute: typeof AppOrgSlugDashboardRoute
   AppOrgSlugLegalRoute: typeof AppOrgSlugLegalRoute
+  AppOrgSlugLoyaltyRoute: typeof AppOrgSlugLoyaltyRoute
   AppOrgSlugMembersRoute: typeof AppOrgSlugMembersRoute
   AppOrgSlugPlanRoute: typeof AppOrgSlugPlanRoute
   AppOrgSlugPromotionsRoute: typeof AppOrgSlugPromotionsRoute
@@ -614,6 +674,7 @@ interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugStatsRoute: typeof AppOrgSlugStatsRoute
   AppOrgSlugTicketsRoute: typeof AppOrgSlugTicketsRoute
   AppOrgSlugWebsiteRoute: typeof AppOrgSlugWebsiteRoute
+  AppOrgSlugSocialAccountIdCampaignsRoute: typeof AppOrgSlugSocialAccountIdCampaignsRoute
   AppOrgSlugChatsIdRoute: typeof AppOrgSlugChatsIdRoute
   AppOrgSlugCommentsIdRoute: typeof AppOrgSlugCommentsIdRoute
 }
@@ -623,6 +684,7 @@ const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugCatalogRoute: AppOrgSlugCatalogRoute,
   AppOrgSlugDashboardRoute: AppOrgSlugDashboardRoute,
   AppOrgSlugLegalRoute: AppOrgSlugLegalRoute,
+  AppOrgSlugLoyaltyRoute: AppOrgSlugLoyaltyRoute,
   AppOrgSlugMembersRoute: AppOrgSlugMembersRoute,
   AppOrgSlugPlanRoute: AppOrgSlugPlanRoute,
   AppOrgSlugPromotionsRoute: AppOrgSlugPromotionsRoute,
@@ -630,6 +692,8 @@ const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugStatsRoute: AppOrgSlugStatsRoute,
   AppOrgSlugTicketsRoute: AppOrgSlugTicketsRoute,
   AppOrgSlugWebsiteRoute: AppOrgSlugWebsiteRoute,
+  AppOrgSlugSocialAccountIdCampaignsRoute:
+    AppOrgSlugSocialAccountIdCampaignsRoute,
   AppOrgSlugChatsIdRoute: AppOrgSlugChatsIdRoute,
   AppOrgSlugCommentsIdRoute: AppOrgSlugCommentsIdRoute,
 }
@@ -643,6 +707,7 @@ const rootRouteChildren: RootRouteChildren = {
   CreateOrganisationRoute: CreateOrganisationRoute,
   InvitationRoute: InvitationRoute,
   OrganisationsRoute: OrganisationsRoute,
+  PricingRoute: PricingRoute,
   AppOrgSlugRouteRoute: AppOrgSlugRouteRouteWithChildren,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthLoginRoute: AuthLoginRoute,
