@@ -172,6 +172,22 @@ export interface Collection {
   product_count?: number
 }
 
+export interface CatalogMigration {
+  id: string
+  catalogId: string
+  sourcePhone: string
+  status: 'QUEUED' | 'EXTRACTING' | 'IMPORTING' | 'COMPLETED' | 'FAILED'
+  totalProducts: number
+  importedProducts: number
+  failedProducts: number
+  error?: string | null
+  /** Number of migrations ahead in the queue (0 = running / next). */
+  position: number
+  /** Estimated minutes before this migration starts (~1 min per sync). */
+  etaMinutes: number
+  createdAt: string
+}
+
 export const catalogApi = {
   list: (orgId: string) => fetchJson<Catalog[]>(`/catalog/org/${orgId}`),
 
@@ -303,6 +319,24 @@ export const catalogApi = {
     fetchJson<{ success: boolean }>(`/catalog/${catalogId}/dissociate-phone/${phoneNumberId}`, {
       method: 'DELETE',
     }),
+
+  // ─── Commerce Manager migration (import a WhatsApp number's catalogue) ───
+
+  startMigration: (data: {
+    organisationId: string
+    catalogId: string
+    sourcePhone: string
+    sourceSocialAccountId?: string
+  }) =>
+    fetchJson<CatalogMigration>('/catalog-migration', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getMigration: (id: string) => fetchJson<CatalogMigration>(`/catalog-migration/${id}`),
+
+  getActiveMigration: (orgId: string) =>
+    fetchJson<CatalogMigration | null>(`/catalog-migration/org/${orgId}/active`),
 }
 
 // ─── Ticket ───
