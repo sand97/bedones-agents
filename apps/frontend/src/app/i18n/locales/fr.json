@@ -883,10 +883,12 @@
     "step_catalog_action": "Configurer mon catalogue",
     "step_comments_desc": "Indiquez à notre IA comment elle doit s'occuper des commentaires de {{page}}.",
     "step_comments_action": "Configurer les réponses maintenant",
+    "step_comments_action_edit": "Modifier la configuration",
     "step_agent_desc_none": "Créez un agent pour {{page}} afin que l'IA puisse répondre à vos clients sur {{channel}}.",
     "step_agent_desc_configuring": "Votre agent est en cours de configuration ({{score}}%). Continuez la configuration pour qu'il atteigne 80%.",
     "step_agent_desc_below_threshold": "L'agent est prêt mais son score est encore de {{score}}%. Continuez la configuration pour pouvoir l'activer.",
     "step_agent_action": "Continuer la configuration",
+    "step_agent_action_edit": "Modifier l'agent",
     "step_progress": "Étape {{current}} sur {{total}}",
 
     "no_accounts_title": "Aucun compte connecté",
@@ -900,8 +902,7 @@
     "setup_success_title": "{{subject}} configuré avec succès",
     "setup_success_desc": "Vous pouvez maintenant passer à la configuration d'un de vos autres comptes.",
     "setup_success_later": "Plus tard",
-    "setup_success_continue": "Continuer",
-    "comments_saved_toast": "{{page}} configurée — passons au compte suivant."
+    "setup_success_continue": "Continuer"
   },
 
   "meta": {

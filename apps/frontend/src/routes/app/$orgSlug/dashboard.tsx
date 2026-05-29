@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
-import { App, Skeleton, Typography } from 'antd'
+import { Skeleton, Typography } from 'antd'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
@@ -22,7 +22,6 @@ function DashboardPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
-  const { message } = App.useApp()
 
   const accountsQuery = $api.useQuery('get', '/social/accounts/{organisationId}', {
     params: { path: { organisationId: orgSlug } },
@@ -37,6 +36,12 @@ function DashboardPage() {
     accountId: string
     pageName: string
   } | null>(null)
+
+  // Step keys the user just finished in this session. We keep them in the
+  // carousel (with a check + "Modifier" label) instead of letting the slide
+  // disappear under the user — both for clarity and to avoid Slick snapping
+  // back to slide 0 every time the children count changes.
+  const [completedKeys, setCompletedKeys] = useState<Set<string>>(() => new Set())
 
   const status = setupStatusQuery.data
   const accounts = accountsQuery.data ?? []
@@ -68,14 +73,21 @@ function DashboardPage() {
   }
 
   const handleCommentsSaved = () => {
-    // We're already on the dashboard — show a lightweight toast and let the
-    // carousel advance naturally to the next pending step once the queries
-    // settle. The "Configurer xxx" message uses the page name we were just on.
-    const pageName = commentsModal?.pageName ?? ''
+    // The CommentsConfigModal already shows its own success toast. We mark the
+    // step as completed for this session — it stays in the carousel with a
+    // checkmark and a "Modifier la configuration" label. We deliberately do
+    // NOT refetch /setup-status here: refetching would drop the slide out of
+    // the carousel mid-session, which is what the user wanted to avoid. The
+    // status will refresh naturally the next time the dashboard mounts.
+    const accountId = commentsModal?.accountId
     setCommentsModal(null)
-    setupStatusQuery.refetch()
-    accountsQuery.refetch()
-    message.success(t('dashboard.comments_saved_toast', { page: pageName }))
+    if (accountId) {
+      setCompletedKeys((prev) => {
+        const next = new Set(prev)
+        next.add(`comments-${accountId}`)
+        return next
+      })
+    }
   }
 
   const handleOpenComments = (provider: string, _accountId: string) => {
@@ -125,6 +137,7 @@ function DashboardPage() {
         ) : status && !status.allConfigured ? (
           <SetupCarousel
             status={status}
+            completedKeys={completedKeys}
             onConfigureCatalog={handleConfigureCatalog}
             onConfigureComments={handleConfigureComments}
             onConfigureAgent={handleConfigureAgent}

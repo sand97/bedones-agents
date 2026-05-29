@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Avatar, Button, Carousel } from 'antd'
 import type { CarouselRef } from 'antd/es/carousel'
-import { ArrowLeft, ArrowRight, ShoppingBag } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, ShoppingBag } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   FacebookIcon,
@@ -35,6 +35,13 @@ export interface SetupStep {
 
 interface SetupCarouselProps {
   status: SetupStatus
+  /**
+   * Step keys (e.g. `comments-<accountId>`, `agent-<accountId>`) that the user
+   * configured during the current session. They stay in the carousel — only
+   * their visual state and action label change — so the user keeps a sense of
+   * the work already done without slides disappearing under them.
+   */
+  completedKeys?: ReadonlySet<string>
   onConfigureCatalog: () => void
   onConfigureComments: (step: PendingComment) => void
   onConfigureAgent: (step: PendingAgent) => void
@@ -47,6 +54,7 @@ interface SetupCarouselProps {
  */
 export function SetupCarousel({
   status,
+  completedKeys,
   onConfigureCatalog,
   onConfigureComments,
   onConfigureAgent,
@@ -54,6 +62,7 @@ export function SetupCarousel({
   const { t } = useTranslation()
   const carouselRef = useRef<CarouselRef | null>(null)
   const [current, setCurrent] = useState(0)
+  const completed = completedKeys ?? EMPTY_KEYS
 
   const steps = useMemo<SetupStep[]>(() => {
     const out: SetupStep[] = []
@@ -72,14 +81,18 @@ export function SetupCarousel({
     }
 
     for (const step of status.pendingComments) {
+      const key = `comments-${step.socialAccountId}`
       const branding = providerBranding(step.provider)
+      const isDone = completed.has(key)
       out.push({
-        key: `comments-${step.socialAccountId}`,
+        key,
         kind: 'comments',
         socialAccountId: step.socialAccountId,
         title: step.pageName ?? branding.name,
         description: t('dashboard.step_comments_desc', { page: step.pageName ?? branding.name }),
-        actionLabel: t('dashboard.step_comments_action'),
+        actionLabel: isDone
+          ? t('dashboard.step_comments_action_edit')
+          : t('dashboard.step_comments_action'),
         onAction: () => onConfigureComments(step),
         icon: <branding.Icon width={24} height={24} />,
         iconColor: branding.color,
@@ -89,15 +102,19 @@ export function SetupCarousel({
     }
 
     for (const step of status.pendingAgents) {
+      const key = `agent-${step.socialAccountId}`
       const branding = channelBranding(step.channel)
       const description = describeAgentStep(t, step, branding.name)
+      const isDone = completed.has(key)
       out.push({
-        key: `agent-${step.socialAccountId}`,
+        key,
         kind: 'agent',
         socialAccountId: step.socialAccountId,
         title: step.pageName ?? branding.name,
         description,
-        actionLabel: t('dashboard.step_agent_action'),
+        actionLabel: isDone
+          ? t('dashboard.step_agent_action_edit')
+          : t('dashboard.step_agent_action'),
         onAction: () => onConfigureAgent(step),
         icon: <branding.Icon width={24} height={24} />,
         iconColor: branding.color,
@@ -107,20 +124,7 @@ export function SetupCarousel({
     }
 
     return out
-  }, [status, t, onConfigureCatalog, onConfigureComments, onConfigureAgent])
-
-  // When a step disappears (after a successful save), keep the same index — the
-  // entry that used to be "next" now sits at the same position, which is exactly
-  // the "advance to next step" behaviour we want. We only clamp when the user
-  // was on the last step and it just disappeared.
-  useEffect(() => {
-    if (steps.length === 0) return
-    if (current >= steps.length) {
-      const last = steps.length - 1
-      setCurrent(last)
-      carouselRef.current?.goTo(last, true)
-    }
-  }, [steps.length, current])
+  }, [status, t, onConfigureCatalog, onConfigureComments, onConfigureAgent, completed])
 
   if (steps.length === 0) return null
 
@@ -137,7 +141,7 @@ export function SetupCarousel({
       >
         {steps.map((step) => (
           <div key={step.key}>
-            <StepBody step={step} />
+            <StepBody step={step} isCompleted={completed.has(step.key)} />
           </div>
         ))}
       </Carousel>
@@ -172,7 +176,7 @@ export function SetupCarousel({
   )
 }
 
-function StepBody({ step }: { step: SetupStep }) {
+function StepBody({ step, isCompleted }: { step: SetupStep; isCompleted: boolean }) {
   return (
     <div className="dashboard-setup-card__body">
       <div className="dashboard-setup-card__icon" style={{ color: step.iconColor }}>
@@ -193,15 +197,20 @@ function StepBody({ step }: { step: SetupStep }) {
         )}
       </div>
 
-      <h3 className="m-0 text-base font-semibold text-text-primary">{step.title}</h3>
+      <h3 className="m-0 flex items-center gap-2 text-base font-semibold text-text-primary">
+        {isCompleted && <CheckCircle2 size={18} className="text-green-500" strokeWidth={2.2} />}
+        {step.title}
+      </h3>
       <p className="m-0 max-w-md text-sm text-text-secondary">{step.description}</p>
 
-      <Button type="primary" size="middle" onClick={step.onAction}>
+      <Button type={isCompleted ? 'default' : 'primary'} size="middle" onClick={step.onAction}>
         {step.actionLabel}
       </Button>
     </div>
   )
 }
+
+const EMPTY_KEYS: ReadonlySet<string> = new Set()
 
 function describeAgentStep(
   t: (k: string, opts?: Record<string, unknown>) => string,
