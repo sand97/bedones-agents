@@ -95,6 +95,12 @@ body {
   background-size: 24px 24px;
 }
 
+.ant-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* Login line grid — centered on the form card, opacity fades outward via a radial mask */
 .login-grid-lines {
   position: absolute;
