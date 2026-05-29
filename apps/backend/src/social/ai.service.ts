@@ -175,8 +175,7 @@ Guidelines:
     if (products && products.length > 0) {
       const productText = products
         .map((p) => {
-          const price =
-            p.price != null ? ` — ${p.price}${p.currency ? ` ${p.currency}` : ''}` : ''
+          const price = p.price != null ? ` — ${p.price}${p.currency ? ` ${p.currency}` : ''}` : ''
           return `- ${p.name || p.retailerId} (code: ${p.retailerId})${price}`
         })
         .join('\n')

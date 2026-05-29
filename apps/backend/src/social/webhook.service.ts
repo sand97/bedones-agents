@@ -2464,8 +2464,37 @@ export class WebhookService {
         return
       }
 
+      // Resolve access token once — used for the thread fetch and (later) for the action.
+      const account = await this.prisma.socialAccount.findUnique({
+        where: { id: socialAccountId },
+        select: { accessToken: true, providerAccountId: true },
+      })
+      if (!account) throw new NotFoundException('Social account not found')
+      const accessToken = await this.encryptionService.decrypt(account.accessToken)
+
+      // Pull the parent reply chain from the platform so the agent can see what was
+      // already said and avoid repeating the same canned answer.
+      const { post, thread } = await this.fetchCommentThread({
+        commentId,
+        provider,
+        socialAccountId,
+        pageId: account.providerAccountId,
+        accessToken,
+      })
+
+      // If a catalog is linked to this page, resolve any product code mentioned in the
+      // post so the agent can answer price/availability questions on the right item.
+      const products = await this.resolvePostProducts({
+        catalogId: settings.catalogId,
+        postMessage: post?.message ?? null,
+        accessToken,
+      })
+
       const result = await this.aiService.analyzeComment({
         comment,
+        post,
+        thread,
+        products,
         pageSettings: {
           undesiredCommentsAction: settings.undesiredCommentsAction,
           spamAction: settings.spamAction,
@@ -2480,14 +2509,6 @@ export class WebhookService {
       this.logger.log(`[AI] Comment ${commentId}: action=${result.action}, reason=${result.reason}`)
 
       if (result.action === 'none') return
-
-      // Get access token for API calls
-      const account = await this.prisma.socialAccount.findUnique({
-        where: { id: socialAccountId },
-        select: { accessToken: true },
-      })
-      if (!account) throw new NotFoundException('Social account not found')
-      const accessToken = await this.encryptionService.decrypt(account.accessToken)
 
       await this.executeAIAction(
         commentId,
