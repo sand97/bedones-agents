@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Input, Segmented, Spin, Button } from 'antd'
+import { Input, Segmented, Spin, Button, Checkbox } from 'antd'
 import { Search, X, ShoppingBag, Layers } from 'lucide-react'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { catalogApi, type Catalog, type Collection, type Product } from '@app/lib/api/agent-api'
@@ -24,20 +24,12 @@ type Mode = 'products' | 'collections'
 
 interface ProductCollectionPickerProps {
   catalog: Catalog
-  /** Currently selected entries (kept by the parent so they survive mode switches). */
   selected: PickerEntity[]
   onChange: (next: PickerEntity[]) => void
-  /** Show a Next button at the bottom — disabled when `selected` is empty. */
   onNext: () => void
   nextLabel?: string
 }
 
-/**
- * Picker step shared by the "Add context" and "Link posts" flows.
- *
- * - Toggle between products / collections.
- * - Newly picked items are pushed to the top of the selected list (most recent first).
- */
 export function ProductCollectionPicker({
   catalog,
   selected,
@@ -68,8 +60,7 @@ export function ProductCollectionPicker({
   const selectedIds = useMemo(() => new Set(selected.map((s) => `${s.kind}:${s.id}`)), [selected])
 
   const toggleProduct = (p: Product) => {
-    const key = `product:${p.id}`
-    if (selectedIds.has(key)) {
+    if (selectedIds.has(`product:${p.id}`)) {
       onChange(selected.filter((s) => !(s.kind === 'product' && s.id === p.id)))
     } else {
       onChange([
@@ -86,8 +77,7 @@ export function ProductCollectionPicker({
   }
 
   const toggleCollection = (c: Collection) => {
-    const key = `collection:${c.id}`
-    if (selectedIds.has(key)) {
+    if (selectedIds.has(`collection:${c.id}`)) {
       onChange(selected.filter((s) => !(s.kind === 'collection' && s.id === c.id)))
     } else {
       onChange([
@@ -114,9 +104,10 @@ export function ProductCollectionPicker({
 
   return (
     <div className="flex flex-col" style={{ minHeight: 480 }}>
-      <div className="flex flex-col gap-2 p-4 border-b border-[var(--color-border-default)]">
+      <div className="flex flex-col gap-3 border-b border-[var(--color-border-default)] p-4">
         <Segmented
           block
+          className="pricing-billing-toggle"
           value={mode}
           onChange={(v) => setMode(v as Mode)}
           options={[
@@ -134,25 +125,23 @@ export function ProductCollectionPicker({
           onChange={(e) => setSearch(e.target.value)}
         />
         {selected.length > 0 && (
-          <div className="context-flow-selected-list">
-            {selected.map((s) => (
-              <div key={`${s.kind}:${s.id}`} className="context-flow-selected-item">
-                {s.kind === 'product' ? (
-                  <ShoppingBag size={14} className="text-text-muted" />
-                ) : (
-                  <Layers size={14} className="text-text-muted" />
-                )}
-                <span className="truncate">{s.name}</span>
-                <button
-                  type="button"
-                  className="context-flow-selected-item__remove"
-                  onClick={() => removeSelected(s)}
-                  aria-label="Retirer"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
+          <div className="picker-selected-strip">
+            {selected.map((s) =>
+              s.kind === 'product' ? (
+                <SelectedProductChip
+                  key={`product:${s.id}`}
+                  name={s.name}
+                  imageUrl={s.imageUrl}
+                  onRemove={() => removeSelected(s)}
+                />
+              ) : (
+                <SelectedCollectionChip
+                  key={`collection:${s.id}`}
+                  name={s.name}
+                  onRemove={() => removeSelected(s)}
+                />
+              ),
+            )}
           </div>
         )}
       </div>
@@ -184,15 +173,13 @@ export function ProductCollectionPicker({
           products.map((p) => {
             const isSelected = selectedIds.has(`product:${p.id}`)
             return (
-              <button
+              <div
                 key={p.id}
-                type="button"
                 className="article-picker-item"
                 onClick={() => toggleProduct(p)}
                 style={{
                   background: isSelected ? 'var(--color-bg-subtle)' : undefined,
-                  width: '100%',
-                  textAlign: 'left',
+                  cursor: 'pointer',
                 }}
               >
                 {p.imageUrl ? (
@@ -211,23 +198,21 @@ export function ProductCollectionPicker({
                     <div className="text-xs text-text-muted truncate">{p.collectionName}</div>
                   )}
                 </div>
-                <input type="checkbox" checked={isSelected} readOnly className="flex-shrink-0" />
-              </button>
+                <Checkbox checked={isSelected} className="flex-shrink-0" />
+              </div>
             )
           })
         ) : (
           filteredCollections.map((c) => {
             const isSelected = selectedIds.has(`collection:${c.id}`)
             return (
-              <button
+              <div
                 key={c.id}
-                type="button"
                 className="article-picker-item"
                 onClick={() => toggleCollection(c)}
                 style={{
                   background: isSelected ? 'var(--color-bg-subtle)' : undefined,
-                  width: '100%',
-                  textAlign: 'left',
+                  cursor: 'pointer',
                 }}
               >
                 <div
@@ -242,8 +227,8 @@ export function ProductCollectionPicker({
                     <div className="text-xs text-text-muted">{c.product_count} produits</div>
                   )}
                 </div>
-                <input type="checkbox" checked={isSelected} readOnly className="flex-shrink-0" />
-              </button>
+                <Checkbox checked={isSelected} className="flex-shrink-0" />
+              </div>
             )
           })
         )}
@@ -258,6 +243,56 @@ export function ProductCollectionPicker({
           {selected.length > 0 ? ` (${selected.length})` : ''}
         </Button>
       </div>
+    </div>
+  )
+}
+
+function SelectedProductChip({
+  name,
+  imageUrl,
+  onRemove,
+}: {
+  name: string
+  imageUrl?: string
+  onRemove: () => void
+}) {
+  return (
+    <div className="picker-selected-chip">
+      {imageUrl ? (
+        <img src={imageUrl} alt="" className="picker-selected-chip__img" />
+      ) : (
+        <div className="picker-selected-chip__img picker-selected-chip__img--placeholder">
+          <ShoppingBag size={14} className="text-text-muted" />
+        </div>
+      )}
+      <span className="picker-selected-chip__label">{name}</span>
+      <Button
+        type="text"
+        size="small"
+        icon={<X size={14} />}
+        onClick={onRemove}
+        className="picker-selected-chip__remove"
+        aria-label="Retirer"
+      />
+    </div>
+  )
+}
+
+function SelectedCollectionChip({ name, onRemove }: { name: string; onRemove: () => void }) {
+  return (
+    <div className="picker-selected-chip">
+      <div className="picker-selected-chip__img picker-selected-chip__img--placeholder">
+        <Layers size={14} className="text-text-muted" />
+      </div>
+      <span className="picker-selected-chip__label">{name}</span>
+      <Button
+        type="text"
+        size="small"
+        icon={<X size={14} />}
+        onClick={onRemove}
+        className="picker-selected-chip__remove"
+        aria-label="Retirer"
+      />
     </div>
   )
 }

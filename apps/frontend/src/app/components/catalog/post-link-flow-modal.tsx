@@ -1,9 +1,13 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Modal, Button, Select, Spin, Empty, message } from 'antd'
-import { ArrowLeft, Link2 } from 'lucide-react'
+import { Modal, Button, Select, Spin, Empty, Input, Checkbox, message } from 'antd'
+import { ArrowLeft, Link2, Search } from 'lucide-react'
 import { catalogApi, type Catalog } from '@app/lib/api/agent-api'
-import { getSocialAccounts, getPostsForAccount, type SocialAccountResponse } from '@app/lib/api'
+import {
+  getSocialAccounts,
+  getProviderPostsForAccount,
+  type SocialAccountResponse,
+} from '@app/lib/api'
 import {
   ProductCollectionPicker,
   type PickerEntity,
@@ -19,13 +23,6 @@ interface PostLinkFlowModalProps {
 
 type Step = 'pick' | 'page' | 'posts'
 
-interface PostItem {
-  id: string
-  message?: string
-  imageUrl?: string
-  permalinkUrl?: string
-}
-
 export function PostLinkFlowModal({
   open,
   catalog,
@@ -37,6 +34,7 @@ export function PostLinkFlowModal({
   const [selected, setSelected] = useState<PickerEntity[]>([])
   const [accountId, setAccountId] = useState<string | undefined>(undefined)
   const [selectedPostIds, setSelectedPostIds] = useState<Set<string>>(new Set())
+  const [postSearch, setPostSearch] = useState('')
   const [saving, setSaving] = useState(false)
 
   const accountsQuery = useQuery({
@@ -46,17 +44,27 @@ export function PostLinkFlowModal({
   })
 
   const postsQuery = useQuery({
-    queryKey: ['social-account-posts', accountId],
-    queryFn: () => getPostsForAccount(accountId!),
+    queryKey: ['provider-posts', accountId, postSearch],
+    queryFn: () =>
+      getProviderPostsForAccount(accountId!, {
+        search: postSearch || undefined,
+        limit: 50,
+      }),
     enabled: !!accountId && step === 'posts',
   })
 
+  // Pages that can serve a post feed (FB pages, IG accounts). Skip channels
+  // that don't expose one (WhatsApp phone numbers, TikTok in this build).
   const accountOptions = useMemo(
     () =>
-      (accountsQuery.data ?? []).map((a: SocialAccountResponse) => ({
-        value: a.id,
-        label: a.pageName || a.username || a.provider,
-      })),
+      (accountsQuery.data ?? [])
+        .filter(
+          (a: SocialAccountResponse) => a.provider === 'FACEBOOK' || a.provider === 'INSTAGRAM',
+        )
+        .map((a: SocialAccountResponse) => ({
+          value: a.id,
+          label: a.pageName || a.username || a.provider,
+        })),
     [accountsQuery.data],
   )
 
@@ -74,6 +82,7 @@ export function PostLinkFlowModal({
     setSelected([])
     setAccountId(undefined)
     setSelectedPostIds(new Set())
+    setPostSearch('')
     setSaving(false)
   }
 
@@ -103,6 +112,8 @@ export function PostLinkFlowModal({
     }
   }
 
+  const posts = postsQuery.data?.posts ?? []
+
   return (
     <Modal
       open={open}
@@ -126,8 +137,8 @@ export function PostLinkFlowModal({
       {step === 'page' && (
         <div className="flex flex-col" style={{ minHeight: 320 }}>
           <div className="p-6">
-            <h3 className="text-base font-semibold mb-2">Choisir une page</h3>
-            <p className="text-sm text-text-muted mb-4">
+            <h3 className="mb-2 text-base font-semibold">Choisir une page</h3>
+            <p className="mb-4 text-sm text-text-muted">
               Sélectionnez la page dont vous voulez voir les posts.
             </p>
             <Select
@@ -140,7 +151,7 @@ export function PostLinkFlowModal({
             />
           </div>
           <div
-            className="flex justify-between gap-2 p-4 mt-auto"
+            className="mt-auto flex justify-between gap-2 p-4"
             style={{ borderTop: '1px solid var(--color-border-default)' }}
           >
             <Button icon={<ArrowLeft size={14} />} onClick={() => setStep('pick')}>
@@ -155,32 +166,39 @@ export function PostLinkFlowModal({
 
       {step === 'posts' && (
         <div className="flex flex-col" style={{ minHeight: 480 }}>
-          <div className="p-4 border-b border-[var(--color-border-default)]">
-            <h3 className="text-base font-semibold m-0">Sélectionner des posts</h3>
-            <p className="text-xs text-text-muted m-0">
-              Sélection multiple — un même post peut être lié à plusieurs produits/collections.
-            </p>
+          <div className="flex flex-col gap-3 border-b border-[var(--color-border-default)] p-4">
+            <div>
+              <h3 className="m-0 text-base font-semibold">Sélectionner des posts</h3>
+              <p className="m-0 text-xs text-text-muted">
+                Sélection multiple — un même post peut être lié à plusieurs produits/collections.
+              </p>
+            </div>
+            <Input
+              allowClear
+              placeholder="Rechercher dans les posts…"
+              prefix={<Search size={16} className="text-text-muted" />}
+              value={postSearch}
+              onChange={(e) => setPostSearch(e.target.value)}
+            />
           </div>
           <div className="flex-1 overflow-y-auto" style={{ maxHeight: 360 }}>
             {postsQuery.isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Spin />
               </div>
-            ) : (postsQuery.data ?? []).length === 0 ? (
+            ) : posts.length === 0 ? (
               <Empty description="Aucun post sur cette page" style={{ padding: '48px 16px' }} />
             ) : (
-              (postsQuery.data ?? []).map((p: PostItem) => {
+              posts.map((p) => {
                 const isSelected = selectedPostIds.has(p.id)
                 return (
-                  <button
+                  <div
                     key={p.id}
-                    type="button"
                     className="article-picker-item"
                     onClick={() => togglePost(p.id)}
                     style={{
                       background: isSelected ? 'var(--color-bg-subtle)' : undefined,
-                      width: '100%',
-                      textAlign: 'left',
+                      cursor: 'pointer',
                     }}
                   >
                     {p.imageUrl ? (
@@ -194,18 +212,17 @@ export function PostLinkFlowModal({
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium truncate">
+                      <div className="truncate text-sm font-medium">
                         {p.message || '(Sans description)'}
                       </div>
-                      <div className="text-xs text-text-muted">{p.id}</div>
+                      {p.createdTime && (
+                        <div className="text-xs text-text-muted">
+                          {new Date(p.createdTime).toLocaleDateString('fr-FR')}
+                        </div>
+                      )}
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      readOnly
-                      className="flex-shrink-0"
-                    />
-                  </button>
+                    <Checkbox checked={isSelected} className="flex-shrink-0" />
+                  </div>
                 )
               })
             )}

@@ -1983,6 +1983,124 @@ export class SocialService {
     }))
   }
 
+  // ─── Fetch fresh page posts straight from Meta ───
+  // Local Post rows are only created when comments arrive via webhook, so the
+  // table starts empty for inactive pages. This method talks to the Graph API
+  // directly and upserts each result so FKs from ProductPostLink stay valid.
+
+  async fetchProviderPosts(
+    userId: string,
+    socialAccountId: string,
+    params?: { search?: string; limit?: number; after?: string },
+  ): Promise<{
+    posts: Array<{
+      id: string
+      message: string | null
+      imageUrl: string | null
+      permalinkUrl: string | null
+      createdTime: string | null
+    }>
+    cursorAfter?: string
+  }> {
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: socialAccountId },
+      omit: { accessToken: false },
+    })
+    if (!account) throw new NotFoundException('Social account not found')
+    await this.assertMembership(userId, account.organisationId)
+
+    if (account.provider !== 'FACEBOOK' && account.provider !== 'INSTAGRAM') {
+      return { posts: [] }
+    }
+
+    const accessToken = await this.encryptionService.decrypt(account.accessToken)
+    const limit = Math.min(params?.limit ?? 25, 50)
+
+    const { edge, fields } =
+      account.provider === 'FACEBOOK'
+        ? {
+            edge: 'posts',
+            fields: 'id,message,full_picture,permalink_url,created_time',
+          }
+        : {
+            edge: 'media',
+            fields: 'id,caption,media_url,thumbnail_url,permalink,timestamp',
+          }
+
+    const query = new URLSearchParams({
+      fields,
+      limit: String(limit),
+      access_token: accessToken,
+    })
+    if (params?.after) query.set('after', params.after)
+
+    const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${account.providerAccountId}/${edge}?${query}`
+    const response = await fetch(url)
+    if (!response.ok) {
+      const errorText = await response.text()
+      this.logger.warn(`fetchProviderPosts ${account.provider} error: ${errorText}`)
+      throw new BadRequestException(`Meta API error: ${errorText}`)
+    }
+
+    const data = (await response.json()) as {
+      data: Array<Record<string, unknown>>
+      paging?: { cursors?: { after?: string } }
+    }
+
+    const rawPosts = data.data ?? []
+    const mapped = rawPosts.map((p) => {
+      if (account.provider === 'FACEBOOK') {
+        return {
+          id: String(p.id ?? ''),
+          message: (p.message as string | undefined) ?? null,
+          imageUrl: (p.full_picture as string | undefined) ?? null,
+          permalinkUrl: (p.permalink_url as string | undefined) ?? null,
+          createdTime: (p.created_time as string | undefined) ?? null,
+        }
+      }
+      return {
+        id: String(p.id ?? ''),
+        message: (p.caption as string | undefined) ?? null,
+        imageUrl:
+          (p.thumbnail_url as string | undefined) ?? (p.media_url as string | undefined) ?? null,
+        permalinkUrl: (p.permalink as string | undefined) ?? null,
+        createdTime: (p.timestamp as string | undefined) ?? null,
+      }
+    })
+
+    // Optional client-side search — Meta's posts/media edges don't support it.
+    const search = params?.search?.trim().toLowerCase()
+    const filtered = search
+      ? mapped.filter((p) => (p.message ?? '').toLowerCase().includes(search))
+      : mapped
+
+    // Mirror into local Post table so ProductPostLink / CollectionPostLink FKs
+    // can reference these rows. Best-effort: failures shouldn't block the UI.
+    await Promise.all(
+      filtered.map((p) =>
+        this.prisma.post
+          .upsert({
+            where: { id: p.id },
+            create: {
+              id: p.id,
+              socialAccountId: account.id,
+              message: p.message,
+              imageUrl: p.imageUrl,
+              permalinkUrl: p.permalinkUrl,
+            },
+            update: {
+              message: p.message ?? undefined,
+              imageUrl: p.imageUrl ?? undefined,
+              permalinkUrl: p.permalinkUrl ?? undefined,
+            },
+          })
+          .catch(() => null),
+      ),
+    )
+
+    return { posts: filtered, cursorAfter: data.paging?.cursors?.after }
+  }
+
   // ─── User stats ───
 
   async getUserStats(userId: string, accountId: string, fromId: string) {
