@@ -11,6 +11,8 @@ import {
   Pencil,
   Trash2,
   ShoppingBag,
+  Sparkles,
+  Link2,
 } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { CatalogIndexingBanner } from '@app/components/catalog/catalog-indexing-banner'
@@ -21,6 +23,11 @@ import { ProductModal } from '@app/components/catalog/product-modal'
 import { CollectionFilterSelect } from '@app/components/catalog/collection-filter-select'
 import { ArticleDescriptionCard } from '@app/components/catalog/article-description-card'
 import { useCatalogColumns } from '@app/components/catalog/catalog-columns'
+import { CatalogQuickActions } from '@app/components/catalog/catalog-quick-actions'
+import { ProductContextFlowModal } from '@app/components/catalog/product-context-flow-modal'
+import { PostLinkFlowModal } from '@app/components/catalog/post-link-flow-modal'
+import { ProductContextDetailModal } from '@app/components/catalog/product-context-detail-modal'
+import { LinkedPostsModal } from '@app/components/catalog/linked-posts-modal'
 import type { CatalogArticle } from '@app/components/whatsapp/mock-data'
 import { AccountSwitcher } from '@app/components/social/account-switcher'
 import { useLayout } from '@app/contexts/layout-context'
@@ -78,6 +85,17 @@ function CatalogPage() {
     isOpen: boolean
     initialProduct?: Product
   }>({ isOpen: false })
+
+  // Quick action wizards
+  const [contextFlowOpen, setContextFlowOpen] = useState(false)
+  const [postLinkFlowOpen, setPostLinkFlowOpen] = useState(false)
+  // Per-product context / linked-posts modals
+  const [contextDetailFor, setContextDetailFor] = useState<Product | null>(null)
+  const [linkedPostsFor, setLinkedPostsFor] = useState<{
+    kind: 'product' | 'collection'
+    id: string
+    name?: string
+  } | null>(null)
 
   // URL params helpers
   const updateSearch = useCallback(
@@ -374,6 +392,25 @@ function CatalogPage() {
                     product && setModalProductConfig({ isOpen: true, initialProduct: product }),
                 },
                 {
+                  key: 'context',
+                  label: 'Voir le contexte',
+                  icon: <Sparkles size={14} />,
+                  onClick: () => product && setContextDetailFor(product),
+                },
+                {
+                  key: 'linked-posts',
+                  label: 'Posts liés',
+                  icon: <Link2 size={14} />,
+                  onClick: () =>
+                    product &&
+                    setLinkedPostsFor({
+                      kind: 'product',
+                      id: product.id,
+                      name: product.name,
+                    }),
+                },
+                { type: 'divider' as const },
+                {
                   key: 'delete',
                   label: t('catalog.delete_article'),
                   icon: <Trash2 size={14} />,
@@ -453,6 +490,13 @@ function CatalogPage() {
       <CatalogIndexingBanner catalogs={catalogs} />
 
       <div className="flex-1 p-4 pb-16 lg:p-6 lg:pb-16">
+        {selectedCatalog && (
+          <CatalogQuickActions
+            onOpenContextFlow={() => setContextFlowOpen(true)}
+            onOpenLinkPostsFlow={() => setPostLinkFlowOpen(true)}
+          />
+        )}
+
         <div className="tickets-filters catalog-filters">
           <div className="flex flex-1 items-center gap-3 lg:contents">
             <Input
@@ -582,6 +626,25 @@ function CatalogPage() {
                                 setModalProductConfig({ isOpen: true, initialProduct: product }),
                             },
                             {
+                              key: 'context',
+                              label: 'Voir le contexte',
+                              icon: <Sparkles size={14} />,
+                              onClick: () => product && setContextDetailFor(product),
+                            },
+                            {
+                              key: 'linked-posts',
+                              label: 'Posts liés',
+                              icon: <Link2 size={14} />,
+                              onClick: () =>
+                                product &&
+                                setLinkedPostsFor({
+                                  kind: 'product',
+                                  id: product.id,
+                                  name: product.name,
+                                }),
+                            },
+                            { type: 'divider' as const },
+                            {
                               key: 'delete',
                               label: t('catalog.delete_article'),
                               icon: <Trash2 size={14} />,
@@ -661,6 +724,44 @@ function CatalogPage() {
         product={modalProductConfig.initialProduct}
         loading={createProductMutation.isPending || updateProductMutation.isPending}
       />
+
+      {selectedCatalog && (
+        <>
+          <ProductContextFlowModal
+            open={contextFlowOpen}
+            catalog={selectedCatalog}
+            onClose={() => setContextFlowOpen(false)}
+            onSaved={() => {
+              // Other catalogue queries don't need refetching — context is a
+              // separate resource fetched on-demand by the detail modal.
+            }}
+          />
+          <PostLinkFlowModal
+            open={postLinkFlowOpen}
+            catalog={selectedCatalog}
+            organisationId={orgSlug}
+            onClose={() => setPostLinkFlowOpen(false)}
+            onSaved={() => {
+              queryClient.invalidateQueries({ queryKey: ['post-links', selectedCatalog.id] })
+            }}
+          />
+          {contextDetailFor && (
+            <ProductContextDetailModal
+              open={!!contextDetailFor}
+              catalogId={selectedCatalog.id}
+              productId={contextDetailFor.id}
+              productName={contextDetailFor.name}
+              onClose={() => setContextDetailFor(null)}
+            />
+          )}
+          <LinkedPostsModal
+            open={!!linkedPostsFor}
+            catalogId={selectedCatalog.id}
+            entity={linkedPostsFor}
+            onClose={() => setLinkedPostsFor(null)}
+          />
+        </>
+      )}
     </div>
   )
 }

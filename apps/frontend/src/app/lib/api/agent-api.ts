@@ -303,6 +303,127 @@ export const catalogApi = {
     fetchJson<{ success: boolean }>(`/catalog/${catalogId}/dissociate-phone/${phoneNumberId}`, {
       method: 'DELETE',
     }),
+
+  // ─── AI Context ───
+
+  listProductContexts: (catalogId: string, providerProductIds?: string[]) => {
+    const q = providerProductIds?.length ? `?ids=${providerProductIds.join(',')}` : ''
+    return fetchJson<Array<{ providerProductId: string; content: string }>>(
+      `/catalog/${catalogId}/product-contexts${q}`,
+    )
+  },
+
+  listCollectionContexts: (catalogId: string, providerCollectionIds?: string[]) => {
+    const q = providerCollectionIds?.length ? `?ids=${providerCollectionIds.join(',')}` : ''
+    return fetchJson<Array<{ providerCollectionId: string; content: string }>>(
+      `/catalog/${catalogId}/collection-contexts${q}`,
+    )
+  },
+
+  getProductContext: (catalogId: string, providerProductId: string) =>
+    fetchJson<{
+      content: string
+      sameContentCount: number
+      sameContentProductIds: string[]
+    }>(`/catalog/${catalogId}/products/${providerProductId}/context`),
+
+  analyzeContext: (
+    catalogId: string,
+    data: { prompt: string; productIds?: string[]; collectionIds?: string[] },
+  ) =>
+    fetchJson<{ hasConflict: boolean; conflictReason: string; suggestedContent: string }>(
+      `/catalog/${catalogId}/product-contexts/analyze`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+
+  saveContext: (
+    catalogId: string,
+    data: { content: string; productIds?: string[]; collectionIds?: string[] },
+  ) =>
+    fetchJson<{ savedProductIds: string[]; savedCollectionIds: string[] }>(
+      `/catalog/${catalogId}/product-contexts/save`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+
+  updateProductContext: (
+    catalogId: string,
+    providerProductId: string,
+    data: { content: string; applyToSiblings?: boolean },
+  ) =>
+    fetchJson<{ success: boolean }>(`/catalog/${catalogId}/products/${providerProductId}/context`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  // ─── Post links ───
+
+  linkPosts: (
+    catalogId: string,
+    data: { postIds: string[]; productIds?: string[]; collectionIds?: string[] },
+  ) =>
+    fetchJson<{ linkedPostIds: string[] }>(`/catalog/${catalogId}/post-links`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  listProductPostLinks: (
+    catalogId: string,
+    providerProductId: string,
+    params?: { limit?: number; offset?: number },
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.limit) q.set('limit', String(params.limit))
+    if (params?.offset) q.set('offset', String(params.offset))
+    return fetchJson<PostLinkList>(
+      `/catalog/${catalogId}/products/${providerProductId}/post-links?${q}`,
+    )
+  },
+
+  listCollectionPostLinks: (
+    catalogId: string,
+    providerCollectionId: string,
+    params?: { limit?: number; offset?: number },
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.limit) q.set('limit', String(params.limit))
+    if (params?.offset) q.set('offset', String(params.offset))
+    return fetchJson<PostLinkList>(
+      `/catalog/${catalogId}/collections/${providerCollectionId}/post-links?${q}`,
+    )
+  },
+
+  deleteProductPostLink: (catalogId: string, linkId: string) =>
+    fetchJson<{ success: boolean }>(`/catalog/${catalogId}/product-post-links/${linkId}`, {
+      method: 'DELETE',
+    }),
+
+  deleteCollectionPostLink: (catalogId: string, linkId: string) =>
+    fetchJson<{ success: boolean }>(`/catalog/${catalogId}/collection-post-links/${linkId}`, {
+      method: 'DELETE',
+    }),
+}
+
+export interface PostLink {
+  id: string
+  createdAt: string
+  post: {
+    id: string
+    message?: string | null
+    imageUrl?: string | null
+    permalinkUrl?: string | null
+    createdAt: string
+  }
+  socialAccount: {
+    id: string
+    provider: string
+    pageName?: string | null
+    username?: string | null
+  }
+}
+
+export interface PostLinkList {
+  total: number
+  links: PostLink[]
 }
 
 // ─── Ticket ───
