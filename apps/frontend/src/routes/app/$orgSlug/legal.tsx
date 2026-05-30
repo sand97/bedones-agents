@@ -160,7 +160,7 @@ function HelpPage() {
 
         {/* ── Contacter le support ── */}
         <section className="mb-10">
-          <div className="help-support-cta">
+          <div className="rounded-card border border-border-subtle bg-bg-surface p-[28px]">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-subtle">
               <Headphones size={24} strokeWidth={1} className="text-text-secondary" />
             </div>
@@ -236,7 +236,7 @@ function HelpPage() {
 
         {/* ── Blog / Ressources ── */}
         <section className="mb-10">
-          <div className="help-support-cta">
+          <div className="rounded-card border border-border-subtle bg-bg-surface p-[28px]">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-subtle">
               <BookOpen size={24} strokeWidth={1} className="text-text-secondary" />
             </div>
@@ -280,7 +280,7 @@ function HelpPage() {
                 href={card.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="legal-card"
+                className="flex flex-col rounded-card border border-border-subtle bg-bg-surface p-5 no-underline transition-[border-color,box-shadow] duration-150 ease-[ease] hover:border-border-default hover:shadow-card"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-subtle text-text-secondary">

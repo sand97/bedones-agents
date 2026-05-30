@@ -1,0 +1,306 @@
+   MARKETING — micro-animations on illustrations & mockups
+
+   Driven by `useScrollReveal`. Any container with class `.mk-anim-host`
+   (e.g. `.mk-feature-visual`, `.mk-mockup`, `.mk-platforms-row`) gets
+   `.mk-anim-in` added when it enters the viewport. Descendants with
+   `data-anim="..."` then play a dedicated keyframe animation per variant.
+
+   Stagger via inline style `style={{ '--mk-d': '420ms' }}` which becomes
+   `animation-delay`. The transforms are deliberately large (~40px) and
+   the durations long-ish (~0.9s) so the sequence reads cleanly on first
+   pass.
+
+   Variants:
+     up | down | left | right | scale | scale-bump | fade — entrances
+     typing       — show, bounce, hide (~1.7s) — "agent is thinking"
+     after-typing — appears once typing dots have faded
+     pulse        — subtle scale pulse (CTA / thumbs-up emphasis)
+   ═══════════════════════════════════════════ */
+.mk-anim-host [data-anim],
+.mk-feature-visual [data-anim],
+.mk-mockup [data-anim],
+.mk-platforms-row [data-anim] {
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+@keyframes mkAnimUp {
+  from {
+    opacity: 0;
+    transform: translateY(36px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mkAnimDown {
+  from {
+    opacity: 0;
+    transform: translateY(-36px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mkAnimLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-44px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mkAnimRight {
+  from {
+    opacity: 0;
+    transform: translateX(44px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mkAnimScale {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mkAnimScaleBump {
+  /* Springy scale-in with a small overshoot — used for the cards that
+     should feel "pop in". */
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes mkAnimFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes mkAnimTyping {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  18% {
+    opacity: 1;
+    transform: none;
+  }
+  78% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+}
+@keyframes mkAnimPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+/* Generic "is visible" rules — host = any of the listed classes. */
+.mk-anim-host.mk-anim-in [data-anim='up'],
+.mk-feature-visual.mk-anim-in [data-anim='up'],
+.mk-mockup.mk-anim-in [data-anim='up'],
+.mk-platforms-row.mk-anim-in [data-anim='up'] {
+  animation: mkAnimUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-anim-host.mk-anim-in [data-anim='down'],
+.mk-feature-visual.mk-anim-in [data-anim='down'],
+.mk-mockup.mk-anim-in [data-anim='down'],
+.mk-platforms-row.mk-anim-in [data-anim='down'] {
+  animation: mkAnimDown 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-anim-host.mk-anim-in [data-anim='left'],
+.mk-feature-visual.mk-anim-in [data-anim='left'],
+.mk-mockup.mk-anim-in [data-anim='left'],
+.mk-platforms-row.mk-anim-in [data-anim='left'] {
+  animation: mkAnimLeft 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-anim-host.mk-anim-in [data-anim='right'],
+.mk-feature-visual.mk-anim-in [data-anim='right'],
+.mk-mockup.mk-anim-in [data-anim='right'],
+.mk-platforms-row.mk-anim-in [data-anim='right'] {
+  animation: mkAnimRight 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-anim-host.mk-anim-in [data-anim='scale'],
+.mk-feature-visual.mk-anim-in [data-anim='scale'],
+.mk-mockup.mk-anim-in [data-anim='scale'],
+.mk-platforms-row.mk-anim-in [data-anim='scale'] {
+  animation: mkAnimScale 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-anim-host.mk-anim-in [data-anim='scale-bump'],
+.mk-feature-visual.mk-anim-in [data-anim='scale-bump'],
+.mk-mockup.mk-anim-in [data-anim='scale-bump'],
+.mk-platforms-row.mk-anim-in [data-anim='scale-bump'] {
+  animation: mkAnimScaleBump 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-anim-host.mk-anim-in [data-anim='fade'],
+.mk-feature-visual.mk-anim-in [data-anim='fade'],
+.mk-mockup.mk-anim-in [data-anim='fade'],
+.mk-platforms-row.mk-anim-in [data-anim='fade'] {
+  animation: mkAnimFade 0.7s ease both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-anim-host.mk-anim-in [data-anim='typing'],
+.mk-feature-visual.mk-anim-in [data-anim='typing'],
+.mk-mockup.mk-anim-in [data-anim='typing'] {
+  animation: mkAnimTyping 1.9s ease both;
+  animation-delay: var(--mk-d, 0ms);
+  transform-origin: left center;
+}
+.mk-anim-host.mk-anim-in [data-anim='after-typing'],
+.mk-feature-visual.mk-anim-in [data-anim='after-typing'],
+.mk-mockup.mk-anim-in [data-anim='after-typing'] {
+  animation: mkAnimUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-anim-host.mk-anim-in [data-anim='pulse'],
+.mk-feature-visual.mk-anim-in [data-anim='pulse'] {
+  animation: mkAnimPulse 0.6s ease both;
+  animation-delay: var(--mk-d, 0ms);
+}
+
+/* ─── Hero entrance: floating social icons "pop in" one by one ───
+   The parallax JS (hero.tsx) waits ~1.8s before writing transforms, so
+   this CSS keyframe plays cleanly first. Two variants — prominent logos
+   land at opacity 1, ghost ones at opacity 0.55. */
+.mk-float-logo {
+  opacity: 0;
+}
+.mk-float-logo:not(.ghost) {
+  animation: mkHeroLogoIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+.mk-float-logo.ghost {
+  animation: mkHeroLogoInGhost 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: var(--mk-d, 0ms);
+}
+@keyframes mkHeroLogoIn {
+  from {
+    opacity: 0;
+    transform: scale(0.3) rotate(-14deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+@keyframes mkHeroLogoInGhost {
+  from {
+    opacity: 0;
+    transform: scale(0.3) rotate(-14deg);
+  }
+  to {
+    opacity: 0.55;
+    transform: scale(1) rotate(0);
+  }
+}
+
+/* Mini typing-dots indicator (scoped to the feature illustrations). */
+.mk-typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fff;
+  border: 1px solid var(--mk-border);
+  border-radius: 18px;
+  border-bottom-left-radius: 6px;
+  padding: 12px 14px;
+  align-self: flex-start;
+  box-shadow: var(--mk-shadow-soft);
+}
+.mk-typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #c7c2b8;
+  animation: mkTypingBounce 1.2s infinite;
+}
+.mk-typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.mk-typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes mkTypingBounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+/* Reduced motion — skip transforms but keep elements visible. */
+@media (prefers-reduced-motion: reduce) {
+  .mk-anim-host [data-anim],
+  .mk-feature-visual [data-anim],
+  .mk-mockup [data-anim],
+  .mk-platforms-row [data-anim] {
+    opacity: 1;
+    animation: none !important;
+    transform: none !important;
+  }
+  .mk-float-logo,
+  .mk-float-logo.ghost {
+    animation: none !important;
+    transform: none !important;
+  }
+  .mk-float-logo:not(.ghost) {
+    opacity: 1;
+  }
+  .mk-float-logo.ghost {
+    opacity: 0.55;
+  }
+  .mk-typing-dots span {
+    animation: none !important;
+    opacity: 0.7;
+  }
+}
+
+/* ─── Dashboard setup carousel ─── */
+
+/* The Carousel container doesn't need its own dots — we have a custom footer */
+.dashboard-setup-card .ant-carousel .slick-dots {
+  display: none !important;
+}
+

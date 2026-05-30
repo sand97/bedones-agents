@@ -85,7 +85,7 @@ const mainGroups: NavGroup[] = [
         labelKey: 'sidebar.whatsapp',
         icon: (
           <span
-            className="sidebar__social-dot"
+            className="inline-block flex-shrink-0 w-2 h-2 rounded-full"
             style={{ background: 'var(--color-brand-whatsapp)' }}
           />
         ),
@@ -97,7 +97,7 @@ const mainGroups: NavGroup[] = [
         labelKey: 'sidebar.instagram_dm',
         icon: (
           <span
-            className="sidebar__social-dot"
+            className="inline-block flex-shrink-0 w-2 h-2 rounded-full"
             style={{ background: 'var(--color-brand-instagram)' }}
           />
         ),
@@ -109,7 +109,7 @@ const mainGroups: NavGroup[] = [
         labelKey: 'sidebar.messenger',
         icon: (
           <span
-            className="sidebar__social-dot"
+            className="inline-block flex-shrink-0 w-2 h-2 rounded-full"
             style={{ background: 'var(--color-brand-messenger)' }}
           />
         ),
@@ -121,7 +121,7 @@ const mainGroups: NavGroup[] = [
         labelKey: 'sidebar.tiktok_dm',
         icon: (
           <span
-            className="sidebar__social-dot"
+            className="inline-block flex-shrink-0 w-2 h-2 rounded-full"
             style={{ background: 'var(--color-brand-tiktok)' }}
           />
         ),
@@ -138,7 +138,7 @@ const mainGroups: NavGroup[] = [
         labelKey: 'sidebar.facebook',
         icon: (
           <span
-            className="sidebar__social-dot"
+            className="inline-block flex-shrink-0 w-2 h-2 rounded-full"
             style={{ background: 'var(--color-brand-facebook)' }}
           />
         ),
@@ -150,7 +150,7 @@ const mainGroups: NavGroup[] = [
         labelKey: 'sidebar.instagram',
         icon: (
           <span
-            className="sidebar__social-dot"
+            className="inline-block flex-shrink-0 w-2 h-2 rounded-full"
             style={{ background: 'var(--color-brand-instagram)' }}
           />
         ),
@@ -162,7 +162,7 @@ const mainGroups: NavGroup[] = [
         labelKey: 'sidebar.tiktok',
         icon: (
           <span
-            className="sidebar__social-dot"
+            className="inline-block flex-shrink-0 w-2 h-2 rounded-full"
             style={{ background: 'var(--color-brand-tiktok)' }}
           />
         ),
@@ -237,13 +237,12 @@ export function Sidebar() {
     navigate({ to: `/app/$orgSlug/${path}` as string, params: { orgSlug } })
   }
 
-  const sidebarClass = [
-    'sidebar',
-    collapsed && isDesktop ? 'sidebar--collapsed' : '',
-    !isDesktop && mobileMenuOpen ? 'sidebar--mobile-open' : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
+  const sidebarWidthClass = collapsed && isDesktop ? 'w-[68px]' : 'w-[260px]'
+  const sidebarMobileClass = !isDesktop
+    ? !mobileMenuOpen
+      ? '-translate-x-full transition-transform duration-300 ease-[ease] shadow-panel'
+      : 'translate-x-0 transition-transform duration-300 ease-[ease] shadow-panel'
+    : 'transition-[width] duration-200 ease-[ease]'
 
   return (
     <>
@@ -253,11 +252,13 @@ export function Sidebar() {
           type="button"
           aria-label={t('sidebar.close_menu')}
           onClick={() => setMobileMenuOpen(false)}
-          className={`sidebar-overlay ${!mobileMenuOpen ? 'sidebar-overlay--hidden' : ''}`}
+          className={`fixed inset-0 z-[39] bg-transparent transition-opacity duration-300${!mobileMenuOpen ? ' pointer-events-none opacity-0' : ''}`}
         />
       )}
 
-      <aside className={sidebarClass}>
+      <aside
+        className={`${sidebarWidthClass} ${sidebarMobileClass} h-dvh fixed top-0 left-0 z-40 bg-bg-subtle border-r border-border-default flex flex-col overflow-hidden`}
+      >
         {/* Org Switcher — sticky top */}
         <div className="flex-shrink-0 px-3 pt-3 pb-1">
           <OrgSwitcher collapsed={collapsed && isDesktop} />
@@ -268,7 +269,9 @@ export function Sidebar() {
           {mainGroups.map((group, gi) => (
             <div key={gi}>
               {group.titleKey && !(collapsed && isDesktop) && (
-                <div className="sidebar__nav-group-title">{t(group.titleKey)}</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.05em] text-text-secondary px-4 pt-2 pb-1 mt-2">
+                  {t(group.titleKey)}
+                </div>
               )}
               {collapsed && isDesktop && group.titleKey && (
                 <div className="mx-4 my-2 h-px bg-border-subtle" />
@@ -285,7 +288,7 @@ export function Sidebar() {
                     key={item.key}
                     type="button"
                     onClick={() => handleNavigate(item.path)}
-                    className={`sidebar__nav-item ${active ? 'sidebar__nav-item--active' : ''}`}
+                    className={`flex items-center gap-[10px] px-4 py-2 mx-2 my-1 rounded-control text-text-secondary text-[13px] font-medium cursor-pointer transition-[background,color,box-shadow] duration-150 ease-out border-none bg-transparent w-[calc(100%-16px)] text-left hover:bg-bg-surface hover:text-text-primary${active ? ' bg-bg-surface text-text-primary font-semibold shadow-card' : ''}`}
                     style={isCollapsed ? { justifyContent: 'center', padding: '8px' } : undefined}
                   >
                     <span className="relative flex-shrink-0">
@@ -296,7 +299,9 @@ export function Sidebar() {
                     </span>
                     {!isCollapsed && <span className="flex-1 truncate">{label}</span>}
                     {!isCollapsed && badge ? (
-                      <span className="sidebar__nav-badge">{badge > 99 ? '99+' : badge}</span>
+                      <span className="flex-shrink-0 min-w-[18px] h-[18px] px-[5px] rounded-pill bg-text-primary text-white text-[10px] font-semibold leading-[18px] text-center">
+                        {badge > 99 ? '99+' : badge}
+                      </span>
                     ) : null}
                   </button>
                 )
@@ -322,7 +327,7 @@ export function Sidebar() {
                 key={item.key}
                 type="button"
                 onClick={() => handleNavigate(item.path)}
-                className={`sidebar__nav-item ${active ? 'sidebar__nav-item--active' : ''}`}
+                className={`flex items-center gap-[10px] px-4 py-2 mx-2 my-1 rounded-control text-text-secondary text-[13px] font-medium cursor-pointer transition-[background,color,box-shadow] duration-150 ease-out border-none bg-transparent w-[calc(100%-16px)] text-left hover:bg-bg-surface hover:text-text-primary${active ? ' bg-bg-surface text-text-primary font-semibold shadow-card' : ''}`}
                 style={
                   collapsed && isDesktop ? { justifyContent: 'center', padding: '8px' } : undefined
                 }
@@ -381,7 +386,7 @@ export function Sidebar() {
             >
               <button
                 type="button"
-                className={`sidebar__profile-btn ${isProfileActive ? 'sidebar__profile-btn--active' : ''}`}
+                className={`flex items-center gap-3 w-full border-none rounded-control p-2 bg-transparent cursor-pointer transition-[background] duration-150 ease-out hover:bg-bg-surface${isProfileActive ? ' bg-bg-surface shadow-card' : ''}`}
                 style={collapsed && isDesktop ? { justifyContent: 'center' } : undefined}
               >
                 <Avatar

@@ -22,14 +22,17 @@ function P({ children }: { children: React.ReactNode }) {
 
 function PrivacyPolicyPage() {
   return (
-    <div className="legal-public">
-      <div className="legal-public__container">
-        <a href="/" className="legal-public__back">
+    <div className="min-h-screen bg-bg-page px-6 pt-10 pb-20 max-[640px]:px-4 max-[640px]:pt-6 max-[640px]:pb-[60px]">
+      <div className="max-w-[720px] mx-auto">
+        <a
+          href="/"
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-secondary no-underline mb-8 transition-colors duration-150 hover:text-text-primary"
+        >
           <ArrowLeft size={16} />
           <span>Back</span>
         </a>
 
-        <div className="legal-public__header">
+        <div className="mb-10 pb-6 border-b border-border-subtle">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-black">
               <span className="text-sm font-bold text-white">B</span>
@@ -42,7 +45,7 @@ function PrivacyPolicyPage() {
           <Text type="secondary">Last updated: April 1, 2026</Text>
         </div>
 
-        <div className="legal-public__content">
+        <div className="bg-bg-surface rounded-panel p-10 shadow-card max-[640px]:p-6 max-[640px]:px-5">
           <SectionTitle>1. Data Controller</SectionTitle>
           <P>
             The data controller for personal data processing is Bedones SAS, with its registered

@@ -12,7 +12,7 @@ export function CreditUsageCard({ used, total, loading }: CreditUsageCardProps) 
   const creditPercent = Math.min(100, Math.round((used / safeTotal) * 100))
 
   return (
-    <div className="stats-card flex-1">
+    <div className="bg-bg-surface border border-border-subtle rounded-card p-5 flex-1">
       <div className="mb-4 flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-bg-subtle">
           <Zap size={18} strokeWidth={1} />

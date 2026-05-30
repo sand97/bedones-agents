@@ -88,11 +88,11 @@ export function CommentsLayout({
 
   if (loading) {
     return (
-      <div className="comments-split">
-        <div className="comments-split__left">
+      <div className="flex flex-1 min-h-0">
+        <div className="w-[360px] max-[1023px]:w-full flex-shrink-0 flex flex-col border-r border-border-subtle overflow-hidden">
           <PostListSkeleton />
         </div>
-        <div className="comments-split__right comments-split__right--visible">
+        <div className="flex-1 flex flex-col min-w-0">
           <CommentThreadSkeleton />
         </div>
       </div>
@@ -134,17 +134,17 @@ export function CommentsLayout({
   }
 
   return (
-    <div className="comments-split">
+    <div className="flex flex-1 min-h-0">
       {/* Left: post list */}
       <div
-        className={`comments-split__left ${selectedPost ? 'comments-split__left--hidden-mobile' : ''}`}
+        className={`w-[360px] max-[1023px]:w-full flex-shrink-0 flex flex-col border-r border-border-subtle overflow-hidden${selectedPost ? ' max-[1023px]:hidden' : ''}`}
       >
         <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-3">
           <Button
             type={filter === 'all' ? 'primary' : 'default'}
             size="small"
             onClick={() => setFilter('all')}
-            className="comments-filter-btn"
+            className="h-7! px-3! text-[13px]! leading-7!"
           >
             {t('comments.all')}
           </Button>
@@ -152,7 +152,7 @@ export function CommentsLayout({
             type={filter === 'unread' ? 'primary' : 'default'}
             size="small"
             onClick={() => setFilter('unread')}
-            className="comments-filter-btn"
+            className="h-7! px-3! text-[13px]! leading-7!"
           >
             {t('comments.unread')}
           </Button>
@@ -174,7 +174,7 @@ export function CommentsLayout({
 
       {/* Right: comment thread or config setup */}
       <div
-        className={`comments-split__right ${selectedPost ? 'comments-split__right--visible' : ''}`}
+        className={`flex-1 flex-col min-w-0 max-[1023px]:hidden${selectedPost ? ' max-[1023px]:flex' : ''} flex`}
       >
         {selectedPost ? (
           <CommentThread

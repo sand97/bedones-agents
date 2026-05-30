@@ -127,21 +127,27 @@ export function ProductContextFlowModal({
             />
           </div>
 
-          <div className="context-flow-mini-chat flex-1 overflow-y-auto" style={{ maxHeight: 320 }}>
+          <div
+            className="flex flex-col gap-3 p-4 flex-1 overflow-y-auto"
+            style={{ maxHeight: 320 }}
+          >
             {prompt && (
-              <div className="context-flow-mini-chat__bubble" style={{ alignSelf: 'flex-end' }}>
+              <div
+                className="px-[14px] py-3 rounded-xl bg-bg-subtle text-[13px] leading-[1.5] whitespace-pre-wrap"
+                style={{ alignSelf: 'flex-end' }}
+              >
                 {prompt}
               </div>
             )}
             {analyzing && (
-              <div className="context-flow-mini-chat__bubble text-text-muted">
+              <div className="px-[14px] py-3 rounded-xl bg-bg-subtle text-[13px] leading-[1.5] whitespace-pre-wrap text-text-muted">
                 Analyse en cours…
               </div>
             )}
             {proposal && !analyzing && (
               <>
                 {proposal.hasConflict && proposal.conflictReason && (
-                  <div className="context-flow-mini-chat__bubble context-flow-mini-chat__bubble--warning">
+                  <div className="px-[14px] py-3 rounded-xl text-[13px] leading-[1.5] whitespace-pre-wrap bg-[#fff7e6] border border-[#ffd591]">
                     <div className="flex items-start gap-2">
                       <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
                       <div>
@@ -151,7 +157,7 @@ export function ProductContextFlowModal({
                     </div>
                   </div>
                 )}
-                <div className="context-flow-mini-chat__bubble">
+                <div className="px-[14px] py-3 rounded-xl bg-bg-subtle text-[13px] leading-[1.5] whitespace-pre-wrap">
                   <div className="text-xs text-text-muted mb-2">
                     Contexte proposé — vous pouvez l&apos;éditer avant d&apos;enregistrer
                   </div>
@@ -165,7 +171,7 @@ export function ProductContextFlowModal({
             )}
           </div>
 
-          <div className="context-flow-mini-chat__footer">
+          <div className="flex items-center gap-2 px-4 py-3 border-t border-border-default">
             <Button
               type="text"
               icon={<ArrowLeft size={16} />}

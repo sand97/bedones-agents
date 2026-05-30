@@ -203,7 +203,7 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
             key={conv.id}
             type="button"
             onClick={() => onSelect(conv)}
-            className={`chat-conv-item ${isSelected ? 'chat-conv-item--active' : ''}`}
+            className={`flex items-center gap-3 px-4 py-3 border-none w-full text-left cursor-pointer transition-[background] duration-150 ${isSelected ? 'bg-bg-subtle' : 'bg-transparent hover:bg-bg-subtle'}`}
           >
             <Avatar
               src={conv.contact.avatarUrl}

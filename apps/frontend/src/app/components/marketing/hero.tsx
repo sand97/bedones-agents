@@ -9,6 +9,7 @@ import {
   WhatsAppIcon,
 } from '@app/components/marketing/social-icons'
 import { formatPhoneNumber } from '@app/lib/phone-format'
+import { MK_CONTAINER, MK_EYEBROW, MK_ACCENT } from './mk'
 
 interface CountryEntry {
   name: string
@@ -168,59 +169,106 @@ export function Hero() {
   }, [])
 
   return (
-    <section className="mk-hero" ref={heroRef}>
-      <div className="mk-hero-grid" />
-      <div className="mk-hero-floats" aria-hidden="true">
-        <span className="mk-float-logo fb p1">
-          <FacebookIcon />
+    <section
+      className="relative overflow-hidden pt-[60px] pb-10 min-h-[720px] max-[768px]:pt-10 max-[768px]:pb-[120px] max-[768px]:min-h-0"
+      ref={heroRef}
+    >
+      {/* .mk-hero-grid */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.55]"
+        style={{
+          backgroundImage:
+            'linear-gradient(#d4d4d4 1px, transparent 1px), linear-gradient(90deg, #d4d4d4 1px, transparent 1px)',
+          backgroundSize: '56px 56px',
+          WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%, #000 25%, transparent 80%)',
+          maskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%, #000 25%, transparent 80%)',
+        }}
+      />
+
+      {/* .mk-hero-floats */}
+      <div className="absolute inset-0 pointer-events-none z-[1]" aria-hidden="true">
+        {/* p1 — FB top-left */}
+        <span className="mk-float-logo fb p1 absolute w-16 h-16 rounded-sm bg-white border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] inline-flex items-center justify-center pointer-events-none will-change-transform text-[var(--color-brand-facebook)] [top:18%] [left:8%] max-[1100px]:[display:none] max-[900px]:[display:inline-flex] max-[900px]:w-[52px] max-[900px]:h-[52px] max-[900px]:[top:6%] max-[768px]:[left:4%]">
+          <FacebookIcon className="w-[30px] h-[30px] max-[900px]:w-6 max-[900px]:h-6" />
         </span>
-        <span className="mk-float-logo tt p2">
-          <TikTokIcon />
+        {/* p2 — TT top-right */}
+        <span className="mk-float-logo tt p2 absolute w-16 h-16 rounded-sm border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] inline-flex items-center justify-center pointer-events-none will-change-transform bg-[var(--color-brand-tiktok)] text-white [top:12%] [right:10%] max-[900px]:w-[52px] max-[900px]:h-[52px] max-[900px]:[top:6%] max-[768px]:[right:4%]">
+          <TikTokIcon className="w-[30px] h-[30px] max-[900px]:w-6 max-[900px]:h-6" />
         </span>
-        <span className="mk-float-logo wa p3">
-          <WhatsAppIcon />
+        {/* p3 — WA mid-left — hidden on <=768 */}
+        <span className="mk-float-logo wa p3 absolute w-16 h-16 rounded-sm bg-white border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] inline-flex items-center justify-center pointer-events-none will-change-transform text-[var(--color-brand-whatsapp)] [top:55%] [left:4%] max-[900px]:w-[52px] max-[900px]:h-[52px] max-[768px]:hidden">
+          <WhatsAppIcon className="w-[30px] h-[30px] max-[900px]:w-6 max-[900px]:h-6" />
         </span>
-        <span className="mk-float-logo ig p4">
-          <InstagramIcon />
+        {/* p4 — IG mid-right — hidden on <=768 */}
+        <span
+          className="mk-float-logo ig p4 absolute w-16 h-16 rounded-sm border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] inline-flex items-center justify-center pointer-events-none will-change-transform text-white [top:50%] [right:5%] max-[900px]:w-[52px] max-[900px]:h-[52px] max-[768px]:hidden"
+          style={{
+            background:
+              'radial-gradient(circle at 30% 110%, #ffdc80 0%, #fcaf45 5%, #f77737 15%, #f56040 25%, #e1306c 45%, #c13584 60%, #833ab4 75%, #5851db 90%)',
+          }}
+        >
+          <InstagramIcon className="w-[30px] h-[30px] max-[900px]:w-6 max-[900px]:h-6" />
         </span>
-        <span className="mk-float-logo ms p5">
-          <MessengerIcon />
+        {/* p5 — MS bottom-left */}
+        <span className="mk-float-logo ms p5 absolute w-16 h-16 rounded-sm bg-white border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] inline-flex items-center justify-center pointer-events-none will-change-transform text-[var(--color-brand-messenger)] [bottom:16%] [left:16%] max-[900px]:w-[52px] max-[900px]:h-[52px] max-[900px]:[bottom:4%] max-[768px]:[bottom:16px] max-[768px]:[left:6%]">
+          <MessengerIcon className="w-[30px] h-[30px] max-[900px]:w-6 max-[900px]:h-6" />
         </span>
-        <span className="mk-float-logo wa p6">
-          <WhatsAppIcon />
+        {/* p6 — WA bottom-right */}
+        <span className="mk-float-logo wa p6 absolute w-16 h-16 rounded-sm bg-white border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] inline-flex items-center justify-center pointer-events-none will-change-transform text-[var(--color-brand-whatsapp)] [bottom:12%] [right:18%] max-[900px]:w-[52px] max-[900px]:h-[52px] max-[900px]:[bottom:4%] max-[768px]:[bottom:16px] max-[768px]:[right:6%] max-[768px]:left-auto">
+          <WhatsAppIcon className="w-[30px] h-[30px] max-[900px]:w-6 max-[900px]:h-6" />
         </span>
-        <span className="mk-float-logo ig p7">
-          <InstagramIcon />
+        {/* p7 — IG bottom-center (mobile only) */}
+        <span
+          className="mk-float-logo ig p7 absolute w-16 h-16 rounded-sm border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] pointer-events-none will-change-transform text-white hidden max-[768px]:inline-flex max-[768px]:[bottom:16px] max-[768px]:[left:calc(50%-26px)]"
+          style={{
+            background:
+              'radial-gradient(circle at 30% 110%, #ffdc80 0%, #fcaf45 5%, #f77737 15%, #f56040 25%, #e1306c 45%, #c13584 60%, #833ab4 75%, #5851db 90%)',
+          }}
+        >
+          <InstagramIcon className="w-[30px] h-[30px]" />
         </span>
-        <span className="mk-float-logo fb ghost g1">
-          <FacebookIcon />
+
+        {/* Ghost logos — hidden <=1100 */}
+        <span className="mk-float-logo fb ghost g1 absolute w-12 h-12 opacity-[0.55] rounded-sm bg-white border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] inline-flex items-center justify-center pointer-events-none will-change-transform text-[var(--color-brand-facebook)] [top:30%] [left:22%] max-[1100px]:hidden">
+          <FacebookIcon className="w-[22px] h-[22px]" />
         </span>
-        <span className="mk-float-logo ig ghost g2">
-          <InstagramIcon />
+        <span className="mk-float-logo ig ghost g2 absolute w-12 h-12 opacity-[0.55] rounded-sm bg-white border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] inline-flex items-center justify-center pointer-events-none will-change-transform text-[var(--color-brand-instagram)] [top:28%] [right:24%] max-[1100px]:hidden">
+          <InstagramIcon className="w-[22px] h-[22px]" />
         </span>
-        <span className="mk-float-logo tt ghost g3">
-          <TikTokIcon />
+        <span className="mk-float-logo tt ghost g3 absolute w-12 h-12 opacity-[0.55] rounded-sm bg-white border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] inline-flex items-center justify-center pointer-events-none will-change-transform text-[var(--color-brand-tiktok)] [bottom:32%] [left:18%] max-[1100px]:hidden">
+          <TikTokIcon className="w-[22px] h-[22px]" />
         </span>
-        <span className="mk-float-logo ms ghost g4">
-          <MessengerIcon />
+        <span className="mk-float-logo ms ghost g4 absolute w-12 h-12 opacity-[0.55] rounded-sm bg-white border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] inline-flex items-center justify-center pointer-events-none will-change-transform text-[var(--color-brand-messenger)] [bottom:28%] [right:30%] max-[1100px]:hidden">
+          <MessengerIcon className="w-[22px] h-[22px]" />
         </span>
       </div>
-      <div className="mk-container">
-        <div className="mk-hero-inner">
-          <span className="mk-eyebrow-pill">
-            <span className="dot" />
+
+      <div className={MK_CONTAINER}>
+        {/* .mk-hero-inner */}
+        <div className="relative text-center max-w-[720px] mx-auto mt-20 z-[2] max-[768px]:mt-10">
+          {/* .mk-eyebrow-pill */}
+          <span className="inline-flex items-center gap-2 text-[13px] font-medium text-[var(--mk-text)] bg-[var(--mk-surface)] border border-[var(--mk-border)] px-[14px] py-2 rounded-[999px] [box-shadow:var(--mk-shadow-soft)]">
+            <span className="w-1.5 h-1.5 rounded-[999px] bg-[var(--mk-text)] [box-shadow:0_0_0_4px_rgba(17,27,33,0.1)]" />
             IA conversationnelle pour vendeurs en ligne
           </span>
-          <h1>
+
+          <h1 className="text-[clamp(40px,6vw,72px)] mt-7 mb-[22px] mx-auto max-w-[720px] leading-[1.02] tracking-[-0.035em] font-[family-name:var(--mk-font-display)] font-bold max-[768px]:text-[38px] max-[768px]:mt-5 max-[768px]:mb-4">
             Votre assistant IA qui répond
-            <br />à vos clients, <span className="mk-accent">24h/24.</span>
+            <br className="max-[768px]:hidden" />à vos clients,{' '}
+            <span className={MK_ACCENT}>24h/24.</span>
           </h1>
-          <p className="mk-sub">
+
+          <p className="text-[clamp(15px,1.4vw,17px)] text-[var(--mk-text-muted)] max-w-[540px] mx-auto mb-8 leading-[1.55] max-[768px]:text-[15px] max-[768px]:mb-6">
             Bedones Moderator gère vos conversations sur WhatsApp, Instagram, TikTok, Messenger et
             Facebook — en apprenant de votre catalogue et de votre façon de répondre.
           </p>
-          <form className="mk-hero-form" onSubmit={handleSubmit}>
-            <label className="cc">
+
+          {/* .mk-hero-form */}
+          <form
+            className="max-w-[520px] mx-auto mb-[18px] bg-white border border-[var(--mk-border)] rounded-[999px] p-[6px] flex items-center gap-[6px] [box-shadow:var(--mk-shadow-card)] max-[768px]:flex-wrap max-[768px]:rounded-[18px] max-[768px]:p-2 max-[768px]:gap-[6px]"
+            onSubmit={handleSubmit}
+          >
+            <label className="inline-flex items-center gap-[6px] px-[14px] h-11 text-[14.5px] font-semibold text-[var(--mk-text)] border-r border-[var(--mk-border)] cursor-pointer max-[768px]:flex-[0_0_auto] max-[768px]:border-r-0 max-[768px]:px-[10px]">
               <svg
                 width="14"
                 height="14"
@@ -242,7 +290,7 @@ export function Hero() {
                   if (entry) setIso(entry.code)
                 }}
                 aria-label="Indicatif pays"
-                className="mk-hero-cc-select"
+                className="appearance-none bg-transparent border-0 outline-none font-[inherit] font-[inherit] color-inherit cursor-pointer p-0 max-w-[80px]"
               >
                 {Array.from(
                   new Map(
@@ -275,17 +323,28 @@ export function Hero() {
               aria-label="Numéro WhatsApp"
               value={formatPhoneNumber(phone, iso)}
               onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
+              className="flex-1 min-w-0 border-0 outline-none bg-transparent h-11 font-[family-name:var(--mk-font-body)] text-[15px] text-[var(--mk-text)] px-[6px] placeholder:text-[var(--mk-text-soft)] max-[768px]:[flex:1_1_60%] max-[768px]:min-w-[100px]"
             />
-            <button type="submit">Commencer →</button>
+            <button
+              type="submit"
+              className="h-11 px-[22px] bg-[var(--mk-text)] text-white rounded-[999px] font-[family-name:var(--mk-font-body)] text-[14.5px] font-semibold inline-flex items-center gap-[6px] flex-shrink-0 transition-[opacity,transform] duration-150 hover:opacity-[0.92] hover:-translate-y-px max-[768px]:[flex:1_1_100%] max-[768px]:rounded-xl"
+            >
+              Commencer →
+            </button>
           </form>
-          <p className="mk-hero-disclaimer">
+
+          {/* .mk-hero-disclaimer */}
+          <p className="text-[12.5px] text-[var(--mk-text-soft)] mx-auto mb-7 max-[768px]:mt-5">
             Démarrez gratuitement en 2 minutes. Pas de carte bancaire.
           </p>
-          <div className="mk-hero-proof">
-            Rejoint par <strong>500+ entrepreneurs</strong>
-            <span className="sep">·</span>
+
+          {/* .mk-hero-proof — hidden on mobile */}
+          <div className="text-[13px] text-[var(--mk-text-soft)] flex gap-[10px] justify-center items-center flex-wrap max-[768px]:hidden">
+            Rejoint par{' '}
+            <strong className="text-[var(--mk-text)] font-semibold">500+ entrepreneurs</strong>
+            <span className="text-[var(--mk-border)]">·</span>
             Service client 24/7
-            <span className="sep">·</span>
+            <span className="text-[var(--mk-border)]">·</span>
             Réponse en moins de 2 min
           </div>
         </div>

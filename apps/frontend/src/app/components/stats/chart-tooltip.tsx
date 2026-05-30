@@ -9,7 +9,7 @@ interface ChartTooltipProps {
 export function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
   if (!active || !payload?.length) return null
   return (
-    <div className="stats-tooltip">
+    <div className="bg-bg-surface border border-border-default rounded-[10px] px-[14px] py-[10px] shadow-popover flex flex-col gap-1">
       <div className="text-xs font-medium text-text-secondary">{label}</div>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center gap-2 text-sm">
