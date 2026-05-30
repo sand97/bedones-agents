@@ -57,7 +57,11 @@ export function LoyaltyTemplatePreview({
     >
       <div className="flex w-full max-w-[280px] flex-col overflow-hidden rounded-[8px] bg-white shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]">
         {headerType === 'IMAGE' && headerMediaUrl && (
-          <img src={headerMediaUrl} alt="header" className="h-[160px] w-full bg-[#f0f0f0] object-cover" />
+          <img
+            src={headerMediaUrl}
+            alt="header"
+            className="h-[160px] w-full bg-[#f0f0f0] object-cover"
+          />
         )}
         {headerType === 'VIDEO' && headerMediaUrl && (
           <video
@@ -82,9 +86,17 @@ export function LoyaltyTemplatePreview({
           {headerType === 'TEXT' && renderedHeader && (
             <div className="text-[0.875rem] font-semibold text-text-primary">{renderedHeader}</div>
           )}
-          {renderedBody && <div className="break-words whitespace-pre-wrap text-[0.875rem] text-text-primary">{renderedBody}</div>}
+          {renderedBody && (
+            <div className="break-words whitespace-pre-wrap text-[0.875rem] text-text-primary">
+              {renderedBody}
+            </div>
+          )}
           <div className="mt-[2px] flex items-end justify-between gap-[8px]">
-            {footerText && <span className="min-w-0 flex-1 break-words text-[0.75rem] text-text-muted">{footerText}</span>}
+            {footerText && (
+              <span className="min-w-0 flex-1 break-words text-[0.75rem] text-text-muted">
+                {footerText}
+              </span>
+            )}
             <span className="shrink-0 self-end text-[0.625rem] text-text-muted">12:18</span>
           </div>
         </div>

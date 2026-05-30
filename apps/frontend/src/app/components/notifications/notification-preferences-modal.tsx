@@ -332,7 +332,9 @@ function PageSection({ page, group, defaultOpen = false, children }: PageSection
       >
         <PageAvatar page={page} />
         <div className="min-w-0 flex-1">
-          <div className="text-[13.5px] font-medium leading-[1.25] text-text-primary">{display}</div>
+          <div className="text-[13.5px] font-medium leading-[1.25] text-text-primary">
+            {display}
+          </div>
           <div
             className="mt-[2px] text-[12px] text-text-tertiary"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
@@ -439,9 +441,7 @@ function ConfirmPopover({
             })}
       </div>
       {!single && (
-        <ul
-          className="m-0 mt-2 flex max-h-[120px] list-none flex-col gap-[6px] overflow-y-auto border-t border-border-subtle p-0 pt-2"
-        >
+        <ul className="m-0 mt-2 flex max-h-[120px] list-none flex-col gap-[6px] overflow-y-auto border-t border-border-subtle p-0 pt-2">
           {users.map((u) => (
             <li key={u.id} className="flex items-center gap-2 text-[12px]">
               <Avatar user={u} size={20} />
@@ -625,7 +625,12 @@ function Row({ page, group, type, members, preferences, pending, onStage }: RowP
             <MixedActivePill onUsers={onUsers} totalUsers={members.length} />
           )}
         </div>
-        <div className="mt-[2px] text-[12px] leading-[1.45] text-text-tertiary" style={{ textWrap: 'pretty' } as React.CSSProperties}>{optionSub}</div>
+        <div
+          className="mt-[2px] text-[12px] leading-[1.45] text-text-tertiary"
+          style={{ textWrap: 'pretty' } as React.CSSProperties}
+        >
+          {optionSub}
+        </div>
       </div>
       <ActionsRow
         status={status}
@@ -750,7 +755,9 @@ export function NotificationPreferencesModal({
             {t('notifications.eyebrow')}
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[16px] font-semibold leading-[1.3] text-text-primary">
-            <span className="font-normal text-text-secondary">{t('notifications.title_prefix')}</span>
+            <span className="font-normal text-text-secondary">
+              {t('notifications.title_prefix')}
+            </span>
             <UsersPopoverTrigger users={renderMembers} />
           </div>
         </div>

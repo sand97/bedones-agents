@@ -237,8 +237,7 @@ export function Sidebar() {
     navigate({ to: `/app/$orgSlug/${path}` as string, params: { orgSlug } })
   }
 
-  const sidebarWidthClass =
-    collapsed && isDesktop ? 'w-[68px]' : 'w-[260px]'
+  const sidebarWidthClass = collapsed && isDesktop ? 'w-[68px]' : 'w-[260px]'
   const sidebarMobileClass = !isDesktop
     ? !mobileMenuOpen
       ? '-translate-x-full transition-transform duration-300 ease-[ease] shadow-panel'
@@ -300,7 +299,9 @@ export function Sidebar() {
                     </span>
                     {!isCollapsed && <span className="flex-1 truncate">{label}</span>}
                     {!isCollapsed && badge ? (
-                      <span className="flex-shrink-0 min-w-[18px] h-[18px] px-[5px] rounded-pill bg-text-primary text-white text-[10px] font-semibold leading-[18px] text-center">{badge > 99 ? '99+' : badge}</span>
+                      <span className="flex-shrink-0 min-w-[18px] h-[18px] px-[5px] rounded-pill bg-text-primary text-white text-[10px] font-semibold leading-[18px] text-center">
+                        {badge > 99 ? '99+' : badge}
+                      </span>
                     ) : null}
                   </button>
                 )

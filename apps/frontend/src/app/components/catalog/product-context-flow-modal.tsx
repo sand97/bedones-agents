@@ -127,9 +127,15 @@ export function ProductContextFlowModal({
             />
           </div>
 
-          <div className="flex flex-col gap-3 p-4 flex-1 overflow-y-auto" style={{ maxHeight: 320 }}>
+          <div
+            className="flex flex-col gap-3 p-4 flex-1 overflow-y-auto"
+            style={{ maxHeight: 320 }}
+          >
             {prompt && (
-              <div className="px-[14px] py-3 rounded-xl bg-bg-subtle text-[13px] leading-[1.5] whitespace-pre-wrap" style={{ alignSelf: 'flex-end' }}>
+              <div
+                className="px-[14px] py-3 rounded-xl bg-bg-subtle text-[13px] leading-[1.5] whitespace-pre-wrap"
+                style={{ alignSelf: 'flex-end' }}
+              >
                 {prompt}
               </div>
             )}

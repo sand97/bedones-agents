@@ -45,12 +45,19 @@ export function CatalogQuickActions({
           className="flex-[0_0_280px] min-w-[280px] flex flex-row items-start gap-[12px] px-[16px] py-[14px] rounded-card border border-border-default bg-bg-surface text-left cursor-pointer transition duration-150 [scroll-snap-align:start] hover:border-border-strong hover:shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
           onClick={a.onClick}
         >
-          <span className="inline-flex items-center justify-center w-[36px] h-[36px] rounded-[8px] bg-bg-subtle text-text-primary flex-shrink-0" aria-hidden="true">
+          <span
+            className="inline-flex items-center justify-center w-[36px] h-[36px] rounded-[8px] bg-bg-subtle text-text-primary flex-shrink-0"
+            aria-hidden="true"
+          >
             {a.icon}
           </span>
           <span className="flex flex-col gap-[4px] min-w-0">
-            <span className="text-[14px] font-semibold text-text-primary leading-[1.3]">{a.title}</span>
-            <span className="text-[12px] text-text-muted leading-[1.4] [-webkit-line-clamp:2] [display:-webkit-box] [-webkit-box-orient:vertical] overflow-hidden">{a.subtitle}</span>
+            <span className="text-[14px] font-semibold text-text-primary leading-[1.3]">
+              {a.title}
+            </span>
+            <span className="text-[12px] text-text-muted leading-[1.4] [-webkit-line-clamp:2] [display:-webkit-box] [-webkit-box-orient:vertical] overflow-hidden">
+              {a.subtitle}
+            </span>
           </span>
         </button>
       ))}

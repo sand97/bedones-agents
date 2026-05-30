@@ -200,8 +200,12 @@ export function Hero() {
           <WhatsAppIcon className="w-[30px] h-[30px] max-[900px]:w-6 max-[900px]:h-6" />
         </span>
         {/* p4 — IG mid-right — hidden on <=768 */}
-        <span className="mk-float-logo ig p4 absolute w-16 h-16 rounded-sm border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] inline-flex items-center justify-center pointer-events-none will-change-transform text-white [top:50%] [right:5%] max-[900px]:w-[52px] max-[900px]:h-[52px] max-[768px]:hidden"
-          style={{ background: 'radial-gradient(circle at 30% 110%, #ffdc80 0%, #fcaf45 5%, #f77737 15%, #f56040 25%, #e1306c 45%, #c13584 60%, #833ab4 75%, #5851db 90%)' }}
+        <span
+          className="mk-float-logo ig p4 absolute w-16 h-16 rounded-sm border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] inline-flex items-center justify-center pointer-events-none will-change-transform text-white [top:50%] [right:5%] max-[900px]:w-[52px] max-[900px]:h-[52px] max-[768px]:hidden"
+          style={{
+            background:
+              'radial-gradient(circle at 30% 110%, #ffdc80 0%, #fcaf45 5%, #f77737 15%, #f56040 25%, #e1306c 45%, #c13584 60%, #833ab4 75%, #5851db 90%)',
+          }}
         >
           <InstagramIcon className="w-[30px] h-[30px] max-[900px]:w-6 max-[900px]:h-6" />
         </span>
@@ -214,8 +218,12 @@ export function Hero() {
           <WhatsAppIcon className="w-[30px] h-[30px] max-[900px]:w-6 max-[900px]:h-6" />
         </span>
         {/* p7 — IG bottom-center (mobile only) */}
-        <span className="mk-float-logo ig p7 absolute w-16 h-16 rounded-sm border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] pointer-events-none will-change-transform text-white hidden max-[768px]:inline-flex max-[768px]:[bottom:16px] max-[768px]:[left:calc(50%-26px)]"
-          style={{ background: 'radial-gradient(circle at 30% 110%, #ffdc80 0%, #fcaf45 5%, #f77737 15%, #f56040 25%, #e1306c 45%, #c13584 60%, #833ab4 75%, #5851db 90%)' }}
+        <span
+          className="mk-float-logo ig p7 absolute w-16 h-16 rounded-sm border border-[var(--mk-border)] [box-shadow:0_4px_12px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.04)] pointer-events-none will-change-transform text-white hidden max-[768px]:inline-flex max-[768px]:[bottom:16px] max-[768px]:[left:calc(50%-26px)]"
+          style={{
+            background:
+              'radial-gradient(circle at 30% 110%, #ffdc80 0%, #fcaf45 5%, #f77737 15%, #f56040 25%, #e1306c 45%, #c13584 60%, #833ab4 75%, #5851db 90%)',
+          }}
         >
           <InstagramIcon className="w-[30px] h-[30px]" />
         </span>
@@ -246,7 +254,8 @@ export function Hero() {
 
           <h1 className="text-[clamp(40px,6vw,72px)] mt-7 mb-[22px] mx-auto max-w-[720px] leading-[1.02] tracking-[-0.035em] font-[family-name:var(--mk-font-display)] font-bold max-[768px]:text-[38px] max-[768px]:mt-5 max-[768px]:mb-4">
             Votre assistant IA qui répond
-            <br className="max-[768px]:hidden" />à vos clients, <span className={MK_ACCENT}>24h/24.</span>
+            <br className="max-[768px]:hidden" />à vos clients,{' '}
+            <span className={MK_ACCENT}>24h/24.</span>
           </h1>
 
           <p className="text-[clamp(15px,1.4vw,17px)] text-[var(--mk-text-muted)] max-w-[540px] mx-auto mb-8 leading-[1.55] max-[768px]:text-[15px] max-[768px]:mb-6">
@@ -331,7 +340,8 @@ export function Hero() {
 
           {/* .mk-hero-proof — hidden on mobile */}
           <div className="text-[13px] text-[var(--mk-text-soft)] flex gap-[10px] justify-center items-center flex-wrap max-[768px]:hidden">
-            Rejoint par <strong className="text-[var(--mk-text)] font-semibold">500+ entrepreneurs</strong>
+            Rejoint par{' '}
+            <strong className="text-[var(--mk-text)] font-semibold">500+ entrepreneurs</strong>
             <span className="text-[var(--mk-border)]">·</span>
             Service client 24/7
             <span className="text-[var(--mk-border)]">·</span>

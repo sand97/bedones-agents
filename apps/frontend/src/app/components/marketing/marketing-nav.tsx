@@ -1,7 +1,14 @@
 import { Link } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { Menu, X } from 'lucide-react'
-import { MK_CONTAINER, MK_LOGO, MK_LOGO_MARK, MK_LOGO_SUFFIX, MK_BTN_PRIMARY, MK_BTN_SM } from './mk'
+import {
+  MK_CONTAINER,
+  MK_LOGO,
+  MK_LOGO_MARK,
+  MK_LOGO_SUFFIX,
+  MK_BTN_PRIMARY,
+  MK_BTN_SM,
+} from './mk'
 
 interface Props {
   current?: 'home' | 'pricing' | 'blog'
@@ -32,7 +39,9 @@ export function MarketingNav({ current }: Props) {
       ].join(' ')}
     >
       {/* .mk-nav-inner */}
-      <div className={`${MK_CONTAINER} flex items-center justify-between h-[72px] gap-6 max-[900px]:h-16`}>
+      <div
+        className={`${MK_CONTAINER} flex items-center justify-between h-[72px] gap-6 max-[900px]:h-16`}
+      >
         <Link to="/" className={MK_LOGO}>
           <span className={MK_LOGO_MARK}>B</span>
           <span>
@@ -73,17 +82,11 @@ export function MarketingNav({ current }: Props) {
         {/* .mk-nav-right */}
         <div className="flex items-center gap-[14px]">
           {/* .mk-login — hidden below 900 px */}
-          <Link
-            to="/auth/login"
-            className="text-[14.5px] font-medium max-[900px]:hidden"
-          >
+          <Link to="/auth/login" className="text-[14.5px] font-medium max-[900px]:hidden">
             Se connecter
           </Link>
           {/* mk-btn hidden below 900 px */}
-          <Link
-            to="/auth/login"
-            className={`${MK_BTN_PRIMARY} ${MK_BTN_SM} max-[900px]:hidden`}
-          >
+          <Link to="/auth/login" className={`${MK_BTN_PRIMARY} ${MK_BTN_SM} max-[900px]:hidden`}>
             Démarrer gratuitement
           </Link>
           {/* .mk-nav-toggle — shown below 900 px */}

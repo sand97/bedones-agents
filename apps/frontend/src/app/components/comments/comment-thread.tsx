@@ -491,21 +491,22 @@ function ThreadBlock({
           {thread.replies.map((reply, i) => {
             const isLast = i === thread.replies.length - 1
             return (
-            <div
-              key={reply.id}
-              className={isLast
-                ? 'relative flex items-start pt-[6px] before:content-[\'\'] before:absolute before:left-[-20px] before:top-0 before:h-[6px] before:w-[1.5px] before:bg-border-default after:content-[\'\'] after:absolute after:left-[-20px] after:top-[6px] after:h-3 after:w-4 after:border-l-[1.5px] after:border-b-[1.5px] after:border-border-default after:rounded-bl-lg after:bg-transparent'
-                : 'relative flex items-start pt-[6px] before:content-[\'\'] before:absolute before:left-[-20px] before:top-0 before:bottom-0 before:w-[1.5px] before:bg-border-default after:content-[\'\'] after:absolute after:left-[-20px] after:top-[18px] after:w-4 after:h-[1.5px] after:bg-border-default'
-              }
-            >
-              <CommentBubble
-                comment={reply}
-                provider={provider}
-                accountId={accountId}
-                isReply
-                userById={userById}
-              />
-            </div>
+              <div
+                key={reply.id}
+                className={
+                  isLast
+                    ? "relative flex items-start pt-[6px] before:content-[''] before:absolute before:left-[-20px] before:top-0 before:h-[6px] before:w-[1.5px] before:bg-border-default after:content-[''] after:absolute after:left-[-20px] after:top-[6px] after:h-3 after:w-4 after:border-l-[1.5px] after:border-b-[1.5px] after:border-border-default after:rounded-bl-lg after:bg-transparent"
+                    : "relative flex items-start pt-[6px] before:content-[''] before:absolute before:left-[-20px] before:top-0 before:bottom-0 before:w-[1.5px] before:bg-border-default after:content-[''] after:absolute after:left-[-20px] after:top-[18px] after:w-4 after:h-[1.5px] after:bg-border-default"
+                }
+              >
+                <CommentBubble
+                  comment={reply}
+                  provider={provider}
+                  accountId={accountId}
+                  isReply
+                  userById={userById}
+                />
+              </div>
             )
           })}
         </div>

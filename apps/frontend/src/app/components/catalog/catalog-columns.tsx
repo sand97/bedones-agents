@@ -20,7 +20,11 @@ export function useCatalogColumns(): ColumnsType<CatalogArticle> {
       ellipsis: true,
       render: (_: unknown, record: CatalogArticle) => (
         <div className="flex items-center gap-3">
-          <img src={record.imageUrl} alt={record.name} className="w-[44px] h-[44px] rounded-[8px] object-cover flex-shrink-0 bg-bg-subtle" />
+          <img
+            src={record.imageUrl}
+            alt={record.name}
+            className="w-[44px] h-[44px] rounded-[8px] object-cover flex-shrink-0 bg-bg-subtle"
+          />
           <div className="min-w-0">
             <div className="truncate text-sm font-medium text-text-primary">{record.name}</div>
             <div className="truncate text-xs text-text-muted">{record.description}</div>

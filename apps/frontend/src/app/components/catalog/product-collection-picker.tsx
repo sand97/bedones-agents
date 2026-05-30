@@ -249,7 +249,8 @@ export function ProductCollectionPicker({
 
 const chipImgCls = 'w-6 h-6 rounded-full object-cover flex-shrink-0 bg-bg-subtle'
 const chipLabelCls = 'text-xs text-text-primary whitespace-nowrap overflow-hidden text-ellipsis'
-const chipRemoveCls = 'w-[22px] h-[22px] min-w-[22px] p-0 inline-flex items-center justify-center text-text-muted'
+const chipRemoveCls =
+  'w-[22px] h-[22px] min-w-[22px] p-0 inline-flex items-center justify-center text-text-muted'
 
 function SelectedProductChip({
   name,
