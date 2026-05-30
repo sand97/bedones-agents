@@ -637,7 +637,7 @@ export function LoyaltyTemplateEditorModal({
                         danger
                         icon={<Trash2 size={14} />}
                         onClick={() => removeButton(i)}
-                        className="!h-input w-input min-w-input shrink-0 !p-0 inline-flex items-center justify-center"
+                        className="loyalty-template-button-delete"
                       />
                     </Space.Compact>
                     {hasFixedLabel && (

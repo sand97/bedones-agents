@@ -308,16 +308,13 @@ export function LoyaltyCampaignModal({
         )}
 
         <Form.Item label={t('loyalty.campaign_frequency')} required className="mb-4">
-          <div className="flex items-stretch gap-0 max-[640px]:flex-col">
+          <div className="loyalty-frequency-row">
             <Form.Item
               name="frequency"
               noStyle
               rules={[{ required: true, message: t('promotions.required') }]}
             >
-              <Select
-                options={FREQUENCY_OPTIONS}
-                className="w-[200px]! shrink-0 [&_.ant-select-selector]:!rounded-br-none [&_.ant-select-selector]:!rounded-tr-none max-[640px]:w-full! max-[640px]:[&_.ant-select-selector]:!rounded-bl-none max-[640px]:[&_.ant-select-selector]:!rounded-tl-control max-[640px]:[&_.ant-select-selector]:!rounded-tr-control [&.ant-select-focused_.ant-select-selector]:relative [&.ant-select-focused_.ant-select-selector]:z-[1] [&_.ant-select-selector:hover]:relative [&_.ant-select-selector:hover]:z-[1]"
-              />
+              <Select options={FREQUENCY_OPTIONS} className="loyalty-frequency-select" />
             </Form.Item>
             <Form.Item
               name="sendTime"
@@ -328,7 +325,7 @@ export function LoyaltyCampaignModal({
                 format="HH:mm"
                 minuteStep={5}
                 placeholder={t('loyalty.campaign_send_time_placeholder')}
-                className="w-full! flex-1 -ml-px !rounded-tl-none !rounded-bl-none !rounded-tr-control !rounded-br-control max-[640px]:ml-0 max-[640px]:-mt-px max-[640px]:!rounded-tl-none max-[640px]:!rounded-tr-none max-[640px]:!rounded-bl-control max-[640px]:!rounded-br-control"
+                className="loyalty-frequency-time"
                 allowClear={false}
               />
             </Form.Item>

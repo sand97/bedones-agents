@@ -42,7 +42,7 @@ export function PostList({ posts, selectedPostId, onSelect }: PostListProps) {
             key={post.id}
             type="button"
             onClick={() => onSelect(post)}
-            className={`flex items-center gap-3 px-4 py-3 border-none bg-transparent w-full text-left cursor-pointer transition-[background] duration-150 ease-out hover:bg-bg-subtle${isSelected ? ' bg-bg-subtle' : ''}`}
+            className={`comments-post-item ${isSelected ? 'comments-post-item--active' : ''}`}
           >
             <Badge dot={hasUnread} offset={[-4, 4]} color="#111b21">
               <PostAvatar post={post} />

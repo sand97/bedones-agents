@@ -10,7 +10,7 @@ interface StatCardProps {
 export function StatCard({ label, value, change, icon: Icon }: StatCardProps) {
   const isPositive = change >= 0
   return (
-    <div className="bg-bg-surface border border-border-subtle rounded-card p-5">
+    <div className="stats-card">
       <div className="flex items-center justify-between">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-bg-subtle">
           <Icon size={18} strokeWidth={1} />

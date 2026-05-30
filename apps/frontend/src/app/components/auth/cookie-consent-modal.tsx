@@ -35,11 +35,11 @@ export function CookieConsentModal({ open, onClose }: CookieConsentModalProps) {
           <Text type="secondary" className="text-sm leading-relaxed">
             Nous utilisons des cookies pour assurer le bon fonctionnement de la plateforme et
             am&eacute;liorer votre exp&eacute;rience. Consultez nos{' '}
-            <a href="/legal/mentions" className="hover:underline text-text-primary">
+            <a href="/legal/mentions" className="link-underline-hover text-text-primary">
               mentions l&eacute;gales
             </a>{' '}
             et notre{' '}
-            <a href="/legal/privacy" className="hover:underline text-text-primary">
+            <a href="/legal/privacy" className="link-underline-hover text-text-primary">
               politique de confidentialit&eacute;
             </a>{' '}
             pour en savoir plus.

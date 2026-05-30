@@ -156,13 +156,13 @@ function StatsPage() {
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-4 lg:mb-6 max-[1023px]:grid-cols-1">
+        <div className="stats-grid mb-4 lg:mb-6">
           {overviewCards.map((s) => (
             <StatCard key={s.label} {...s} />
           ))}
         </div>
 
-        <div className="mb-4 lg:mb-6 bg-bg-surface border border-border-subtle rounded-card p-5">
+        <div className="mb-4 lg:mb-6 stats-card">
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <div className="flex gap-2">
               {(Object.keys(PERIOD_CONFIG) as Period[]).map((p) => (
@@ -170,7 +170,7 @@ function StatsPage() {
                   key={p}
                   type="button"
                   onClick={() => setPeriod(p)}
-                  className={`px-4 py-[6px] rounded-full border border-border-default bg-bg-surface text-text-secondary text-[13px] font-medium cursor-pointer transition duration-150 hover:bg-bg-subtle hover:border-[#b3b3b3] ${period === p ? 'bg-text-primary border-text-primary text-white hover:bg-[#333] hover:border-[#333]' : ''}`}
+                  className={`stats-period-btn ${period === p ? 'stats-period-btn--active' : ''}`}
                 >
                   {PERIOD_CONFIG[p].label}
                 </button>

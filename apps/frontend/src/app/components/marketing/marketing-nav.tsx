@@ -1,14 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { Menu, X } from 'lucide-react'
-import {
-  MK_CONTAINER,
-  MK_LOGO,
-  MK_LOGO_MARK,
-  MK_LOGO_SUFFIX,
-  MK_BTN_PRIMARY,
-  MK_BTN_SM,
-} from './mk'
 
 interface Props {
   current?: 'home' | 'pricing' | 'blog'
@@ -27,71 +19,37 @@ export function MarketingNav({ current }: Props) {
   }, [])
 
   return (
-    <header
-      ref={navRef}
-      className={[
-        // .mk-nav
-        'sticky top-0 z-50 border-b transition-[box-shadow,border-color,background] duration-200 ease-[ease]',
-        scrolled
-          ? // .mk-nav.scrolled
-            'bg-[rgba(250,250,250,0.94)] [box-shadow:var(--mk-shadow-nav)] border-[var(--mk-border)]'
-          : 'bg-[rgba(250,250,250,0.85)] backdrop-blur-[10px] [-webkit-backdrop-filter:blur(10px)] border-transparent',
-      ].join(' ')}
-    >
-      {/* .mk-nav-inner */}
-      <div
-        className={`${MK_CONTAINER} flex items-center justify-between h-[72px] gap-6 max-[900px]:h-16`}
-      >
-        <Link to="/" className={MK_LOGO}>
-          <span className={MK_LOGO_MARK}>B</span>
+    <header ref={navRef} className={`mk-nav${scrolled ? ' scrolled' : ''}`}>
+      <div className="mk-container mk-nav-inner">
+        <Link to="/" className="mk-logo">
+          <span className="mk-logo-mark">B</span>
           <span>
-            Bedones <span className={MK_LOGO_SUFFIX}>/ Moderator</span>
+            Bedones <span className="mk-logo-suffix">/ Moderator</span>
           </span>
         </Link>
-
-        {/* .mk-nav-links — hidden below 900 px */}
-        <nav className="flex gap-8 items-center max-[900px]:hidden">
-          <Link
-            to="/"
-            hash="features"
-            className={`text-[14.5px] font-medium text-[var(--mk-text)] transition-opacity duration-150 hover:opacity-100 ${current === 'home' ? 'opacity-100 font-semibold' : 'opacity-85'}`}
-          >
+        <nav className="mk-nav-links">
+          <Link to="/" hash="features" className={current === 'home' ? 'active' : ''}>
             Fonctionnalités
           </Link>
-          <Link
-            to="/"
-            hash="how"
-            className="text-[14.5px] font-medium text-[var(--mk-text)] opacity-85 transition-opacity duration-150 hover:opacity-100"
-          >
+          <Link to="/" hash="how">
             Comment ça marche
           </Link>
-          <Link
-            to="/pricing"
-            className={`text-[14.5px] font-medium text-[var(--mk-text)] transition-opacity duration-150 hover:opacity-100 ${current === 'pricing' ? 'opacity-100 font-semibold' : 'opacity-85'}`}
-          >
+          <Link to="/pricing" className={current === 'pricing' ? 'active' : ''}>
             Tarifs
           </Link>
-          <Link
-            to="/blog"
-            className={`text-[14.5px] font-medium text-[var(--mk-text)] transition-opacity duration-150 hover:opacity-100 ${current === 'blog' ? 'opacity-100 font-semibold' : 'opacity-85'}`}
-          >
+          <Link to="/blog" className={current === 'blog' ? 'active' : ''}>
             Blog
           </Link>
         </nav>
-
-        {/* .mk-nav-right */}
-        <div className="flex items-center gap-[14px]">
-          {/* .mk-login — hidden below 900 px */}
-          <Link to="/auth/login" className="text-[14.5px] font-medium max-[900px]:hidden">
+        <div className="mk-nav-right">
+          <Link to="/auth/login" className="mk-login">
             Se connecter
           </Link>
-          {/* mk-btn hidden below 900 px */}
-          <Link to="/auth/login" className={`${MK_BTN_PRIMARY} ${MK_BTN_SM} max-[900px]:hidden`}>
+          <Link to="/auth/login" className="mk-btn mk-btn-primary mk-btn-sm">
             Démarrer gratuitement
           </Link>
-          {/* .mk-nav-toggle — shown below 900 px */}
           <button
-            className="hidden max-[900px]:inline-flex w-10 h-10 items-center justify-center rounded-[999px] text-[var(--mk-text)]"
+            className="mk-nav-toggle"
             aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'}
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
@@ -100,63 +58,29 @@ export function MarketingNav({ current }: Props) {
           </button>
         </div>
       </div>
-
-      {/* .mk-mobile-menu — shown when open */}
-      {open && (
-        <div className="flex flex-col gap-3 border-t border-[var(--mk-border)] bg-white px-6 py-4 pb-5">
-          <Link
-            to="/"
-            onClick={() => setOpen(false)}
-            className="text-base font-medium text-[var(--mk-text)] py-2 border-b border-[var(--mk-border-soft)]"
-          >
-            Accueil
-          </Link>
-          <Link
-            to="/"
-            hash="features"
-            onClick={() => setOpen(false)}
-            className="text-base font-medium text-[var(--mk-text)] py-2 border-b border-[var(--mk-border-soft)]"
-          >
-            Fonctionnalités
-          </Link>
-          <Link
-            to="/"
-            hash="how"
-            onClick={() => setOpen(false)}
-            className="text-base font-medium text-[var(--mk-text)] py-2 border-b border-[var(--mk-border-soft)]"
-          >
-            Comment ça marche
-          </Link>
-          <Link
-            to="/pricing"
-            onClick={() => setOpen(false)}
-            className="text-base font-medium text-[var(--mk-text)] py-2 border-b border-[var(--mk-border-soft)]"
-          >
-            Tarifs
-          </Link>
-          <Link
-            to="/blog"
-            onClick={() => setOpen(false)}
-            className="text-base font-medium text-[var(--mk-text)] py-2 border-b border-[var(--mk-border-soft)]"
-          >
-            Blog
-          </Link>
-          <Link
-            to="/auth/login"
-            onClick={() => setOpen(false)}
-            className="text-base font-medium text-[var(--mk-text)] py-2"
-          >
-            Se connecter
-          </Link>
-          <Link
-            to="/auth/login"
-            className={`${MK_BTN_PRIMARY} mt-2 w-full`}
-            onClick={() => setOpen(false)}
-          >
-            Démarrer gratuitement
-          </Link>
-        </div>
-      )}
+      <div className={`mk-mobile-menu${open ? ' open' : ''}`}>
+        <Link to="/" onClick={() => setOpen(false)}>
+          Accueil
+        </Link>
+        <Link to="/" hash="features" onClick={() => setOpen(false)}>
+          Fonctionnalités
+        </Link>
+        <Link to="/" hash="how" onClick={() => setOpen(false)}>
+          Comment ça marche
+        </Link>
+        <Link to="/pricing" onClick={() => setOpen(false)}>
+          Tarifs
+        </Link>
+        <Link to="/blog" onClick={() => setOpen(false)}>
+          Blog
+        </Link>
+        <Link to="/auth/login" onClick={() => setOpen(false)}>
+          Se connecter
+        </Link>
+        <Link to="/auth/login" className="mk-btn mk-btn-primary" onClick={() => setOpen(false)}>
+          Démarrer gratuitement
+        </Link>
+      </div>
     </header>
   )
 }

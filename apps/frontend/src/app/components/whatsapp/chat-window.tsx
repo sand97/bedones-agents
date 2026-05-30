@@ -105,9 +105,9 @@ function LazyVideo({ src, onPlay }: { src?: string; onPlay?: () => void }) {
           }
         }}
         aria-label="Lire la vidéo"
-        className="relative flex w-full items-center justify-center aspect-video bg-bg-muted rounded-control cursor-pointer outline-none focus-visible:shadow-[0_0_0_2px_var(--color-text-primary)]"
+        className="chat-video-placeholder"
       >
-        <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-black/60 text-white">
+        <span className="chat-video-placeholder__play">
           <Play size={20} />
         </span>
       </div>
@@ -253,7 +253,6 @@ function AudioPlayer({
 
 function ReplyContextBubble({
   replyTo,
-  isOutgoing,
   onClick,
 }: {
   replyTo: Message['replyTo']
@@ -268,7 +267,7 @@ function ReplyContextBubble({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
-      className={`w-full border-l-2 border-[rgba(17,27,33,0.3)] rounded-[18px_18px_4px_4px] px-[10px] py-[6px] text-xs text-left transition-[background] duration-150 mb-1 cursor-pointer ${isOutgoing ? 'bg-[rgba(17,27,33,0.06)] hover:bg-[rgba(17,27,33,0.1)]' : 'bg-bg-subtle hover:bg-bg-muted'}`}
+      className="chat-reply-context mb-1 cursor-pointer"
     >
       <div className="font-semibold text-text-primary">
         {replyTo.from === 'business' ? 'Vous' : 'Client'}
@@ -514,8 +513,8 @@ function MessageBubble({
       case 'image':
         return (
           <div>
-            <div className="relative aspect-[4/3] [&:has(img[src])]:aspect-auto [&:has(video[src])]:aspect-auto bg-bg-muted rounded-control overflow-hidden">
-              <div className="absolute inset-0 flex items-center justify-center z-0 text-text-muted opacity-30">
+            <div className="chat-media-container">
+              <div className="chat-media-placeholder">
                 <ImageIcon size={32} />
               </div>
               <img
@@ -766,9 +765,9 @@ function MessageBubble({
         )}
         {renderContent()}
         {message.reactions && message.reactions.length > 0 && (
-          <div className="absolute -bottom-[10px] left-2 flex gap-0.5 bg-[var(--color-bg-elevated,#fff)] rounded-full px-1 py-px shadow-[0_1px_3px_rgba(0,0,0,0.12)] z-[1]">
+          <div className="chat-reactions">
             {message.reactions.map((r, i) => (
-              <span key={i} className="text-sm leading-none">
+              <span key={i} className="chat-reaction">
                 {r.emoji}
               </span>
             ))}
@@ -1145,7 +1144,7 @@ export function ChatWindow({
 
       {/* Sticky pinned ticket — most recent active */}
       {activeTicket && (
-        <div className="flex-shrink-0 flex flex-col bg-bg-surface sticky top-0 z-[5]">
+        <div className="ticket-sticky-bar">
           <TicketCard ticket={activeTicket} onClick={openTicket} />
         </div>
       )}

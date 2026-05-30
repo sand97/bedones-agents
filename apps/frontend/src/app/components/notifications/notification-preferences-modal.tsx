@@ -102,7 +102,7 @@ function splitByStatus(
 function Avatar({ user, size = 28 }: { user: NotifMember; size?: number }) {
   return (
     <span
-      className="inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white"
+      className="notif-modal__avatar"
       style={{
         width: size,
         height: size,
@@ -137,7 +137,7 @@ function AvatarStack({
   const shown = users.slice(0, max)
   const overflow = users.length - shown.length
   return (
-    <span className="inline-flex items-center">
+    <span className="notif-modal__avatar-stack">
       {shown.map((u, i) => (
         <span key={u.id} style={{ marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i }}>
           <Avatar user={u} size={size} />
@@ -145,15 +145,13 @@ function AvatarStack({
       ))}
       {overflow > 0 && (
         <span
-          className="inline-flex shrink-0 items-center justify-center rounded-full font-semibold"
+          className="notif-modal__avatar notif-modal__avatar--more"
           style={{
             width: size,
             height: size,
             marginLeft: -8,
             boxShadow: '0 0 0 2px var(--color-bg-surface)',
             fontSize: Math.max(9, Math.round(size * 0.34)),
-            background: 'var(--color-bg-muted)',
-            color: 'var(--color-text-secondary)',
           }}
         >
           +{overflow}
@@ -167,7 +165,7 @@ function MiniStack({ users, max = 3 }: { users: NotifMember[]; max?: number }) {
   const shown = users.slice(0, max)
   const overflow = users.length - shown.length
   return (
-    <span className="inline-flex">
+    <span className="notif-modal__stack-mini">
       {shown.map((u, i) => (
         <span key={u.id} style={{ marginLeft: i === 0 ? 0 : -6 }}>
           <Avatar user={u} size={16} />
@@ -175,15 +173,13 @@ function MiniStack({ users, max = 3 }: { users: NotifMember[]; max?: number }) {
       ))}
       {overflow > 0 && (
         <span
-          className="inline-flex shrink-0 items-center justify-center rounded-full font-semibold"
+          className="notif-modal__avatar notif-modal__avatar--more"
           style={{
             width: 16,
             height: 16,
             marginLeft: -6,
             fontSize: 8,
             boxShadow: '0 0 0 1.5px var(--color-bg-surface)',
-            background: 'var(--color-bg-muted)',
-            color: 'var(--color-text-secondary)',
           }}
         >
           +{overflow}
@@ -202,18 +198,18 @@ function UsersPopoverTrigger({ users }: { users: NotifMember[] }) {
 
   const popover = (
     <div style={{ minWidth: 240 }}>
-      <div className="px-2 pb-2 pt-[6px] text-[11px] font-medium uppercase tracking-[0.15em] text-text-tertiary">
+      <div className="notif-modal__users-pop-head">
         {users.length === 1
           ? t('notifications.selected_member')
           : t('notifications.selected_members')}
       </div>
-      <ul className="m-0 list-none p-0">
+      <ul className="notif-modal__users-pop-list">
         {users.map((u) => (
-          <li key={u.id} className="flex items-center gap-[10px] rounded-lg p-2 hover:bg-bg-subtle">
+          <li key={u.id}>
             <Avatar user={u} size={28} />
             <div style={{ minWidth: 0 }}>
-              <div className="text-[13px] font-medium text-text-primary">{u.name}</div>
-              {u.email && <div className="text-[11px] text-text-tertiary">{u.email}</div>}
+              <div className="notif-modal__users-pop-name">{u.name}</div>
+              {u.email && <div className="notif-modal__users-pop-mail">{u.email}</div>}
             </div>
           </li>
         ))}
@@ -229,22 +225,16 @@ function UsersPopoverTrigger({ users }: { users: NotifMember[] }) {
       open={open}
       onOpenChange={setOpen}
     >
-      <button
-        type="button"
-        className={
-          'inline-flex cursor-pointer items-center gap-2 rounded-pill border border-transparent bg-bg-subtle py-1 pl-1 pr-[10px] text-[13px] font-semibold text-text-primary transition-[background,border-color] duration-150 ' +
-          (open ? 'bg-bg-muted' : 'hover:bg-bg-muted')
-        }
-      >
+      <button type="button" className={'notif-modal__users-trigger ' + (open ? 'is-open' : '')}>
         {single ? (
           <>
             <Avatar user={users[0]} size={26} />
-            <span className="text-[13px]">{users[0].name}</span>
+            <span className="notif-modal__users-trigger-name">{users[0].name}</span>
           </>
         ) : (
           <>
             <AvatarStack users={users} size={26} max={4} />
-            <span className="text-[13px]">
+            <span className="notif-modal__users-trigger-name">
               {t('notifications.members_count', { count: users.length })}
             </span>
           </>
@@ -260,10 +250,7 @@ function UsersPopoverTrigger({ users }: { users: NotifMember[] }) {
 function PageAvatar({ page }: { page: NotifSocialAccount }) {
   const display = page.pageName || page.username || page.providerAccountId
   return (
-    <span
-      className="inline-flex shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white"
-      style={{ width: 36, height: 36, background: toneFor(page.id) }}
-    >
+    <span className="notif-modal__pageavatar" style={{ background: toneFor(page.id) }}>
       {page.profilePictureUrl ? (
         <img
           src={page.profilePictureUrl}
@@ -322,37 +309,29 @@ function PageSection({ page, group, defaultOpen = false, children }: PageSection
   const display = page.pageName || page.username || page.providerAccountId
 
   return (
-    <div className="border-t border-border-subtle first:border-t-0">
+    <div className="notif-modal__pageblock">
       <button
         type="button"
-        className="flex w-full cursor-pointer items-center gap-3 bg-bg-surface px-5 py-[14px] text-left font-[inherit] text-[inherit] transition-[background] duration-[120ms] hover:bg-bg-subtle"
-        style={{ border: 0 }}
+        className="notif-modal__section"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
       >
         <PageAvatar page={page} />
-        <div className="min-w-0 flex-1">
-          <div className="text-[13.5px] font-medium leading-[1.25] text-text-primary">
-            {display}
-          </div>
+        <div className="notif-modal__section-text">
+          <div className="notif-modal__section-name">{display}</div>
           <div
-            className="mt-[2px] text-[12px] text-text-tertiary"
+            className="notif-modal__section-meta"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
             <Icon provider={page.provider} size={12} />
             {subLabel}
           </div>
         </div>
-        <span
-          className={
-            'inline-flex shrink-0 items-center justify-center text-text-tertiary transition-transform duration-[180ms] ease-in-out ' +
-            (open ? 'rotate-180' : '')
-          }
-        >
+        <span className={'notif-modal__section-chevron ' + (open ? 'is-open' : '')}>
           <ChevronDown size={16} strokeWidth={1.75} />
         </span>
       </button>
-      {open && <div className="border-t border-border-subtle pb-2">{children}</div>}
+      {open && <div className="notif-modal__pageblock-body">{children}</div>}
     </div>
   )
 }
@@ -363,17 +342,15 @@ function MixedActivePill({ onUsers, totalUsers }: { onUsers: NotifMember[]; tota
   const { t } = useTranslation()
   const popover = (
     <div style={{ minWidth: 220 }}>
-      <div className="px-2 pb-2 pt-[6px] text-[11px] font-medium uppercase tracking-[0.15em] text-text-tertiary">
-        {t('notifications.active_for_label')}
-      </div>
-      <ul className="m-0 list-none p-0">
+      <div className="notif-modal__users-pop-head">{t('notifications.active_for_label')}</div>
+      <ul className="notif-modal__users-pop-list">
         {onUsers.length === 0 && (
           <li style={{ color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>
             {t('notifications.active_for_no_member')}
           </li>
         )}
         {onUsers.map((u) => (
-          <li key={u.id} className="flex items-center gap-[10px] rounded-lg p-2 hover:bg-bg-subtle">
+          <li key={u.id}>
             <Avatar user={u} size={22} />
             <span style={{ fontSize: 12.5, color: 'var(--color-text-primary)' }}>{u.name}</span>
           </li>
@@ -384,11 +361,7 @@ function MixedActivePill({ onUsers, totalUsers }: { onUsers: NotifMember[]; tota
 
   return (
     <Popover content={popover} trigger="click" placement="bottom">
-      <button
-        type="button"
-        className="ml-2 inline-flex h-5 cursor-pointer items-center gap-[6px] rounded-pill border border-border-default bg-bg-subtle px-2 align-middle text-[10.5px] font-normal text-text-secondary transition-[background,border-color] duration-150 hover:border-border-strong hover:bg-bg-muted"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <button type="button" className="notif-modal__mixedpill" onClick={(e) => e.stopPropagation()}>
         <span>{t('notifications.active_for', { on: onUsers.length, total: totalUsers })}</span>
         <ChevronDown size={11} strokeWidth={1.5} />
       </button>
@@ -423,10 +396,10 @@ function ConfirmPopover({
   const single = users.length === 1
   const content = (
     <div style={{ width: 280 }}>
-      <div className="mb-[6px] text-[13px] font-semibold leading-[1.35] text-text-primary">
+      <div className="notif-modal__confirm-title">
         {t('notifications.confirm_title', { label: optionLabel })}
       </div>
-      <div className="text-[12px] leading-[1.5] text-text-secondary">
+      <div className="notif-modal__confirm-body">
         {single
           ? t('notifications.confirm_body_single', {
               name: users[0]?.name ?? '',
@@ -441,9 +414,9 @@ function ConfirmPopover({
             })}
       </div>
       {!single && (
-        <ul className="m-0 mt-2 flex max-h-[120px] list-none flex-col gap-[6px] overflow-y-auto border-t border-border-subtle p-0 pt-2">
+        <ul className="notif-modal__confirm-users">
           {users.map((u) => (
-            <li key={u.id} className="flex items-center gap-2 text-[12px]">
+            <li key={u.id}>
               <Avatar user={u} size={20} />
               <span>{u.name}</span>
             </li>
@@ -453,8 +426,9 @@ function ConfirmPopover({
       <div style={{ marginTop: 12, display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
         <button
           type="button"
-          className="inline-flex h-[30px] cursor-pointer items-center gap-[6px] rounded-lg border border-border-default bg-bg-surface px-[10px] text-[12px] font-medium text-text-primary transition-[background,border-color] duration-150 hover:border-text-primary hover:bg-bg-subtle"
+          className="notif-modal__actionbtn"
           onClick={onClose}
+          style={{ height: 30 }}
         >
           {t('common.cancel')}
         </button>
@@ -532,7 +506,7 @@ function ActionsRow({
     <button
       type="button"
       key="activate"
-      className="inline-flex h-[30px] cursor-pointer items-center gap-[6px] rounded-lg border border-border-default bg-bg-surface px-[10px] text-[12px] font-medium text-text-primary transition-[background,border-color] duration-150 hover:border-text-primary hover:bg-bg-subtle"
+      className="notif-modal__actionbtn"
       onClick={() => onActivate(activateTargets.map((u) => u.id))}
     >
       <Plus size={12} strokeWidth={2} />
@@ -561,7 +535,7 @@ function ActionsRow({
     >
       <button
         type="button"
-        className="inline-flex h-[30px] cursor-pointer items-center gap-[6px] rounded-lg border border-danger-border bg-bg-surface px-[10px] text-[12px] font-medium text-danger transition-[background,border-color,color] duration-150 hover:border-danger hover:bg-danger-bg hover:text-danger-hover"
+        className="notif-modal__actionbtn notif-modal__actionbtn--danger"
         onClick={() => setConfirmOpen(true)}
       >
         <Minus size={12} strokeWidth={2} />
@@ -576,11 +550,11 @@ function ActionsRow({
   )
 
   if (hasActivate && !hasDeactivate)
-    return <div className="mt-[10px] flex flex-wrap items-center gap-2">{activateBtn}</div>
+    return <div className="notif-modal__actions">{activateBtn}</div>
   if (!hasActivate && hasDeactivate)
-    return <div className="mt-[10px] flex flex-wrap items-center gap-2">{deactivateBtn}</div>
+    return <div className="notif-modal__actions">{deactivateBtn}</div>
   return (
-    <div className="mt-[10px] flex flex-wrap items-center gap-2">
+    <div className="notif-modal__actions">
       {activateBtn}
       {deactivateBtn}
     </div>
@@ -617,20 +591,15 @@ function Row({ page, group, type, members, preferences, pending, onStage }: RowP
   const pageLabel = page.pageName || page.username || page.providerAccountId
 
   return (
-    <div className="px-5 py-3 pb-[14px]">
-      <div className="min-w-0 flex-1">
-        <div className="text-[13.5px] font-medium leading-[1.4] text-text-primary">
+    <div className="notif-modal__row">
+      <div className="notif-modal__row-text">
+        <div className="notif-modal__row-label">
           {optionLabel}
           {status === 'mixed' && members.length > 1 && (
             <MixedActivePill onUsers={onUsers} totalUsers={members.length} />
           )}
         </div>
-        <div
-          className="mt-[2px] text-[12px] leading-[1.45] text-text-tertiary"
-          style={{ textWrap: 'pretty' } as React.CSSProperties}
-        >
-          {optionSub}
-        </div>
+        <div className="notif-modal__row-sub">{optionSub}</div>
       </div>
       <ActionsRow
         status={status}
@@ -748,22 +717,20 @@ export function NotificationPreferencesModal({
       destroyOnClose
       className="notif-modal"
     >
-      <div className="flex items-start gap-3 border-b border-border-subtle px-5 pb-[14px] pt-[18px]">
-        <div className="min-w-0 flex-1">
-          <div className="mb-[6px] inline-flex items-center gap-[6px] text-[11px] font-medium uppercase tracking-[0.15em] text-text-tertiary">
+      <div className="notif-modal__head">
+        <div className="notif-modal__head-text">
+          <div className="notif-modal__eyebrow">
             <Bell size={12} strokeWidth={1.25} />
             {t('notifications.eyebrow')}
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-[16px] font-semibold leading-[1.3] text-text-primary">
-            <span className="font-normal text-text-secondary">
-              {t('notifications.title_prefix')}
-            </span>
+          <div className="notif-modal__title">
+            <span className="notif-modal__title-prefix">{t('notifications.title_prefix')}</span>
             <UsersPopoverTrigger users={renderMembers} />
           </div>
         </div>
         <button
           type="button"
-          className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border-default bg-transparent text-text-secondary transition-[background] duration-150 hover:bg-bg-subtle hover:text-text-primary"
+          className="notif-modal__close"
           aria-label={t('common.cancel')}
           onClick={onClose}
         >
@@ -771,7 +738,7 @@ export function NotificationPreferencesModal({
         </button>
       </div>
 
-      <div className="max-h-[60vh] overflow-y-auto p-0">
+      <div className="notif-modal__body">
         {query.isLoading && (
           <div style={{ padding: 40, textAlign: 'center' }}>
             <Spin />
@@ -820,11 +787,11 @@ export function NotificationPreferencesModal({
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-border-subtle bg-bg-surface px-5 py-3">
+      <div className="notif-modal__foot">
         <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
           <button
             type="button"
-            className="inline-flex h-[30px] cursor-pointer items-center gap-[6px] rounded-lg border border-border-default bg-bg-surface px-[10px] text-[12px] font-medium text-text-primary transition-[background,border-color] duration-150 hover:border-text-primary hover:bg-bg-subtle"
+            className="notif-modal__actionbtn"
             onClick={onClose}
             disabled={saving}
           >
@@ -832,7 +799,7 @@ export function NotificationPreferencesModal({
           </button>
           <button
             type="button"
-            className="inline-flex h-[30px] cursor-pointer items-center gap-[6px] rounded-lg border border-border-default bg-bg-surface px-[10px] text-[12px] font-medium text-text-primary transition-[background,border-color] duration-150 hover:border-text-primary hover:bg-bg-subtle"
+            className="notif-modal__actionbtn"
             onClick={handleSave}
             disabled={saving || dirtyCount === 0}
             style={{

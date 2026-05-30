@@ -132,7 +132,7 @@ export function SetupCarousel({
   const isLast = current === steps.length - 1
 
   return (
-    <div className="bg-white border border-border-default rounded-[16px] pt-8 px-6 pb-0 max-w-[560px] w-full mx-auto">
+    <div className="dashboard-setup-card">
       <Carousel
         ref={carouselRef}
         dots={false}
@@ -146,8 +146,8 @@ export function SetupCarousel({
         ))}
       </Carousel>
 
-      <div className="flex items-center justify-between border-t border-border-subtle pt-4 pb-4 mt-2">
-        <div className="text-xs text-text-muted">
+      <div className="dashboard-setup-card__footer">
+        <div className="dashboard-setup-card__count">
           {t('dashboard.step_progress', { current: current + 1, total: steps.length })}
         </div>
         <div className="flex items-center gap-2">
@@ -178,8 +178,8 @@ export function SetupCarousel({
 
 function StepBody({ step, isCompleted }: { step: SetupStep; isCompleted: boolean }) {
   return (
-    <div className="flex flex-col items-center gap-3 px-3 pb-6 pt-2 text-center">
-      <div className="flex items-center justify-center" style={{ color: step.iconColor }}>
+    <div className="dashboard-setup-card__body">
+      <div className="dashboard-setup-card__icon" style={{ color: step.iconColor }}>
         {step.pageAvatarUrl ? (
           <Avatar
             size={56}
