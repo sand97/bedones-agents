@@ -47,6 +47,10 @@ export class ImageProcessingModule implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
+    const disableCatalogIndexing = process.env.DISABLE_CATALOG_INDEXING === 'true'
+    if (disableCatalogIndexing) {
+      return
+    }
     try {
       // Find all catalogs with a Meta providerId that haven't been fully indexed yet.
       // This covers: PENDING, ANALYZING (interrupted), INDEXING (interrupted), COMPLETED but 0 indexed.
