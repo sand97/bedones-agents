@@ -20,6 +20,8 @@ Règle de décision unique : **« Est-ce que je style un composant *système* (A
   3. **Le style global / reset** de l'application (`body`, `html`, `*`, focus) et tout réglage commun à toute l'app.
   4. **Les animations globales** (`@keyframes`) et les systèmes d'animation réutilisés (ex. scroll-reveal).
 
+- **Organisation : `styles.css` n'est qu'un point d'entrée.** Le fichier `apps/frontend/src/styles.css` ne contient plus que `@import 'tailwindcss'` puis les `@import './styles/*.css'`. Le CSS autorisé (cf. ci-dessus) est découpé **par concern / feature** dans le dossier `apps/frontend/src/styles/` : `theme.css` (le bloc `@theme`), `base.css` (reset global), `antd.css` (overrides `.ant-…`), `animations.css` (`@keyframes` + scroll-reveal), et un fichier par domaine pour le CSS système restant (`layout.css`, `comments.css`, `chat.css`, `tickets.css`, `catalog.css`, `pages.css`, `marketing.css`, `auth.css`). Quand tu ajoutes du CSS autorisé, écris-le dans le partial correspondant (et ajoute son `@import` dans `styles.css` si tu crées un nouveau partial) — **ne recrée jamais un gros fichier monolithique**.
+
 - **En résumé.** Tu modifies l'apparence d'un composant Antd ou un réglage global → `styles.css`. Tu construis/styles ton propre composant → Tailwind dans le composant. Ne **jamais** accumuler du CSS de composants maison dans `styles.css` — c'est exactement ce qui l'a fait gonfler.
 
 ## Fichiers protégés (ne pas modifier)
