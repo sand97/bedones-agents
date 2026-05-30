@@ -125,7 +125,7 @@ export function ProductCollectionPicker({
           onChange={(e) => setSearch(e.target.value)}
         />
         {selected.length > 0 && (
-          <div className="flex flex-row items-center gap-2 overflow-x-auto overflow-y-hidden px-1 py-3 pb-5 -my-3 [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]">
+          <div className="picker-selected-strip">
             {selected.map((s) =>
               s.kind === 'product' ? (
                 <SelectedProductChip
@@ -247,11 +247,6 @@ export function ProductCollectionPicker({
   )
 }
 
-const chipImgCls = 'w-6 h-6 rounded-full object-cover flex-shrink-0 bg-bg-subtle'
-const chipLabelCls = 'text-xs text-text-primary whitespace-nowrap overflow-hidden text-ellipsis'
-const chipRemoveCls =
-  'w-[22px] h-[22px] min-w-[22px] p-0 inline-flex items-center justify-center text-text-muted'
-
 function SelectedProductChip({
   name,
   imageUrl,
@@ -262,21 +257,21 @@ function SelectedProductChip({
   onRemove: () => void
 }) {
   return (
-    <div className="flex-none inline-flex items-center gap-2 px-1.5 py-1 pl-[6px] max-w-[220px] rounded-full border border-border-default bg-bg-surface">
+    <div className="picker-selected-chip">
       {imageUrl ? (
-        <img src={imageUrl} alt="" className={chipImgCls} />
+        <img src={imageUrl} alt="" className="picker-selected-chip__img" />
       ) : (
-        <div className={`${chipImgCls} inline-flex items-center justify-center`}>
+        <div className="picker-selected-chip__img picker-selected-chip__img--placeholder">
           <ShoppingBag size={14} className="text-text-muted" />
         </div>
       )}
-      <span className={chipLabelCls}>{name}</span>
+      <span className="picker-selected-chip__label">{name}</span>
       <Button
         type="text"
         size="small"
         icon={<X size={14} />}
         onClick={onRemove}
-        className={chipRemoveCls}
+        className="picker-selected-chip__remove"
         aria-label="Retirer"
       />
     </div>
@@ -285,17 +280,17 @@ function SelectedProductChip({
 
 function SelectedCollectionChip({ name, onRemove }: { name: string; onRemove: () => void }) {
   return (
-    <div className="flex-none inline-flex items-center gap-2 px-1.5 py-1 pl-[6px] max-w-[220px] rounded-full border border-border-default bg-bg-surface">
-      <div className={`${chipImgCls} inline-flex items-center justify-center`}>
+    <div className="picker-selected-chip">
+      <div className="picker-selected-chip__img picker-selected-chip__img--placeholder">
         <Layers size={14} className="text-text-muted" />
       </div>
-      <span className={chipLabelCls}>{name}</span>
+      <span className="picker-selected-chip__label">{name}</span>
       <Button
         type="text"
         size="small"
         icon={<X size={14} />}
         onClick={onRemove}
-        className={chipRemoveCls}
+        className="picker-selected-chip__remove"
         aria-label="Retirer"
       />
     </div>

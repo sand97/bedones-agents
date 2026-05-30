@@ -93,18 +93,12 @@ function PricingPage() {
       />
       <MarketingNav current="pricing" />
 
-      {/* mk-pricing-section */}
-      <section className="py-20 bg-[var(--mk-bg)]">
-        <div className="mx-auto w-full max-w-[1200px] px-6 max-[768px]:px-4">
-          {/* mk-pricing-head */}
-          <div className="text-center max-w-[720px] mx-auto mb-14">
-            <span className="block font-[family-name:var(--mk-font-body)] text-xs font-semibold tracking-[0.18em] uppercase text-[var(--mk-text-muted)] mb-4">
-              Tarifs
-            </span>
-            <h1 className="text-[clamp(36px,4.8vw,56px)] mb-4 font-[family-name:var(--mk-font-display)] font-bold tracking-[-0.035em] leading-[1.05]">
-              Un plan pour chaque taille de business
-            </h1>
-            <p className="text-[var(--mk-text-muted)] text-[17px] m-0">
+      <section className="mk-pricing-section">
+        <div className="mk-container">
+          <div className="mk-pricing-head">
+            <span className="mk-eyebrow">Tarifs</span>
+            <h1>Un plan pour chaque taille de business</h1>
+            <p>
               Commencez gratuitement. Passez à un plan supérieur quand vous êtes prêt. Vous payez à
               la durée — pas d&apos;engagement caché.
             </p>

@@ -544,11 +544,11 @@ function AgentsPage() {
         }
       />
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="chat-split flex-1 overflow-hidden">
         {/* Agent List */}
         {(isDesktop || showList) && (
           <div
-            className={`flex flex-col overflow-hidden border-r border-border-subtle max-[1023px]:w-full ${!isDesktop && !showList ? 'max-[1023px]:hidden' : ''} min-[1024px]:w-[360px] min-[1024px]:flex-shrink-0`}
+            className={`chat-split__left ${!isDesktop && !showList ? 'chat-split__left--hidden-mobile' : ''}`}
           >
             <div className="flex flex-col overflow-y-auto">
               {agentsQuery.isLoading ? (
@@ -575,7 +575,7 @@ function AgentsPage() {
         {/* Agent Chat — full remaining width */}
         {(isDesktop || !showList) && (
           <div
-            className={`flex flex-1 flex-col min-w-0 max-[1023px]:hidden ${!isDesktop && !showList ? 'max-[1023px]:flex' : ''}`}
+            className={`chat-split__right ${!isDesktop && !showList ? 'chat-split__right--visible' : ''}`}
           >
             {renderAgentContent()}
           </div>

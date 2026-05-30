@@ -65,11 +65,11 @@ export function ActivityChart({ data, visibleSeries, onToggleSeries, height }: A
               key={s.key}
               type="button"
               onClick={() => onToggleSeries(s.key)}
-              className={`flex items-center gap-2 px-[14px] py-[6px] rounded-full border border-border-default bg-bg-surface text-text-secondary cursor-pointer transition duration-150 hover:border-[#b3b3b3] ${active ? 'text-text-primary font-medium' : ''}`}
+              className={`stats-toggle ${active ? 'stats-toggle--active' : ''}`}
               style={active ? { borderColor: s.color, background: `${s.color}0d` } : undefined}
             >
               <span
-                className="flex items-center justify-center w-4 h-4 rounded-[4px] border-[1.5px] border-border-default bg-bg-surface flex-shrink-0 transition duration-150"
+                className="stats-toggle__check"
                 style={active ? { background: s.color, borderColor: s.color } : undefined}
               >
                 {active && (
