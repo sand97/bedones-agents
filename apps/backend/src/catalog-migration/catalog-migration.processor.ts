@@ -3,10 +3,7 @@ import { Logger } from '@nestjs/common'
 import type { Job } from 'bullmq'
 
 import { CATALOG_MIGRATION_QUEUE } from '../queue/queue.module'
-import {
-  CatalogMigrationJobData,
-  CatalogMigrationService,
-} from './catalog-migration.service'
+import { CatalogMigrationJobData, CatalogMigrationService } from './catalog-migration.service'
 
 /**
  * Processes catalogue migrations one at a time (`concurrency: 1`) — the Notion

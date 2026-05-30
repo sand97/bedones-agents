@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
 import type { CatalogMigration } from '../../generated/prisma/client'
@@ -11,9 +6,10 @@ import type { CatalogMigration } from '../../generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { CatalogService } from '../catalog/catalog.service'
+import { UploadService } from '../upload/upload.service'
 import { CATALOG_MIGRATION_QUEUE } from '../queue/queue.module'
 
-import { CatalogConnectorClient, ConnectorProduct } from './catalog-connector.client'
+import { CatalogConnectorClient, ExtractedProduct } from './catalog-connector.client'
 import { StartCatalogMigrationDto } from './dto/catalog-migration.dto'
 
 /** Data carried by every job on the `catalog-migration` queue. */
@@ -22,6 +18,17 @@ export interface CatalogMigrationJobData {
   organisationId: string
   catalogId: string
   sourcePhone: string
+}
+
+/** A product shaped for CatalogService.createProduct (pushed to Meta). */
+interface PreparedProduct {
+  name: string
+  description?: string
+  imageUrl?: string
+  additionalImageUrls?: string[]
+  price?: string
+  currency?: string
+  availability?: string
 }
 
 /** Notion spec: an extraction is capped at ~1 minute, one at a time. */
@@ -36,6 +43,7 @@ export class CatalogMigrationService {
     private readonly gateway: EventsGateway,
     private readonly catalogService: CatalogService,
     private readonly connector: CatalogConnectorClient,
+    private readonly upload: UploadService,
     @InjectQueue(CATALOG_MIGRATION_QUEUE)
     private readonly queue: Queue<CatalogMigrationJobData>,
   ) {}
@@ -159,36 +167,51 @@ export class CatalogMigrationService {
         where: { id: migrationId },
         data: { status: 'EXTRACTING', startedAt: new Date() },
       })
-      this.gateway.emitToOrg(organisationId, 'catalog:migration-started', { migrationId, catalogId })
+      this.gateway.emitToOrg(organisationId, 'catalog:migration-started', {
+        migrationId,
+        catalogId,
+      })
       onProgress?.(5)
 
-      const products = await this.connector.fetchPublicCatalog(sourcePhone)
+      // 1) Extract the public catalogue from the connected WhatsApp session
+      //    (page script injected through the connector, targeting the client wid).
+      const clientUserId = `${sourcePhone}@c.us`
+      const extracted = await this.connector.extractClientCatalog(clientUserId)
+
+      // 2) Re-host the (in-browser downloaded) images on our storage so Meta can
+      //    fetch them, and shape the products for the Meta catalogue.
+      const prepared = await this.prepareProducts(migrationId, extracted)
+
+      // 3) Keep a temporary JSON of the catalogue on Minio for the duration of
+      //    the sync (no product is persisted in our DB).
+      await this.storeCatalogJson(migrationId, prepared)
 
       await this.prisma.catalogMigration.update({
         where: { id: migrationId },
-        data: { status: 'IMPORTING', totalProducts: products.length },
+        data: { status: 'IMPORTING', totalProducts: prepared.length },
       })
       this.emitProgress(organisationId, migrationId, {
         imported: 0,
         failed: 0,
-        total: products.length,
+        total: prepared.length,
         percentage: 10,
       })
       onProgress?.(10)
 
       let imported = 0
       let failed = 0
-      for (let i = 0; i < products.length; i++) {
+      for (let i = 0; i < prepared.length; i++) {
         try {
-          await this.catalogService.createProduct(catalogId, this.mapProduct(products[i]))
+          await this.catalogService.createProduct(catalogId, prepared[i])
           imported++
         } catch (error) {
           failed++
           const message = error instanceof Error ? error.message : String(error)
-          this.logger.warn(`Failed to import "${products[i]?.name}" into ${catalogId}: ${message}`)
+          this.logger.warn(`Failed to import "${prepared[i]?.name}" into ${catalogId}: ${message}`)
         }
 
-        const percentage = Math.round(10 + ((i + 1) / products.length) * 90)
+        const percentage =
+          prepared.length > 0 ? Math.round(10 + ((i + 1) / prepared.length) * 90) : 100
         onProgress?.(percentage)
         await this.prisma.catalogMigration.update({
           where: { id: migrationId },
@@ -197,7 +220,7 @@ export class CatalogMigrationService {
         this.emitProgress(organisationId, migrationId, {
           imported,
           failed,
-          total: products.length,
+          total: prepared.length,
           percentage,
         })
       }
@@ -216,7 +239,7 @@ export class CatalogMigrationService {
         catalogId,
         imported,
         failed,
-        total: products.length,
+        total: prepared.length,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -259,7 +282,9 @@ export class CatalogMigrationService {
       }
     } catch (error) {
       // Never let a websocket/queue read crash the worker lifecycle.
-      this.logger.warn(`broadcastQueueState failed: ${error instanceof Error ? error.message : error}`)
+      this.logger.warn(
+        `broadcastQueueState failed: ${error instanceof Error ? error.message : error}`,
+      )
     }
   }
 
@@ -278,7 +303,9 @@ export class CatalogMigrationService {
   }
 
   /** Find a job's position in the queue and estimate the minutes before it starts. */
-  private async computePositionEta(jobId: string): Promise<{ position: number; etaMinutes: number }> {
+  private async computePositionEta(
+    jobId: string,
+  ): Promise<{ position: number; etaMinutes: number }> {
     const [active, waiting] = await Promise.all([
       this.queue.getActive(0, -1),
       this.queue.getWaiting(0, -1),
@@ -292,18 +319,79 @@ export class CatalogMigrationService {
     return { position: ahead, etaMinutes: ahead * MINUTES_PER_SYNC }
   }
 
-  private mapProduct(p: ConnectorProduct) {
-    return {
-      name: p.name,
-      description: p.description ?? undefined,
-      imageUrl: p.imageUrl ?? undefined,
-      additionalImageUrls:
-        Array.isArray(p.additionalImageUrls) && p.additionalImageUrls.length > 0
-          ? p.additionalImageUrls
-          : undefined,
-      price: p.price != null && p.price !== '' ? String(p.price) : undefined,
-      currency: p.currency ?? undefined,
-      availability: p.availability ?? undefined,
+  /**
+   * Re-host every product's images on our storage (Meta can't fetch the
+   * short-lived, auth-gated WhatsApp CDN URLs) and shape the products for
+   * `CatalogService.createProduct` (price is sent as a major-unit string —
+   * createProduct converts to Meta's minor units).
+   */
+  private async prepareProducts(
+    migrationId: string,
+    extracted: ExtractedProduct[],
+  ): Promise<PreparedProduct[]> {
+    const prepared: PreparedProduct[] = []
+    for (const product of extracted) {
+      const urls: string[] = []
+      const images = [...(product.images ?? [])].sort((a, b) => a.index - b.index)
+      for (const image of images) {
+        const url = await this.rehostImage(migrationId, product.id, image.index, image.data)
+        if (url) urls.push(url)
+      }
+      prepared.push({
+        name: product.name || 'Sans nom',
+        description: product.description ?? undefined,
+        imageUrl: urls[0],
+        additionalImageUrls: urls.length > 1 ? urls.slice(1) : undefined,
+        // WhatsApp price is in major units here (extracted as amount/1000).
+        price: product.price != null ? String(product.price) : undefined,
+        currency: product.currency ?? undefined,
+        availability: product.availability ?? undefined,
+      })
+    }
+    return prepared
+  }
+
+  /** Decode a base64 data URL and upload it; returns the public URL or null. */
+  private async rehostImage(
+    migrationId: string,
+    productId: string,
+    index: number,
+    dataUrl: string,
+  ): Promise<string | null> {
+    const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl || '')
+    if (!match) return null
+    const contentType = match[1] || 'image/jpeg'
+    try {
+      const buffer = Buffer.from(match[2], 'base64')
+      return await this.upload.uploadBuffer(
+        buffer,
+        `${productId}-${index}`,
+        contentType,
+        `catalog-migration/${migrationId}`,
+      )
+    } catch (error) {
+      this.logger.warn(
+        `Failed to re-host image ${productId}-${index}: ${error instanceof Error ? error.message : error}`,
+      )
+      return null
+    }
+  }
+
+  /** Persist the prepared catalogue as a temporary JSON on Minio for the sync. */
+  private async storeCatalogJson(migrationId: string, products: PreparedProduct[]): Promise<void> {
+    try {
+      const buffer = Buffer.from(JSON.stringify({ migrationId, products }, null, 2), 'utf8')
+      await this.upload.uploadBuffer(
+        buffer,
+        `catalog-${migrationId}`,
+        'application/json',
+        `catalog-migration/${migrationId}`,
+      )
+    } catch (error) {
+      // Non-fatal: the import can still proceed from the in-memory products.
+      this.logger.warn(
+        `Failed to store temporary catalogue JSON for ${migrationId}: ${error instanceof Error ? error.message : error}`,
+      )
     }
   }
 
