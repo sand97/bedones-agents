@@ -9,6 +9,7 @@ import { CatalogService } from '../catalog/catalog.service'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
 import { EventsGateway } from '../gateway/events.gateway'
 import { ProductImageSyncService } from './product-image-sync.service'
+import { SocialHealthService } from './social-health.service'
 
 type TikTokMessageType = 'TEXT' | 'IMAGE' | 'SHARE_POST' | 'TEMPLATE' | 'SENDER_ACTION'
 type TikTokSenderAction = 'TYPING' | 'MARK_READ'
@@ -92,6 +93,7 @@ export class MessagingService {
     private catalogService: CatalogService,
     private productImageSyncService: ProductImageSyncService,
     private eventsGateway: EventsGateway,
+    private socialHealth: SocialHealthService,
   ) {}
 
   // ─── Get conversations for a social account ───
@@ -173,6 +175,8 @@ export class MessagingService {
             providerAccountId: true,
             organisationId: true,
             scopes: true,
+            disabled: true,
+            featureDisabled: true,
           },
         },
       },
@@ -180,6 +184,8 @@ export class MessagingService {
     if (!conversation) throw new NotFoundException('Conversation not found')
     await this.assertMembership(userId, conversation.socialAccount.organisationId)
     this.assertScope(conversation.socialAccount.scopes, 'messages')
+    // Circuit breaker: refuse outbound sends on a disabled account / feature.
+    this.socialHealth.ensureOutboundAllowed(conversation.socialAccount, 'MESSAGE')
 
     const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
     const provider = conversation.socialAccount.provider
@@ -266,8 +272,26 @@ export class MessagingService {
       this.logger.error(
         `[${provider}] Failed to send message to platform: ${error instanceof Error ? error.message : error}`,
       )
+      await this.socialHealth.recordError({
+        socialAccountId: conversation.socialAccount.id,
+        provider,
+        operation: 'sendMessage',
+        feature: 'MESSAGE',
+        resource: provider === 'TIKTOK' ? 'tiktok' : 'page',
+        error,
+        // TikTok: a personal (non-business) account loses messaging instantly,
+        // without waiting for the 5-error threshold.
+        forceDisableFeature: await this.detectTikTokBusinessLoss(
+          provider,
+          conversation.socialAccount.providerAccountId,
+          accessToken,
+        ),
+      })
       throw error
     }
+
+    // Sent successfully — clear the consecutive-error counter.
+    await this.socialHealth.recordSuccess(conversation.socialAccount.id)
 
     // Save the sent message
     const savedMessage = await this.prisma.directMessage.create({
@@ -315,6 +339,40 @@ export class MessagingService {
             from: savedMessage.replyTo.isFromPage ? 'business' : 'customer',
           }
         : undefined,
+    }
+  }
+
+  /**
+   * TikTok messaging requires an active Business account. When a send fails we
+   * probe /business/get/: a non-business response means the user downgraded to a
+   * personal account, so messaging must be disabled immediately (the Notion
+   * spec's "block without waiting for 5 errors" case). Returns 'MESSAGE' to
+   * force-disable that feature, or undefined when the probe is inconclusive.
+   */
+  private async detectTikTokBusinessLoss(
+    provider: string,
+    businessId: string,
+    accessToken: string,
+  ): Promise<'MESSAGE' | undefined> {
+    if (provider !== 'TIKTOK' || !businessId) return undefined
+    try {
+      const res = await fetch(
+        `https://business-api.tiktok.com/open_api/v1.3/business/get/?business_id=${encodeURIComponent(
+          businessId,
+        )}&fields=${encodeURIComponent(JSON.stringify(['display_name']))}`,
+        { headers: { 'Access-Token': accessToken } },
+      )
+      const raw = await res.text()
+      let data: { code?: number } = {}
+      try {
+        data = JSON.parse(raw)
+      } catch {
+        return undefined // non-JSON → cannot confirm, stay safe
+      }
+      // code 0 means Business access is intact; anything else = lost it.
+      return data.code === 0 ? undefined : 'MESSAGE'
+    } catch {
+      return undefined
     }
   }
 
@@ -416,6 +474,8 @@ export class MessagingService {
             providerAccountId: true,
             organisationId: true,
             scopes: true,
+            disabled: true,
+            featureDisabled: true,
           },
         },
       },
@@ -423,6 +483,8 @@ export class MessagingService {
     if (!conversation) throw new NotFoundException('Conversation not found')
     await this.assertMembership(userId, conversation.socialAccount.organisationId)
     this.assertScope(conversation.socialAccount.scopes, 'messages')
+    // Circuit breaker: refuse outbound sends on a disabled account / feature.
+    this.socialHealth.ensureOutboundAllowed(conversation.socialAccount, 'MESSAGE')
 
     if (conversation.socialAccount.provider !== 'WHATSAPP') {
       throw new BadRequestException('Template messages are only supported on WhatsApp')
@@ -487,48 +549,70 @@ export class MessagingService {
             provider: true,
             providerAccountId: true,
             organisationId: true,
+            disabled: true,
+            featureDisabled: true,
           },
         },
       },
     })
     if (!conversation) throw new NotFoundException('Conversation not found')
+    // Circuit breaker: agent auto-replies must also stop on a disabled account.
+    this.socialHealth.ensureOutboundAllowed(conversation.socialAccount, 'MESSAGE')
 
     const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
     const provider = conversation.socialAccount.provider
 
     let platformMsgId: string | null = null
 
-    if (provider === 'FACEBOOK') {
-      platformMsgId = await this.sendFacebookMessage(
-        conversation.socialAccount.providerAccountId,
-        conversation.participantId,
-        accessToken,
-        message,
-      )
-    } else if (provider === 'INSTAGRAM') {
-      platformMsgId = await this.sendInstagramMessage(
-        conversation.participantId,
-        accessToken,
-        message,
-      )
-    } else if (provider === 'WHATSAPP') {
-      platformMsgId = await this.sendWhatsAppMessage(
-        conversation.socialAccount.providerAccountId,
-        conversation.participantId,
-        accessToken,
-        message,
-      )
-    } else if (provider === 'TIKTOK') {
-      const result = await this.sendTikTokMessage({
-        conversationId,
-        businessId: conversation.socialAccount.providerAccountId,
-        conversationPlatformId: conversation.platformThreadId || conversation.participantId,
-        accessToken,
-        message,
-        messageType: 'TEXT',
+    try {
+      if (provider === 'FACEBOOK') {
+        platformMsgId = await this.sendFacebookMessage(
+          conversation.socialAccount.providerAccountId,
+          conversation.participantId,
+          accessToken,
+          message,
+        )
+      } else if (provider === 'INSTAGRAM') {
+        platformMsgId = await this.sendInstagramMessage(
+          conversation.participantId,
+          accessToken,
+          message,
+        )
+      } else if (provider === 'WHATSAPP') {
+        platformMsgId = await this.sendWhatsAppMessage(
+          conversation.socialAccount.providerAccountId,
+          conversation.participantId,
+          accessToken,
+          message,
+        )
+      } else if (provider === 'TIKTOK') {
+        const result = await this.sendTikTokMessage({
+          conversationId,
+          businessId: conversation.socialAccount.providerAccountId,
+          conversationPlatformId: conversation.platformThreadId || conversation.participantId,
+          accessToken,
+          message,
+          messageType: 'TEXT',
+        })
+        platformMsgId = result.platformMsgId
+      }
+    } catch (error) {
+      await this.socialHealth.recordError({
+        socialAccountId: conversation.socialAccount.id,
+        provider,
+        operation: 'sendMessageAsAgent',
+        feature: 'MESSAGE',
+        resource: provider === 'TIKTOK' ? 'tiktok' : 'page',
+        error,
+        forceDisableFeature: await this.detectTikTokBusinessLoss(
+          provider,
+          conversation.socialAccount.providerAccountId,
+          accessToken,
+        ),
       })
-      platformMsgId = result.platformMsgId
+      throw error
     }
+    await this.socialHealth.recordSuccess(conversation.socialAccount.id)
 
     const savedMessage = await this.prisma.directMessage.create({
       data: {
@@ -877,6 +961,8 @@ export class MessagingService {
         providerAccountId: true,
         organisationId: true,
         scopes: true,
+        disabled: true,
+        featureDisabled: true,
       },
     })
     if (!account) throw new NotFoundException('Social account not found')
@@ -885,16 +971,23 @@ export class MessagingService {
 
     const accessToken = await this.getDecryptedToken(accountId)
 
-    if (account.provider === 'FACEBOOK') {
-      await this.syncFacebookConversations(accountId, account.providerAccountId, accessToken)
-    } else if (account.provider === 'INSTAGRAM') {
-      await this.syncInstagramConversations(accountId, account.providerAccountId, accessToken)
-    } else if (account.provider === 'TIKTOK') {
-      await this.syncTikTokConversations(accountId, account.providerAccountId, accessToken)
-    } else if (account.provider === 'WHATSAPP') {
-      // WhatsApp is webhook-driven — no sync API. Just return existing conversations.
-      this.logger.log(`[WhatsApp] Sync skipped — WhatsApp uses webhooks for real-time messages`)
-    }
+    // Outbound history fetch — gated by the circuit breaker.
+    await this.socialHealth.wrapOutbound(
+      account,
+      { operation: 'syncConversations', feature: 'MESSAGE', resource: 'page' },
+      async () => {
+        if (account.provider === 'FACEBOOK') {
+          await this.syncFacebookConversations(accountId, account.providerAccountId, accessToken)
+        } else if (account.provider === 'INSTAGRAM') {
+          await this.syncInstagramConversations(accountId, account.providerAccountId, accessToken)
+        } else if (account.provider === 'TIKTOK') {
+          await this.syncTikTokConversations(accountId, account.providerAccountId, accessToken)
+        } else if (account.provider === 'WHATSAPP') {
+          // WhatsApp is webhook-driven — no sync API. Just return existing conversations.
+          this.logger.log(`[WhatsApp] Sync skipped — WhatsApp uses webhooks for real-time messages`)
+        }
+      },
+    )
 
     return this.getConversations(userId, accountId)
   }
@@ -2618,6 +2711,8 @@ export class MessagingService {
             providerAccountId: true,
             organisationId: true,
             scopes: true,
+            disabled: true,
+            featureDisabled: true,
           },
         },
       },
@@ -2625,6 +2720,8 @@ export class MessagingService {
     if (!conversation) throw new NotFoundException('Conversation not found')
     await this.assertMembership(userId, conversation.socialAccount.organisationId)
     this.assertScope(conversation.socialAccount.scopes, 'messages')
+    // Circuit breaker: refuse outbound sends on a disabled account / feature.
+    this.socialHealth.ensureOutboundAllowed(conversation.socialAccount, 'MESSAGE')
 
     if (conversation.socialAccount.provider !== 'WHATSAPP') {
       throw new BadRequestException('Product messages are only supported on WhatsApp')

@@ -18,6 +18,7 @@ import {
   CommentOnPostDto,
   CommentActionDto,
   TikTokBusinessCheckDto,
+  SocialAccountHealthDto,
 } from './dto/social.dto'
 
 @ApiTags('Social')
@@ -96,6 +97,17 @@ export class SocialController {
   @ApiOkResponse({ type: [PostResponseDto] })
   async getPosts(@CurrentUser() user: { id: string }, @Param('accountId') accountId: string) {
     return this.socialService.getPostsForAccount(user.id, accountId)
+  }
+
+  // ─── Account health / last error (for the reconnect prompt) ───
+
+  @Get('accounts/:accountId/health')
+  @ApiOkResponse({ type: SocialAccountHealthDto })
+  async getAccountHealth(
+    @CurrentUser() user: { id: string },
+    @Param('accountId') accountId: string,
+  ) {
+    return this.socialService.getAccountHealth(user.id, accountId)
   }
 
   @Get('accounts/:accountId/provider-posts')

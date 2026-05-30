@@ -10,6 +10,7 @@ import { MessagingService } from './messaging.service'
 import { CatalogService } from '../catalog/catalog.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
+import { SocialHealthService } from './social-health.service'
 
 export interface IncomingMessageEvent {
   conversationId: string
@@ -42,6 +43,7 @@ export class WebhookService {
     private catalogService: CatalogService,
     private eventsGateway: EventsGateway,
     private eventEmitter: EventEmitter2,
+    private socialHealth: SocialHealthService,
   ) {
     this.facebookAppSecret = this.configService.getOrThrow<string>('FACEBOOK_APP_SECRET')
     this.instagramAppSecret = this.configService.getOrThrow<string>('INSTAGRAM_APP_SECRET')
@@ -2837,6 +2839,32 @@ export class WebhookService {
     return Array.from(codes).slice(0, 15)
   }
 
+  /**
+   * Feeds the result of an automated moderation call into the circuit breaker:
+   * a success resets the counter, a failure increments it (tripping past the
+   * threshold) so a page that lost its permissions eventually stops being hit.
+   */
+  private async recordModerationOutcome(
+    ok: boolean,
+    socialAccountId: string,
+    provider: 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK',
+    action: string,
+    errorText?: string,
+  ) {
+    if (ok) {
+      await this.socialHealth.recordSuccess(socialAccountId)
+      return
+    }
+    await this.socialHealth.recordError({
+      socialAccountId,
+      provider,
+      operation: `aiModerate:${action}`,
+      feature: 'COMMENT',
+      resource: provider === 'INSTAGRAM' ? 'instagram' : provider === 'TIKTOK' ? 'tiktok' : 'page',
+      error: new Error(errorText || `aiModerate ${action} failed`),
+    })
+  }
+
   private async executeAIAction(
     commentId: string,
     provider: 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK',
@@ -2846,6 +2874,23 @@ export class WebhookService {
     socialAccountId: string,
     comment: { fromName: string; fromId: string },
   ) {
+    // Circuit breaker: keep ingesting the incoming comment, but skip the
+    // automated outbound moderation when the account / COMMENT feature is
+    // disabled after repeated errors or missing permissions.
+    const health = await this.prisma.socialAccount.findUnique({
+      where: { id: socialAccountId },
+      select: { id: true, provider: true, disabled: true, featureDisabled: true },
+    })
+    if (!health) return
+    try {
+      this.socialHealth.ensureOutboundAllowed(health, 'COMMENT')
+    } catch {
+      this.logger.warn(
+        `[AI] Skipping ${result.action} on disabled account ${socialAccountId} (provider=${provider})`,
+      )
+      return
+    }
+
     if (provider === 'TIKTOK') {
       await this.executeTikTokAIAction(commentId, result, accessToken, orgId, socialAccountId)
       return
@@ -2875,6 +2920,7 @@ export class WebhookService {
           data: { status: 'HIDDEN', action: 'HIDE', actionReason: result.reason, isRead: true },
         })
         this.logger.log(`[AI] Hidden comment ${commentId}`)
+        await this.recordModerationOutcome(true, socialAccountId, provider, 'hide')
         this.eventsGateway.emitToOrg(orgId, 'comment:updated', {
           commentId,
           socialAccountId,
@@ -2882,7 +2928,9 @@ export class WebhookService {
           action: 'hide',
         })
       } else {
-        this.logger.error(`[AI] Failed to hide comment: ${await response.text()}`)
+        const errorText = await response.text()
+        this.logger.error(`[AI] Failed to hide comment: ${errorText}`)
+        await this.recordModerationOutcome(false, socialAccountId, provider, 'hide', errorText)
       }
     }
 
@@ -2897,6 +2945,7 @@ export class WebhookService {
           data: { status: 'DELETED', action: 'DELETE', actionReason: result.reason, isRead: true },
         })
         this.logger.log(`[AI] Deleted comment ${commentId}`)
+        await this.recordModerationOutcome(true, socialAccountId, provider, 'delete')
         this.eventsGateway.emitToOrg(orgId, 'comment:updated', {
           commentId,
           socialAccountId,
@@ -2904,7 +2953,9 @@ export class WebhookService {
           action: 'delete',
         })
       } else {
-        this.logger.error(`[AI] Failed to delete comment: ${await response.text()}`)
+        const errorText = await response.text()
+        this.logger.error(`[AI] Failed to delete comment: ${errorText}`)
+        await this.recordModerationOutcome(false, socialAccountId, provider, 'delete', errorText)
       }
     }
 
@@ -2963,6 +3014,7 @@ export class WebhookService {
         })
 
         this.logger.log(`[AI] Replied to comment ${commentId}`)
+        await this.recordModerationOutcome(true, socialAccountId, provider, 'reply')
         this.eventsGateway.emitToOrg(orgId, 'comment:updated', {
           commentId,
           socialAccountId,
@@ -2970,7 +3022,9 @@ export class WebhookService {
           action: 'reply',
         })
       } else {
-        this.logger.error(`[AI] Failed to reply to comment: ${await response.text()}`)
+        const errorText = await response.text()
+        this.logger.error(`[AI] Failed to reply to comment: ${errorText}`)
+        await this.recordModerationOutcome(false, socialAccountId, provider, 'reply', errorText)
       }
     }
   }

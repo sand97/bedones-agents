@@ -4569,6 +4569,36 @@
           "WhatsAppOptIn"
         ]
       }
+    },
+    "/social/accounts/{accountId}/health": {
+      "get": {
+        "operationId": "SocialController_getAccountHealth",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialAccountHealthDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
     }
   },
   "info": {
@@ -5346,13 +5376,34 @@
           },
           "settings": {
             "$ref": "#/components/schemas/PageSettingsResponseDto"
+          },
+          "disabled": {
+            "description": "Whether outbound calls are disabled after repeated errors or missing scopes",
+            "type": "boolean"
+          },
+          "disabledReason": {
+            "description": "Why the account/feature was disabled (e.g. too_many_errors, missing_scopes:...)",
+            "type": "string"
+          },
+          "featureDisabled": {
+            "description": "Outbound features disabled granularly",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "COMMENT",
+                "MESSAGE"
+              ]
+            }
           }
         },
         "required": [
           "id",
           "provider",
           "providerAccountId",
-          "scopes"
+          "scopes",
+          "disabled",
+          "featureDisabled"
         ]
       },
       "UnreadCountDto": {
@@ -7494,6 +7545,72 @@
       "SendTemplateBody": {
         "type": "object",
         "properties": {}
+      },
+      "SocialAccountLastErrorDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "description": "Provider/HTTP error code (e.g. 190, OAuthException)",
+            "type": "string"
+          },
+          "resource": {
+            "description": "Resource to reconnect (page, catalog, tiktok, ...)",
+            "type": "string"
+          },
+          "technical": {
+            "description": "Raw provider error payload, for \"show details\"",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "technical",
+          "createdAt"
+        ]
+      },
+      "SocialAccountHealthDto": {
+        "type": "object",
+        "properties": {
+          "disabled": {
+            "type": "boolean"
+          },
+          "disabledReason": {
+            "type": "string"
+          },
+          "featureDisabled": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "COMMENT",
+                "MESSAGE"
+              ]
+            }
+          },
+          "message": {
+            "description": "Human-friendly explanation keyed by language (e.g. { en, fr })",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "lastError": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SocialAccountLastErrorDto"
+              }
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "disabled",
+          "featureDisabled"
+        ]
       }
     }
   }

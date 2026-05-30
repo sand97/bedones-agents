@@ -172,8 +172,60 @@ export class SocialAccountResponseDto {
   @ApiProperty({ type: [String], description: 'Feature scopes (e.g. comments, messages)' })
   scopes: string[]
 
+  @ApiProperty({
+    description: 'Whether outbound calls are disabled after repeated errors or missing scopes',
+  })
+  disabled: boolean
+
+  @ApiPropertyOptional({
+    description: 'Why the account/feature was disabled (e.g. too_many_errors, missing_scopes:...)',
+  })
+  disabledReason?: string
+
+  @ApiProperty({
+    enum: ['COMMENT', 'MESSAGE'],
+    isArray: true,
+    description: 'Outbound features disabled granularly',
+  })
+  featureDisabled: string[]
+
   @ApiPropertyOptional({ type: PageSettingsResponseDto })
   settings?: PageSettingsResponseDto
+}
+
+export class SocialAccountLastErrorDto {
+  @ApiPropertyOptional({ description: 'Provider/HTTP error code (e.g. 190, OAuthException)' })
+  code?: string
+
+  @ApiPropertyOptional({ description: 'Resource to reconnect (page, catalog, tiktok, …)' })
+  resource?: string
+
+  @ApiProperty({ description: 'Raw provider error payload, for "show details"' })
+  technical: string
+
+  @ApiProperty()
+  createdAt: Date
+}
+
+export class SocialAccountHealthDto {
+  @ApiProperty()
+  disabled: boolean
+
+  @ApiPropertyOptional()
+  disabledReason?: string
+
+  @ApiProperty({ enum: ['COMMENT', 'MESSAGE'], isArray: true })
+  featureDisabled: string[]
+
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description: 'Human-friendly explanation keyed by language (e.g. { en, fr })',
+  })
+  message?: Record<string, string> | null
+
+  @ApiPropertyOptional({ type: SocialAccountLastErrorDto, nullable: true })
+  lastError?: SocialAccountLastErrorDto | null
 }
 
 export class UnreadCountDto {

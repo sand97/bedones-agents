@@ -25,12 +25,14 @@ import { AvatarSyncService, AVATAR_SYNC_JOB, type AvatarSyncJobData } from './av
 import { AvatarSyncProcessor } from './avatar-sync.processor'
 import { ProductImageSyncService } from './product-image-sync.service'
 import { ProductImageSyncProcessor } from './product-image-sync.processor'
+import { SocialHealthModule } from './social-health.module'
 
 @Module({
   imports: [
     AuthModule,
     UploadModule,
     CatalogModule,
+    SocialHealthModule,
     QueueModule,
     BullModule.registerQueue({ name: SOCIAL_AVATAR_SYNC_QUEUE }),
     BullModule.registerQueue({ name: WHATSAPP_PRODUCT_IMAGE_SYNC_QUEUE }),
