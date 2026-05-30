@@ -157,7 +157,7 @@ export function FeedbackModal({ open, onClose, originalMessage, onSubmit }: Feed
       <div className="flex flex-1 flex-col overflow-hidden">
         {step === 'success' ? (
           /* Success takes over the whole body */
-          <div className="feedback-modal-grid flex flex-1 flex-col items-center justify-center gap-3 px-5 py-10 text-center">
+          <div className="[background-image:radial-gradient(circle,rgba(0,0,0,0.08)_1px,transparent_1px)] [background-size:20px_20px] [background-position:-10px_-10px] flex flex-1 flex-col items-center justify-center gap-3 px-5 py-10 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-brand-whatsapp)_15%,transparent)] text-[color:var(--color-brand-whatsapp)]">
               <CheckCircle2 size={32} strokeWidth={2} />
             </div>
@@ -172,7 +172,7 @@ export function FeedbackModal({ open, onClose, originalMessage, onSubmit }: Feed
           /* Scrollable area: original message + conversation */
           <div
             ref={scrollRef}
-            className="feedback-modal-grid flex-1 overflow-y-auto px-5 pt-4 pb-3"
+            className="[background-image:radial-gradient(circle,rgba(0,0,0,0.08)_1px,transparent_1px)] [background-size:20px_20px] [background-position:-10px_-10px] flex-1 overflow-y-auto px-5 pt-4 pb-3"
           >
             <div className="mb-3 text-xs text-text-muted">{t('feedback.subtitle')}</div>
 
@@ -181,7 +181,7 @@ export function FeedbackModal({ open, onClose, originalMessage, onSubmit }: Feed
               {t('feedback.original_response')}
             </div>
             <div className="mb-5 flex justify-end">
-              <div className="feedback-bubble feedback-bubble--quoted">
+              <div className="max-w-[80%] px-3 py-2 text-sm leading-[1.4] break-words bg-white text-text-primary border border-border-subtle rounded-[18px_18px_4px_18px] shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                 <p className="m-0 whitespace-pre-wrap text-sm">{originalPreview}</p>
                 <div className="mt-1 text-right text-[10px] text-text-muted">
                   {originalTime} {t('chat.by_ai')}
@@ -207,9 +207,7 @@ export function FeedbackModal({ open, onClose, originalMessage, onSubmit }: Feed
                         />
                       )}
                       <div
-                        className={`feedback-bubble ${
-                          isUser ? 'feedback-bubble--user' : 'feedback-bubble--agent'
-                        }`}
+                        className={`max-w-[80%] px-3 py-2 text-sm leading-[1.4] break-words ${isUser ? 'bg-text-primary text-white rounded-[18px_18px_4px_18px]' : 'bg-bg-subtle text-text-primary rounded-[18px_18px_18px_4px]'}`}
                       >
                         <p className="m-0 whitespace-pre-wrap text-sm">{turn.text}</p>
                         <div className="mt-1 text-right text-[10px] opacity-70">
@@ -230,7 +228,7 @@ export function FeedbackModal({ open, onClose, originalMessage, onSubmit }: Feed
                   className="flex-shrink-0 bg-black text-white"
                   icon={<Sparkles size={12} />}
                 />
-                <div className="feedback-bubble feedback-bubble--agent flex items-center gap-3">
+                <div className="max-w-[80%] px-3 py-2 text-sm leading-[1.4] break-words bg-bg-subtle text-text-primary rounded-[18px_18px_18px_4px] flex items-center gap-3">
                   <Spin size="small" />
                   <div className="flex flex-col">
                     <span className="text-sm font-medium text-text-primary">

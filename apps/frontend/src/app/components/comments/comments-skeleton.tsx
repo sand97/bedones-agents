@@ -58,11 +58,16 @@ function SkThread({
 
       {/* Replies */}
       {hasReplies && (
-        <div className="thread-replies">
-          {Array.from({ length: replyCount }).map((_, i) => (
+        <div className="relative ml-[15px] pl-[20px] mt-1">
+          {Array.from({ length: replyCount }).map((_, i) => {
+            const isLast = i === replyCount - 1
+            return (
             <div
               key={i}
-              className={`thread-reply ${i === replyCount - 1 ? 'thread-reply--last' : ''}`}
+              className={isLast
+                ? 'relative flex items-start pt-[6px] before:content-[\'\'] before:absolute before:left-[-20px] before:top-0 before:h-[6px] before:w-[1.5px] before:bg-border-default after:content-[\'\'] after:absolute after:left-[-20px] after:top-[6px] after:h-3 after:w-4 after:border-l-[1.5px] after:border-b-[1.5px] after:border-border-default after:rounded-bl-lg after:bg-transparent'
+                : 'relative flex items-start pt-[6px] before:content-[\'\'] before:absolute before:left-[-20px] before:top-0 before:bottom-0 before:w-[1.5px] before:bg-border-default after:content-[\'\'] after:absolute after:left-[-20px] after:top-[18px] after:w-4 after:h-[1.5px] after:bg-border-default'
+              }
             >
               <div className="flex gap-3">
                 <Sk className="h-6 w-6 flex-shrink-0 rounded-full" />
@@ -72,7 +77,8 @@ function SkThread({
                 </div>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

@@ -7,8 +7,20 @@
 ## Règles Design System
 
 - **Ne jamais utiliser de composants HTML bruts** (`<button>`, `<textarea>`, `<select>`, `<input>`) dans les pages ou composants. Utiliser systématiquement les composants Ant Design (`Button`, `Input`, `Input.TextArea`, `Select`, `Dropdown`, etc.).
-- Tailwind CSS est réservé au **positionnement** (flex, grid, gap, margin, padding) et à la **typographie** (text-sm, font-semibold). Le style visuel des composants (background, border, hover, colors) doit venir d'Antd et de son thème.
-- Les seules exceptions acceptées sont les éléments interactifs complexes avec des classes CSS centralisées (ex: `sidebar__nav-item`, `chat-conv-item`, `ticket-card`).
+
+### Où écrire le CSS : Tailwind dans le composant **vs** `styles.css`
+
+Règle de décision unique : **« Est-ce que je style un composant *système* (Antd) ou quelque chose de *global* à toute l'application ? → `apps/frontend/src/styles.css`. Est-ce que je style un composant que j'ai créé moi-même ? → Tailwind directement dans le composant. »**
+
+- **Tailwind directement dans le composant (cas par défaut).** Dès qu'on crée soi-même un composant (carte, panneau, ligne de liste, section de page, layout maison, header, etc.), **tout** son style s'écrit en classes Tailwind dans le `className` du JSX : positionnement (flex, grid, gap, padding), typographie (`text-sm`, `font-semibold`) **et** style visuel (background, border, radius, ombre, hover, couleurs). On utilise les tokens du thème (`bg-bg-surface`, `text-text-primary`, `border-border-default`, `rounded-card`, `shadow-card`…) et, à défaut de token, des valeurs arbitraires (`text-[14.5px]`, `bg-[#9a958d]`, `max-md:hidden`, `before:content-['']`, `[grid-template-areas:…]`…). **Ne jamais** créer de classe CSS custom dans `styles.css` pour styler un composant maison.
+
+- **`styles.css` — réservé au global et aux composants système.** On n'y écrit que :
+  1. **Les tokens de thème Tailwind** — le bloc `@theme { … }` (couleurs, radius, ombres, espacements partagés par toute l'app).
+  2. **Les overrides de composants système Antd** (`Button`, `Tabs`, `Select`, `DatePicker`, `Pagination`, `Collapse`, `Modal`…). Ils doivent **cibler les classes internes d'Antd** (`.ant-…`) — impossible à exprimer via un `className` Tailwind — donc ils vivent ici.
+  3. **Le style global / reset** de l'application (`body`, `html`, `*`, focus) et tout réglage commun à toute l'app.
+  4. **Les animations globales** (`@keyframes`) et les systèmes d'animation réutilisés (ex. scroll-reveal).
+
+- **En résumé.** Tu modifies l'apparence d'un composant Antd ou un réglage global → `styles.css`. Tu construis/styles ton propre composant → Tailwind dans le composant. Ne **jamais** accumuler du CSS de composants maison dans `styles.css` — c'est exactement ce qui l'a fait gonfler.
 
 ## Fichiers protégés (ne pas modifier)
 

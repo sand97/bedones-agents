@@ -517,11 +517,11 @@ function WhatsAppLoginCard({
 
         <Text type="secondary" className="text-center text-xs">
           En continuant, vous acceptez nos{' '}
-          <a href="/legal/conditions" className="link-underline-hover text-text-primary">
+          <a href="/legal/conditions" className="hover:underline text-text-primary">
             conditions d&apos;utilisation
           </a>{' '}
           et notre{' '}
-          <a href="/legal/privacy" className="link-underline-hover text-text-primary">
+          <a href="/legal/privacy" className="hover:underline text-text-primary">
             politique de confidentialité
           </a>
           .
@@ -609,11 +609,11 @@ function EmailLoginCard({
 
         <Text type="secondary" className="text-center text-xs">
           En continuant, vous acceptez nos{' '}
-          <a href="/legal/conditions" className="link-underline-hover text-text-primary">
+          <a href="/legal/conditions" className="hover:underline text-text-primary">
             conditions d&apos;utilisation
           </a>{' '}
           et notre{' '}
-          <a href="/legal/privacy" className="link-underline-hover text-text-primary">
+          <a href="/legal/privacy" className="hover:underline text-text-primary">
             politique de confidentialité
           </a>
           .

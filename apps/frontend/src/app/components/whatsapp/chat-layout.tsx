@@ -339,11 +339,11 @@ export function ChatLayout({
 
   if (loading) {
     return (
-      <div className="chat-split">
-        <div className="chat-split__left">
+      <div className="flex flex-1 min-h-0">
+        <div className="w-[360px] flex-shrink-0 flex flex-col border-r border-border-subtle overflow-hidden">
           <ConversationListSkeleton />
         </div>
-        <div className="chat-split__right chat-split__right--visible">
+        <div className="flex-1 flex flex-col min-w-0">
           <ChatWindowSkeleton />
         </div>
       </div>
@@ -433,10 +433,10 @@ export function ChatLayout({
   }
 
   return (
-    <div className="chat-split">
+    <div className="flex flex-1 min-h-0">
       {/* Left: conversation list */}
       <div
-        className={`chat-split__left ${selectedConversation ? 'chat-split__left--hidden-mobile' : ''}`}
+        className={`w-[360px] flex-shrink-0 flex flex-col border-r border-border-subtle overflow-hidden max-[1023px]:w-full ${selectedConversation ? 'max-[1023px]:hidden' : ''}`}
       >
         {/* Filter bar */}
         <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-3.5">
@@ -444,7 +444,7 @@ export function ChatLayout({
             type={filter === 'all' ? 'primary' : 'default'}
             size="small"
             onClick={() => setFilter('all')}
-            className="comments-filter-btn"
+            className="h-[28px]! py-0! px-3! text-[13px]! leading-[28px]!"
           >
             {t('comments.all')}
           </Button>
@@ -452,7 +452,7 @@ export function ChatLayout({
             type={filter === 'unread' ? 'primary' : 'default'}
             size="small"
             onClick={() => setFilter('unread')}
-            className="comments-filter-btn"
+            className="h-[28px]! py-0! px-3! text-[13px]! leading-[28px]!"
           >
             {t('comments.unread')}
           </Button>
@@ -464,7 +464,7 @@ export function ChatLayout({
             <Button
               type={selectedLabelIds.length > 0 ? 'primary' : 'default'}
               size="small"
-              className="comments-filter-btn"
+              className="h-[28px]! py-0! px-3! text-[13px]! leading-[28px]!"
             >
               {t('chat.tools_labels')}
               {selectedLabelIds.length > 0 ? ` (${selectedLabelIds.length})` : ''}
@@ -524,7 +524,7 @@ export function ChatLayout({
 
       {/* Right: chat window — click to mark as read */}
       <div
-        className={`chat-split__right ${selectedConversation ? 'chat-split__right--visible' : ''}`}
+        className={`flex-1 flex flex-col min-w-0 max-[1023px]:hidden ${selectedConversation ? 'max-[1023px]:flex' : ''}`}
         onClick={onChatClick}
       >
         {selectedConversation ? (

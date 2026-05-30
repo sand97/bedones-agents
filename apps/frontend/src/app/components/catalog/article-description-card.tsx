@@ -18,7 +18,7 @@ export function ArticleDescriptionCard({ article, actions }: ArticleDescriptionC
   return (
     <div className="catalog-card">
       <div className="catalog-card__header">
-        <img src={article.imageUrl} alt={article.name} className="catalog-article-image" />
+        <img src={article.imageUrl} alt={article.name} className="w-[44px] h-[44px] rounded-[8px] object-cover flex-shrink-0 bg-bg-subtle" />
         <div className="min-w-0 flex-1">
           <div className="font-medium text-text-primary">{article.name}</div>
           <div className="truncate text-xs text-text-muted">{article.description}</div>

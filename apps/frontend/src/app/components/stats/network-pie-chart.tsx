@@ -8,7 +8,7 @@ interface NetworkPieChartProps {
 
 export function NetworkPieChart({ title, data }: NetworkPieChartProps) {
   return (
-    <div className="stats-card">
+    <div className="bg-bg-surface border border-border-subtle rounded-card p-5">
       <div className="mb-4 text-sm font-semibold text-text-primary">{title}</div>
       <div className="flex items-center gap-6">
         <div style={{ width: 140, height: 140 }}>
