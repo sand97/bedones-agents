@@ -1735,7 +1735,8 @@ a {
   gap: 8px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 4px 0 6px;
+  padding: 12px 4px 20px 4px;
+  margin: -12px 0;
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
 }
