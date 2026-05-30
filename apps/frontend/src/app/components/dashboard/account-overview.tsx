@@ -1,6 +1,8 @@
-import { Avatar, Button, Card, Typography } from 'antd'
-import { MessageCircle, MessageSquare } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { App, Avatar, Button, Card, Tag, Tooltip, Typography } from 'antd'
+import { AlertCircle, MessageCircle, MessageSquare, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   FacebookIcon,
   InstagramIcon,
@@ -8,11 +10,23 @@ import {
   TikTokIcon,
   WhatsAppIcon,
 } from '@app/components/icons/social-icons'
+import { SocialAccountErrorDetails } from '@app/components/social/social-account-error-details'
+import { reconnectSocialAccount } from '@app/lib/social-reconnect'
+import { launchWhatsAppSignup } from '@app/lib/facebook-sdk'
+import { exchangeWhatsAppCode } from '@app/server/whatsapp'
 import type { components } from '@app/lib/api/v1'
 
 const { Title, Text } = Typography
 
+const FACEBOOK_APP_ID = import.meta.env.VITE_FACEBOOK_APP_ID
+const WHATSAPP_CONFIG_ID = import.meta.env.VITE_WHATSAPP_CONFIGGURATION_ID
+
 type SocialAccount = components['schemas']['SocialAccountResponseDto']
+
+/** An account is unhealthy when fully disabled or with a feature turned off. */
+function isUnhealthy(account: SocialAccount): boolean {
+  return account.disabled || (account.featureDisabled?.length ?? 0) > 0
+}
 
 /**
  * The "all configured" dashboard view: groups every connected account by
@@ -30,11 +44,54 @@ export function AccountOverview({
   onOpenMessaging: (provider: string, accountId: string) => void
 }) {
   const { t } = useTranslation()
+  const { message } = App.useApp()
+  const queryClient = useQueryClient()
+  const [detailsAccount, setDetailsAccount] = useState<SocialAccount | null>(null)
+  const [reconnectingId, setReconnectingId] = useState<string | null>(null)
+
+  const handleReconnect = useCallback(
+    async (account: SocialAccount) => {
+      // Facebook / Instagram / TikTok: redirect to the provider's OAuth screen.
+      if (account.provider !== 'WHATSAPP') {
+        const outcome = reconnectSocialAccount(account, orgSlug)
+        if (outcome === 'unsupported') message.error(t('social.reconnect_unavailable'))
+        return
+      }
+
+      // WhatsApp: re-run the Embedded Signup flow, then refresh the list.
+      setReconnectingId(account.id)
+      try {
+        const { loginResponse, sessionInfo } = await launchWhatsAppSignup(
+          FACEBOOK_APP_ID,
+          WHATSAPP_CONFIG_ID,
+        )
+        if (loginResponse.authResponse?.code) {
+          const res = await exchangeWhatsAppCode({
+            data: {
+              code: loginResponse.authResponse.code,
+              wabaId: sessionInfo.waba_id,
+              phoneNumberId: sessionInfo.phone_number_id,
+            },
+          })
+          if (res.success) {
+            message.success(t('social.reconnect_success'))
+            queryClient.invalidateQueries({
+              queryKey: ['get', '/social/accounts/{organisationId}'],
+            })
+          } else {
+            message.error(res.error || t('social.connection_error'))
+          }
+        }
+      } catch (err) {
+        message.error(err instanceof Error ? err.message : t('social.connection_error'))
+      } finally {
+        setReconnectingId(null)
+      }
+    },
+    [orgSlug, t, message, queryClient],
+  )
 
   const groups = groupByNetwork(accounts)
-  // Avoid an unused-var lint when orgSlug isn't read directly (kept in the API
-  // for future per-network deep links).
-  void orgSlug
 
   if (groups.length === 0) {
     return (
@@ -76,10 +133,13 @@ export function AccountOverview({
             {group.accounts.map((account) => {
               const hasComments = NETWORKS_WITH_COMMENTS.has(account.provider)
               const hasMessaging = accountSupportsMessaging(account)
+              const unhealthy = isUnhealthy(account)
               return (
                 <div
                   key={account.id}
-                  className="flex flex-wrap items-center gap-3 rounded-xl border border-border-default bg-white p-3"
+                  className={`flex flex-wrap items-center gap-3 rounded-xl border bg-white p-3 ${
+                    unhealthy ? 'border-red-300 bg-red-50/40' : 'border-border-default'
+                  }`}
                 >
                   <Avatar
                     size={36}
@@ -93,17 +153,47 @@ export function AccountOverview({
                     icon={<group.Icon width={18} height={18} />}
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-text-primary">
-                      {account.pageName ||
-                        account.username ||
-                        t('dashboard.account_no_name', { provider: group.label })}
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium text-text-primary">
+                        {account.pageName ||
+                          account.username ||
+                          t('dashboard.account_no_name', { provider: group.label })}
+                      </span>
+                      {unhealthy && (
+                        <Tooltip title={accountErrorTooltip(account, t)}>
+                          <Tag
+                            color="error"
+                            icon={<AlertCircle size={12} className="inline" />}
+                            className="m-0! flex items-center gap-1"
+                          >
+                            {t('dashboard.account_needs_reconnect')}
+                          </Tag>
+                        </Tooltip>
+                      )}
                     </div>
                     {account.username && account.pageName && (
                       <div className="truncate text-xs text-text-muted">@{account.username}</div>
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {hasComments && (
+                    {unhealthy && (
+                      <>
+                        <Button
+                          size="small"
+                          type="primary"
+                          danger
+                          loading={reconnectingId === account.id}
+                          icon={<RefreshCw size={14} />}
+                          onClick={() => handleReconnect(account)}
+                        >
+                          {t('dashboard.action_reconnect')}
+                        </Button>
+                        <Button size="small" onClick={() => setDetailsAccount(account)}>
+                          {t('social.error_show_details')}
+                        </Button>
+                      </>
+                    )}
+                    {!unhealthy && hasComments && (
                       <Button
                         size="small"
                         icon={<MessageCircle size={14} />}
@@ -112,7 +202,7 @@ export function AccountOverview({
                         {t('dashboard.action_comments')}
                       </Button>
                     )}
-                    {hasMessaging && (
+                    {!unhealthy && hasMessaging && (
                       <Button
                         size="small"
                         icon={<MessageSquare size={14} />}
@@ -128,8 +218,29 @@ export function AccountOverview({
           </div>
         </Card>
       ))}
+      {detailsAccount && (
+        <SocialAccountErrorDetails
+          accountId={detailsAccount.id}
+          open={!!detailsAccount}
+          onClose={() => setDetailsAccount(null)}
+        />
+      )}
     </div>
   )
+}
+
+/** Short reason shown on hover of the "needs reconnect" badge. */
+function accountErrorTooltip(
+  account: SocialAccount,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string {
+  if (account.featureDisabled?.length) {
+    const features = account.featureDisabled
+      .map((f) => (f === 'MESSAGE' ? t('social.feature_messaging') : t('social.feature_comments')))
+      .join(', ')
+    return t('social.feature_disabled_tooltip', { features })
+  }
+  return t('social.account_disabled_tooltip')
 }
 
 interface NetworkGroup {

@@ -34,6 +34,7 @@ import { useLayout } from '@app/contexts/layout-context'
 import { catalogApi } from '@app/lib/api/agent-api'
 import { setAuthRedirect, buildFacebookOAuthUrl } from '@app/lib/auth-redirect'
 import type { Product, Collection } from '@app/lib/api/agent-api'
+import { CatalogSocialEmpty } from '@app/components/catalog/catalog-social-empty'
 import {
   prependDirectListCache,
   prependListItemCache,
@@ -555,7 +556,9 @@ function CatalogPage() {
           </div>
         </div>
 
-        {isDesktop ? (
+        {productsQuery.isError ? (
+          <CatalogSocialEmpty error={productsQuery.error} onReconnect={handleConnectCatalog} />
+        ) : isDesktop ? (
           productsQuery.isLoading ? (
             <Table
               dataSource={[]}
