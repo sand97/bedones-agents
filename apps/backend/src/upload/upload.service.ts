@@ -134,6 +134,35 @@ export class UploadService {
     }
   }
 
+  /** Upload JSON at an exact key (deterministic, overwrites). Returns its public URL. */
+  async uploadJsonAtKey(key: string, data: unknown): Promise<string> {
+    await this.ensureBucket()
+    const buffer = Buffer.from(JSON.stringify(data), 'utf8')
+    await this.client.putObject(this.bucket, key, buffer, buffer.length, {
+      'Content-Type': 'application/json',
+    })
+    return `${this.publicBaseUrl}/${this.bucket}/${key}`
+  }
+
+  /** Read and parse a JSON object stored at an exact key. Returns null on failure. */
+  async getJson<T>(key: string): Promise<T | null> {
+    try {
+      const stream = await this.client.getObject(this.bucket, key)
+      const chunks: Buffer[] = []
+      await new Promise<void>((resolve, reject) => {
+        stream.on('data', (chunk: Buffer) => chunks.push(chunk))
+        stream.on('end', () => resolve())
+        stream.on('error', reject)
+      })
+      return JSON.parse(Buffer.concat(chunks).toString('utf8')) as T
+    } catch (error) {
+      this.logger.warn(
+        `[Upload] getJson failed for ${key}: ${error instanceof Error ? error.message : error}`,
+      )
+      return null
+    }
+  }
+
   private async ensureBucket() {
     const exists = await this.client.bucketExists(this.bucket)
     if (!exists) {

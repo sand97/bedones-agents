@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
+import { JwtService } from '@nestjs/jwt'
+import { ConfigService } from '@nestjs/config'
 import { Queue } from 'bullmq'
 import type { CatalogMigration } from '../../generated/prisma/client'
 
@@ -9,7 +11,9 @@ import { CatalogService } from '../catalog/catalog.service'
 import { UploadService } from '../upload/upload.service'
 import { CATALOG_MIGRATION_QUEUE } from '../queue/queue.module'
 
-import { CatalogConnectorClient, ExtractedProduct } from './catalog-connector.client'
+import { CatalogConnectorClient } from './catalog-connector.client'
+import { catalogJsonKey } from './catalog-migration-callback.controller'
+import { MIGRATION_CALLBACK_SCOPE } from './catalog-migration-callback.guard'
 import { StartCatalogMigrationDto } from './dto/catalog-migration.dto'
 
 /** Data carried by every job on the `catalog-migration` queue. */
@@ -20,15 +24,16 @@ export interface CatalogMigrationJobData {
   sourcePhone: string
 }
 
-/** A product shaped for CatalogService.createProduct (pushed to Meta). */
-interface PreparedProduct {
+/** A product as stored by the page script's save-catalog callback. */
+interface StoredProduct {
   name: string
-  description?: string
-  imageUrl?: string
+  description?: string | null
+  price?: number | null
+  currency?: string | null
+  availability?: string | null
+  retailerId?: string | null
+  imageUrl?: string | null
   additionalImageUrls?: string[]
-  price?: string
-  currency?: string
-  availability?: string
 }
 
 /** Notion spec: an extraction is capped at ~1 minute, one at a time. */
@@ -44,6 +49,8 @@ export class CatalogMigrationService {
     private readonly catalogService: CatalogService,
     private readonly connector: CatalogConnectorClient,
     private readonly upload: UploadService,
+    private readonly jwt: JwtService,
+    private readonly config: ConfigService,
     @InjectQueue(CATALOG_MIGRATION_QUEUE)
     private readonly queue: Queue<CatalogMigrationJobData>,
   ) {}
@@ -173,18 +180,27 @@ export class CatalogMigrationService {
       })
       onProgress?.(5)
 
-      // 1) Extract the public catalogue from the connected WhatsApp session
-      //    (page script injected through the connector, targeting the client wid).
+      // 1) Inject the extraction script into the connector. It downloads the
+      //    images (streaming them to our upload-image callback) and posts the
+      //    assembled catalogue to save-catalog, stored as a temporary JSON on
+      //    Minio — no product is persisted in our DB.
       const clientUserId = `${sourcePhone}@c.us`
-      const extracted = await this.connector.extractClientCatalog(clientUserId)
+      const token = this.jwt.sign(
+        { migrationId, scope: MIGRATION_CALLBACK_SCOPE },
+        { expiresIn: '30m' },
+      )
+      const backendUrl =
+        this.config.get<string>('WHATSAPP_MIGRATION_CALLBACK_URL') ||
+        this.config.get<string>('APP_URL') ||
+        ''
+      await this.connector.extractClientCatalog({ clientUserId, backendUrl, token })
 
-      // 2) Re-host the (in-browser downloaded) images on our storage so Meta can
-      //    fetch them, and shape the products for the Meta catalogue.
-      const prepared = await this.prepareProducts(migrationId, extracted)
-
-      // 3) Keep a temporary JSON of the catalogue on Minio for the duration of
-      //    the sync (no product is persisted in our DB).
-      await this.storeCatalogJson(migrationId, prepared)
+      // 2) Load the catalogue the script just stored on Minio and shape it for
+      //    the Meta catalogue.
+      const stored = await this.upload.getJson<{ products: StoredProduct[] }>(
+        catalogJsonKey(migrationId),
+      )
+      const prepared = (stored?.products ?? []).map((p) => this.toCreateProduct(p))
 
       await this.prisma.catalogMigration.update({
         where: { id: migrationId },
@@ -319,79 +335,21 @@ export class CatalogMigrationService {
     return { position: ahead, etaMinutes: ahead * MINUTES_PER_SYNC }
   }
 
-  /**
-   * Re-host every product's images on our storage (Meta can't fetch the
-   * short-lived, auth-gated WhatsApp CDN URLs) and shape the products for
-   * `CatalogService.createProduct` (price is sent as a major-unit string —
-   * createProduct converts to Meta's minor units).
-   */
-  private async prepareProducts(
-    migrationId: string,
-    extracted: ExtractedProduct[],
-  ): Promise<PreparedProduct[]> {
-    const prepared: PreparedProduct[] = []
-    for (const product of extracted) {
-      const urls: string[] = []
-      const images = [...(product.images ?? [])].sort((a, b) => a.index - b.index)
-      for (const image of images) {
-        const url = await this.rehostImage(migrationId, product.id, image.index, image.data)
-        if (url) urls.push(url)
-      }
-      prepared.push({
-        name: product.name || 'Sans nom',
-        description: product.description ?? undefined,
-        imageUrl: urls[0],
-        additionalImageUrls: urls.length > 1 ? urls.slice(1) : undefined,
-        // WhatsApp price is in major units here (extracted as amount/1000).
-        price: product.price != null ? String(product.price) : undefined,
-        currency: product.currency ?? undefined,
-        availability: product.availability ?? undefined,
-      })
-    }
-    return prepared
-  }
-
-  /** Decode a base64 data URL and upload it; returns the public URL or null. */
-  private async rehostImage(
-    migrationId: string,
-    productId: string,
-    index: number,
-    dataUrl: string,
-  ): Promise<string | null> {
-    const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl || '')
-    if (!match) return null
-    const contentType = match[1] || 'image/jpeg'
-    try {
-      const buffer = Buffer.from(match[2], 'base64')
-      return await this.upload.uploadBuffer(
-        buffer,
-        `${productId}-${index}`,
-        contentType,
-        `catalog-migration/${migrationId}`,
-      )
-    } catch (error) {
-      this.logger.warn(
-        `Failed to re-host image ${productId}-${index}: ${error instanceof Error ? error.message : error}`,
-      )
-      return null
-    }
-  }
-
-  /** Persist the prepared catalogue as a temporary JSON on Minio for the sync. */
-  private async storeCatalogJson(migrationId: string, products: PreparedProduct[]): Promise<void> {
-    try {
-      const buffer = Buffer.from(JSON.stringify({ migrationId, products }, null, 2), 'utf8')
-      await this.upload.uploadBuffer(
-        buffer,
-        `catalog-${migrationId}`,
-        'application/json',
-        `catalog-migration/${migrationId}`,
-      )
-    } catch (error) {
-      // Non-fatal: the import can still proceed from the in-memory products.
-      this.logger.warn(
-        `Failed to store temporary catalogue JSON for ${migrationId}: ${error instanceof Error ? error.message : error}`,
-      )
+  /** Shape a stored product for CatalogService.createProduct (price → major-unit string). */
+  private toCreateProduct(p: StoredProduct) {
+    const additional =
+      Array.isArray(p.additionalImageUrls) && p.additionalImageUrls.length > 0
+        ? p.additionalImageUrls
+        : undefined
+    return {
+      name: p.name || 'Sans nom',
+      description: p.description ?? undefined,
+      imageUrl: p.imageUrl ?? undefined,
+      additionalImageUrls: additional,
+      // Major currency units (createProduct converts to Meta's minor units).
+      price: p.price != null ? String(p.price) : undefined,
+      currency: p.currency ?? undefined,
+      availability: p.availability ?? undefined,
     }
   }
 

@@ -1,41 +1,43 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
-/** One image of an extracted product (base64 data URL downloaded in-browser). */
-export interface ExtractedProductImage {
-  index: number
-  type: string
-  /** `data:image/...;base64,...` */
-  data: string
+export interface ExtractionResult {
+  productCount: number
 }
 
-/**
- * A product extracted from a WhatsApp number's public catalogue by the page
- * script. Price is in major currency units (WhatsApp stores it as 1/1000).
- */
-export interface ExtractedProduct {
-  id: string
-  name: string
-  description?: string | null
-  price?: number | null
-  currency?: string | null
-  availability?: string | null
-  retailerId?: string | null
-  images: ExtractedProductImage[]
+export interface ExtractClientCatalogParams {
+  clientUserId: string
+  /** Base URL of bedones-agents reachable from the connector (for callbacks). */
+  backendUrl: string
+  /** Per-migration bearer token authenticating the callbacks. */
+  token: string
 }
 
 /**
  * Page script injected into the connected WhatsApp Web session to read the
  * *public* catalogue of a target number. Adapted from the proven
- * `getCatalog.ts` script — the key difference is that we target the client's
- * wid (`{{CLIENT_USER_ID}}`) instead of `window.WPP.conn.getMyUserId()`, and we
- * return the products + images inline instead of POSTing them to a backend.
+ * `getCatalog.ts` script — it targets the client's wid (`{{CLIENT_USER_ID}}`),
+ * streams every image to our `upload-image` callback and posts the assembled
+ * catalogue to `save-catalog` (both authenticated by `{{TOKEN}}`).
+ *
+ * `window.nodeFetch` is exposed by the connector and proxies the request
+ * server-side (no CSP/CORS). The browser `fetch` is only used to download the
+ * images from WhatsApp's CDN within the authenticated session.
  *
  * It is an IIFE expression so the connector's `page.evaluate(script)` resolves
- * to its return value.
+ * to its return value (a small summary).
  */
 const CLIENT_CATALOG_SCRIPT = `(async () => {
   const CLIENT_USER_ID = '{{CLIENT_USER_ID}}';
+  const BACKEND_URL = '{{BACKEND_URL}}';
+  const TOKEN = '{{TOKEN}}';
+
+  const post = (path, body) => window.nodeFetch(BACKEND_URL + path, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
   const toPriceAmount1000 = (p) => {
     const raw = p.priceAmount1000 ?? p.price_amount_1000 ?? p.price ?? null;
     if (raw === null || raw === undefined) return null;
@@ -55,6 +57,7 @@ const CLIENT_CATALOG_SCRIPT = `(async () => {
     if (!idx || typeof idx !== 'object') return [];
     return Object.keys(idx).map((id) => idx[id] && idx[id].attributes).filter(Boolean);
   };
+
   try {
     const userId = CLIENT_USER_ID;
     const wa = window.WPP.whatsapp;
@@ -77,14 +80,12 @@ const CLIENT_CATALOG_SCRIPT = `(async () => {
         }
       } catch (e) {}
     }
-
     if (wa && wa.CatalogStore && wa.CatalogStore.findQuery) {
       try {
         const res = await wa.CatalogStore.findQuery(userId);
         if (Array.isArray(res)) for (const en of res) for (const p of extractFromCatalog(en)) add(p);
       } catch (e) {}
     }
-
     if (productsById.size === 0) {
       try {
         const fb = await window.WPP.catalog.getProducts(userId, 999);
@@ -105,7 +106,8 @@ const CLIENT_CATALOG_SCRIPT = `(async () => {
           if (u) imageUrls.push({ url: u, type: 'additional', index: i + 1 });
         });
       }
-      const images = [];
+
+      const uploaded = [];
       for (const info of imageUrls) {
         try {
           const resp = await fetch(info.url, {
@@ -116,38 +118,51 @@ const CLIENT_CATALOG_SCRIPT = `(async () => {
           if (!resp.ok) continue;
           const blob = await resp.blob();
           if (blob.size === 0) continue;
-          const data = await new Promise((res, rej) => {
+          const dataUrl = await new Promise((res, rej) => {
             const reader = new FileReader();
             reader.onloadend = () => res(reader.result);
             reader.onerror = rej;
             reader.readAsDataURL(blob);
           });
-          images.push({ index: info.index, type: info.type, data });
+          const up = await post('/catalog-migration/callback/upload-image', {
+            image: dataUrl, productId: product.id, imageIndex: info.index, imageType: info.type,
+          });
+          if (up && up.ok) {
+            const r = await up.json();
+            const url = r && (r.url || (r.data && r.data.url));
+            if (url) uploaded.push({ index: info.index, url });
+          }
         } catch (e) {}
       }
+      uploaded.sort((a, b) => a.index - b.index);
+      const urls = uploaded.map((u) => u.url);
+
       const amount = toPriceAmount1000(product);
       products.push({
-        id: product.id,
         name: product.name || '',
         description: product.description || null,
         price: amount !== null ? amount / 1000 : null,
         currency: product.currency || null,
         availability: product.availability || null,
         retailerId: product.retailerId || product.retailer_id || null,
-        images,
+        imageUrl: urls[0] || null,
+        additionalImageUrls: urls.slice(1),
       });
     }
-    return { success: true, products };
+
+    const save = await post('/catalog-migration/callback/save-catalog', { products });
+    const saved = !!(save && save.ok);
+    return { success: saved, productCount: products.length, saved };
   } catch (error) {
-    return { success: false, error: (error && error.message) || String(error), products: [] };
+    return { success: false, error: (error && error.message) || String(error), productCount: 0 };
   }
 })()`
 
 /**
- * Thin HTTP client for the external `whatsapp-connector` (wppconnect) service.
- * One of our own WhatsApp numbers is connected on that service (QR scanned from
- * the terminal). Because WhatsApp Business catalogues are public, we inject a
- * page script that reads the catalogue of any business number we point it at.
+ * Thin client for the external `whatsapp-connector` (wppconnect) service. One of
+ * our own numbers is connected there (QR scanned from the terminal). Because
+ * WhatsApp Business catalogues are public, we inject a page script that reads
+ * the catalogue of any business number and streams it back to us.
  *
  * Configuration (env):
  *   - WHATSAPP_CATALOG_CONNECTOR_URL    base URL (e.g. http://wpp-connector:3001)
@@ -170,12 +185,14 @@ export class CatalogConnectorClient {
   }
 
   /**
-   * Extract the public catalogue of a WhatsApp number by injecting the page
-   * script into the connector's session via its generic /whatsapp/execute-script.
-   * @param clientUserId the target wid, e.g. `237657888690@c.us`
+   * Inject the extraction script into the connector's session. The script does
+   * the heavy lifting (download images → upload-image, post catalogue →
+   * save-catalog) and returns a small summary.
    */
-  async extractClientCatalog(clientUserId: string): Promise<ExtractedProduct[]> {
-    const script = CLIENT_CATALOG_SCRIPT.replace('{{CLIENT_USER_ID}}', clientUserId)
+  async extractClientCatalog(params: ExtractClientCatalogParams): Promise<ExtractionResult> {
+    const script = CLIENT_CATALOG_SCRIPT.replace('{{CLIENT_USER_ID}}', params.clientUserId)
+      .replace('{{BACKEND_URL}}', params.backendUrl.replace(/\/+$/, ''))
+      .replace('{{TOKEN}}', params.token)
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -185,7 +202,7 @@ export class CatalogConnectorClient {
     if (instanceId) headers['x-bedones-target-instance'] = instanceId
 
     const url = `${this.baseUrl}/whatsapp/execute-script`
-    this.logger.log(`Extracting public catalogue for ${clientUserId} via connector`)
+    this.logger.log(`Extracting public catalogue for ${params.clientUserId} via connector`)
 
     let response: Response
     try {
@@ -206,7 +223,7 @@ export class CatalogConnectorClient {
 
     const payload = (await response.json()) as {
       success?: boolean
-      result?: { success?: boolean; error?: string; products?: ExtractedProduct[] }
+      result?: { success?: boolean; error?: string; productCount?: number }
     }
     const result = payload?.result
     if (!result?.success) {
@@ -214,8 +231,7 @@ export class CatalogConnectorClient {
         `Catalogue extraction failed: ${result?.error || 'unknown error'}`,
       )
     }
-    const products = Array.isArray(result.products) ? result.products : []
-    this.logger.log(`Connector returned ${products.length} product(s) for ${clientUserId}`)
-    return products
+    this.logger.log(`Extraction reported ${result.productCount ?? 0} product(s)`)
+    return { productCount: result.productCount ?? 0 }
   }
 }

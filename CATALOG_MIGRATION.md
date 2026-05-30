@@ -3,11 +3,12 @@
 Importer le catalogue **public** d'un numéro WhatsApp (catalogue WhatsApp Business / SMB,
 non accessible via l'API standard) dans un catalogue **Commerce Manager** connecté.
 
-> Tout le code vit dans **bedones-agents**. `bedones-whatsapp` n'est **pas modifié** :
-> on réutilise tel quel son `whatsapp-connector` (endpoint générique `/whatsapp/execute-script`)
-> et le script `apps/backend/src/page-scripts/scripts/getCatalog.ts` sert de référence.
+> Tout le code vit dans **bedones-agents**. `bedones-whatsapp` n'est **pas modifié** : on
+> réutilise tel quel son `whatsapp-connector` (endpoint générique `/whatsapp/execute-script`
+> + `window.nodeFetch`) et le script `apps/backend/src/page-scripts/scripts/getCatalog.ts`
+> sert de référence.
 
-## Architecture
+## Architecture (pattern callback)
 
 ```
 Frontend (modale wizard)
@@ -17,31 +18,35 @@ Frontend (modale wizard)
                                                  │     position + ETA (~1 min/sync) ──► websocket ──► browser
                                                  │
                                                  ├─ EXTRACTING:
-                                                 │   POST {CONNECTOR}/whatsapp/execute-script
-                                                 │     └─ injecte un script qui lit le catalogue public
-                                                 │        du wid CLIENT (`<phone>@c.us`) et renvoie les
-                                                 │        produits (nom, description, prix, devise) + images base64
-                                                 │   → réhéberge les images sur Minio (UploadService)
-                                                 │   → écrit un JSON temporaire du catalogue sur Minio
+                                                 │   POST {CONNECTOR}/whatsapp/execute-script (script + token)
+                                                 │     └─ le script (session WhatsApp) lit le catalogue du
+                                                 │        wid CLIENT (`<phone>@c.us`), et pour chaque image :
+                                                 │          nodeFetch → POST /catalog-migration/callback/upload-image
+                                                 │            └─ bedones-agents → Minio → renvoie l'URL
+                                                 │        puis nodeFetch → POST /catalog-migration/callback/save-catalog
+                                                 │            └─ bedones-agents écrit le JSON du catalogue sur Minio
                                                  │
                                                  └─ IMPORTING:
-                                                       CatalogService.createProduct() ──► Meta Graph API
+                                                       lit le JSON Minio → CatalogService.createProduct() ──► Meta
                                                        progression ──► websocket ──► browser
 ```
 
-Un job se termine → `@OnWorkerEvent('completed')` → on rediffuse la file à tous les
-utilisateurs en attente (`catalog:migration-queue`), leur ETA décrémente.
+Callbacks authentifiés par un **JWT par-migration** (`scope: catalog-migration-callback`,
+30 min), vérifié par `CatalogMigrationCallbackGuard`. Aucun produit n'est stocké en base :
+seul un **JSON temporaire sur Minio** persiste le temps de la synchronisation.
 
-Aucun produit n'est stocké en base : seul un **JSON temporaire sur Minio** persiste le
-temps de la synchronisation.
+Un job se termine → `@OnWorkerEvent('completed')` → on rediffuse la file aux utilisateurs en
+attente (`catalog:migration-queue`), leur ETA décrémente.
 
 ## Le script injecté
 
 `catalog-connector.client.ts` contient un script (adapté de `getCatalog.ts`) injecté via
 `/whatsapp/execute-script`. Différences avec l'original :
-- il cible le **wid du client** (`{{CLIENT_USER_ID}}`) au lieu de `WPP.conn.getMyUserId()` ;
-- il **retourne** les produits (au lieu de POSTer vers un backend) ;
-- prix = `priceAmount1000 / 1000` (unités majeures), devise = `product.currency`.
+- cible le **wid du client** (`{{CLIENT_USER_ID}}`) au lieu de `WPP.conn.getMyUserId()` ;
+- prix = `priceAmount1000 / 1000` (unités majeures), devise = `product.currency` ;
+- POST les images vers `upload-image` et le catalogue vers `save-catalog`
+  (`window.nodeFetch`, proxy server-side du connecteur → pas de CSP/CORS), avec
+  `Authorization: Bearer {{TOKEN}}`.
 
 ## Parcours UI (modale `commerce-manager-migration-modal.tsx`)
 
@@ -61,6 +66,7 @@ Deux points d'entrée : **page Catalogues** (toolbar + état vide) et **carousel
 ```
 WHATSAPP_CATALOG_CONNECTOR_URL=http://localhost:3001   # base URL du connecteur wppconnect
 WHATSAPP_CONNECTOR_INSTANCE_ID=                        # = CONNECTOR_INSTANCE_ID du connecteur (si activé)
+WHATSAPP_MIGRATION_CALLBACK_URL=http://localhost:3005  # URL de CE backend, joignable depuis le connecteur
 ```
 
 Le réhébergement d'images et le JSON temporaire utilisent la config **Minio** existante.
@@ -70,8 +76,8 @@ Le réhébergement d'images et le JSON temporaire utilisent la config **Minio** 
 1. **Connecteur** : démarrer `whatsapp-connector`, scanner le QR (terminal) avec **un de nos numéros**.
 2. **Backend** : `pnpm --filter backend exec prisma migrate deploy` (migration
    `20260529000000_add_catalog_migration`) puis `prisma generate`. Redis requis.
-3. Renseigner `WHATSAPP_CATALOG_CONNECTOR_URL` (+ instance id si besoin). Le connecteur doit
-   pouvoir joindre l'URL Minio publique de bedones-agents (images réhébergées lues par Meta).
+3. Renseigner `WHATSAPP_CATALOG_CONNECTOR_URL` + `WHATSAPP_MIGRATION_CALLBACK_URL` (le connecteur
+   doit joindre cette URL, et l'URL Minio publique, pour les callbacks et les images).
 4. Lancer backend + frontend.
 
 ## Vérification de bout en bout
@@ -84,7 +90,7 @@ Le réhébergement d'images et le JSON temporaire utilisent la config **Minio** 
 ## Notes
 - **Prix** : `priceAmount1000/1000` (unités majeures) passé en string à `createProduct`, qui le
   convertit vers les unités mineures de Meta (×100), comme pour la création manuelle de produits.
-- Images : téléchargées dans le navigateur (session WhatsApp), réhébergées sur Minio, puis
-  fournies à Meta en `image_url` (les URLs CDN WhatsApp sont éphémères/non lisibles par Meta).
+- Images : téléchargées dans le navigateur (session WhatsApp), réhébergées sur Minio via
+  `upload-image`, puis fournies à Meta en `image_url`.
 - Le catalogue de destination doit être **connecté à Commerce Manager** (`providerId`) avant l'import.
 - ETA = nombre de migrations en attente devant soi × ~1 min (une extraction à la fois).
