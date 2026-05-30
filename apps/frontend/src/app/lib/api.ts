@@ -155,7 +155,7 @@ export async function connectFacebookCatalog(
   redirectUri: string,
   scopes?: string[],
 ): Promise<unknown> {
-  const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
   const res = await fetch(`${API_URL}/social/connect/facebook-catalog`, {
     method: 'POST',
     credentials: 'include',

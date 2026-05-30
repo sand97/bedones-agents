@@ -47,6 +47,77 @@
         ]
       }
     },
+    "/auth/whatsapp/send-otp": {
+      "post": {
+        "operationId": "AuthController_sendWhatsAppOtp",
+        "parameters": [
+          {
+            "name": "accept-language",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendWhatsAppOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/whatsapp/verify-otp": {
+      "post": {
+        "operationId": "AuthController_verifyWhatsAppOtp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyWhatsAppOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatsAppVerifyResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/cookie-consent": {
       "post": {
         "operationId": "AuthController_setCookieConsent",
@@ -189,6 +260,37 @@
         ]
       }
     },
+    "/auth/me/name": {
+      "patch": {
+        "operationId": "AuthController_updateName",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNameDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
@@ -299,6 +401,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrganisationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/organisations/{id}/setup-status": {
+      "get": {
+        "operationId": "OrganisationController_getSetupStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupStatusResponseDto"
                 }
               }
             }
@@ -4098,6 +4230,93 @@
           "status"
         ]
       },
+      "SendWhatsAppOtpDto": {
+        "type": "object",
+        "properties": {
+          "countryCode": {
+            "type": "string",
+            "example": "+237",
+            "description": "Country dial code with leading +"
+          },
+          "phone": {
+            "type": "string",
+            "example": "657888690",
+            "description": "Local phone number (digits only)"
+          }
+        },
+        "required": [
+          "countryCode",
+          "phone"
+        ]
+      },
+      "VerifyWhatsAppOtpDto": {
+        "type": "object",
+        "properties": {
+          "countryCode": {
+            "type": "string",
+            "example": "+237"
+          },
+          "phone": {
+            "type": "string",
+            "example": "657888690"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "countryCode",
+          "phone",
+          "code"
+        ]
+      },
+      "WhatsAppLoginUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "phoneCountryCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "phoneLocal": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "phone",
+          "phoneCountryCode",
+          "phoneLocal"
+        ]
+      },
+      "WhatsAppVerifyResponseDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/WhatsAppLoginUserDto"
+          },
+          "isNewUser": {
+            "type": "boolean",
+            "description": "True if the user was just created on this verification"
+          }
+        },
+        "required": [
+          "user",
+          "isNewUser"
+        ]
+      },
       "CookieConsentDto": {
         "type": "object",
         "properties": {
@@ -4128,6 +4347,14 @@
             "type": "object",
             "nullable": true
           },
+          "phoneCountryCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "phoneLocal": {
+            "type": "object",
+            "nullable": true
+          },
           "name": {
             "type": "string"
           },
@@ -4140,7 +4367,8 @@
             "enum": [
               "PASSWORD",
               "FACEBOOK",
-              "INSTAGRAM"
+              "INSTAGRAM",
+              "WHATSAPP"
             ]
           },
           "status": {
@@ -4280,6 +4508,18 @@
           "user",
           "organisations",
           "pendingInvitations"
+        ]
+      },
+      "UpdateNameDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Aminata Diallo"
+          }
+        },
+        "required": [
+          "name"
         ]
       },
       "CreateOrganisationDto": {
@@ -4449,6 +4689,141 @@
             "example": "Africa/Douala"
           }
         }
+      },
+      "PendingCommentsStepDto": {
+        "type": "object",
+        "properties": {
+          "socialAccountId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "FACEBOOK",
+              "INSTAGRAM",
+              "TIKTOK"
+            ]
+          },
+          "pageName": {
+            "type": "object",
+            "nullable": true
+          },
+          "profilePictureUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "socialAccountId",
+          "provider",
+          "pageName",
+          "profilePictureUrl",
+          "createdAt"
+        ]
+      },
+      "PendingAgentStepDto": {
+        "type": "object",
+        "properties": {
+          "socialAccountId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "FACEBOOK",
+              "INSTAGRAM",
+              "WHATSAPP",
+              "TIKTOK"
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "WHATSAPP",
+              "MESSENGER",
+              "INSTAGRAM_DM",
+              "TIKTOK_DM"
+            ]
+          },
+          "pageName": {
+            "type": "object",
+            "nullable": true
+          },
+          "profilePictureUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "agentStatus": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "DRAFT_OR_CONFIGURING",
+              "READY_BELOW_THRESHOLD"
+            ]
+          },
+          "agentScore": {
+            "type": "number"
+          },
+          "agentId": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "socialAccountId",
+          "provider",
+          "channel",
+          "pageName",
+          "profilePictureUrl",
+          "createdAt",
+          "agentStatus",
+          "agentScore",
+          "agentId"
+        ]
+      },
+      "SetupStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "catalogPending": {
+            "type": "boolean",
+            "description": "True when the organisation has no catalog yet."
+          },
+          "pendingComments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingCommentsStepDto"
+            }
+          },
+          "pendingAgents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingAgentStepDto"
+            }
+          },
+          "pendingCount": {
+            "type": "number",
+            "description": "Sum of all pending steps across categories."
+          },
+          "allConfigured": {
+            "type": "boolean",
+            "description": "Convenience flag: `pendingCount === 0`."
+          }
+        },
+        "required": [
+          "catalogPending",
+          "pendingComments",
+          "pendingAgents",
+          "pendingCount",
+          "allConfigured"
+        ]
       },
       "UploadResponseDto": {
         "type": "object",

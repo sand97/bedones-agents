@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as OrganisationsRouteImport } from './routes/organisations'
 import { Route as InvitationRouteImport } from './routes/invitation'
 import { Route as CreateOrganisationRouteImport } from './routes/create-organisation'
@@ -41,6 +42,11 @@ import { Route as AppOrgSlugCommentsIdRouteImport } from './routes/app/$orgSlug/
 import { Route as AppOrgSlugChatsIdRouteImport } from './routes/app/$orgSlug/chats/$id'
 import { Route as AppOrgSlugSocialAccountIdCampaignsRouteImport } from './routes/app/$orgSlug/$socialAccountId/campaigns'
 
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrganisationsRoute = OrganisationsRouteImport.update({
   id: '/organisations',
   path: '/organisations',
@@ -203,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/create-organisation': typeof CreateOrganisationRoute
   '/invitation': typeof InvitationRoute
   '/organisations': typeof OrganisationsRoute
+  '/pricing': typeof PricingRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
@@ -236,6 +243,7 @@ export interface FileRoutesByTo {
   '/create-organisation': typeof CreateOrganisationRoute
   '/invitation': typeof InvitationRoute
   '/organisations': typeof OrganisationsRoute
+  '/pricing': typeof PricingRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
@@ -270,6 +278,7 @@ export interface FileRoutesById {
   '/create-organisation': typeof CreateOrganisationRoute
   '/invitation': typeof InvitationRoute
   '/organisations': typeof OrganisationsRoute
+  '/pricing': typeof PricingRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
@@ -305,6 +314,7 @@ export interface FileRouteTypes {
     | '/create-organisation'
     | '/invitation'
     | '/organisations'
+    | '/pricing'
     | '/app/$orgSlug'
     | '/auth/callback'
     | '/auth/login'
@@ -338,6 +348,7 @@ export interface FileRouteTypes {
     | '/create-organisation'
     | '/invitation'
     | '/organisations'
+    | '/pricing'
     | '/app/$orgSlug'
     | '/auth/callback'
     | '/auth/login'
@@ -371,6 +382,7 @@ export interface FileRouteTypes {
     | '/create-organisation'
     | '/invitation'
     | '/organisations'
+    | '/pricing'
     | '/app/$orgSlug'
     | '/auth/callback'
     | '/auth/login'
@@ -405,6 +417,7 @@ export interface RootRouteChildren {
   CreateOrganisationRoute: typeof CreateOrganisationRoute
   InvitationRoute: typeof InvitationRoute
   OrganisationsRoute: typeof OrganisationsRoute
+  PricingRoute: typeof PricingRoute
   AppOrgSlugRouteRoute: typeof AppOrgSlugRouteRouteWithChildren
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthLoginRoute: typeof AuthLoginRoute
@@ -421,6 +434,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/organisations': {
       id: '/organisations'
       path: '/organisations'
@@ -687,6 +707,7 @@ const rootRouteChildren: RootRouteChildren = {
   CreateOrganisationRoute: CreateOrganisationRoute,
   InvitationRoute: InvitationRoute,
   OrganisationsRoute: OrganisationsRoute,
+  PricingRoute: PricingRoute,
   AppOrgSlugRouteRoute: AppOrgSlugRouteRouteWithChildren,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthLoginRoute: AuthLoginRoute,

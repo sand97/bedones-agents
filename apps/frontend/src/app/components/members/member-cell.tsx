@@ -37,7 +37,9 @@ export function MemberCell({ member }: { member: Member }) {
             </Button>
           )}
         </div>
-        {member.phone && <div className="truncate text-xs text-text-muted">{member.phone}</div>}
+        {(member.phone || member.email) && (
+          <div className="truncate text-xs text-text-muted">{member.phone || member.email}</div>
+        )}
       </div>
     </div>
   )

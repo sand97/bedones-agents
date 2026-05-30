@@ -24,7 +24,9 @@
     "change": "Change",
     "details": "Details",
     "all": "All",
-    "none": "None"
+    "none": "None",
+    "previous": "Previous",
+    "next": "Next"
   },
 
   "sidebar": {
@@ -64,6 +66,7 @@
   },
 
   "auth": {
+    "title": "Login / Sign up",
     "login": "Login",
     "login_error": "Login error",
     "email": "Email",
@@ -80,7 +83,16 @@
     "fetch_user_error": "Unable to retrieve your information. Please try again.",
     "back_to_login": "Back to login",
     "user_info_error": "Unable to retrieve your information from the social network.",
-    "unexpected_error": "An unexpected error occurred. Please try again."
+    "unexpected_error": "An unexpected error occurred. Please try again.",
+    "whatsapp_subtitle": "Enter your WhatsApp number to receive a verification code.",
+    "send_verification_code": "Send verification code",
+    "remember_phone": "Remember this number",
+    "invalid_phone": "Invalid phone number",
+    "verify_code": "Verify code",
+    "welcome": "Welcome!",
+    "your_name": "How would you like to be called?",
+    "full_name_placeholder": "Ex: Jane Smith",
+    "name_required": "Please enter your name"
   },
 
   "org": {
@@ -691,6 +703,8 @@
     "thinking": "The agent is thinking...",
     "score_ready_tooltip": "Your agent can be activated.",
     "score_not_ready_tooltip": "Your agent must have a score > 80 to be activated.",
+    "default_name": "your agent",
+    "activation_success_title": "Agent {{name}} successfully activated",
     "activate_banner_title": "You can activate or test your agent",
     "activate_banner_desc": "We have enough information to respond to your customers. You can activate the agent for specific contacts only or for all incoming messages.",
     "activate_banner_btn": "Activate",
@@ -838,6 +852,7 @@
     "title": "Overview",
     "welcome_title": "Welcome to Bedones",
     "welcome_description": "Centralize your social interactions and convert your prospects into customers. Connect your networks to get started.",
+    "welcome_setup_subtitle": "We now have access to your pages — set up how the AI should respond to your customers.",
     "comments_title": "Comments",
     "comments_description": "Connect your social media and let AI manage your comments for you.",
     "messaging_title": "Messaging",
@@ -845,7 +860,33 @@
     "agent_title": "Create your agent",
     "agent_description": "Create an agent to manage your conversations and create tickets that will be sent to your team members.",
     "agent_members_link": "Add team members",
-    "agent_description_2": " to your team. You can also create promotions that will be taken into account by the agent."
+    "agent_description_2": " to your team. You can also create promotions that will be taken into account by the agent.",
+
+    "step_catalog_title": "Catalog",
+    "step_catalog_desc": "We need to understand your products. Add a Commerce Manager catalog to get started — we'll walk you through it step by step.",
+    "step_catalog_action": "Configure my catalog",
+    "step_comments_desc": "Tell our AI how it should handle comments on {{page}}.",
+    "step_comments_action": "Configure replies now",
+    "step_comments_action_edit": "Edit configuration",
+    "step_agent_desc_none": "Create an agent for {{page}} so the AI can reply to your customers on {{channel}}.",
+    "step_agent_desc_configuring": "Your agent is being configured ({{score}}%). Keep going to reach the 80% threshold.",
+    "step_agent_desc_below_threshold": "The agent is ready but its score is still {{score}}%. Keep configuring it before activating.",
+    "step_agent_action": "Continue configuration",
+    "step_agent_action_edit": "Edit agent",
+    "step_progress": "Step {{current}} of {{total}}",
+
+    "no_accounts_title": "No connected accounts",
+    "no_accounts_desc": "Connect a social network to start managing your interactions from Bedones.",
+    "network_accounts_count_one": "{{count}} connected account",
+    "network_accounts_count_other": "{{count}} connected accounts",
+    "account_no_name": "{{provider}} account",
+    "action_comments": "Comments",
+    "action_messaging": "Messaging",
+
+    "setup_success_title": "{{subject}} successfully configured",
+    "setup_success_desc": "You can now move on to configuring one of your other accounts.",
+    "setup_success_later": "Later",
+    "setup_success_continue": "Continue"
   },
 
   "meta": {
