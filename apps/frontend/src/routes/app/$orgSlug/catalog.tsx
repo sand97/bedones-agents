@@ -730,6 +730,8 @@ function CatalogPage() {
           <ProductContextFlowModal
             open={contextFlowOpen}
             catalog={selectedCatalog}
+            placeholderProducts={products}
+            placeholderCollections={collections}
             onClose={() => setContextFlowOpen(false)}
             onSaved={() => {
               // Other catalogue queries don't need refetching — context is a
@@ -740,6 +742,8 @@ function CatalogPage() {
             open={postLinkFlowOpen}
             catalog={selectedCatalog}
             organisationId={orgSlug}
+            placeholderProducts={products}
+            placeholderCollections={collections}
             onClose={() => setPostLinkFlowOpen(false)}
             onSaved={() => {
               queryClient.invalidateQueries({ queryKey: ['post-links', selectedCatalog.id] })
