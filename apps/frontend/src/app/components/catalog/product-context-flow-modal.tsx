@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Modal, Input, Button, message } from 'antd'
-import { ArrowLeft, Send, Sparkles, AlertTriangle, Check } from 'lucide-react'
+import type { TextAreaRef } from 'antd/es/input/TextArea'
+import { ArrowLeft, Send, Sparkles, AlertTriangle, Check, Pencil, X } from 'lucide-react'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { MarkdownContent } from '@app/components/shared/markdown-content'
 import { catalogApi, type Catalog, type Collection, type Product } from '@app/lib/api/agent-api'
@@ -16,6 +17,15 @@ interface ProductContextFlowModalProps {
   onSaved: () => void
   placeholderProducts?: Product[]
   placeholderCollections?: Collection[]
+  /**
+   * Edit-mode entry point: skip the picker and start the chat with the given
+   * targets already selected and the current context surfaced as a saved AI
+   * proposal. Used by the "Modifier le contexte" actions on a single product.
+   */
+  editMode?: {
+    targets: PickerEntity[]
+    currentContext: string
+  }
 }
 
 type Step = 'pick' | 'chat'
@@ -37,6 +47,7 @@ export function ProductContextFlowModal({
   onSaved,
   placeholderProducts,
   placeholderCollections,
+  editMode,
 }: ProductContextFlowModalProps) {
   const [step, setStep] = useState<Step>('pick')
   const [selected, setSelected] = useState<PickerEntity[]>([])
@@ -44,6 +55,41 @@ export function ProductContextFlowModal({
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [analyzing, setAnalyzing] = useState(false)
   const [savingMessageId, setSavingMessageId] = useState<string | null>(null)
+  // After a successful save we collapse the composer into a Modifier/Fermer
+  // pair so users can't keep firing prompts unintentionally.
+  const [savedMode, setSavedMode] = useState(false)
+  const textareaRef = useRef<TextAreaRef | null>(null)
+
+  // Hydrate the initial state from editMode whenever the modal (re)opens in
+  // edit mode. Resets back to the picker for the normal add flow.
+  useEffect(() => {
+    if (!open) return
+    if (editMode) {
+      setStep('chat')
+      setSelected(editMode.targets)
+      setMessages([
+        {
+          id: 'init-ai',
+          role: 'ai',
+          proposal: {
+            hasConflict: false,
+            conflictReason: '',
+            suggestedContent: editMode.currentContext,
+          },
+          saved: true,
+        },
+      ])
+      setSavedMode(true)
+    } else {
+      setStep('pick')
+      setSelected([])
+      setMessages([])
+      setSavedMode(false)
+    }
+    setDraft('')
+    setAnalyzing(false)
+    setSavingMessageId(null)
+  }, [open, editMode])
 
   const reset = () => {
     setStep('pick')
@@ -52,6 +98,7 @@ export function ProductContextFlowModal({
     setMessages([])
     setAnalyzing(false)
     setSavingMessageId(null)
+    setSavedMode(false)
   }
 
   const handleClose = () => {
@@ -62,6 +109,7 @@ export function ProductContextFlowModal({
   const handleSend = async () => {
     const text = draft.trim()
     if (!text || analyzing) return
+    setSavedMode(false)
     const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: 'user', text }
     setMessages((prev) => [...prev, userMsg])
     setDraft('')
@@ -89,13 +137,10 @@ export function ProductContextFlowModal({
       const collectionIds = selected.filter((s) => s.kind === 'collection').map((s) => s.id)
       await catalogApi.saveContext(catalog.id, { content, productIds, collectionIds })
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === msgId && m.role === 'ai'
-            ? { ...m, proposal: { ...m.proposal, suggestedContent: content }, saved: true }
-            : m,
-        ),
+        prev.map((m) => (m.id === msgId && m.role === 'ai' ? { ...m, saved: true } : m)),
       )
       message.success('Contexte enregistré')
+      setSavedMode(true)
       onSaved()
     } catch (e) {
       message.error((e as Error).message || "Échec de l'enregistrement")
@@ -104,38 +149,46 @@ export function ProductContextFlowModal({
     }
   }
 
-  const handleEditProposal = (msgId: string, value: string) => {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === msgId && m.role === 'ai'
-          ? { ...m, proposal: { ...m.proposal, suggestedContent: value }, saved: false }
-          : m,
-      ),
-    )
+  const handleEnableEdit = () => {
+    setSavedMode(false)
+    // wait one frame so the textarea is mounted before focusing
+    requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
   const hasMessages = messages.length > 0
   const lastAiId = [...messages].reverse().find((m) => m.role === 'ai')?.id
 
   const modalTitle =
-    step === 'chat' && hasMessages ? (
-      <div className="flex items-center gap-2">
+    step === 'chat' ? (
+      hasMessages ? (
+        <div className="flex items-center gap-2">
+          <Button
+            type="text"
+            size="small"
+            shape="circle"
+            icon={<ArrowLeft size={16} />}
+            onClick={() => setStep('pick')}
+            aria-label="Modifier la sélection"
+          />
+          <div className="flex flex-col leading-tight">
+            <span className="text-sm font-semibold">
+              {selected.length}{' '}
+              {selected.length > 1 ? 'éléments sélectionnés' : 'élément sélectionné'}
+            </span>
+            <span className="text-xs font-normal text-text-muted">Modifications du contexte</span>
+          </div>
+        </div>
+      ) : (
         <Button
           type="text"
           size="small"
-          shape="circle"
           icon={<ArrowLeft size={16} />}
           onClick={() => setStep('pick')}
-          aria-label="Modifier la sélection"
-        />
-        <div className="flex flex-col leading-tight">
-          <span className="text-sm font-semibold">
-            {selected.length}{' '}
-            {selected.length > 1 ? 'éléments sélectionnés' : 'élément sélectionné'}
-          </span>
-          <span className="text-xs font-normal text-text-muted">Modifications du contexte</span>
-        </div>
-      </div>
+          style={{ paddingLeft: 0 }}
+        >
+          Modifier la sélection
+        </Button>
+      )
     ) : null
 
   return (
@@ -162,19 +215,8 @@ export function ProductContextFlowModal({
 
       {step === 'chat' && (
         <div className="flex flex-col" style={{ minHeight: 480 }}>
-          {/* Top-right "back to selection" — outlined secondary action available
-              before the first prompt is sent. Once the chat starts the header
-              takes over with a compact icon variant. */}
           {!hasMessages && (
-            <div className="flex items-center justify-end px-4 pt-4">
-              <Button size="small" onClick={() => setStep('pick')}>
-                Modifier la sélection
-              </Button>
-            </div>
-          )}
-
-          {!hasMessages && (
-            <div className="px-4 pt-2 pb-2">
+            <div className="px-4 pt-4 pb-2">
               <SocialSetup
                 icon={<Sparkles size={28} strokeWidth={1.5} />}
                 color="#111b21"
@@ -222,37 +264,23 @@ export function ProductContextFlowModal({
                     </div>
                   )}
                   <div className="context-flow-mini-chat__bubble">
-                    {isLast && !m.saved ? (
-                      <>
-                        <div className="mb-2 text-xs text-text-muted">
-                          Contexte proposé — vous pouvez l&apos;éditer
-                        </div>
-                        <Input.TextArea
-                          autoSize={{ minRows: 4, maxRows: 12 }}
-                          value={m.proposal.suggestedContent}
-                          onChange={(e) => handleEditProposal(m.id, e.target.value)}
-                        />
-                        <div className="mt-3 flex justify-end">
-                          <Button
-                            type="primary"
-                            icon={<Check size={14} />}
-                            loading={isSaving}
-                            disabled={!m.proposal.suggestedContent.trim()}
-                            onClick={() => handleSaveProposal(m.id, m.proposal.suggestedContent)}
-                          >
-                            Enregistrer
-                          </Button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <MarkdownContent content={m.proposal.suggestedContent} />
-                        {m.saved && (
-                          <div className="mt-2 flex items-center gap-1 text-xs text-success">
-                            <Check size={12} /> Enregistré
-                          </div>
-                        )}
-                      </>
+                    <MarkdownContent content={m.proposal.suggestedContent} />
+                    {m.saved && (
+                      <div className="mt-2 flex items-center gap-1 text-xs text-success">
+                        <Check size={12} /> Enregistré
+                      </div>
+                    )}
+                    {isLast && !m.saved && (
+                      <div className="mt-3 flex justify-end">
+                        <Button
+                          type="primary"
+                          icon={<Check size={14} />}
+                          loading={isSaving}
+                          onClick={() => handleSaveProposal(m.id, m.proposal.suggestedContent)}
+                        >
+                          Enregistrer
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -268,32 +296,47 @@ export function ProductContextFlowModal({
             )}
           </div>
 
-          <div className="context-flow-mini-chat__footer">
-            <Input.TextArea
-              placeholder="Décrivez la modification…"
-              autoSize={{ minRows: 1, maxRows: 4 }}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onPressEnter={(e) => {
-                if (!e.shiftKey) {
-                  e.preventDefault()
-                  handleSend()
-                }
-              }}
-              disabled={analyzing}
-              className="rounded-2xl!"
-            />
-            <Button
-              type="text"
-              shape="circle"
-              icon={<Send size={18} />}
-              onClick={handleSend}
-              loading={analyzing}
-              disabled={!draft.trim() || analyzing}
-              aria-label="Envoyer"
-              className="flex-shrink-0"
-            />
-          </div>
+          {savedMode ? (
+            <div
+              className="flex justify-end gap-2 p-4"
+              style={{ borderTop: '1px solid var(--color-border-default)' }}
+            >
+              <Button icon={<X size={14} />} onClick={handleClose}>
+                Fermer
+              </Button>
+              <Button type="primary" icon={<Pencil size={14} />} onClick={handleEnableEdit}>
+                Modifier
+              </Button>
+            </div>
+          ) : (
+            <div className="context-flow-mini-chat__footer">
+              <Input.TextArea
+                ref={textareaRef}
+                placeholder="Décrivez la modification…"
+                autoSize={{ minRows: 1, maxRows: 4 }}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onPressEnter={(e) => {
+                  if (!e.shiftKey) {
+                    e.preventDefault()
+                    handleSend()
+                  }
+                }}
+                disabled={analyzing}
+                className="rounded-2xl!"
+              />
+              <Button
+                type="text"
+                shape="circle"
+                icon={<Send size={18} />}
+                onClick={handleSend}
+                loading={analyzing}
+                disabled={!draft.trim() || analyzing}
+                aria-label="Envoyer"
+                className="flex-shrink-0"
+              />
+            </div>
+          )}
         </div>
       )}
     </Modal>

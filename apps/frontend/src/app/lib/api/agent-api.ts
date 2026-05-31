@@ -215,6 +215,11 @@ export const catalogApi = {
     }>(`/catalog/${id}/products?${query}`)
   },
 
+  getProductsByIds: (catalogId: string, ids: string[]) =>
+    fetchJson<{ products: Array<Product | null> }>(
+      `/catalog/${catalogId}/products-by-ids?ids=${encodeURIComponent(ids.join(','))}`,
+    ),
+
   getAnalysisProgress: (id: string) =>
     fetchJson<{
       analysisStatus: string

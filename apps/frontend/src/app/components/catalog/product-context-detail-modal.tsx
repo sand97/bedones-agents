@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Modal, Input, Button, Radio, Skeleton, message } from 'antd'
+import { Modal, Button, Skeleton, message } from 'antd'
+import { Pencil, Users } from 'lucide-react'
 import { catalogApi } from '@app/lib/api/agent-api'
+import { MarkdownContent } from '@app/components/shared/markdown-content'
+
+export interface ContextDetail {
+  content: string
+  sameContentCount: number
+  sameContentProductIds: string[]
+}
 
 interface ProductContextDetailModalProps {
   open: boolean
@@ -8,7 +16,12 @@ interface ProductContextDetailModalProps {
   productId: string
   productName?: string
   onClose: () => void
-  onSaved?: () => void
+  /** "Modifier le contexte de ce produit". */
+  onEditOne: (detail: ContextDetail) => void
+  /** "Modifier le contexte des N produits" (this one + siblings). */
+  onEditAll: (detail: ContextDetail) => void
+  /** "Voir les N autres produits". */
+  onViewSiblings: (detail: ContextDetail) => void
 }
 
 export function ProductContextDetailModal({
@@ -17,27 +30,23 @@ export function ProductContextDetailModal({
   productId,
   productName,
   onClose,
-  onSaved,
+  onEditOne,
+  onEditAll,
+  onViewSiblings,
 }: ProductContextDetailModalProps) {
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [content, setContent] = useState('')
-  const [originalContent, setOriginalContent] = useState('')
-  const [sameContentCount, setSameContentCount] = useState(0)
-  const [applyToSiblings, setApplyToSiblings] = useState<'this' | 'all'>('this')
+  const [detail, setDetail] = useState<ContextDetail | null>(null)
 
   useEffect(() => {
     if (!open) return
     let cancelled = false
     setLoading(true)
+    setDetail(null)
     catalogApi
       .getProductContext(catalogId, productId)
       .then((res) => {
         if (cancelled) return
-        setContent(res.content)
-        setOriginalContent(res.content)
-        setSameContentCount(res.sameContentCount)
-        setApplyToSiblings('this')
+        setDetail(res)
       })
       .catch((e) => message.error((e as Error).message))
       .finally(() => {
@@ -48,75 +57,59 @@ export function ProductContextDetailModal({
     }
   }, [open, catalogId, productId])
 
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      await catalogApi.updateProductContext(catalogId, productId, {
-        content,
-        applyToSiblings: applyToSiblings === 'all',
-      })
-      message.success('Contexte mis à jour')
-      onSaved?.()
-      onClose()
-    } catch (e) {
-      message.error((e as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const siblingsCount = Math.max(0, sameContentCount - 1)
+  const siblingsCount = Math.max(0, (detail?.sameContentCount ?? 0) - 1)
+  const totalSharing = detail?.sameContentCount ?? 0
   const hasSiblings = siblingsCount > 0
-  const isDirty = content !== originalContent
+  const hasContent = !!detail?.content?.trim()
 
   return (
     <Modal
       open={open}
       onCancel={onClose}
       title={productName ? `Contexte – ${productName}` : 'Contexte du produit'}
-      footer={[
-        <Button key="cancel" onClick={onClose}>
-          Annuler
-        </Button>,
-        <Button key="save" type="primary" loading={saving} disabled={!isDirty} onClick={handleSave}>
-          Enregistrer
-        </Button>,
-      ]}
+      footer={null}
       width={520}
       centered
     >
       {loading ? (
         <Skeleton active />
+      ) : !hasContent ? (
+        <div className="py-2 text-sm text-text-muted">
+          Aucun contexte enregistré pour ce produit.
+        </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          <div className="text-xs text-text-muted">
-            {hasSiblings
-              ? `${siblingsCount} autre${siblingsCount > 1 ? 's' : ''} produit${
-                  siblingsCount > 1 ? 's partagent' : ' partage'
-                } ce contexte.`
-              : 'Ce contexte n’est utilisé que pour ce produit.'}
+        <div className="flex flex-col gap-4">
+          <div className="rounded-lg p-3" style={{ background: 'var(--color-bg-subtle)' }}>
+            <MarkdownContent content={detail!.content} />
           </div>
-          <Input.TextArea
-            autoSize={{ minRows: 5, maxRows: 12 }}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Aucun contexte enregistré"
-          />
-          {hasSiblings && isDirty && (
-            <div className="rounded-lg p-3" style={{ background: 'var(--color-bg-subtle)' }}>
-              <div className="text-sm font-medium mb-2">Appliquer la modification à :</div>
-              <Radio.Group
-                value={applyToSiblings}
-                onChange={(e) => setApplyToSiblings(e.target.value as 'this' | 'all')}
+
+          <Button
+            type="primary"
+            block
+            icon={<Pencil size={14} />}
+            onClick={() => detail && onEditOne(detail)}
+          >
+            Modifier le contexte de ce produit
+          </Button>
+
+          {hasSiblings && (
+            <div className="flex flex-col gap-2 border-t border-[var(--color-border-default)] pt-3">
+              <div className="text-sm text-text-muted">
+                {siblingsCount} autre{siblingsCount > 1 ? 's' : ''} produit
+                {siblingsCount > 1 ? 's partagent' : ' partage'} ce contexte.
+              </div>
+              <Button block icon={<Pencil size={14} />} onClick={() => detail && onEditAll(detail)}>
+                Modifier le contexte des {totalSharing} produits
+              </Button>
+              <Button
+                type="text"
+                block
+                icon={<Users size={14} />}
+                onClick={() => detail && onViewSiblings(detail)}
               >
-                <div className="flex flex-col gap-1">
-                  <Radio value="this">Ce produit uniquement</Radio>
-                  <Radio value="all">
-                    Ce produit et les {siblingsCount} autre{siblingsCount > 1 ? 's' : ''} produit
-                    {siblingsCount > 1 ? 's' : ''} partageant ce contexte
-                  </Radio>
-                </div>
-              </Radio.Group>
+                Voir les {siblingsCount} autre{siblingsCount > 1 ? 's' : ''} produit
+                {siblingsCount > 1 ? 's' : ''}
+              </Button>
             </div>
           )}
         </div>
