@@ -6293,7 +6293,7 @@ a {
 .ant-modal-content {
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 32px);
+  max-height: calc(100vh - 48px);
   overflow: hidden;
 }
 
@@ -6319,7 +6319,7 @@ a {
   }
 
   .ant-modal-content {
-    max-height: calc(100vh - 16px);
-    max-height: calc(100dvh - 16px);
+    max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
   }
 }
