@@ -6277,3 +6277,49 @@ a {
 .dashboard-setup-card .ant-carousel .slick-dots {
   display: none !important;
 }
+
+/* ═══════════════════════════════════════════
+   Global: keep every modal inside the viewport
+   ═══════════════════════════════════════════
+   Some Antd modals overflow the viewport on mobile, hiding the footer
+   below the fold. Cap the content to the available height and let the
+   body scroll so the header & footer stay visible. */
+
+.ant-modal {
+  max-width: calc(100vw - 16px);
+  padding-bottom: 0 !important;
+}
+
+.ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+}
+
+.ant-modal-body {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ant-modal-header,
+.ant-modal-footer {
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .ant-modal {
+    margin: 8px auto;
+    top: 8px !important;
+  }
+
+  .ant-modal.ant-modal-centered {
+    top: 0 !important;
+  }
+
+  .ant-modal-content {
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+}
