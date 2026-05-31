@@ -11,6 +11,23 @@ import { EventsGateway } from '../gateway/events.gateway'
 import { ProductImageSyncService } from './product-image-sync.service'
 import { SocialHealthService } from './social-health.service'
 
+/**
+ * Rolling window (in days) for the connect-time message history backfill.
+ *
+ * Configurable via `MESSAGE_HISTORY_SYNC_WINDOW_DAYS` (default 30). The backfill
+ * runs progressively in the background, so widening the window only adds more
+ * paginated work — it does not block the connect flow. Bounded to a sane range
+ * (1..180) since most providers cap history depth anyway (WhatsApp ~6 months,
+ * TikTok 90 days, Messenger/Instagram ~20 most-recent messages per thread).
+ */
+export const HISTORY_SYNC_WINDOW_DAYS = (() => {
+  const raw = Number(process.env.MESSAGE_HISTORY_SYNC_WINDOW_DAYS)
+  if (!Number.isFinite(raw) || raw <= 0) return 30
+  return Math.min(Math.floor(raw), 180)
+})()
+/** Safety cap on paginated provider requests per backfill run. */
+const HISTORY_MAX_PAGES = 40
+
 type TikTokMessageType = 'TEXT' | 'IMAGE' | 'SHARE_POST' | 'TEMPLATE' | 'SENDER_ACTION'
 type TikTokSenderAction = 'TYPING' | 'MARK_READ'
 type TikTokTemplatePayload = {
@@ -78,6 +95,60 @@ interface TikTokConversationParticipant {
 interface TikTokConversationContent {
   messages?: TikTokConversationMessage[]
   participants?: TikTokConversationParticipant[]
+}
+
+/** A conversation discovered during phase 1 of the history backfill. */
+export interface HistoryConversationRef {
+  /** Local Conversation id. Null for TikTok until resolved in phase 2. */
+  conversationId: string | null
+  /** Provider thread/conversation id. */
+  platformThreadId: string | null
+  /** Platform user id of the other party. Null for TikTok until resolved. */
+  participantId: string | null
+}
+
+/** Normalized input for persisting a single backfilled (historical) message. */
+export interface HistoricalMessageInput {
+  socialAccountId: string
+  participantId: string
+  participantName?: string | null
+  participantUsername?: string | null
+  participantAvatar?: string | null
+  platformThreadId?: string | null
+  platformMsgId: string | null
+  message: string
+  senderId: string
+  senderName: string
+  isFromPage: boolean
+  mediaUrl?: string | null
+  mediaType?: string | null
+  fileName?: string | null
+  fileSize?: number | null
+  replyToMid?: string | null
+  deliveryStatus?: string | null
+  metadata?: Record<string, unknown> | null
+  timestamp: Date
+}
+
+interface MetaConversationListResponse {
+  data?: Array<{
+    id: string
+    participants?: { data: Array<{ id: string; name?: string; username?: string }> }
+    updated_time?: string
+    unread_count?: number
+  }>
+  paging?: { next?: string }
+}
+
+interface MetaMessageListResponse {
+  data?: Array<{
+    id: string
+    message?: string
+    from?: { id: string; name?: string; username?: string }
+    created_time: string
+    attachments?: { data?: Array<{ mime_type?: string; image_data?: { url?: string } }> }
+  }>
+  paging?: { next?: string }
 }
 
 @Injectable()
@@ -2594,6 +2665,525 @@ export class MessagingService {
     )
 
     return inserted
+  }
+
+  // ─── Message history backfill (initial sync on connect) ───
+
+  /** Cutoff for the rolling history window (now − HISTORY_SYNC_WINDOW_DAYS). */
+  private historyCutoff(): Date {
+    return new Date(Date.now() - HISTORY_SYNC_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+  }
+
+  /**
+   * Persist a single historical (backfilled) message.
+   *
+   * Shared by every backfill path (provider pull jobs and WhatsApp Coexistence
+   * webhooks). Idempotent and concurrency-safe:
+   *  - dedup is keyed on the provider message id (`platformMsgId`, UNIQUE), with
+   *    a P2002 guard so a live webhook landing mid-sync never creates a dup;
+   *  - it never increments `unreadCount` and never lowers a newer
+   *    `lastMessageAt`, so a message arriving live during the backfill keeps the
+   *    conversation's up-to-date state intact.
+   *
+   * Returns true when a new row was inserted.
+   */
+  async handleHistoricalMessage(params: HistoricalMessageInput): Promise<boolean> {
+    const { socialAccountId, participantId, platformMsgId } = params
+    if (!platformMsgId) return false
+
+    const existing = await this.prisma.directMessage.findUnique({
+      where: { platformMsgId },
+      select: { id: true },
+    })
+    if (existing) return false
+
+    const displayText = params.message || (params.mediaType ? `[${params.mediaType}]` : '')
+
+    // Upsert the conversation shell. On UPDATE we deliberately leave
+    // lastMessage*/unreadCount untouched so we never clobber live state.
+    const conversation = await this.prisma.conversation.upsert({
+      where: { socialAccountId_participantId: { socialAccountId, participantId } },
+      create: {
+        socialAccountId,
+        platformThreadId: params.platformThreadId ?? null,
+        participantId,
+        participantName: params.participantName || participantId,
+        participantUsername: params.participantUsername ?? null,
+        participantAvatar: params.participantAvatar ?? null,
+        lastMessageText: displayText,
+        lastMessageAt: params.timestamp,
+        unreadCount: 0,
+      },
+      update: {
+        ...(params.platformThreadId ? { platformThreadId: params.platformThreadId } : {}),
+        ...(params.participantName ? { participantName: params.participantName } : {}),
+        ...(params.participantUsername ? { participantUsername: params.participantUsername } : {}),
+        ...(params.participantAvatar ? { participantAvatar: params.participantAvatar } : {}),
+      },
+    })
+
+    // Resolve reply target if we already stored it.
+    let replyToId: string | null = null
+    if (params.replyToMid) {
+      const repliedMsg = await this.prisma.directMessage.findUnique({
+        where: { platformMsgId: params.replyToMid },
+        select: { id: true },
+      })
+      replyToId = repliedMsg?.id || null
+    }
+
+    try {
+      await this.prisma.directMessage.create({
+        data: {
+          conversationId: conversation.id,
+          platformMsgId,
+          message: params.message || '',
+          senderId: params.senderId,
+          senderName: params.senderName,
+          isFromPage: params.isFromPage,
+          isRead: true, // historical messages are treated as already read
+          mediaUrl: params.mediaUrl ?? null,
+          mediaType: params.mediaType ?? null,
+          fileName: params.fileName ?? null,
+          fileSize: params.fileSize ?? null,
+          replyToId,
+          deliveryStatus: params.deliveryStatus ?? null,
+          metadata: (params.metadata as Prisma.InputJsonValue | undefined) ?? Prisma.JsonNull,
+          createdTime: params.timestamp,
+        },
+      })
+    } catch (error) {
+      // A concurrent webhook/sync inserted the same provider id first.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        return false
+      }
+      throw error
+    }
+
+    // Move lastMessageAt forward only — never lower a value set by a live message.
+    await this.prisma.conversation.updateMany({
+      where: {
+        id: conversation.id,
+        OR: [{ lastMessageAt: null }, { lastMessageAt: { lt: params.timestamp } }],
+      },
+      data: { lastMessageText: displayText, lastMessageAt: params.timestamp },
+    })
+
+    return true
+  }
+
+  /**
+   * Phase 1 of the connect-time backfill: list the account's conversations
+   * touched within the configured window, upsert their shells, and return refs so
+   * the caller can enqueue a per-conversation message backfill job for each.
+   *
+   * WhatsApp is intentionally excluded — its history is delivered through
+   * Coexistence webhooks (no pull API), handled in WebhookService.
+   */
+  async listHistoryConversations(socialAccountId: string): Promise<HistoryConversationRef[]> {
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: socialAccountId },
+      select: {
+        id: true,
+        provider: true,
+        providerAccountId: true,
+        disabled: true,
+        featureDisabled: true,
+      },
+    })
+    if (!account) return []
+    if (this.isMessagingDisabled(account)) {
+      this.logger.warn(
+        `[History] messaging disabled for account ${socialAccountId} — skipping list`,
+      )
+      return []
+    }
+
+    const cutoff = this.historyCutoff()
+    if (account.provider === 'FACEBOOK' || account.provider === 'INSTAGRAM') {
+      const accessToken = await this.getDecryptedToken(socialAccountId)
+      return this.listMetaHistoryConversations(
+        account.id,
+        account.providerAccountId,
+        accessToken,
+        cutoff,
+        account.provider,
+      )
+    }
+    if (account.provider === 'TIKTOK') {
+      const accessToken = await this.getDecryptedToken(socialAccountId)
+      return this.listTikTokHistoryConversations(
+        account.id,
+        account.providerAccountId,
+        accessToken,
+        cutoff,
+      )
+    }
+    return []
+  }
+
+  /** Phase 2 of the connect-time backfill: pull this conversation's messages. */
+  async syncConversationHistory(
+    socialAccountId: string,
+    ref: HistoryConversationRef,
+  ): Promise<number> {
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: socialAccountId },
+      select: {
+        id: true,
+        provider: true,
+        providerAccountId: true,
+        disabled: true,
+        featureDisabled: true,
+      },
+    })
+    if (!account) return 0
+    if (this.isMessagingDisabled(account)) return 0
+
+    const cutoff = this.historyCutoff()
+    const accessToken = await this.getDecryptedToken(socialAccountId)
+
+    if (account.provider === 'FACEBOOK' || account.provider === 'INSTAGRAM') {
+      return this.syncMetaConversationHistory(
+        account.id,
+        account.providerAccountId,
+        accessToken,
+        ref,
+        cutoff,
+        account.provider,
+      )
+    }
+    if (account.provider === 'TIKTOK') {
+      return this.syncTikTokConversationHistory(
+        account.id,
+        account.providerAccountId,
+        accessToken,
+        ref,
+        cutoff,
+      )
+    }
+    return 0
+  }
+
+  private isMessagingDisabled(account: { disabled: boolean; featureDisabled: string[] }): boolean {
+    return account.disabled || account.featureDisabled.includes('MESSAGE')
+  }
+
+  // ─── Meta (Messenger / Instagram) backfill ───
+
+  private async listMetaHistoryConversations(
+    socialAccountId: string,
+    pageOrIgId: string,
+    accessToken: string,
+    cutoff: Date,
+    provider: 'FACEBOOK' | 'INSTAGRAM',
+  ): Promise<HistoryConversationRef[]> {
+    const base =
+      provider === 'INSTAGRAM'
+        ? `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/me`
+        : `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${pageOrIgId}`
+    const params = new URLSearchParams({
+      fields: 'id,participants,updated_time,unread_count',
+      limit: '50',
+      access_token: accessToken,
+    })
+    if (provider === 'INSTAGRAM') params.set('platform', 'instagram')
+
+    let url: string | null = `${base}/conversations?${params.toString()}`
+    const refs: HistoryConversationRef[] = []
+    let pages = 0
+
+    while (url && pages < HISTORY_MAX_PAGES) {
+      pages++
+      let body: MetaConversationListResponse
+      try {
+        const response = await fetch(url)
+        if (!response.ok) {
+          this.logger.warn(
+            `[History] ${provider} conversation list failed (${response.status}): ${await response.text()}`,
+          )
+          break
+        }
+        body = (await response.json()) as MetaConversationListResponse
+      } catch (error) {
+        this.logger.warn(
+          `[History] ${provider} conversation list threw: ${error instanceof Error ? error.message : error}`,
+        )
+        break
+      }
+
+      let reachedWindowEdge = false
+      for (const conv of body.data || []) {
+        const updatedAt = conv.updated_time ? new Date(conv.updated_time) : null
+        if (updatedAt && updatedAt < cutoff) {
+          reachedWindowEdge = true
+          continue
+        }
+        const participant = conv.participants?.data?.find((p) => p.id !== pageOrIgId)
+        if (!participant) continue
+
+        const fallbackName = provider === 'INSTAGRAM' ? 'Utilisateur Instagram' : 'Utilisateur'
+        const conversation = await this.prisma.conversation.upsert({
+          where: {
+            socialAccountId_participantId: { socialAccountId, participantId: participant.id },
+          },
+          create: {
+            socialAccountId,
+            platformThreadId: conv.id,
+            participantId: participant.id,
+            participantName: participant.username || participant.name || fallbackName,
+            participantUsername: participant.username || null,
+          },
+          update: {
+            platformThreadId: conv.id,
+            ...(participant.username || participant.name
+              ? { participantName: participant.username || participant.name }
+              : {}),
+            ...(participant.username ? { participantUsername: participant.username } : {}),
+          },
+        })
+        refs.push({
+          conversationId: conversation.id,
+          platformThreadId: conv.id,
+          participantId: participant.id,
+        })
+      }
+
+      // The conversations edge is ordered most-recent first, so once a page
+      // contains a thread older than the cutoff we can stop paginating.
+      url = reachedWindowEdge ? null : body.paging?.next || null
+    }
+
+    this.logger.log(
+      `[History] ${provider} listed ${refs.length} conversation(s) within window for account ${socialAccountId}`,
+    )
+    return refs
+  }
+
+  private async syncMetaConversationHistory(
+    socialAccountId: string,
+    pageOrIgId: string,
+    accessToken: string,
+    ref: HistoryConversationRef,
+    cutoff: Date,
+    provider: 'FACEBOOK' | 'INSTAGRAM',
+  ): Promise<number> {
+    const threadId = ref.platformThreadId
+    const participantId = ref.participantId
+    if (!threadId || !participantId) return 0
+
+    const host =
+      provider === 'INSTAGRAM' ? 'https://graph.instagram.com' : 'https://graph.facebook.com'
+    const params = new URLSearchParams({
+      fields: 'id,message,from,created_time,attachments{mime_type,name,size,image_data}',
+      limit: '50',
+      access_token: accessToken,
+    })
+    let url: string | null =
+      `${host}/${FACEBOOK_GRAPH_API_VERSION}/${threadId}/messages?${params.toString()}`
+    let inserted = 0
+    let pages = 0
+
+    while (url && pages < HISTORY_MAX_PAGES) {
+      pages++
+      let body: MetaMessageListResponse
+      try {
+        const response = await fetch(url)
+        if (!response.ok) {
+          this.logger.warn(
+            `[History] ${provider} message list failed (${response.status}) thread ${threadId}: ${await response.text()}`,
+          )
+          break
+        }
+        body = (await response.json()) as MetaMessageListResponse
+      } catch (error) {
+        this.logger.warn(
+          `[History] ${provider} message list threw thread ${threadId}: ${error instanceof Error ? error.message : error}`,
+        )
+        break
+      }
+
+      let reachedWindowEdge = false
+      for (const msg of body.data || []) {
+        const createdTime = new Date(msg.created_time)
+        if (createdTime < cutoff) {
+          reachedWindowEdge = true
+          continue
+        }
+        const isFromPage = msg.from?.id === pageOrIgId
+        const attachment = msg.attachments?.data?.[0]
+        const mediaUrl = attachment?.image_data?.url || null
+        const created = await this.handleHistoricalMessage({
+          socialAccountId,
+          participantId,
+          platformThreadId: threadId,
+          platformMsgId: msg.id,
+          message: msg.message || '',
+          senderId: msg.from?.id || (isFromPage ? pageOrIgId : participantId),
+          senderName: msg.from?.username || msg.from?.name || (isFromPage ? 'Page' : 'Utilisateur'),
+          isFromPage,
+          mediaUrl,
+          mediaType: mediaUrl ? 'image' : null,
+          timestamp: createdTime,
+        })
+        if (created) inserted++
+      }
+
+      url = reachedWindowEdge ? null : body.paging?.next || null
+    }
+
+    await this.markConversationHistorySynced(ref.conversationId)
+    this.logger.log(
+      `[History] ${provider} backfilled ${inserted} message(s) for conversation ${ref.conversationId}`,
+    )
+    return inserted
+  }
+
+  // ─── TikTok backfill ───
+
+  private async listTikTokHistoryConversations(
+    socialAccountId: string,
+    businessId: string,
+    accessToken: string,
+    cutoff: Date,
+  ): Promise<HistoryConversationRef[]> {
+    const refs: HistoryConversationRef[] = []
+    for (const conversationType of ['SINGLE', 'STRANGER'] as const) {
+      let cursor: string | undefined
+      let pages = 0
+      do {
+        pages++
+        const url = new URL(
+          'https://business-api.tiktok.com/open_api/v1.3/business/message/conversation/list/',
+        )
+        url.searchParams.set('business_id', businessId)
+        url.searchParams.set('conversation_type', conversationType)
+        url.searchParams.set('limit', '100')
+        if (cursor) url.searchParams.set('cursor', cursor)
+
+        const response = await fetch(url.toString(), { headers: { 'Access-Token': accessToken } })
+        const body = await this.readTikTokResponse<{
+          conversations?: Array<{ conversation_id: string; update_time?: string | number }>
+          has_more?: boolean
+          next_cursor?: string
+        }>(response, `history list ${conversationType} conversations`)
+
+        for (const conv of body.data?.conversations || []) {
+          if (!conv.conversation_id) continue
+          const updatedAt = this.parseTikTokTimestamp(conv.update_time)
+          if (updatedAt < cutoff) continue
+          refs.push({
+            conversationId: null,
+            platformThreadId: conv.conversation_id,
+            participantId: null,
+          })
+        }
+        cursor = body.data?.has_more ? body.data?.next_cursor : undefined
+      } while (cursor && pages < HISTORY_MAX_PAGES)
+    }
+
+    this.logger.log(
+      `[History] TikTok listed ${refs.length} conversation(s) within window for account ${socialAccountId}`,
+    )
+    return refs
+  }
+
+  private async syncTikTokConversationHistory(
+    socialAccountId: string,
+    businessId: string,
+    accessToken: string,
+    ref: HistoryConversationRef,
+    cutoff: Date,
+  ): Promise<number> {
+    const conversationId = ref.platformThreadId
+    if (!conversationId) return 0
+
+    const body = await this.fetchTikTokConversationContent(
+      businessId,
+      accessToken,
+      conversationId,
+      'history conversation messages',
+    )
+
+    const messages = (body.data?.messages || []).sort(
+      (a, b) =>
+        this.parseTikTokTimestamp(a.timestamp).getTime() -
+        this.parseTikTokTimestamp(b.timestamp).getTime(),
+    )
+    const personalParticipant = this.findTikTokConversationParticipant(
+      body.data?.participants || [],
+    )
+    const fallbackUser = messages.find((m) =>
+      this.isTikTokPersonalRole(m.from_user?.role),
+    )?.from_user
+    const participantId =
+      personalParticipant?.id ||
+      fallbackUser?.id ||
+      messages.find((m) => m.sender && m.sender !== businessId)?.sender ||
+      conversationId
+    const participantName =
+      personalParticipant?.display_name ||
+      fallbackUser?.display_name ||
+      personalParticipant?.id ||
+      'Utilisateur TikTok'
+    const participantAvatar = await this.mirrorTikTokParticipantAvatar(
+      socialAccountId,
+      participantId,
+      personalParticipant?.profile_image || null,
+    )
+
+    let inserted = 0
+    for (const msg of messages) {
+      if (!msg.message_id) continue
+      const createdTime = this.parseTikTokTimestamp(msg.timestamp)
+      if (createdTime < cutoff) continue
+
+      const isFromPage = this.isTikTokBusinessRole(msg.from_user?.role) || msg.sender === businessId
+      const mapped = await this.mapTikTokMessageForStorage(
+        businessId,
+        accessToken,
+        conversationId,
+        msg,
+      )
+      const created = await this.handleHistoricalMessage({
+        socialAccountId,
+        participantId,
+        platformThreadId: conversationId,
+        participantName,
+        participantAvatar,
+        platformMsgId: msg.message_id,
+        message: mapped.message,
+        senderId: msg.from_user?.id || msg.sender || (isFromPage ? businessId : participantId),
+        senderName: isFromPage ? 'Page' : msg.from_user?.display_name || participantName,
+        isFromPage,
+        mediaUrl: mapped.mediaUrl,
+        mediaType: mapped.mediaType,
+        fileName: mapped.fileName,
+        fileSize: mapped.fileSize,
+        replyToMid: msg.referenced_message_info?.referenced_message_id || null,
+        metadata: (mapped.metadata as unknown as Record<string, unknown> | undefined) ?? null,
+        timestamp: createdTime,
+      })
+      if (created) inserted++
+    }
+
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { socialAccountId_participantId: { socialAccountId, participantId } },
+      select: { id: true },
+    })
+    await this.markConversationHistorySynced(conversation?.id ?? null)
+
+    this.logger.log(
+      `[History] TikTok backfilled ${inserted} message(s) for conversation ${conversationId}`,
+    )
+    return inserted
+  }
+
+  private async markConversationHistorySynced(conversationId: string | null): Promise<void> {
+    if (!conversationId) return
+    await this.prisma.conversation
+      .update({ where: { id: conversationId }, data: { historySyncedAt: new Date() } })
+      .catch(() => undefined)
   }
 
   // ─── Handle echo message (sent by page) ───

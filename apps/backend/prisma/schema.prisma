@@ -31,6 +31,14 @@ enum SocialFeature {
   MESSAGE
 }
 
+enum MessageHistorySyncStatus {
+  PENDING // not started yet
+  RUNNING // backfill jobs in flight (or, for WhatsApp, awaiting Coexistence history webhooks)
+  COMPLETED // backfill finished
+  FAILED // backfill failed (see historySyncError)
+  UNSUPPORTED // provider does not expose history for this account
+}
+
 enum OrgRole {
   OWNER
   ADMIN
@@ -230,6 +238,15 @@ model SocialAccount {
   // Features turned off granularly (e.g. TikTok messaging when the user is no
   // longer a business account) without disabling the whole account.
   featureDisabled   SocialFeature[]
+
+  // ─── Message history sync (14-day backfill on connect) ───
+  // Tracks the initial backfill of the last 14 days of conversations/messages
+  // that runs once when an account is connected. WhatsApp delivers its history
+  // through Coexistence webhooks (no pull API), so for WHATSAPP this only
+  // reflects whether the history webhook(s) have been received.
+  historySyncStatus MessageHistorySyncStatus @default(PENDING)
+  historySyncedAt   DateTime?
+  historySyncError  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -646,6 +663,7 @@ model Conversation {
   lastMessageText          String?
   lastMessageAt            DateTime?
   unreadCount              Int                              @default(0)
+  historySyncedAt          DateTime? // last time the 14-day message backfill ran for this thread
   aiOverride               AiConversationOverride? // Per-conversation override of agent activation rules
   messages                 DirectMessage[]
   conversationLabels       ConversationLabel[]
