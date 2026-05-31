@@ -62,12 +62,49 @@ export function ProductContextDetailModal({
   const hasSiblings = siblingsCount > 0
   const hasContent = !!detail?.content?.trim()
 
+  // Actions live in the Antd `footer` slot so .ant-modal-footer stays pinned
+  // (flex-shrink: 0 via global CSS) while only the context body scrolls.
+  const footer =
+    !loading && hasContent ? (
+      <div className="flex w-full flex-col gap-2">
+        <Button
+          type="primary"
+          block
+          icon={<Pencil size={14} />}
+          onClick={() => detail && onEditOne(detail)}
+        >
+          Modifier le contexte de ce produit
+        </Button>
+
+        {hasSiblings && (
+          <>
+            <div className="text-sm text-text-muted">
+              {siblingsCount} autre{siblingsCount > 1 ? 's' : ''} produit
+              {siblingsCount > 1 ? 's partagent' : ' partage'} ce contexte.
+            </div>
+            <Button block icon={<Pencil size={14} />} onClick={() => detail && onEditAll(detail)}>
+              Modifier le contexte des {totalSharing} produits
+            </Button>
+            <Button
+              type="text"
+              block
+              icon={<Users size={14} />}
+              onClick={() => detail && onViewSiblings(detail)}
+            >
+              Voir les {siblingsCount} autre{siblingsCount > 1 ? 's' : ''} produit
+              {siblingsCount > 1 ? 's' : ''}
+            </Button>
+          </>
+        )}
+      </div>
+    ) : null
+
   return (
     <Modal
       open={open}
       onCancel={onClose}
       title={productName ? `Contexte – ${productName}` : 'Contexte du produit'}
-      footer={null}
+      footer={footer}
       width={520}
       centered
     >
@@ -78,40 +115,8 @@ export function ProductContextDetailModal({
           Aucun contexte enregistré pour ce produit.
         </div>
       ) : (
-        <div className="flex flex-col gap-4">
-          <div className="rounded-lg p-3" style={{ background: 'var(--color-bg-subtle)' }}>
-            <MarkdownContent content={detail!.content} />
-          </div>
-
-          <Button
-            type="primary"
-            block
-            icon={<Pencil size={14} />}
-            onClick={() => detail && onEditOne(detail)}
-          >
-            Modifier le contexte de ce produit
-          </Button>
-
-          {hasSiblings && (
-            <div className="flex flex-col gap-2 border-t border-[var(--color-border-default)] pt-3">
-              <div className="text-sm text-text-muted">
-                {siblingsCount} autre{siblingsCount > 1 ? 's' : ''} produit
-                {siblingsCount > 1 ? 's partagent' : ' partage'} ce contexte.
-              </div>
-              <Button block icon={<Pencil size={14} />} onClick={() => detail && onEditAll(detail)}>
-                Modifier le contexte des {totalSharing} produits
-              </Button>
-              <Button
-                type="text"
-                block
-                icon={<Users size={14} />}
-                onClick={() => detail && onViewSiblings(detail)}
-              >
-                Voir les {siblingsCount} autre{siblingsCount > 1 ? 's' : ''} produit
-                {siblingsCount > 1 ? 's' : ''}
-              </Button>
-            </div>
-          )}
+        <div className="rounded-lg p-3" style={{ background: 'var(--color-bg-subtle)' }}>
+          <MarkdownContent content={detail!.content} />
         </div>
       )}
     </Modal>
