@@ -453,8 +453,6 @@ export class CatalogService {
       )
     }
 
-    if (account) await this.socialHealth.recordSuccess(account.id)
-
     return {
       products: filtered,
       total: data.summary?.total_count ?? filtered.length,
