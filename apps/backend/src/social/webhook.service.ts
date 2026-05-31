@@ -26,6 +26,13 @@ export interface IncomingMessageEvent {
   }
 }
 
+/**
+ * Error code returned in a Coexistence `history` webhook when the business chose
+ * not to share its message history during Embedded Signup.
+ * @see https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/onboarding-business-app-users
+ */
+const HISTORY_NOT_SHARED_ERROR_CODE = 2593109
+
 @Injectable()
 export class WebhookService {
   private readonly logger = new Logger(WebhookService.name)
@@ -1481,6 +1488,32 @@ export class WebhookService {
     value: WhatsAppWebhookValue,
     orgId: string,
   ) {
+    // The business declined to share its history during Embedded Signup: Meta
+    // sends a `history` webhook carrying error 2593109 instead of any messages.
+    // Mark the account so the UI stops "awaiting history" forever.
+    const errors = [
+      ...(value.errors || []),
+      ...(value.history || []).flatMap((c) => c.errors || []),
+    ]
+    const notSharedError = errors.find((e) => e.code === HISTORY_NOT_SHARED_ERROR_CODE)
+    if (notSharedError) {
+      this.logger.warn(
+        `[WhatsApp History] Business declined to share history for account ${socialAccountId} (code ${notSharedError.code})`,
+      )
+      await this.prisma.socialAccount
+        .update({
+          where: { id: socialAccountId },
+          data: {
+            historySyncStatus: 'UNSUPPORTED',
+            historySyncedAt: new Date(),
+            historySyncError:
+              notSharedError.message || 'Business declined to share message history',
+          },
+        })
+        .catch(() => undefined)
+      return
+    }
+
     const contacts = value.contacts
     const cutoff = new Date(Date.now() - HISTORY_SYNC_WINDOW_DAYS * 24 * 60 * 60 * 1000)
     let imported = 0
@@ -3499,12 +3532,20 @@ interface WhatsAppWebhookValue {
   messages?: WhatsAppMessage[]
   message_echoes?: WhatsAppMessageEcho[]
   history?: WhatsAppHistoryEntry[]
+  errors?: WhatsAppWebhookError[]
   statuses?: Array<{
     id: string
     status: string
     timestamp: string
     recipient_id: string
   }>
+}
+
+interface WhatsAppWebhookError {
+  code: number
+  title?: string
+  message?: string
+  error_data?: { details?: string }
 }
 
 interface WhatsAppContact {
@@ -3557,6 +3598,7 @@ interface WhatsAppHistoryEntry {
     chunk_order?: string | number
     progress?: string | number
   }
+  errors?: WhatsAppWebhookError[]
   threads?: Array<{ id: string; messages?: WhatsAppHistoryMessage[] }>
 }
 

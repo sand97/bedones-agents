@@ -1215,8 +1215,15 @@ export class SocialService {
 
     await this.avatarSyncService.enqueue(socialAccount.id)
 
-    // WhatsApp delivers history via Coexistence webhooks — flag the account as
-    // awaiting that history (no pull API).
+    // WhatsApp delivers history via Coexistence webhooks, but Meta requires an
+    // explicit call to START the backfill (SMB App Data API, step 2 — after the
+    // WABA webhook subscription done above). Without this, no `history` webhook
+    // is ever pushed. Non-blocking; the actual history then arrives async.
+    if (wabaId) {
+      await this.initiateWhatsAppHistorySync(phoneId, accessToken)
+    }
+
+    // Flag the account as awaiting that Coexistence history (no pull API).
     await this.historySync.enqueueInitialSync(socialAccount.id)
 
     // A successful (re)connect resets the circuit breaker. WhatsApp scopes are
@@ -1851,6 +1858,57 @@ export class SocialService {
       this.logger.log(`[WhatsApp Webhook] Subscribed WABA ${wabaId}`)
     } catch (error) {
       this.logger.error(`[WhatsApp Webhook] Error subscribing WABA ${wabaId}:`, error)
+    }
+  }
+
+  /**
+   * Initiate Coexistence message-history synchronization (SMB App Data API).
+   *
+   * After subscribing the WABA (step 1), Meta requires an explicit call on the
+   * phone number to kick off the history backfill (step 2). On success it
+   * returns a `request_id` and, minutes later, pushes one or more `history`
+   * webhooks — OR a `history` webhook with error code 2593109 if the business
+   * chose not to share its history during Embedded Signup.
+   *
+   * This can only be done ONCE per onboarding (re-doing it requires the customer
+   * to offboard and complete Embedded Signup again), so we call it on connect and
+   * keep it non-blocking — a failure must never break the connection flow.
+   */
+  private async initiateWhatsAppHistorySync(
+    phoneId: string,
+    accessToken: string,
+  ): Promise<string | null> {
+    try {
+      const response = await fetch(
+        `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${phoneId}/smb_app_data?access_token=${accessToken}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', sync_type: 'history' }),
+        },
+      )
+
+      const body = (await response.json().catch(() => null)) as {
+        request_id?: string
+        error?: { message?: string }
+      } | null
+
+      if (!response.ok) {
+        this.logger.error(
+          `[WhatsApp History] Failed to initiate history sync for ${phoneId}: ${
+            body?.error?.message || JSON.stringify(body)
+          }`,
+        )
+        return null
+      }
+
+      this.logger.log(
+        `[WhatsApp History] Initiated history sync for ${phoneId} (request_id=${body?.request_id ?? 'n/a'})`,
+      )
+      return body?.request_id ?? null
+    } catch (error) {
+      this.logger.error(`[WhatsApp History] Error initiating history sync for ${phoneId}:`, error)
+      return null
     }
   }
 
