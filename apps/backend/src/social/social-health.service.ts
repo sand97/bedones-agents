@@ -195,6 +195,36 @@ export class SocialHealthService {
     }
   }
 
+  /**
+   * Records an outbound failure for visibility (error log) and warms the
+   * explanation bank, WITHOUT incrementing the consecutive-error counter or
+   * tripping the breaker. Use for user-triggered reads (catalog listing,
+   * provider posts) where React Query retries would otherwise disable the
+   * account on a single failed page load.
+   */
+  async logError(params: Omit<RecordErrorParams, 'forceDisableFeature'>): Promise<void> {
+    const { socialAccountId, provider, operation, feature, resource } = params
+    const { code, trace } = this.parseError(params.error)
+    try {
+      await this.prisma.socialAccountErrorLog.create({
+        data: {
+          socialAccountId,
+          provider,
+          feature: feature ?? null,
+          operation: operation ?? null,
+          resource: resource ?? null,
+          errorCode: code,
+          errorTrace: trace,
+        },
+      })
+      void this.errorExplanation
+        .getOrCreate({ provider, errorCode: code, errorTrace: trace, resource })
+        .catch(() => undefined)
+    } catch (error) {
+      this.logger.error(`logError failed for ${socialAccountId}: ${String(error)}`)
+    }
+  }
+
   // ─── Granular / explicit disabling ───
 
   /** Disables a single feature immediately (TikTok non-business, manual ops). */

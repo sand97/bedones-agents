@@ -412,6 +412,10 @@ export class SocialService {
       },
     })
 
+    // A successful (re)connect must clear any prior disabled / error state so
+    // the catalog can be listed again.
+    await this.socialHealth.clearHealth(socialAccount.id)
+
     // Save each catalog in our DB
     const savedCatalogs = []
     for (const metaCatalog of metaCatalogs) {
