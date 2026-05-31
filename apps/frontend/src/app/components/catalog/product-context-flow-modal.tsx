@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Modal, Input, Button, message } from 'antd'
 import type { TextAreaRef } from 'antd/es/input/TextArea'
 import { ArrowLeft, Send, Sparkles, AlertTriangle, Check, Pencil, X } from 'lucide-react'
@@ -17,6 +17,15 @@ interface ProductContextFlowModalProps {
   onSaved: () => void
   placeholderProducts?: Product[]
   placeholderCollections?: Collection[]
+  /**
+   * Edit-mode entry point: skip the picker and start the chat with the given
+   * targets already selected and the current context surfaced as a saved AI
+   * proposal. Used by the "Modifier le contexte" actions on a single product.
+   */
+  editMode?: {
+    targets: PickerEntity[]
+    currentContext: string
+  }
 }
 
 type Step = 'pick' | 'chat'
@@ -38,6 +47,7 @@ export function ProductContextFlowModal({
   onSaved,
   placeholderProducts,
   placeholderCollections,
+  editMode,
 }: ProductContextFlowModalProps) {
   const [step, setStep] = useState<Step>('pick')
   const [selected, setSelected] = useState<PickerEntity[]>([])
@@ -49,6 +59,37 @@ export function ProductContextFlowModal({
   // pair so users can't keep firing prompts unintentionally.
   const [savedMode, setSavedMode] = useState(false)
   const textareaRef = useRef<TextAreaRef | null>(null)
+
+  // Hydrate the initial state from editMode whenever the modal (re)opens in
+  // edit mode. Resets back to the picker for the normal add flow.
+  useEffect(() => {
+    if (!open) return
+    if (editMode) {
+      setStep('chat')
+      setSelected(editMode.targets)
+      setMessages([
+        {
+          id: 'init-ai',
+          role: 'ai',
+          proposal: {
+            hasConflict: false,
+            conflictReason: '',
+            suggestedContent: editMode.currentContext,
+          },
+          saved: true,
+        },
+      ])
+      setSavedMode(true)
+    } else {
+      setStep('pick')
+      setSelected([])
+      setMessages([])
+      setSavedMode(false)
+    }
+    setDraft('')
+    setAnalyzing(false)
+    setSavingMessageId(null)
+  }, [open, editMode])
 
   const reset = () => {
     setStep('pick')

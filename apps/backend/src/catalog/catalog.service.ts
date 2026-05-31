@@ -191,6 +191,36 @@ export class CatalogService {
   }
 
   /**
+   * Fetch a subset of catalog products by their Meta product IDs. Missing
+   * products are returned as `null` at the matching index so the caller can
+   * align the response with the request order (handy for placeholder rendering
+   * on the frontend).
+   */
+  async findProductsByIds(catalogId: string, productIds: string[]) {
+    const ids = Array.from(new Set(productIds.filter(Boolean)))
+    if (ids.length === 0)
+      return { products: [] as Array<ReturnType<typeof this.mapMetaProduct> | null> }
+    const accessToken = await this.resolveAccessToken(catalogId)
+
+    const results = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const url = `${this.META_API_BASE}/${id}?fields=${CatalogService.META_PRODUCT_FIELDS}&access_token=${accessToken}`
+          const res = await fetch(url)
+          if (!res.ok) return null
+          const data = (await res.json()) as Record<string, unknown>
+          return this.mapMetaProduct(data)
+        } catch {
+          return null
+        }
+      }),
+    )
+
+    const map = new Map(results.filter((r) => r !== null).map((r) => [String(r!.id), r]))
+    return { products: productIds.map((id) => map.get(id) ?? null) }
+  }
+
+  /**
    * Fetch a subset of catalog products by their retailer IDs, via Meta Graph API.
    * Resolves the access token from any social account linked to the catalog whose
    * providerId matches `catalogProviderId` (Meta catalog ID).

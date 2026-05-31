@@ -28,6 +28,8 @@ import { ProductContextFlowModal } from '@app/components/catalog/product-context
 import { PostLinkFlowModal } from '@app/components/catalog/post-link-flow-modal'
 import { ProductContextDetailModal } from '@app/components/catalog/product-context-detail-modal'
 import { LinkedPostsModal } from '@app/components/catalog/linked-posts-modal'
+import { SharedProductsModal } from '@app/components/catalog/shared-products-modal'
+import type { PickerEntity } from '@app/components/catalog/product-collection-picker'
 import type { CatalogArticle } from '@app/components/whatsapp/mock-data'
 import { AccountSwitcher } from '@app/components/social/account-switcher'
 import { useLayout } from '@app/contexts/layout-context'
@@ -91,9 +93,14 @@ function CatalogPage() {
 
   // Quick action wizards
   const [contextFlowOpen, setContextFlowOpen] = useState(false)
+  const [contextFlowEdit, setContextFlowEdit] = useState<{
+    targets: PickerEntity[]
+    currentContext: string
+  } | null>(null)
   const [postLinkFlowOpen, setPostLinkFlowOpen] = useState(false)
   // Per-product context / linked-posts modals
   const [contextDetailFor, setContextDetailFor] = useState<Product | null>(null)
+  const [sharedProductsConfig, setSharedProductsConfig] = useState<{ ids: string[] } | null>(null)
   const [linkedPostsFor, setLinkedPostsFor] = useState<{
     kind: 'product' | 'collection'
     id: string
@@ -745,14 +752,21 @@ function CatalogPage() {
       {selectedCatalog && (
         <>
           <ProductContextFlowModal
-            open={contextFlowOpen}
+            open={contextFlowOpen || !!contextFlowEdit}
             catalog={selectedCatalog}
             placeholderProducts={products}
             placeholderCollections={collections}
-            onClose={() => setContextFlowOpen(false)}
+            editMode={contextFlowEdit ?? undefined}
+            onClose={() => {
+              setContextFlowOpen(false)
+              setContextFlowEdit(null)
+            }}
             onSaved={() => {
-              // Other catalogue queries don't need refetching — context is a
-              // separate resource fetched on-demand by the detail modal.
+              // Refresh context-related queries so the detail / siblings views
+              // pick the new content up next time they're opened.
+              queryClient.invalidateQueries({
+                queryKey: ['get', '/catalog/{catalogId}/products/{productId}/context'],
+              })
             }}
           />
           <PostLinkFlowModal
@@ -773,6 +787,61 @@ function CatalogPage() {
               productId={contextDetailFor.id}
               productName={contextDetailFor.name}
               onClose={() => setContextDetailFor(null)}
+              onEditOne={(detail) => {
+                if (!contextDetailFor) return
+                const target: PickerEntity = {
+                  kind: 'product',
+                  id: contextDetailFor.id,
+                  retailerId: contextDetailFor.retailerId,
+                  name: contextDetailFor.name,
+                  imageUrl: contextDetailFor.imageUrl,
+                }
+                setContextFlowEdit({ targets: [target], currentContext: detail.content })
+                setContextDetailFor(null)
+              }}
+              onEditAll={async (detail) => {
+                // Hydrate every sibling so the chips that show up if the user
+                // hits "back" in the flow have proper names / images.
+                const ids = detail.sameContentProductIds
+                const known = new Map(products.map((p) => [p.id, p]))
+                const missing = ids.filter((id) => !known.has(id))
+                let fetched: (Product | null)[] = []
+                if (missing.length > 0) {
+                  try {
+                    const res = await catalogApi.getProductsByIds(selectedCatalog.id, missing)
+                    fetched = res.products
+                  } catch {
+                    fetched = []
+                  }
+                }
+                const fetchedMap = new Map(
+                  fetched.filter((p): p is Product => p !== null).map((p) => [p.id, p]),
+                )
+                const targets: PickerEntity[] = ids.map((id) => {
+                  const p = known.get(id) ?? fetchedMap.get(id)
+                  return {
+                    kind: 'product',
+                    id,
+                    retailerId: p?.retailerId,
+                    name: p?.name ?? 'Produit',
+                    imageUrl: p?.imageUrl,
+                  }
+                })
+                setContextFlowEdit({ targets, currentContext: detail.content })
+                setContextDetailFor(null)
+              }}
+              onViewSiblings={(detail) => {
+                setSharedProductsConfig({ ids: detail.sameContentProductIds })
+              }}
+            />
+          )}
+          {sharedProductsConfig && (
+            <SharedProductsModal
+              open={!!sharedProductsConfig}
+              catalogId={selectedCatalog.id}
+              productIds={sharedProductsConfig.ids}
+              placeholderProducts={products}
+              onClose={() => setSharedProductsConfig(null)}
             />
           )}
           <LinkedPostsModal
