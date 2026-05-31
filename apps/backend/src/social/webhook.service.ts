@@ -6,7 +6,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
 import { UploadService } from '../upload/upload.service'
 import { AIService, type AIAnalysisResult } from './ai.service'
-import { MessagingService } from './messaging.service'
+import { MessagingService, HISTORY_SYNC_WINDOW_DAYS } from './messaging.service'
 import { CatalogService } from '../catalog/catalog.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
@@ -991,7 +991,10 @@ export class WebhookService {
       for (const change of entry.changes || []) {
         const isMessageField = change.field === 'messages'
         const isMessageEchoField = change.field === 'smb_message_echoes'
-        if (!isMessageField && !isMessageEchoField) continue
+        // Coexistence history sync. The WABA must be subscribed to the
+        // `history` webhook field (configured in the Meta App Dashboard).
+        const isHistoryField = change.field === 'history'
+        if (!isMessageField && !isMessageEchoField && !isHistoryField) continue
 
         const value = change.value
         if (!value?.metadata?.phone_number_id) continue
@@ -1026,6 +1029,13 @@ export class WebhookService {
         }
 
         const orgId = socialAccount.organisationId
+
+        // Coexistence: Meta pushes up to ~6 months of chat history through the
+        // `history` field after onboarding. We backfill the 14-day window.
+        if (isHistoryField) {
+          await this.handleWhatsAppHistory(socialAccount.id, phoneNumberId, value, orgId)
+          continue
+        }
 
         // Handle status updates (sent, delivered, read)
         for (const status of value.statuses || []) {
@@ -1453,6 +1463,164 @@ export class WebhookService {
       platformMsgId: status.id,
       status: status.status,
     })
+  }
+
+  /**
+   * Persist a Coexistence history-sync webhook (field: `history`).
+   *
+   * Meta pushes up to ~6 months of chat history in chunked phases; we keep only
+   * the trailing 14-day window. Every message is written through
+   * {@link MessagingService.handleHistoricalMessage}, which dedups on the
+   * provider message id (wamid) — so a live webhook arriving during the sync
+   * never produces a duplicate. The account's history status is marked COMPLETED
+   * once the final chunk reports 100% progress.
+   */
+  private async handleWhatsAppHistory(
+    socialAccountId: string,
+    phoneNumberId: string,
+    value: WhatsAppWebhookValue,
+    orgId: string,
+  ) {
+    const contacts = value.contacts
+    const cutoff = new Date(Date.now() - HISTORY_SYNC_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+    let imported = 0
+    let maxProgress = 0
+
+    for (const chunk of value.history || []) {
+      const progress = Number(chunk.metadata?.progress ?? 0)
+      if (!Number.isNaN(progress)) maxProgress = Math.max(maxProgress, progress)
+
+      for (const thread of chunk.threads || []) {
+        const participantId = thread.id
+        if (!participantId) continue
+        const contact = contacts?.find((c) => c.wa_id === participantId)
+        const participantName = contact?.profile?.name || participantId
+
+        for (const msg of thread.messages || []) {
+          // Reactions are folded into their target message live; skip in history.
+          if (msg.type === 'reaction') continue
+
+          const timestamp = new Date(parseInt(msg.timestamp) * 1000)
+          if (Number.isNaN(timestamp.getTime()) || timestamp < cutoff) continue
+
+          // Direction: prefer Meta's explicit flag, fall back to sender identity.
+          const fromMe =
+            msg.history_context?.from_me === true ||
+            (msg.from !== undefined && msg.from !== participantId)
+
+          const content = await this.mapWhatsAppHistoryContent(socialAccountId, msg)
+          const created = await this.messagingService.handleHistoricalMessage({
+            socialAccountId,
+            participantId,
+            participantName,
+            platformThreadId: participantId,
+            platformMsgId: msg.id,
+            message: content.messageText,
+            senderId: fromMe ? phoneNumberId : participantId,
+            senderName: fromMe ? 'WhatsApp' : participantName,
+            isFromPage: fromMe,
+            mediaUrl: content.mediaUrl,
+            mediaType: content.mediaType,
+            fileName: content.fileName,
+            replyToMid: msg.context?.id || null,
+            deliveryStatus: fromMe ? msg.history_context?.status?.toLowerCase() || null : null,
+            metadata: content.metadata,
+            timestamp,
+          })
+          if (created) imported++
+        }
+      }
+    }
+
+    if (maxProgress >= 100) {
+      await this.prisma.socialAccount
+        .update({
+          where: { id: socialAccountId },
+          data: {
+            historySyncStatus: 'COMPLETED',
+            historySyncedAt: new Date(),
+            historySyncError: null,
+          },
+        })
+        .catch(() => undefined)
+    }
+
+    this.logger.log(
+      `[WhatsApp History] imported ${imported} message(s) for account ${socialAccountId} (progress=${maxProgress}%)`,
+    )
+
+    this.eventsGateway.emitToOrg(orgId, 'message:new', {
+      socialAccountId,
+      provider: 'WHATSAPP',
+      historyImported: imported,
+    })
+  }
+
+  /** Extract displayable content from a historical WhatsApp message. */
+  private async mapWhatsAppHistoryContent(
+    socialAccountId: string,
+    msg: WhatsAppHistoryMessage,
+  ): Promise<{
+    messageText: string
+    mediaUrl: string | null
+    mediaType: string | null
+    fileName: string | null
+    metadata: Record<string, unknown> | null
+  }> {
+    let messageText = ''
+    let mediaUrl: string | null = null
+    let mediaType: string | null = null
+    let fileName: string | null = null
+    let metadata: Record<string, unknown> | null = null
+
+    switch (msg.type) {
+      case 'text':
+        messageText = msg.text?.body || ''
+        break
+      case 'image':
+        mediaType = 'image'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.image?.id)
+        messageText = msg.image?.caption || ''
+        break
+      case 'video':
+        mediaType = 'video'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.video?.id)
+        messageText = msg.video?.caption || ''
+        break
+      case 'audio':
+        mediaType = 'audio'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.audio?.id)
+        break
+      case 'document':
+        mediaType = 'file'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.document?.id)
+        fileName = msg.document?.filename || null
+        break
+      case 'sticker':
+        mediaType = 'image'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.sticker?.id)
+        break
+      case 'interactive':
+      case 'button': {
+        const reply = this.extractWhatsAppButtonReply(msg)
+        if (reply) {
+          messageText = reply.title
+          metadata = {
+            kind: reply.kind,
+            replyId: reply.id,
+            replyTitle: reply.title,
+            ...(reply.description ? { replyDescription: reply.description } : {}),
+          }
+        } else {
+          messageText = `[${msg.type}]`
+        }
+        break
+      }
+      default:
+        messageText = msg.text?.body || `[${msg.type}]`
+    }
+
+    return { messageText, mediaUrl, mediaType, fileName, metadata }
   }
 
   private async markInboundMessagesAsRead(conversationId: string, orgId: string, readAt: Date) {
@@ -3330,6 +3498,7 @@ interface WhatsAppWebhookValue {
   contacts?: WhatsAppContact[]
   messages?: WhatsAppMessage[]
   message_echoes?: WhatsAppMessageEcho[]
+  history?: WhatsAppHistoryEntry[]
   statuses?: Array<{
     id: string
     status: string
@@ -3379,6 +3548,21 @@ interface WhatsAppMessageEcho extends WhatsAppMessage {
   to?: string
   to_user_id?: string
   from_user_id?: string
+}
+
+// ─── Coexistence message history (field: "history") ───
+interface WhatsAppHistoryEntry {
+  metadata?: {
+    phase?: string | number
+    chunk_order?: string | number
+    progress?: string | number
+  }
+  threads?: Array<{ id: string; messages?: WhatsAppHistoryMessage[] }>
+}
+
+interface WhatsAppHistoryMessage extends WhatsAppMessage {
+  to?: string
+  history_context?: { status?: string; from_me?: boolean }
 }
 
 // ─── TikTok webhook payload types ───

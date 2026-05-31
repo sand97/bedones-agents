@@ -12,6 +12,7 @@ import { EncryptionService } from '../auth/encryption.service'
 import { UploadService } from '../upload/upload.service'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
 import { AvatarSyncService } from './avatar-sync.service'
+import { MessageHistorySyncService } from './message-history-sync.service'
 import { SocialHealthService } from './social-health.service'
 import { ErrorExplanationService } from './error-explanation.service'
 import { featuresFromRequestedScopes } from './required-scopes.config'
@@ -49,6 +50,7 @@ export class SocialService {
     private configService: ConfigService,
     private encryptionService: EncryptionService,
     private avatarSyncService: AvatarSyncService,
+    private historySync: MessageHistorySyncService,
     private uploadService: UploadService,
     private socialHealth: SocialHealthService,
     private errorExplanation: ErrorExplanationService,
@@ -281,6 +283,9 @@ export class SocialService {
       // Mirror the (often temporary) Meta avatar URL to our own MinIO bucket
       // in the background so we don't lose the image when the URL expires.
       await this.avatarSyncService.enqueue(socialAccount.id)
+
+      // Backfill the last 14 days of conversations/messages for this page.
+      await this.historySync.enqueueInitialSync(socialAccount.id)
 
       savedPages.push(socialAccount)
     }
@@ -614,6 +619,9 @@ export class SocialService {
 
     await this.avatarSyncService.enqueue(socialAccount.id)
 
+    // Backfill the last 14 days of DMs for this account.
+    await this.historySync.enqueueInitialSync(socialAccount.id)
+
     // Scope verification: Instagram returns the granted permissions on the token
     // exchange. Reset the breaker on (re)connect, then disable any feature that
     // is still missing a required permission.
@@ -930,6 +938,9 @@ export class SocialService {
 
     await this.avatarSyncService.enqueue(socialAccount.id)
 
+    // Backfill the last 14 days of DMs for this account.
+    await this.historySync.enqueueInitialSync(socialAccount.id)
+
     // Scope verification: TikTok returns the granted scopes on the token
     // exchange and lets users uncheck individual permissions. Reset the breaker
     // on (re)connect, then disable any feature whose scopes are incomplete.
@@ -1196,6 +1207,10 @@ export class SocialService {
     })
 
     await this.avatarSyncService.enqueue(socialAccount.id)
+
+    // WhatsApp delivers history via Coexistence webhooks — flag the account as
+    // awaiting that history (no pull API).
+    await this.historySync.enqueueInitialSync(socialAccount.id)
 
     // A successful (re)connect resets the circuit breaker. WhatsApp scopes are
     // fixed and granted through Embedded Signup, so there is nothing to disable.
