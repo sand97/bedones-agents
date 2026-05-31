@@ -412,6 +412,10 @@ export class SocialService {
       },
     })
 
+    // A successful (re)connect must clear any prior disabled / error state so
+    // the catalog can be listed again.
+    await this.socialHealth.clearHealth(socialAccount.id)
+
     // Save each catalog in our DB
     const savedCatalogs = []
     for (const metaCatalog of metaCatalogs) {
@@ -2185,7 +2189,6 @@ export class SocialService {
     })
     if (!account) throw new NotFoundException('Social account not found')
     await this.assertMembership(userId, account.organisationId)
-    this.socialHealth.ensureOutboundAllowed(account)
 
     if (account.provider !== 'FACEBOOK' && account.provider !== 'INSTAGRAM') {
       return { posts: [] }
@@ -2218,7 +2221,8 @@ export class SocialService {
       const errorText = await response.text()
       this.logger.warn(`fetchProviderPosts ${account.provider} error: ${errorText}`)
       const httpError = new BadRequestException(`Meta API error: ${errorText}`)
-      await this.socialHealth.recordError({
+      // User-triggered read: log it (no breaker trip) so we don't lock the page out.
+      await this.socialHealth.logError({
         socialAccountId: account.id,
         provider: account.provider,
         operation: 'fetchProviderPosts',
@@ -2227,7 +2231,6 @@ export class SocialService {
       })
       throw httpError
     }
-    await this.socialHealth.recordSuccess(account.id)
 
     const data = (await response.json()) as {
       data: Array<Record<string, unknown>>

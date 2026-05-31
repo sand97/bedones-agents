@@ -376,9 +376,9 @@ export class CatalogService {
       this.resolveCatalogSocialAccount(catalogId),
     ])
 
-    // Circuit breaker: don't keep hitting Meta when the backing account is
-    // disabled — surface the disabled state to the user instead.
-    if (account) this.socialHealth.ensureOutboundAllowed(account)
+    // Note: catalog listing is a user-triggered READ, so we never gate it on the
+    // circuit breaker (and React Query retries would trip it almost instantly).
+    // We still surface a friendly error + log it for visibility on failure.
 
     // When filtering by collection, fetch from the product set endpoint
     const baseId = params?.collectionId || providerId
@@ -398,12 +398,12 @@ export class CatalogService {
       const errorText = await response.text()
       this.logger.error(`Meta list products error: ${errorText}`)
 
-      // Record the failure against the backing account (feeds the breaker) and
-      // resolve a human-friendly, multilingual explanation so the frontend can
-      // show a "social empty" state with a reconnect prompt + technical details.
+      // Log the failure (for visibility + the error bank) WITHOUT tripping the
+      // circuit breaker, then resolve a human-friendly, multilingual explanation
+      // so the frontend can show a "social empty" state with a reconnect prompt.
       let messages: Record<string, string> | null = null
       if (account) {
-        await this.socialHealth.recordError({
+        await this.socialHealth.logError({
           socialAccountId: account.id,
           provider: account.provider,
           operation: 'findProducts',
@@ -452,8 +452,6 @@ export class CatalogService {
           (p.description as string)?.toLowerCase().includes(q),
       )
     }
-
-    if (account) await this.socialHealth.recordSuccess(account.id)
 
     return {
       products: filtered,
