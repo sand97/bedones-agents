@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Button, Card, Checkbox, Form, Input, Modal, Select, Typography, message } from 'antd'
+import { Button, Card, Checkbox, Form, Input, Modal, Select, Spin, Typography, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Lock, Mail, BookOpen, HelpCircle, RotateCw, Send } from 'lucide-react'
@@ -76,6 +76,16 @@ function LoginPage() {
   const { t } = useTranslation()
   const search = Route.useSearch()
 
+  // Si une session est déjà active, on redirige l'utilisateur sans afficher le
+  // formulaire (dashboard, organisations ou onboarding selon son état — voir
+  // resolvePostAuthRoute). `retry: false` : un 401 (non connecté) doit basculer
+  // immédiatement sur le formulaire, sans réessais inutiles.
+  const meQuery = $api.useQuery('get', '/auth/me', {}, { retry: false })
+
+  useEffect(() => {
+    if (meQuery.data) navigateAfterAuth(navigate, meQuery.data)
+  }, [meQuery.data, navigate])
+
   const method: LoginMethod = search.method === 'email' ? 'email' : 'whatsapp'
 
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null)
@@ -85,6 +95,16 @@ function LoginPage() {
   const [cookieConsentOpen, setCookieConsentOpen] = useState(() => {
     return !document.cookie.split('; ').some((c) => c.startsWith('cookie_consent='))
   })
+
+  // Tant que la vérification de session est en cours — ou qu'elle a réussi et
+  // qu'on s'apprête à rediriger — on affiche un loader plutôt que le formulaire.
+  if (meQuery.isLoading || meQuery.data) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Spin size="large" />
+      </div>
+    )
+  }
 
   return (
     <div className="relative flex min-h-screen flex-col items-center overflow-hidden px-4 py-12">
