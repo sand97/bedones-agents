@@ -17,6 +17,9 @@ import { LoyaltyBonusTab } from '@app/components/loyalty/loyalty-bonus-tab'
 import { LoyaltyCampaignsTab } from '@app/components/loyalty/loyalty-campaigns-tab'
 import { launchWhatsAppSignup } from '@app/lib/facebook-sdk'
 import { useQueryClient } from '@tanstack/react-query'
+import { getStoredSelection, setStoredSelection } from '@app/lib/selection-storage'
+
+const LOYALTY_ACCOUNT_SCOPE = 'loyalty-account'
 
 const VALID_TABS = ['contacts', 'bonus', 'campaigns'] as const
 type LoyaltyTab = (typeof VALID_TABS)[number]
@@ -62,16 +65,29 @@ function LoyaltyPage() {
     [accountsQuery.data],
   )
 
-  const currentAccount =
-    whatsappAccounts.find((a) => a.id === search.account) || whatsappAccounts[0] || null
-
-  // Sync URL with first available account when none selected (or selected one is gone)
-  useEffect(() => {
-    if (whatsappAccounts.length === 0) return
-    if (!search.account || !whatsappAccounts.some((a) => a.id === search.account)) {
-      updateSearch({ account: whatsappAccounts[0].id })
+  // Selection priority: explicit URL param > last persisted choice for this
+  // org > first WhatsApp account.
+  const resolvedAccountId = useMemo(() => {
+    if (search.account && whatsappAccounts.some((a) => a.id === search.account)) {
+      return search.account
     }
-  }, [whatsappAccounts, search.account, updateSearch])
+    const stored = getStoredSelection(LOYALTY_ACCOUNT_SCOPE, orgSlug)
+    if (stored && whatsappAccounts.some((a) => a.id === stored)) return stored
+    return whatsappAccounts[0]?.id ?? null
+  }, [search.account, whatsappAccounts, orgSlug])
+
+  const currentAccount =
+    whatsappAccounts.find((a) => a.id === resolvedAccountId) || whatsappAccounts[0] || null
+
+  // Keep the URL in sync with the resolved selection so deep-links share the
+  // current account, and persist for the next visit.
+  useEffect(() => {
+    if (!resolvedAccountId) return
+    if (search.account !== resolvedAccountId) {
+      updateSearch({ account: resolvedAccountId })
+    }
+    setStoredSelection(LOYALTY_ACCOUNT_SCOPE, orgSlug, resolvedAccountId)
+  }, [resolvedAccountId, search.account, updateSearch, orgSlug])
 
   const connectMutation = $api.useMutation('post', '/social/connect/whatsapp')
 

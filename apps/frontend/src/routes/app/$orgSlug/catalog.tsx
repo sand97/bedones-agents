@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -43,6 +43,9 @@ import {
   updateDirectListCache,
   updateListItemCache,
 } from '@app/lib/query-cache'
+import { getStoredSelection, setStoredSelection } from '@app/lib/selection-storage'
+
+const CATALOG_SELECTION_SCOPE = 'catalog-current'
 
 export const Route = createFileRoute('/app/$orgSlug/catalog')({
   component: CatalogPage,
@@ -113,7 +116,6 @@ function CatalogPage() {
     [navigate],
   )
 
-  const selectedCatalogId = search.catalogId || null
   const selectedCollectionId = search.collection || undefined
 
   // ─── Queries ───
@@ -125,10 +127,25 @@ function CatalogPage() {
   })
 
   const catalogs = catalogsQuery.data || []
+
+  // Selection priority: explicit URL param > last persisted choice for this org
+  // > first available catalog. Mirrors the WhatsApp chat behaviour so the user
+  // lands on the catalog they last worked on.
+  const selectedCatalogId = useMemo(() => {
+    if (search.catalogId) return search.catalogId
+    const stored = getStoredSelection(CATALOG_SELECTION_SCOPE, orgSlug)
+    if (stored && catalogs.some((c) => c.id === stored)) return stored
+    return catalogs[0]?.id ?? null
+  }, [search.catalogId, catalogs, orgSlug])
+
   const selectedCatalog = useMemo(
     () => catalogs.find((c) => c.id === selectedCatalogId) ?? catalogs[0] ?? null,
     [catalogs, selectedCatalogId],
   )
+
+  useEffect(() => {
+    if (selectedCatalog) setStoredSelection(CATALOG_SELECTION_SCOPE, orgSlug, selectedCatalog.id)
+  }, [orgSlug, selectedCatalog])
 
   const productsQuery = useQuery({
     queryKey: [
