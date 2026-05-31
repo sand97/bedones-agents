@@ -1129,8 +1129,15 @@ export class SocialService {
       this.logger.warn(`[WhatsApp] Could not fetch business profile for ${phoneId}`)
     }
 
-    // 6. Webhook subscription is configured at app level in the Meta Dashboard
-    // (same as Instagram — no per-account subscription needed)
+    // 6. Subscribe our app to this WABA's webhooks. Unlike the *webhook fields*
+    // (configured once at the App Dashboard level), each WhatsApp Business
+    // Account must be explicitly subscribed via POST /{waba-id}/subscribed_apps,
+    // otherwise Meta routes NO webhook (messages, smb_message_echoes, history)
+    // to our callback for that WABA. Without this, a freshly connected number
+    // receives nothing until someone subscribes it by hand.
+    if (wabaId) {
+      await this.subscribeWabaToWebhook(wabaId, accessToken)
+    }
 
     // 7. Save the account
     const encryptedToken = await this.encryptionService.encrypt(accessToken)
@@ -1816,6 +1823,34 @@ export class SocialService {
       this.logger.log(`[Facebook Webhook] Subscribed page ${pageId}`)
     } catch (error) {
       this.logger.error(`[Facebook Webhook] Error subscribing page ${pageId}:`, error)
+    }
+  }
+
+  /**
+   * Subscribe our app to a WhatsApp Business Account's webhooks.
+   *
+   * Required for Meta to deliver ANY webhook (messages, smb_message_echoes,
+   * history, …) for the WABA — the App-level webhook *fields* config only
+   * decides which event types are sent once a WABA is subscribed. We don't pass
+   * `subscribed_fields`: the app inherits the fields enabled in the App
+   * Dashboard. Non-blocking (logs on failure) like the Facebook page variant.
+   */
+  private async subscribeWabaToWebhook(wabaId: string, accessToken: string) {
+    try {
+      const response = await fetch(
+        `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${wabaId}/subscribed_apps?access_token=${accessToken}`,
+        { method: 'POST' },
+      )
+
+      if (!response.ok) {
+        const error = await response.text()
+        this.logger.error(`[WhatsApp Webhook] Failed to subscribe WABA ${wabaId}: ${error}`)
+        return
+      }
+
+      this.logger.log(`[WhatsApp Webhook] Subscribed WABA ${wabaId}`)
+    } catch (error) {
+      this.logger.error(`[WhatsApp Webhook] Error subscribing WABA ${wabaId}:`, error)
     }
   }
 
