@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { antdProviderProps } from './theme'
+import { GlobalNumericInputMode } from './global-numeric-input-mode'
 
 const antdLocales = { fr: frFR, en: enUS } as const
 
@@ -15,7 +16,10 @@ export default function AntdProviders({ children }: { children: ReactNode }) {
 
   return (
     <ConfigProvider {...antdProviderProps} locale={locale}>
-      <AntdApp>{children}</AntdApp>
+      <AntdApp>
+        <GlobalNumericInputMode />
+        {children}
+      </AntdApp>
     </ConfigProvider>
   )
 }
