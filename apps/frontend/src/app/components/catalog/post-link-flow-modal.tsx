@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Modal, Button, Select, Spin, Empty, Input, Checkbox, message } from 'antd'
 import { ArrowLeft, Link2, Search } from 'lucide-react'
-import { catalogApi, type Catalog } from '@app/lib/api/agent-api'
+import { catalogApi, type Catalog, type Collection, type Product } from '@app/lib/api/agent-api'
 import {
   getSocialAccounts,
   getProviderPostsForAccount,
@@ -12,6 +12,7 @@ import {
   ProductCollectionPicker,
   type PickerEntity,
 } from '@app/components/catalog/product-collection-picker'
+import { FacebookIcon, InstagramIcon, TikTokIcon } from '@app/components/icons/social-icons'
 
 interface PostLinkFlowModalProps {
   open: boolean
@@ -19,6 +20,33 @@ interface PostLinkFlowModalProps {
   organisationId: string
   onClose: () => void
   onSaved: () => void
+  placeholderProducts?: Product[]
+  placeholderCollections?: Collection[]
+}
+
+function ProviderAvatar({
+  provider,
+  profilePictureUrl,
+  size = 20,
+}: {
+  provider: string
+  profilePictureUrl?: string | null
+  size?: number
+}) {
+  if (profilePictureUrl) {
+    return (
+      <img
+        src={profilePictureUrl}
+        alt=""
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover' }}
+      />
+    )
+  }
+  const style = { width: size, height: size }
+  if (provider === 'FACEBOOK') return <FacebookIcon style={{ ...style, color: '#1877F2' }} />
+  if (provider === 'INSTAGRAM') return <InstagramIcon style={{ ...style, color: '#E1306C' }} />
+  if (provider === 'TIKTOK') return <TikTokIcon style={{ ...style, color: '#111b21' }} />
+  return null
 }
 
 type Step = 'pick' | 'page' | 'posts'
@@ -29,6 +57,8 @@ export function PostLinkFlowModal({
   organisationId,
   onClose,
   onSaved,
+  placeholderProducts,
+  placeholderCollections,
 }: PostLinkFlowModalProps) {
   const [step, setStep] = useState<Step>('pick')
   const [selected, setSelected] = useState<PickerEntity[]>([])
@@ -53,19 +83,30 @@ export function PostLinkFlowModal({
     enabled: !!accountId && step === 'posts',
   })
 
-  // Pages that can serve a post feed (FB pages, IG accounts). Skip channels
-  // that don't expose one (WhatsApp phone numbers, TikTok in this build).
+  // Pages that can serve a post feed. WhatsApp numbers don't expose one;
+  // everything else (FB, IG, TikTok) does.
+  const linkableAccounts = useMemo(
+    () =>
+      (accountsQuery.data ?? []).filter((a: SocialAccountResponse) => a.provider !== 'WHATSAPP'),
+    [accountsQuery.data],
+  )
+
   const accountOptions = useMemo(
     () =>
-      (accountsQuery.data ?? [])
-        .filter(
-          (a: SocialAccountResponse) => a.provider === 'FACEBOOK' || a.provider === 'INSTAGRAM',
-        )
-        .map((a: SocialAccountResponse) => ({
-          value: a.id,
-          label: a.pageName || a.username || a.provider,
-        })),
-    [accountsQuery.data],
+      linkableAccounts.map((a: SocialAccountResponse) => ({
+        value: a.id,
+        label: (
+          <span className="flex items-center gap-2">
+            <ProviderAvatar
+              provider={a.provider}
+              profilePictureUrl={a.profilePictureUrl}
+              size={18}
+            />
+            <span className="truncate">{a.pageName || a.username || a.provider}</span>
+          </span>
+        ),
+      })),
+    [linkableAccounts],
   )
 
   const togglePost = (postId: string) => {
@@ -121,6 +162,7 @@ export function PostLinkFlowModal({
       footer={null}
       destroyOnHidden
       width={560}
+      centered
       styles={{ body: { padding: 0 } }}
       title={null}
       closable={false}
@@ -131,6 +173,8 @@ export function PostLinkFlowModal({
           selected={selected}
           onChange={setSelected}
           onNext={() => setStep('page')}
+          placeholderProducts={placeholderProducts}
+          placeholderCollections={placeholderCollections}
         />
       )}
 

@@ -83,6 +83,7 @@ export function ProductContextDetailModal({
         </Button>,
       ]}
       width={520}
+      centered
     >
       {loading ? (
         <Skeleton active />

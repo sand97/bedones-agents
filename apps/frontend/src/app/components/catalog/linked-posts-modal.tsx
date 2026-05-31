@@ -84,6 +84,7 @@ export function LinkedPostsModal({ open, catalogId, entity, onClose }: LinkedPos
       title={entity?.name ? `Posts liés – ${entity.name}` : 'Posts liés'}
       footer={null}
       width={560}
+      centered
     >
       {linksQuery.isLoading ? (
         <div className="flex items-center justify-center py-12">

@@ -2190,22 +2190,51 @@ export class SocialService {
     if (!account) throw new NotFoundException('Social account not found')
     await this.assertMembership(userId, account.organisationId)
 
-    if (account.provider !== 'FACEBOOK' && account.provider !== 'INSTAGRAM') {
+    if (account.provider === 'WHATSAPP') {
       return { posts: [] }
+    }
+
+    // TikTok has no live posts endpoint we can hit here — videos are synced
+    // periodically into the local Post table via the Business API. Serve that
+    // table directly with the same shape as Meta returns.
+    if (account.provider === 'TIKTOK') {
+      const search = params?.search?.trim().toLowerCase()
+      const limit = Math.min(params?.limit ?? 25, 50)
+      const posts = await this.prisma.post.findMany({
+        where: {
+          socialAccountId: account.id,
+          ...(search ? { message: { contains: search, mode: 'insensitive' } } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      })
+      return {
+        posts: posts.map((p) => ({
+          id: p.id,
+          message: p.message,
+          imageUrl: p.imageUrl,
+          permalinkUrl: p.permalinkUrl,
+          createdTime: p.createdAt.toISOString(),
+        })),
+      }
     }
 
     const accessToken = await this.encryptionService.decrypt(account.accessToken)
     const limit = Math.min(params?.limit ?? 25, 50)
 
-    const { edge, fields } =
+    const { edge, fields, baseHost } =
       account.provider === 'FACEBOOK'
         ? {
             edge: 'posts',
             fields: 'id,message,full_picture,permalink_url,created_time',
+            baseHost: 'https://graph.facebook.com',
           }
         : {
             edge: 'media',
             fields: 'id,caption,media_url,thumbnail_url,permalink,timestamp',
+            // Instagram Basic Display / IG Login tokens go through graph.instagram.com.
+            // Using graph.facebook.com here returns "Cannot parse access token".
+            baseHost: 'https://graph.instagram.com',
           }
 
     const query = new URLSearchParams({
@@ -2215,7 +2244,7 @@ export class SocialService {
     })
     if (params?.after) query.set('after', params.after)
 
-    const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${account.providerAccountId}/${edge}?${query}`
+    const url = `${baseHost}/${FACEBOOK_GRAPH_API_VERSION}/${account.providerAccountId}/${edge}?${query}`
     const response = await fetch(url)
     if (!response.ok) {
       const errorText = await response.text()
