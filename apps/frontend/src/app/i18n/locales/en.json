@@ -28,7 +28,6 @@
     "previous": "Previous",
     "next": "Next"
   },
-
   "sidebar": {
     "agents": "My Agents",
     "tickets": "Tickets",
@@ -57,14 +56,12 @@
     "use_french": "Utiliser le Français",
     "recap": "Overview"
   },
-
   "errors": {
     "AUTH_INVALID_CREDENTIALS": "Invalid email or password",
     "AUTH_SESSION_MISSING": "Session missing",
     "AUTH_SESSION_EXPIRED": "Session expired",
     "AUTH_SESSION_INVALID": "Invalid session"
   },
-
   "auth": {
     "title": "Login / Sign up",
     "login": "Login",
@@ -94,19 +91,16 @@
     "full_name_placeholder": "Ex: Jane Smith",
     "name_required": "Please enter your name"
   },
-
   "org": {
     "create": "Create an organization",
     "create_error": "Error creating organization",
     "update_error": "Error updating organization"
   },
-
   "upload": {
     "error": "Upload error",
     "media_error": "Media upload error",
     "label": "Upload"
   },
-
   "social": {
     "connected_accounts": "Connected accounts",
     "facebook_connect_error": "Facebook connection error",
@@ -119,9 +113,18 @@
     "reply_error": "Error replying",
     "hide_error": "Error hiding",
     "delete_error": "Error deleting",
-    "connection_error": "Connection error"
+    "connection_error": "Connection error",
+    "error_details_title": "Error details",
+    "error_generic": "Something went wrong with this resource. Please reconnect it.",
+    "error_show_details": "Show details",
+    "error_reconnect_hint": "Reconnect the affected resource to restore the service.",
+    "feature_messaging": "Messaging",
+    "feature_comments": "Comments",
+    "feature_disabled_tooltip": "Unavailable: {{features}}. Reconnect to re-enable.",
+    "account_disabled_tooltip": "This account is disabled after repeated errors. Reconnect it.",
+    "reconnect_unavailable": "Reconnect is unavailable for this resource.",
+    "reconnect_success": "Resource reconnected successfully."
   },
-
   "comments": {
     "facebook_label": "Facebook Comments",
     "instagram_label": "Instagram Comments",
@@ -183,7 +186,6 @@
     "no_comments_desc": "Comments on your {{provider}} posts will appear here",
     "view_comments": "View comments"
   },
-
   "comments_config": {
     "title_short": "Configuration",
     "title": "Comments configuration",
@@ -216,7 +218,6 @@
     "catalog_description": "Link a catalog to this page so the agent can detect product references in comments and respond.",
     "catalog_placeholder": "No catalog linked"
   },
-
   "chat": {
     "no_conversations": "No conversations",
     "select_conversation": "Select a conversation",
@@ -370,7 +371,6 @@
     "preview_message": "Message",
     "preview_reaction": "Reaction"
   },
-
   "feedback": {
     "title": "Improve the response",
     "subtitle": "Help the agent answer better next time",
@@ -386,7 +386,6 @@
     "you": "You",
     "error_generic": "Something went wrong. Please try again."
   },
-
   "catalog_link": {
     "title": "Associate a catalog",
     "phone_number": "WhatsApp number",
@@ -394,7 +393,6 @@
     "select_placeholder": "Select a catalog...",
     "associate": "Associate"
   },
-
   "whatsapp_config": {
     "title": "WhatsApp Configuration",
     "phone_info": "Phone Information",
@@ -412,7 +410,6 @@
     "associate_catalog": "Associate catalog",
     "label_placeholder": "Label name"
   },
-
   "members": {
     "title": "Members",
     "selected_count": "{{count}} member(s) selected",
@@ -448,7 +445,6 @@
     "copy_invite": "Copy invitation",
     "invitation_share_message": "The invitation for {{name}} has been created. Share this link so they can join the organization."
   },
-
   "notifications": {
     "eyebrow": "Notifications",
     "title_prefix": "Settings for",
@@ -487,7 +483,6 @@
       "message_daily_summary_desc": "Number of conversations, messages and tickets for the day."
     }
   },
-
   "tickets": {
     "title": "Tickets",
     "create": "Create a ticket",
@@ -531,7 +526,6 @@
     "all_statuses": "All statuses",
     "view_diff": "View before / after"
   },
-
   "catalog": {
     "title": "Catalog",
     "connect_title": "Connect your catalog",
@@ -592,9 +586,10 @@
     "connect_button": "Connect",
     "status_published": "Published",
     "status_draft": "Draft",
-    "status_archived": "Archived"
+    "status_archived": "Archived",
+    "error_title": "Unable to load your catalogue",
+    "error_description": "We couldn't load your products. Please reconnect your catalogue."
   },
-
   "promotions": {
     "title": "Promotions",
     "create": "Create a promotion",
@@ -666,7 +661,6 @@
     "created": "Promotion created successfully",
     "updated": "Promotion updated successfully"
   },
-
   "agent": {
     "title": "My Agent",
     "setup_title": "Configure your AI agent",
@@ -727,7 +721,6 @@
     "select_exclude_labels_placeholder": "Select labels to exclude",
     "no_labels_found": "No labels found. Create labels in your messaging pages."
   },
-
   "stats": {
     "title": "Statistics & Usage",
     "comments": "comments",
@@ -736,13 +729,11 @@
     "messages_by_network": "Messages by network",
     "comments_by_network": "Comments by network"
   },
-
   "plan": {
     "title": "Subscription",
     "pay_card": "Pay by card",
     "pay_mobile": "Pay by Mobile Money"
   },
-
   "legal": {
     "title": "Help & Resources",
     "faq_title": "Frequently asked questions",
@@ -754,7 +745,6 @@
     "privacy": "Privacy policy",
     "terms": "Terms of service"
   },
-
   "help": {
     "page_title": "Help & Resources",
     "faq_section_title": "Frequently asked questions",
@@ -808,7 +798,6 @@
     "legal_section_title": "Legal information",
     "legal_section_subtitle": "View legal documents related to using Bedones"
   },
-
   "invitation": {
     "invalid_link": "This invitation link is invalid, expired, or has already been used.",
     "phone": "Phone",
@@ -829,7 +818,6 @@
     "accept": "Accept invitation",
     "rejected": "Invitation declined"
   },
-
   "pagination": {
     "item": "item",
     "items": "items",
@@ -837,17 +825,14 @@
     "next": "Next",
     "of": "of"
   },
-
   "date": {
     "today": "Today",
     "yesterday": "Yesterday",
     "at": "at"
   },
-
   "format": {
     "date_time": "MM/DD at HH:mm"
   },
-
   "dashboard": {
     "title": "Overview",
     "welcome_title": "Welcome to Bedones",
@@ -861,7 +846,6 @@
     "agent_description": "Create an agent to manage your conversations and create tickets that will be sent to your team members.",
     "agent_members_link": "Add team members",
     "agent_description_2": " to your team. You can also create promotions that will be taken into account by the agent.",
-
     "step_catalog_title": "Catalog",
     "step_catalog_desc": "We need to understand your products. Add a Commerce Manager catalog to get started — we'll walk you through it step by step.",
     "step_catalog_action": "Configure my catalog",
@@ -874,7 +858,6 @@
     "step_agent_action": "Continue configuration",
     "step_agent_action_edit": "Edit agent",
     "step_progress": "Step {{current}} of {{total}}",
-
     "no_accounts_title": "No connected accounts",
     "no_accounts_desc": "Connect a social network to start managing your interactions from Bedones.",
     "network_accounts_count_one": "{{count}} connected account",
@@ -882,29 +865,26 @@
     "account_no_name": "{{provider}} account",
     "action_comments": "Comments",
     "action_messaging": "Messaging",
-
     "setup_success_title": "{{subject}} successfully configured",
     "setup_success_desc": "You can now move on to configuring one of your other accounts.",
     "setup_success_later": "Later",
-    "setup_success_continue": "Continue"
+    "setup_success_continue": "Continue",
+    "account_needs_reconnect": "Needs reconnect",
+    "action_reconnect": "Reconnect"
   },
-
   "meta": {
     "title": "Bedones — Social CRM",
     "description": "Centralize your social interactions into business opportunities."
   },
-
   "loyalty": {
     "title": "Loyalty program",
     "setup_title": "Connect a WhatsApp number to get started",
     "setup_desc": "You need to connect a WhatsApp account so we can send loyalty reminders to your customers.",
     "setup_btn": "Connect a WhatsApp number",
     "connect_label": "Connect a number",
-
     "tab_contacts": "Contacts",
     "tab_bonus": "Bonus",
     "tab_campaigns": "Campaigns",
-
     "contact_create_title": "Add a contact",
     "contact_edit_title": "Edit contact",
     "contact_name": "Name",
@@ -920,7 +900,6 @@
     "contact_updated": "Contact updated",
     "confirm_delete_contact_title": "Delete contact",
     "confirm_delete_contact_message": "Are you sure you want to delete the contact \"{{name}}\"?",
-
     "bonus_create_title": "Create a bonus",
     "bonus_edit_title": "Edit bonus",
     "bonus_name": "Name",
@@ -936,7 +915,6 @@
     "bonus_updated": "Bonus updated",
     "confirm_delete_bonus_title": "Delete bonus",
     "confirm_delete_bonus_message": "Are you sure you want to delete the bonus \"{{name}}\"?",
-
     "target_spend": "Total amount spent",
     "target_order_count": "Number of orders",
     "target_products": "Ordered products",
@@ -949,7 +927,6 @@
     "select_products": "Select products",
     "edit_selection": "Edit selection",
     "products_count": "{{count}} products",
-
     "reward": "Reward",
     "reward_type": "Reward type",
     "reward_products": "Free products",
@@ -959,7 +936,6 @@
     "reward_percent_value": "Discount percentage",
     "no_reward_products": "No free products",
     "reward_products_hint": "Pick the products offered to the customer when targets are met.",
-
     "templates": "Templates",
     "templates_title": "Templates",
     "templates_manage": "Manage your templates",
@@ -1056,7 +1032,6 @@
     "template_updated": "Template updated",
     "confirm_delete_template_title": "Delete template",
     "confirm_delete_template_message": "Are you sure you want to delete the template \"{{name}}\"?",
-
     "campaign_create_title": "Launch a campaign",
     "campaign_edit_title": "Edit campaign",
     "campaign_general_title": "Campaigns",
@@ -1132,22 +1107,18 @@
     "campaign_updated": "Campaign updated",
     "confirm_delete_campaign_title": "Delete campaign",
     "confirm_delete_campaign_message": "Are you sure you want to delete the campaign \"{{name}}\"?",
-
     "segment_criteria": "Segment criteria",
     "segment_criteria_hint": "Pick the minimum thresholds to target customers worth re-engaging.",
     "criteria_min_spend": "Minimum spend reached (FCFA)",
     "criteria_min_orders": "Minimum number of orders",
     "criteria_min_products": "Minimum count of eligible products",
-
     "frequency_once": "Once",
     "frequency_daily": "Daily",
     "frequency_weekly": "Weekly",
     "frequency_monthly": "Monthly",
-
     "status_scheduled": "Scheduled",
     "status_running": "Running",
     "status_completed": "Completed",
-
     "col_schedule": "Schedule",
     "col_started": "Started",
     "col_ends": "Ends",
@@ -1156,7 +1127,6 @@
     "col_read": "Read",
     "col_replied": "Replies"
   },
-
   "tiktok_business": {
     "modal_title": "TikTok Business Account Required",
     "description": "To use TikTok direct messages, your account must be a Business account (not Creator or Personal). Follow these steps to convert it:",

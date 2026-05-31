@@ -10,6 +10,9 @@ import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { EncryptionService } from '../auth/encryption.service'
+import { SocialHealthService } from '../social/social-health.service'
+import { ErrorExplanationService, redactSecrets } from '../social/error-explanation.service'
+import type { SocialFeature, SocialProvider } from 'generated/prisma/enums'
 
 @Injectable()
 export class CatalogService {
@@ -44,6 +47,8 @@ export class CatalogService {
     private config: ConfigService,
     private gateway: EventsGateway,
     private encryptionService: EncryptionService,
+    private socialHealth: SocialHealthService,
+    private errorExplanation: ErrorExplanationService,
   ) {}
 
   // ─── CRUD ───
@@ -365,10 +370,15 @@ export class CatalogService {
       collectionId?: string
     },
   ) {
-    const [accessToken, providerId] = await Promise.all([
+    const [accessToken, providerId, account] = await Promise.all([
       this.resolveAccessToken(catalogId),
       this.getCatalogProviderId(catalogId),
+      this.resolveCatalogSocialAccount(catalogId),
     ])
+
+    // Circuit breaker: don't keep hitting Meta when the backing account is
+    // disabled — surface the disabled state to the user instead.
+    if (account) this.socialHealth.ensureOutboundAllowed(account)
 
     // When filtering by collection, fetch from the product set endpoint
     const baseId = params?.collectionId || providerId
@@ -385,9 +395,38 @@ export class CatalogService {
     const response = await fetch(url)
 
     if (!response.ok) {
-      const error = await response.text()
-      this.logger.error(`Meta list products error: ${error}`)
-      throw new BadRequestException(`Meta API error: ${error}`)
+      const errorText = await response.text()
+      this.logger.error(`Meta list products error: ${errorText}`)
+
+      // Record the failure against the backing account (feeds the breaker) and
+      // resolve a human-friendly, multilingual explanation so the frontend can
+      // show a "social empty" state with a reconnect prompt + technical details.
+      let messages: Record<string, string> | null = null
+      if (account) {
+        await this.socialHealth.recordError({
+          socialAccountId: account.id,
+          provider: account.provider,
+          operation: 'findProducts',
+          resource: 'catalog',
+          error: new BadRequestException(`Meta API error: ${errorText}`),
+        })
+        messages = await this.errorExplanation.getOrCreate({
+          provider: account.provider,
+          errorCode: this.extractProviderErrorCode(errorText),
+          errorTrace: errorText,
+          resource: 'catalog',
+        })
+      }
+
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'CatalogFetchError',
+        code: 'catalog_fetch_failed',
+        resource: 'catalog',
+        message: messages?.en ?? 'Unable to load your catalogue. Please reconnect it to continue.',
+        messages,
+        technical: redactSecrets(errorText).slice(0, 2000),
+      })
     }
 
     const data = (await response.json()) as {
@@ -413,6 +452,8 @@ export class CatalogService {
           (p.description as string)?.toLowerCase().includes(q),
       )
     }
+
+    if (account) await this.socialHealth.recordSuccess(account.id)
 
     return {
       products: filtered,
@@ -528,6 +569,37 @@ export class CatalogService {
       throw new NotFoundException('Catalogue ou providerId introuvable')
     }
     return catalog.providerId
+  }
+
+  /** The social account backing a catalog — used to gate/record outbound calls. */
+  private async resolveCatalogSocialAccount(catalogId: string): Promise<{
+    id: string
+    provider: SocialProvider
+    disabled: boolean
+    featureDisabled: SocialFeature[]
+  } | null> {
+    const catalog = await this.prisma.catalog.findUnique({
+      where: { id: catalogId },
+      include: {
+        socialAccounts: {
+          include: {
+            socialAccount: {
+              select: { id: true, provider: true, disabled: true, featureDisabled: true },
+            },
+          },
+        },
+      },
+    })
+    return catalog?.socialAccounts[0]?.socialAccount ?? null
+  }
+
+  /** Parses a Meta/TikTok error code from a raw provider error payload. */
+  private extractProviderErrorCode(text: string): string | null {
+    const code = text.match(/"code"\s*:\s*(\d+)/)
+    const sub = text.match(/"error_subcode"\s*:\s*(\d+)/)
+    if (code) return sub ? `${code[1]}/${sub[1]}` : code[1]
+    const type = text.match(/"type"\s*:\s*"([A-Za-z]+Exception)"/)
+    return type ? type[1] : null
   }
 
   // ─── WhatsApp Commerce Settings ───

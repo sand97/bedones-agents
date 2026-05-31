@@ -12,6 +12,9 @@ import { EncryptionService } from '../auth/encryption.service'
 import { UploadService } from '../upload/upload.service'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
 import { AvatarSyncService } from './avatar-sync.service'
+import { SocialHealthService } from './social-health.service'
+import { ErrorExplanationService } from './error-explanation.service'
+import { featuresFromRequestedScopes } from './required-scopes.config'
 
 interface FacebookPage {
   id: string
@@ -47,11 +50,31 @@ export class SocialService {
     private encryptionService: EncryptionService,
     private avatarSyncService: AvatarSyncService,
     private uploadService: UploadService,
+    private socialHealth: SocialHealthService,
+    private errorExplanation: ErrorExplanationService,
   ) {}
 
   private getMetaGraphReadTokens(primaryToken?: string | null): string[] {
     const systemUserToken = this.configService.get<string>('META_SYSTEM_USER')
     return [primaryToken, systemUserToken].filter((token): token is string => Boolean(token))
+  }
+
+  /** Human-facing resource name used in error explanations / reconnect prompts. */
+  private resourceForProvider(provider: string): string {
+    switch (provider) {
+      case 'FACEBOOK':
+        return 'page'
+      case 'INSTAGRAM':
+        return 'instagram'
+      case 'WHATSAPP':
+        return 'whatsapp'
+      case 'TIKTOK':
+        return 'tiktok'
+      case 'FACEBOOK_CATALOG':
+        return 'catalog'
+      default:
+        return 'account'
+    }
   }
 
   private asRecord(value: unknown): Record<string, unknown> {
@@ -262,8 +285,41 @@ export class SocialService {
       savedPages.push(socialAccount)
     }
 
+    // Verify the user actually granted every permission each requested feature
+    // needs. A successful connect resets the circuit breaker; missing scopes
+    // re-disable the affected feature until the next correct reconnect.
+    const grantedScopes = await this.fetchFacebookGrantedScopes(userAccessToken)
+    const intendedFeatures = featuresFromRequestedScopes(newScopes)
+    for (const account of savedPages) {
+      await this.socialHealth.clearHealth(account.id)
+      if (intendedFeatures.length > 0) {
+        await this.socialHealth.syncScopeHealth({
+          socialAccountId: account.id,
+          provider: 'FACEBOOK',
+          grantedScopes,
+          intendedFeatures,
+        })
+      }
+    }
+
     this.logger.log(`[Facebook] ✅ Connected ${savedPages.length} pages for org ${organisationId}`)
     return savedPages
+  }
+
+  /** Reads the permissions actually granted on a Meta user access token. */
+  private async fetchFacebookGrantedScopes(userAccessToken: string): Promise<string[]> {
+    try {
+      const url = new URL(`https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/me/permissions`)
+      url.searchParams.set('access_token', userAccessToken)
+      const res = await fetch(url.toString())
+      if (!res.ok) return []
+      const body = (await res.json()) as {
+        data?: Array<{ permission: string; status: string }>
+      }
+      return (body.data ?? []).filter((p) => p.status === 'granted').map((p) => p.permission)
+    } catch {
+      return []
+    }
   }
 
   // ─── Connect Facebook Catalogs ───
@@ -554,10 +610,42 @@ export class SocialService {
 
     await this.avatarSyncService.enqueue(socialAccount.id)
 
+    // Scope verification: Instagram returns the granted permissions on the token
+    // exchange. Reset the breaker on (re)connect, then disable any feature that
+    // is still missing a required permission.
+    const grantedScopes = this.parseInstagramPermissions(
+      (tokenData as { permissions?: unknown }).permissions,
+      mergedScopes,
+    )
+    await this.socialHealth.clearHealth(socialAccount.id)
+    const intendedFeatures = featuresFromRequestedScopes(
+      newScopes.length > 0 ? newScopes : mergedScopes,
+    )
+    if (intendedFeatures.length > 0) {
+      await this.socialHealth.syncScopeHealth({
+        socialAccountId: socialAccount.id,
+        provider: 'INSTAGRAM',
+        grantedScopes,
+        intendedFeatures,
+      })
+    }
+
     this.logger.log(
       `[Instagram] ✅ Connected account "${profileRaw.username}" (${socialAccount.id}) for org ${organisationId}`,
     )
     return socialAccount
+  }
+
+  /** Normalizes Instagram's granted `permissions` (CSV string or array). */
+  private parseInstagramPermissions(value: unknown, fallback: string[]): string[] {
+    if (Array.isArray(value)) return value.map((v) => String(v))
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    }
+    return fallback
   }
 
   // ─── Check TikTok Business Account ───
@@ -838,6 +926,31 @@ export class SocialService {
 
     await this.avatarSyncService.enqueue(socialAccount.id)
 
+    // Scope verification: TikTok returns the granted scopes on the token
+    // exchange and lets users uncheck individual permissions. Reset the breaker
+    // on (re)connect, then disable any feature whose scopes are incomplete.
+    const rawTikTokScope =
+      (tokenPayload as { scope?: string }).scope ??
+      (tokenPayload as { data?: { scope?: string } }).data?.scope ??
+      ''
+    const grantedTikTokScopes =
+      rawTikTokScope.trim().length > 0
+        ? rawTikTokScope
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : mergedScopes
+    await this.socialHealth.clearHealth(socialAccount.id)
+    const intendedTikTokFeatures = featuresFromRequestedScopes(requestedScopes)
+    if (intendedTikTokFeatures.length > 0) {
+      await this.socialHealth.syncScopeHealth({
+        socialAccountId: socialAccount.id,
+        provider: 'TIKTOK',
+        grantedScopes: grantedTikTokScopes,
+        intendedFeatures: intendedTikTokFeatures,
+      })
+    }
+
     this.logger.log(
       `[TikTok] ✅ Connected account "${displayName}" (${socialAccount.id}) for org ${organisationId}`,
     )
@@ -1079,6 +1192,10 @@ export class SocialService {
     })
 
     await this.avatarSyncService.enqueue(socialAccount.id)
+
+    // A successful (re)connect resets the circuit breaker. WhatsApp scopes are
+    // fixed and granted through Embedded Signup, so there is nothing to disable.
+    await this.socialHealth.clearHealth(socialAccount.id)
 
     this.logger.log(
       `[WhatsApp] ✅ Connected "${displayName}" (number=${displayPhone || 'n/a'}, phone=${phoneId}, waba=${wabaId}) for org ${organisationId}`,
@@ -1476,7 +1593,15 @@ export class SocialService {
       include: {
         post: {
           include: {
-            socialAccount: { select: { id: true, provider: true, organisationId: true } },
+            socialAccount: {
+              select: {
+                id: true,
+                provider: true,
+                organisationId: true,
+                disabled: true,
+                featureDisabled: true,
+              },
+            },
           },
         },
       },
@@ -1955,6 +2080,58 @@ export class SocialService {
     })
   }
 
+  // ─── Account health (for the "reconnect" error state) ───
+
+  async getAccountHealth(userId: string, accountId: string) {
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: accountId },
+      select: {
+        provider: true,
+        organisationId: true,
+        disabled: true,
+        disabledReason: true,
+        featureDisabled: true,
+        errorLogs: { take: 1, orderBy: { createdAt: 'desc' } },
+      },
+    })
+    if (!account) throw new NotFoundException('Social account not found')
+    await this.assertMembership(userId, account.organisationId)
+
+    const last = account.errorLogs[0]
+    let message: Record<string, string> | null = null
+    if (last) {
+      // Serve from the bank if warmed; otherwise generate + cache on demand.
+      const signature = this.errorExplanation.buildSignature(
+        last.provider,
+        last.errorCode,
+        last.resource,
+      )
+      message =
+        (await this.errorExplanation.lookup(signature)) ??
+        (await this.errorExplanation.getOrCreate({
+          provider: last.provider,
+          errorCode: last.errorCode,
+          errorTrace: last.errorTrace,
+          resource: last.resource,
+        }))
+    }
+
+    return {
+      disabled: account.disabled,
+      disabledReason: account.disabledReason ?? undefined,
+      featureDisabled: account.featureDisabled,
+      message,
+      lastError: last
+        ? {
+            code: last.errorCode ?? undefined,
+            resource: last.resource ?? undefined,
+            technical: last.errorTrace,
+            createdAt: last.createdAt,
+          }
+        : null,
+    }
+  }
+
   // ─── Get posts with comments for a social account ───
 
   async getPostsForAccount(userId: string, socialAccountId: string) {
@@ -2008,6 +2185,7 @@ export class SocialService {
     })
     if (!account) throw new NotFoundException('Social account not found')
     await this.assertMembership(userId, account.organisationId)
+    this.socialHealth.ensureOutboundAllowed(account)
 
     if (account.provider !== 'FACEBOOK' && account.provider !== 'INSTAGRAM') {
       return { posts: [] }
@@ -2039,8 +2217,17 @@ export class SocialService {
     if (!response.ok) {
       const errorText = await response.text()
       this.logger.warn(`fetchProviderPosts ${account.provider} error: ${errorText}`)
-      throw new BadRequestException(`Meta API error: ${errorText}`)
+      const httpError = new BadRequestException(`Meta API error: ${errorText}`)
+      await this.socialHealth.recordError({
+        socialAccountId: account.id,
+        provider: account.provider,
+        operation: 'fetchProviderPosts',
+        resource: this.resourceForProvider(account.provider),
+        error: httpError,
+      })
+      throw httpError
     }
+    await this.socialHealth.recordSuccess(account.id)
 
     const data = (await response.json()) as {
       data: Array<Record<string, unknown>>
@@ -2156,7 +2343,15 @@ export class SocialService {
     const post = await this.prisma.post.findUnique({
       where: { id: postId },
       include: {
-        socialAccount: { select: { id: true, provider: true, organisationId: true } },
+        socialAccount: {
+          select: {
+            id: true,
+            provider: true,
+            organisationId: true,
+            disabled: true,
+            featureDisabled: true,
+          },
+        },
       },
     })
     if (!post) throw new NotFoundException('Post not found')
@@ -2170,23 +2365,33 @@ export class SocialService {
 
     const accessToken = await this.getDecryptedToken(post.socialAccount.id)
 
-    if (provider === 'FACEBOOK') {
-      await this.facebookReplyToComment(postId, message, accessToken)
-    } else if (provider === 'INSTAGRAM') {
-      // Instagram: POST /{media-id}/comments
-      const response = await fetch(
-        `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/${postId}/comments?access_token=${accessToken}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message }),
-        },
-      )
-      if (!response.ok) {
-        this.logger.error(`[Instagram] Comment on post failed: ${await response.text()}`)
-        throw new BadRequestException('Failed to comment on Instagram post')
-      }
-    }
+    await this.socialHealth.wrapOutbound(
+      post.socialAccount,
+      {
+        operation: 'commentOnPost',
+        feature: 'COMMENT',
+        resource: this.resourceForProvider(provider),
+      },
+      async () => {
+        if (provider === 'FACEBOOK') {
+          await this.facebookReplyToComment(postId, message, accessToken)
+        } else if (provider === 'INSTAGRAM') {
+          // Instagram: POST /{media-id}/comments
+          const response = await fetch(
+            `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/${postId}/comments?access_token=${accessToken}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message }),
+            },
+          )
+          if (!response.ok) {
+            this.logger.error(`[Instagram] Comment on post failed: ${await response.text()}`)
+            throw new BadRequestException('Failed to comment on Instagram post')
+          }
+        }
+      },
+    )
 
     const commentId = `comment_${Date.now()}_${postId}`
     return this.prisma.comment.create({
@@ -2211,7 +2416,15 @@ export class SocialService {
       include: {
         post: {
           include: {
-            socialAccount: { select: { id: true, provider: true, organisationId: true } },
+            socialAccount: {
+              select: {
+                id: true,
+                provider: true,
+                organisationId: true,
+                disabled: true,
+                featureDisabled: true,
+              },
+            },
           },
         },
       },
@@ -2229,11 +2442,21 @@ export class SocialService {
         ? `@[${comment.fromId}] ${message}`
         : `@${comment.fromName} ${message}`
 
-    if (provider === 'FACEBOOK') {
-      await this.facebookReplyToComment(commentId, taggedMessage, accessToken)
-    } else if (provider === 'INSTAGRAM') {
-      await this.instagramReplyToComment(commentId, taggedMessage, accessToken)
-    }
+    await this.socialHealth.wrapOutbound(
+      comment.post.socialAccount,
+      {
+        operation: 'replyToComment',
+        feature: 'COMMENT',
+        resource: this.resourceForProvider(provider),
+      },
+      async () => {
+        if (provider === 'FACEBOOK') {
+          await this.facebookReplyToComment(commentId, taggedMessage, accessToken)
+        } else if (provider === 'INSTAGRAM') {
+          await this.instagramReplyToComment(commentId, taggedMessage, accessToken)
+        }
+      },
+    )
 
     // Save the reply as a new comment (with tag)
     const replyId = `reply_${Date.now()}_${commentId}`
@@ -2260,7 +2483,15 @@ export class SocialService {
       include: {
         post: {
           include: {
-            socialAccount: { select: { id: true, provider: true, organisationId: true } },
+            socialAccount: {
+              select: {
+                id: true,
+                provider: true,
+                organisationId: true,
+                disabled: true,
+                featureDisabled: true,
+              },
+            },
           },
         },
       },
@@ -2272,19 +2503,29 @@ export class SocialService {
     const accessToken = await this.getDecryptedToken(comment.post.socialAccount.id)
     const provider = comment.post.socialAccount.provider
 
-    if (provider === 'FACEBOOK') {
-      await this.facebookHideComment(commentId, accessToken)
-    } else if (provider === 'INSTAGRAM') {
-      await this.instagramHideComment(commentId, accessToken)
-    } else if (provider === 'TIKTOK') {
-      await this.tiktokHideComment(
-        comment.post.socialAccount.id,
-        comment.postId,
-        commentId,
-        accessToken,
-        'HIDE',
-      )
-    }
+    await this.socialHealth.wrapOutbound(
+      comment.post.socialAccount,
+      {
+        operation: 'hideComment',
+        feature: 'COMMENT',
+        resource: this.resourceForProvider(provider),
+      },
+      async () => {
+        if (provider === 'FACEBOOK') {
+          await this.facebookHideComment(commentId, accessToken)
+        } else if (provider === 'INSTAGRAM') {
+          await this.instagramHideComment(commentId, accessToken)
+        } else if (provider === 'TIKTOK') {
+          await this.tiktokHideComment(
+            comment.post.socialAccount.id,
+            comment.postId,
+            commentId,
+            accessToken,
+            'HIDE',
+          )
+        }
+      },
+    )
 
     return this.prisma.comment.update({
       where: { id: commentId },
@@ -2300,7 +2541,15 @@ export class SocialService {
       include: {
         post: {
           include: {
-            socialAccount: { select: { id: true, provider: true, organisationId: true } },
+            socialAccount: {
+              select: {
+                id: true,
+                provider: true,
+                organisationId: true,
+                disabled: true,
+                featureDisabled: true,
+              },
+            },
           },
         },
       },
@@ -2312,19 +2561,29 @@ export class SocialService {
     const accessToken = await this.getDecryptedToken(comment.post.socialAccount.id)
     const provider = comment.post.socialAccount.provider
 
-    if (provider === 'FACEBOOK') {
-      await this.facebookUnhideComment(commentId, accessToken)
-    } else if (provider === 'INSTAGRAM') {
-      await this.instagramUnhideComment(commentId, accessToken)
-    } else if (provider === 'TIKTOK') {
-      await this.tiktokHideComment(
-        comment.post.socialAccount.id,
-        comment.postId,
-        commentId,
-        accessToken,
-        'UNHIDE',
-      )
-    }
+    await this.socialHealth.wrapOutbound(
+      comment.post.socialAccount,
+      {
+        operation: 'unhideComment',
+        feature: 'COMMENT',
+        resource: this.resourceForProvider(provider),
+      },
+      async () => {
+        if (provider === 'FACEBOOK') {
+          await this.facebookUnhideComment(commentId, accessToken)
+        } else if (provider === 'INSTAGRAM') {
+          await this.instagramUnhideComment(commentId, accessToken)
+        } else if (provider === 'TIKTOK') {
+          await this.tiktokHideComment(
+            comment.post.socialAccount.id,
+            comment.postId,
+            commentId,
+            accessToken,
+            'UNHIDE',
+          )
+        }
+      },
+    )
 
     return this.prisma.comment.update({
       where: { id: commentId },
@@ -2340,7 +2599,15 @@ export class SocialService {
       include: {
         post: {
           include: {
-            socialAccount: { select: { id: true, provider: true, organisationId: true } },
+            socialAccount: {
+              select: {
+                id: true,
+                provider: true,
+                organisationId: true,
+                disabled: true,
+                featureDisabled: true,
+              },
+            },
           },
         },
       },
@@ -2352,13 +2619,23 @@ export class SocialService {
     const accessToken = await this.getDecryptedToken(comment.post.socialAccount.id)
     const provider = comment.post.socialAccount.provider
 
-    if (provider === 'FACEBOOK') {
-      await this.facebookDeleteComment(commentId, accessToken)
-    } else if (provider === 'INSTAGRAM') {
-      await this.instagramDeleteComment(commentId, accessToken)
-    } else if (provider === 'TIKTOK') {
-      await this.tiktokDeleteComment(comment.post.socialAccount.id, commentId, accessToken)
-    }
+    await this.socialHealth.wrapOutbound(
+      comment.post.socialAccount,
+      {
+        operation: 'deleteComment',
+        feature: 'COMMENT',
+        resource: this.resourceForProvider(provider),
+      },
+      async () => {
+        if (provider === 'FACEBOOK') {
+          await this.facebookDeleteComment(commentId, accessToken)
+        } else if (provider === 'INSTAGRAM') {
+          await this.instagramDeleteComment(commentId, accessToken)
+        } else if (provider === 'TIKTOK') {
+          await this.tiktokDeleteComment(comment.post.socialAccount.id, commentId, accessToken)
+        }
+      },
+    )
 
     return this.prisma.comment.delete({
       where: { id: commentId },
