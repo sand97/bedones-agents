@@ -11,8 +11,20 @@ import { EventsGateway } from '../gateway/events.gateway'
 import { ProductImageSyncService } from './product-image-sync.service'
 import { SocialHealthService } from './social-health.service'
 
-/** Rolling window (in days) for the connect-time message history backfill. */
-export const HISTORY_SYNC_WINDOW_DAYS = 14
+/**
+ * Rolling window (in days) for the connect-time message history backfill.
+ *
+ * Configurable via `MESSAGE_HISTORY_SYNC_WINDOW_DAYS` (default 30). The backfill
+ * runs progressively in the background, so widening the window only adds more
+ * paginated work — it does not block the connect flow. Bounded to a sane range
+ * (1..180) since most providers cap history depth anyway (WhatsApp ~6 months,
+ * TikTok 90 days, Messenger/Instagram ~20 most-recent messages per thread).
+ */
+export const HISTORY_SYNC_WINDOW_DAYS = (() => {
+  const raw = Number(process.env.MESSAGE_HISTORY_SYNC_WINDOW_DAYS)
+  if (!Number.isFinite(raw) || raw <= 0) return 30
+  return Math.min(Math.floor(raw), 180)
+})()
 /** Safety cap on paginated provider requests per backfill run. */
 const HISTORY_MAX_PAGES = 40
 
@@ -2655,9 +2667,9 @@ export class MessagingService {
     return inserted
   }
 
-  // ─── 14-day message history backfill (initial sync on connect) ───
+  // ─── Message history backfill (initial sync on connect) ───
 
-  /** Cutoff for the rolling history window (now − 14 days). */
+  /** Cutoff for the rolling history window (now − HISTORY_SYNC_WINDOW_DAYS). */
   private historyCutoff(): Date {
     return new Date(Date.now() - HISTORY_SYNC_WINDOW_DAYS * 24 * 60 * 60 * 1000)
   }
@@ -2762,7 +2774,7 @@ export class MessagingService {
 
   /**
    * Phase 1 of the connect-time backfill: list the account's conversations
-   * touched within the 14-day window, upsert their shells, and return refs so
+   * touched within the configured window, upsert their shells, and return refs so
    * the caller can enqueue a per-conversation message backfill job for each.
    *
    * WhatsApp is intentionally excluded — its history is delivered through

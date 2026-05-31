@@ -1031,7 +1031,7 @@ export class WebhookService {
         const orgId = socialAccount.organisationId
 
         // Coexistence: Meta pushes up to ~6 months of chat history through the
-        // `history` field after onboarding. We backfill the 14-day window.
+        // `history` field after onboarding. We backfill the configured window.
         if (isHistoryField) {
           await this.handleWhatsAppHistory(socialAccount.id, phoneNumberId, value, orgId)
           continue
@@ -1469,7 +1469,7 @@ export class WebhookService {
    * Persist a Coexistence history-sync webhook (field: `history`).
    *
    * Meta pushes up to ~6 months of chat history in chunked phases; we keep only
-   * the trailing 14-day window. Every message is written through
+   * the trailing configured window (HISTORY_SYNC_WINDOW_DAYS). Every message is written through
    * {@link MessagingService.handleHistoricalMessage}, which dedups on the
    * provider message id (wamid) — so a live webhook arriving during the sync
    * never produces a duplicate. The account's history status is marked COMPLETED

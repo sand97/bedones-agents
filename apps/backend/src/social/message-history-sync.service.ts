@@ -29,7 +29,8 @@ const JOB_OPTS = {
 }
 
 /**
- * Orchestrates the connect-time backfill of the last 14 days of messages.
+ * Orchestrates the connect-time backfill of recent message history (rolling
+ * window configured via MESSAGE_HISTORY_SYNC_WINDOW_DAYS, default 30 days).
  *
  * Two-phase, queue-driven (per the product requirement): an account-level job
  * lists the conversations first, then enqueues one job per conversation to pull
