@@ -60,7 +60,9 @@ function DashboardPage() {
   const handleConfigureComments = (step: PendingComment) => {
     setCommentsModal({
       accountId: step.socialAccountId,
-      pageName: step.pageName ?? step.provider,
+      // Generated openapi types model pageName as `Record<string,never> | null`;
+      // it is a string at runtime — fall back to the provider when absent.
+      pageName: typeof step.pageName === 'string' ? step.pageName : step.provider,
     })
   }
 

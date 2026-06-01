@@ -345,6 +345,7 @@ function WhatsAppLoginCard({
     }
     try {
       await sendOtp.mutateAsync({
+        params: { header: { 'accept-language': navigator.language || 'fr' } },
         body: { countryCode: parts.countryCode, phone: parts.phoneLocal },
       })
       message.success(t('invitation.otp_sent'))

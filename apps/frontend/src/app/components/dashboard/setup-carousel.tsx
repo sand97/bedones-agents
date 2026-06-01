@@ -84,20 +84,22 @@ export function SetupCarousel({
       const key = `comments-${step.socialAccountId}`
       const branding = providerBranding(step.provider)
       const isDone = completed.has(key)
+      const pageName = asString(step.pageName)
+      const avatarUrl = asString(step.profilePictureUrl)
       out.push({
         key,
         kind: 'comments',
         socialAccountId: step.socialAccountId,
-        title: step.pageName ?? branding.name,
-        description: t('dashboard.step_comments_desc', { page: step.pageName ?? branding.name }),
+        title: pageName ?? branding.name,
+        description: t('dashboard.step_comments_desc', { page: pageName ?? branding.name }),
         actionLabel: isDone
           ? t('dashboard.step_comments_action_edit')
           : t('dashboard.step_comments_action'),
         onAction: () => onConfigureComments(step),
         icon: <branding.Icon width={24} height={24} />,
         iconColor: branding.color,
-        pageAvatarUrl: step.profilePictureUrl,
-        pageName: step.pageName,
+        pageAvatarUrl: avatarUrl,
+        pageName,
       })
     }
 
@@ -106,11 +108,13 @@ export function SetupCarousel({
       const branding = channelBranding(step.channel)
       const description = describeAgentStep(t, step, branding.name)
       const isDone = completed.has(key)
+      const pageName = asString(step.pageName)
+      const avatarUrl = asString(step.profilePictureUrl)
       out.push({
         key,
         kind: 'agent',
         socialAccountId: step.socialAccountId,
-        title: step.pageName ?? branding.name,
+        title: pageName ?? branding.name,
         description,
         actionLabel: isDone
           ? t('dashboard.step_agent_action_edit')
@@ -118,8 +122,8 @@ export function SetupCarousel({
         onAction: () => onConfigureAgent(step),
         icon: <branding.Icon width={24} height={24} />,
         iconColor: branding.color,
-        pageAvatarUrl: step.profilePictureUrl,
-        pageName: step.pageName,
+        pageAvatarUrl: avatarUrl,
+        pageName,
       })
     }
 
@@ -211,6 +215,15 @@ function StepBody({ step, isCompleted }: { step: SetupStep; isCompleted: boolean
 }
 
 const EMPTY_KEYS: ReadonlySet<string> = new Set()
+
+/**
+ * The generated openapi types model some nullable string fields as
+ * `Record<string, never> | null`; at runtime they are plain strings. Coerce
+ * safely to `string | null`.
+ */
+function asString(v: unknown): string | null {
+  return typeof v === 'string' ? v : null
+}
 
 function describeAgentStep(
   t: (k: string, opts?: Record<string, unknown>) => string,
