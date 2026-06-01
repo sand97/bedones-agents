@@ -53,6 +53,7 @@ pnpm install
 pnpm dev:whatsapp-connector            # port 3001 — démarre le client directement
 # le QR s'affiche dans le terminal → scanner avec un de nos numéros
 #   GET http://localhost:3001/whatsapp/status  → isReady: true
+#   Swagger UI : http://localhost:3001/api
 ```
 (ou en Docker : `apps/whatsapp-connector/Dockerfile`, contexte = racine du repo.)
 

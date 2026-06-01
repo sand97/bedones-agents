@@ -282,6 +282,115 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
     return page.evaluate(script)
   }
 
+  /**
+   * Read a number's public catalogue for testing — returns the products inline
+   * (name, price/currency, image CDN URLs) without downloading images or going
+   * through the migration pipeline. `GET /whatsapp/catalog/:phoneNumber`.
+   */
+  async getCatalogPreview(phoneNumber: string): Promise<{
+    phoneNumber: string
+    wid: string
+    productCount: number
+    products: unknown[]
+  }> {
+    const digits = (phoneNumber || '').replace(/[^0-9]/g, '')
+    if (!digits) throw new Error('Invalid phone number')
+    const wid = `${digits}@c.us`
+
+    if (!this.client) throw new Error('WhatsApp client is not initialized')
+    const page = this.client.pupPage
+    if (!page) throw new Error('Puppeteer page is not available')
+
+    const wppAvailable = await page.evaluate(
+      () => typeof window.WPP !== 'undefined' && window.WPP?.isReady,
+    )
+    if (!wppAvailable) await this.ensureWPPInjected()
+
+    const products = await page.evaluate(async (targetWid: string) => {
+      const wa = window.WPP.whatsapp as any
+      const byId = new Map<string, any>()
+      const add = (raw: any) => {
+        const p = (raw && raw.attributes) || raw
+        if (p && p.id && !byId.has(p.id)) byId.set(p.id, p)
+      }
+      const pick = (variants: any): string | null => {
+        if (!Array.isArray(variants)) return null
+        const full = variants.find((v: any) => v && v.key === 'full')
+        if (full && full.value) return full.value
+        const req = variants.find((v: any) => v && v.key === 'requested')
+        return (req && req.value) || null
+      }
+      const fromCatalog = (entry: any): any[] => {
+        const idx = entry && entry.productCollection && entry.productCollection._index
+        if (!idx || typeof idx !== 'object') return []
+        return Object.keys(idx)
+          .map((id) => idx[id] && idx[id].attributes)
+          .filter(Boolean)
+      }
+
+      if (wa && wa.functions && wa.functions.queryCatalog) {
+        try {
+          let after: string | undefined = undefined
+          while (true) {
+            const r = await wa.functions.queryCatalog(targetWid, after)
+            const list = Array.isArray(r && r.data) ? r.data : []
+            for (const p of list) add(p)
+            const next = r && r.paging && r.paging.cursors && r.paging.cursors.after
+            if (!next || next === after) break
+            after = next
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      if (wa && wa.CatalogStore && wa.CatalogStore.findQuery) {
+        try {
+          const res = await wa.CatalogStore.findQuery(targetWid)
+          if (Array.isArray(res)) for (const en of res) for (const p of fromCatalog(en)) add(p)
+        } catch {
+          /* ignore */
+        }
+      }
+      if (byId.size === 0) {
+        try {
+          const fb = await window.WPP.catalog.getProducts(targetWid as any, 999)
+          if (Array.isArray(fb)) for (const p of fb) add(p)
+        } catch {
+          /* ignore */
+        }
+      }
+
+      return Array.from(byId.values()).map((product: any) => {
+        const imageUrls: string[] = []
+        const main = product.imageCdnUrl || product.image_cdn_url || pick(product.image_cdn_urls)
+        if (main) imageUrls.push(main)
+        if (Array.isArray(product.additional_image_cdn_urls)) {
+          for (const arr of product.additional_image_cdn_urls) {
+            const u = pick(arr)
+            if (u) imageUrls.push(u)
+          }
+        }
+        const rawPrice =
+          product.priceAmount1000 ?? product.price_amount_1000 ?? product.price ?? null
+        const price =
+          rawPrice != null && Number.isFinite(Number(rawPrice)) ? Number(rawPrice) / 1000 : null
+        return {
+          id: product.id,
+          retailerId: product.retailerId || product.retailer_id || null,
+          name: product.name || '',
+          description: product.description || null,
+          price,
+          currency: product.currency || null,
+          availability: product.availability || null,
+          imageCount: imageUrls.length,
+          imageUrls,
+        }
+      })
+    }, wid)
+
+    return { phoneNumber: digits, wid, productCount: products.length, products }
+  }
+
   getStatus() {
     return {
       isInitialized: !!this.client,
