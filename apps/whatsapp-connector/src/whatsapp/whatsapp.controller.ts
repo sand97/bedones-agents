@@ -1,4 +1,13 @@
-import { Body, Controller, Get, HttpException, HttpStatus, Post, UseGuards } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common'
 
 import { ExecutePageScriptDto } from './dto/execute-page-script.dto'
 import { TargetInstanceGuard } from './guards/target-instance.guard'
@@ -36,6 +45,22 @@ export class WhatsAppController {
   @Get('status')
   status() {
     return this.whatsapp.getStatus()
+  }
+
+  /**
+   * Test helper: read a number's public catalogue and return the products
+   * inline (no image download, no migration). e.g. GET /whatsapp/catalog/237657888690
+   */
+  @Get('catalog/:phoneNumber')
+  async catalog(@Param('phoneNumber') phoneNumber: string) {
+    try {
+      return await this.whatsapp.getCatalogPreview(phoneNumber)
+    } catch (error) {
+      throw new HttpException(
+        { success: false, error: error instanceof Error ? error.message : String(error) },
+        HttpStatus.BAD_REQUEST,
+      )
+    }
   }
 
   @Get('qr')
