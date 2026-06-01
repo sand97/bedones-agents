@@ -5,9 +5,10 @@ import { CatalogWebhookController } from './catalog-webhook.controller'
 import { CatalogService } from './catalog.service'
 import { ProductContextController } from './product-context.controller'
 import { ProductContextService } from './product-context.service'
+import { SocialHealthModule } from '../social/social-health.module'
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, SocialHealthModule],
   controllers: [CatalogController, CatalogWebhookController, ProductContextController],
   providers: [CatalogService, ProductContextService],
   exports: [CatalogService, ProductContextService],

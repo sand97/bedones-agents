@@ -24,6 +24,21 @@ enum SocialProvider {
   TIKTOK
 }
 
+// Granular outbound capabilities that can be disabled independently on a
+// SocialAccount (e.g. lose messaging permission but keep comment moderation).
+enum SocialFeature {
+  COMMENT
+  MESSAGE
+}
+
+enum MessageHistorySyncStatus {
+  PENDING // not started yet
+  RUNNING // backfill jobs in flight (or, for WhatsApp, awaiting Coexistence history webhooks)
+  COMPLETED // backfill finished
+  FAILED // backfill failed (see historySyncError)
+  UNSUPPORTED // provider does not expose history for this account
+}
+
 enum OrgRole {
   OWNER
   ADMIN
@@ -121,27 +136,27 @@ enum NotificationType {
 // ─── Models ───
 
 model User {
-  id             String     @id @default(uuid())
-  email          String?    @unique
+  id               String     @id @default(uuid())
+  email            String?    @unique
   // Full phone number in E.164 format (e.g. "+237657888690"). Kept as the
   // unique key used for lookups across modules (members, invitations, OTP).
-  phone          String?    @unique
+  phone            String?    @unique
   // Split components for display/formatting. `phoneCountryCode` is the dial
   // code with leading "+" (e.g. "+237"); `phoneLocal` is the local part
   // without the dial code (e.g. "657888690").
   phoneCountryCode String?
   phoneLocal       String?
-  name           String
-  avatar         String?
-  passwordHash   String?
-  authType       AuthType
-  providerUserId String?
-  status         UserStatus @default(VERIFIED)
+  name             String
+  avatar           String?
+  passwordHash     String?
+  authType         AuthType
+  providerUserId   String?
+  status           UserStatus @default(VERIFIED)
   // BCP-47 short tag ("fr", "en") used for outbound messages (e.g. WhatsApp
   // template language) and as the i18n hint until the user changes it.
-  locale         String     @default("fr")
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  locale           String     @default("fr")
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   memberships             OrganisationMember[]
   sessions                Session[]
@@ -209,8 +224,32 @@ model SocialAccount {
   refreshToken      String?
   tokenExpiresAt    DateTime?
   scopes            String[]
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+
+  // ─── Account health / circuit breaker ───
+  // Set to true once the account accumulates too many consecutive outbound
+  // errors (or loses required permissions). When disabled we keep processing
+  // INCOMING webhooks but stop all OUTBOUND calls (send/get/post). Re-enabled
+  // only by a successful (re)connect through the OAuth callback.
+  disabled          Boolean         @default(false)
+  disabledReason    String?
+  disabledAt        DateTime?
+  // Count of consecutive outbound failures; reset to 0 on any success.
+  consecutiveErrors Int             @default(0)
+  // Features turned off granularly (e.g. TikTok messaging when the user is no
+  // longer a business account) without disabling the whole account.
+  featureDisabled   SocialFeature[]
+
+  // ─── Message history sync (14-day backfill on connect) ───
+  // Tracks the initial backfill of the last 14 days of conversations/messages
+  // that runs once when an account is connected. WhatsApp delivers its history
+  // through Coexistence webhooks (no pull API), so for WHATSAPP this only
+  // reflects whether the history webhook(s) have been received.
+  historySyncStatus MessageHistorySyncStatus @default(PENDING)
+  historySyncedAt   DateTime?
+  historySyncError  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   settings                PageSettings?
   posts                   Post[]
@@ -219,6 +258,7 @@ model SocialAccount {
   agentLink               AgentSocialAccount?
   labels                  Label[]
   notificationPreferences NotificationPreference[]
+  errorLogs               SocialAccountErrorLog[]
 
   loyaltyContacts                 LoyaltyContact[]
   loyaltyBonuses                  LoyaltyBonus[]
@@ -623,6 +663,7 @@ model Conversation {
   lastMessageText          String?
   lastMessageAt            DateTime?
   unreadCount              Int                              @default(0)
+  historySyncedAt          DateTime? // last time the 14-day message backfill ran for this thread
   aiOverride               AiConversationOverride? // Per-conversation override of agent activation rules
   messages                 DirectMessage[]
   conversationLabels       ConversationLabel[]
@@ -1004,4 +1045,44 @@ model ContactConsentEvent {
   @@index([socialAccountId])
   @@index([campaignId])
   @@index([purpose, topic])
+}
+
+// Append-only log of outbound provider API failures. Powers the consecutive
+// error counter / circuit breaker and feeds the human-friendly error bank.
+model SocialAccountErrorLog {
+  id              String         @id @default(uuid())
+  socialAccountId String
+  socialAccount   SocialAccount  @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  provider        SocialProvider
+  // Outbound capability that failed, when applicable (helps target a granular
+  // disable instead of the whole account).
+  feature         SocialFeature?
+  // Service method that triggered the call (e.g. "sendMessage", "findProducts").
+  operation       String?
+  // Logical resource the user must reconnect to fix this (e.g. "page",
+  // "catalog", "tiktok", "instagram"). Passed to the LLM explanation prompt.
+  resource        String?
+  // Provider/HTTP error code (e.g. "190", "OAuthException", "400").
+  errorCode       String?
+  // Raw provider error payload / stack for debugging and "show details".
+  errorTrace      String
+  createdAt       DateTime       @default(now())
+
+  @@index([socialAccountId, createdAt])
+}
+
+// Cache of human-friendly, multilingual explanations generated by an LLM for a
+// given class of provider error. Reused across accounts so we only pay the LLM
+// once per distinct error signature.
+model ProviderErrorMessage {
+  id        String         @id @default(uuid())
+  // Stable hash of provider + errorCode + resource used to dedupe/lookups.
+  signature String         @unique
+  provider  SocialProvider
+  errorCode String?
+  resource  String?
+  // Localized explanations, shape: { "en": string, "fr": string, ... }.
+  messages  Json
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 }

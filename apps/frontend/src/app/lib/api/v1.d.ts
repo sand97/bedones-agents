@@ -1093,6 +1093,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/catalog/{catalogId}/product-contexts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProductContextController_listProductContexts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/{catalogId}/collection-contexts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProductContextController_listCollectionContexts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/{catalogId}/products/{productId}/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProductContextController_getProductContext"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ProductContextController_updateProductContext"];
+        trace?: never;
+    };
+    "/catalog/{catalogId}/product-contexts/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProductContextController_analyzeContext"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/{catalogId}/product-contexts/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProductContextController_saveContext"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/{catalogId}/post-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProductContextController_linkPosts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/{catalogId}/products/{productId}/post-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProductContextController_listProductLinks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/{catalogId}/collections/{collectionId}/post-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProductContextController_listCollectionLinks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/{catalogId}/product-post-links/{linkId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ProductContextController_deleteProductLink"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/{catalogId}/collection-post-links/{linkId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ProductContextController_deleteCollectionLink"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organisations/{orgId}/members": {
         parameters: {
             query?: never;
@@ -1925,6 +2085,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/social/accounts/{accountId}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SocialController_getAccountHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2020,6 +2196,10 @@ export interface components {
             organisations: components["schemas"]["OrganisationSummaryDto"][];
             pendingInvitations: components["schemas"]["PendingInvitationDto"][];
         };
+        UpdateNameDto: {
+            /** @example Aminata Diallo */
+            name: string;
+        };
         CreateOrganisationDto: {
             /** @example Mon entreprise */
             name: string;
@@ -2062,12 +2242,20 @@ export interface components {
             socialAccounts: components["schemas"]["OrgSocialAccountDto"][];
             members: components["schemas"]["OrgMemberDto"][];
         };
+        UpdateOrganisationDto: {
+            /** @example Nouveau nom */
+            name?: string;
+            /** @example https://minio.bedones.test/logos/logo.png */
+            logoUrl?: string;
+            /** @example Africa/Douala */
+            timezone?: string;
+        };
         PendingCommentsStepDto: {
             socialAccountId: string;
             /** @enum {string} */
             provider: "FACEBOOK" | "INSTAGRAM" | "TIKTOK";
-            pageName: string | null;
-            profilePictureUrl: string | null;
+            pageName: Record<string, never> | null;
+            profilePictureUrl: Record<string, never> | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -2077,29 +2265,24 @@ export interface components {
             provider: "FACEBOOK" | "INSTAGRAM" | "WHATSAPP" | "TIKTOK";
             /** @enum {string} */
             channel: "WHATSAPP" | "MESSENGER" | "INSTAGRAM_DM" | "TIKTOK_DM";
-            pageName: string | null;
-            profilePictureUrl: string | null;
+            pageName: Record<string, never> | null;
+            profilePictureUrl: Record<string, never> | null;
             /** Format: date-time */
             createdAt: string;
             /** @enum {string} */
             agentStatus: "NONE" | "DRAFT_OR_CONFIGURING" | "READY_BELOW_THRESHOLD";
             agentScore: number;
-            agentId: string | null;
+            agentId: Record<string, never> | null;
         };
         SetupStatusResponseDto: {
+            /** @description True when the organisation has no catalog yet. */
             catalogPending: boolean;
             pendingComments: components["schemas"]["PendingCommentsStepDto"][];
             pendingAgents: components["schemas"]["PendingAgentStepDto"][];
+            /** @description Sum of all pending steps across categories. */
             pendingCount: number;
+            /** @description Convenience flag: `pendingCount === 0`. */
             allConfigured: boolean;
-        };
-        UpdateOrganisationDto: {
-            /** @example Nouveau nom */
-            name?: string;
-            /** @example https://minio.bedones.test/logos/logo.png */
-            logoUrl?: string;
-            /** @example Africa/Douala */
-            timezone?: string;
         };
         UploadResponseDto: {
             /** @example https://minio.bedones.test/logos/abc123.png */
@@ -2140,6 +2323,12 @@ export interface components {
             /** @description Feature scopes (e.g. comments, messages) */
             scopes: string[];
             settings?: components["schemas"]["PageSettingsResponseDto"];
+            /** @description Whether outbound calls are disabled after repeated errors or missing scopes */
+            disabled: boolean;
+            /** @description Why the account/feature was disabled (e.g. too_many_errors, missing_scopes:...) */
+            disabledReason?: string;
+            /** @description Outbound features disabled granularly */
+            featureDisabled: ("COMMENT" | "MESSAGE")[];
         };
         UnreadCountDto: {
             provider: string;
@@ -2406,6 +2595,31 @@ export interface components {
         };
         AssociatePhoneDto: {
             phoneNumberId: string;
+        };
+        AnalyzeContextDto: {
+            /** @description User natural-language prompt describing the change to apply. */
+            prompt: string;
+            /** @description Meta product IDs targeted. */
+            productIds?: string[];
+            /** @description Meta product set (collection) IDs targeted. */
+            collectionIds?: string[];
+        };
+        SaveContextDto: {
+            /** @description Final context content to persist on each selected entity. */
+            content: string;
+            productIds?: string[];
+            collectionIds?: string[];
+        };
+        UpdateProductContextDto: {
+            content: string;
+            /** @description When true, also update every product sharing the previous identical content. */
+            applyToSiblings?: boolean;
+        };
+        LinkPostsDto: {
+            /** @description Provider post IDs (FB post / IG media) to link. */
+            postIds: string[];
+            productIds?: string[];
+            collectionIds?: string[];
         };
         MemberUserDto: {
             id: string;
@@ -2755,6 +2969,26 @@ export interface components {
             enabled: boolean;
         };
         SendTemplateBody: Record<string, never>;
+        SocialAccountLastErrorDto: {
+            /** @description Provider/HTTP error code (e.g. 190, OAuthException) */
+            code?: string;
+            /** @description Resource to reconnect (page, catalog, tiktok, ...) */
+            resource?: string;
+            /** @description Raw provider error payload, for "show details" */
+            technical: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SocialAccountHealthDto: {
+            disabled: boolean;
+            disabledReason?: string;
+            featureDisabled: ("COMMENT" | "MESSAGE")[];
+            /** @description Human-friendly explanation keyed by language (e.g. { en, fr }) */
+            message?: {
+                [key: string]: string;
+            } | null;
+            lastError?: components["schemas"]["SocialAccountLastErrorDto"] | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -2807,8 +3041,8 @@ export interface operations {
     AuthController_sendWhatsAppOtp: {
         parameters: {
             query?: never;
-            header?: {
-                "accept-language"?: string;
+            header: {
+                "accept-language": string;
             };
             path?: never;
             cookie?: never;
@@ -2979,10 +3213,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /** @example Aminata Diallo */
-                    name: string;
-                };
+                "application/json": components["schemas"]["UpdateNameDto"];
             };
         };
         responses: {
@@ -4426,6 +4657,247 @@ export interface operations {
             };
         };
     };
+    ProductContextController_listProductContexts: {
+        parameters: {
+            query: {
+                ids: string;
+            };
+            header?: never;
+            path: {
+                catalogId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductContextController_listCollectionContexts: {
+        parameters: {
+            query: {
+                ids: string;
+            };
+            header?: never;
+            path: {
+                catalogId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductContextController_getProductContext: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogId: string;
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductContextController_updateProductContext: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogId: string;
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProductContextDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductContextController_analyzeContext: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalyzeContextDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductContextController_saveContext: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveContextDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductContextController_linkPosts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkPostsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductContextController_listProductLinks: {
+        parameters: {
+            query: {
+                limit: string;
+                offset: string;
+            };
+            header?: never;
+            path: {
+                catalogId: string;
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductContextController_listCollectionLinks: {
+        parameters: {
+            query: {
+                limit: string;
+                offset: string;
+            };
+            header?: never;
+            path: {
+                catalogId: string;
+                collectionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductContextController_deleteProductLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogId: string;
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductContextController_deleteCollectionLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogId: string;
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     MemberController_list: {
         parameters: {
             query?: never;
@@ -5765,6 +6237,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    SocialController_getAccountHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountHealthDto"];
+                };
             };
         };
     };

@@ -28,6 +28,13 @@ interface ProductCollectionPickerProps {
   onChange: (next: PickerEntity[]) => void
   onNext: () => void
   nextLabel?: string
+  /**
+   * Optional pre-loaded lists from the parent page — used as
+   * `placeholderData` so the picker shows content instantly on first open
+   * (and on every back-navigation) instead of flashing a spinner.
+   */
+  placeholderProducts?: Product[]
+  placeholderCollections?: Collection[]
 }
 
 export function ProductCollectionPicker({
@@ -36,22 +43,44 @@ export function ProductCollectionPicker({
   onChange,
   onNext,
   nextLabel = 'Suivant',
+  placeholderProducts,
+  placeholderCollections,
 }: ProductCollectionPickerProps) {
   const [mode, setMode] = useState<Mode>('products')
   const [search, setSearch] = useState('')
+
+  // Filter the placeholder client-side so it tracks the search input even
+  // before the network call returns.
+  const filteredPlaceholderProducts = useMemo(() => {
+    if (!placeholderProducts) return undefined
+    const q = search.trim().toLowerCase()
+    if (!q)
+      return { products: placeholderProducts, total: placeholderProducts.length, hasMore: false }
+    return {
+      products: placeholderProducts.filter(
+        (p) => p.name.toLowerCase().includes(q) || (p.description ?? '').toLowerCase().includes(q),
+      ),
+      total: placeholderProducts.length,
+      hasMore: false,
+    }
+  }, [placeholderProducts, search])
 
   const productsQuery = useQuery({
     queryKey: ['catalog-products-picker', catalog.id, search],
     queryFn: () => catalogApi.getProducts(catalog.id, { search: search || undefined, limit: 50 }),
     enabled: mode === 'products',
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    placeholderData: filteredPlaceholderProducts,
   })
 
   const collectionsQuery = useQuery({
     queryKey: ['catalog-collections-picker', catalog.id],
     queryFn: () => catalogApi.listCollections(catalog.id),
     enabled: mode === 'collections',
-    staleTime: 5 * 60_000,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+    placeholderData: placeholderCollections,
   })
 
   const products = productsQuery.data?.products ?? []
@@ -91,10 +120,15 @@ export function ProductCollectionPicker({
     onChange(selected.filter((s) => !(s.kind === entry.kind && s.id === entry.id)))
   }
 
+  const isLoading =
+    mode === 'products'
+      ? productsQuery.isLoading && !productsQuery.data
+      : collectionsQuery.isLoading && !collectionsQuery.data
+
   const isEmpty =
     mode === 'products'
-      ? !productsQuery.isLoading && products.length === 0
-      : !collectionsQuery.isLoading && collections.length === 0
+      ? !isLoading && products.length === 0
+      : !isLoading && collections.length === 0
 
   const filteredCollections = useMemo(() => {
     if (!search) return collections
@@ -105,16 +139,17 @@ export function ProductCollectionPicker({
   return (
     <div className="flex flex-col" style={{ minHeight: 480 }}>
       <div className="flex flex-col gap-3 border-b border-[var(--color-border-default)] p-4">
-        <Segmented
-          block
-          className="pricing-billing-toggle"
-          value={mode}
-          onChange={(v) => setMode(v as Mode)}
-          options={[
-            { label: 'Produits', value: 'products' },
-            { label: 'Collections', value: 'collections' },
-          ]}
-        />
+        <div className="flex justify-center">
+          <Segmented
+            className="pricing-billing-toggle"
+            value={mode}
+            onChange={(v) => setMode(v as Mode)}
+            options={[
+              { label: 'Produits', value: 'products' },
+              { label: 'Collections', value: 'collections' },
+            ]}
+          />
+        </div>
         <Input
           allowClear
           placeholder={
@@ -147,8 +182,7 @@ export function ProductCollectionPicker({
       </div>
 
       <div className="flex-1 overflow-y-auto" style={{ maxHeight: 360 }}>
-        {(productsQuery.isLoading && mode === 'products') ||
-        (collectionsQuery.isLoading && mode === 'collections') ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Spin />
           </div>

@@ -6,10 +6,11 @@ import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
 import { UploadService } from '../upload/upload.service'
 import { AIService, type AIAnalysisResult } from './ai.service'
-import { MessagingService } from './messaging.service'
+import { MessagingService, HISTORY_SYNC_WINDOW_DAYS } from './messaging.service'
 import { CatalogService } from '../catalog/catalog.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
+import { SocialHealthService } from './social-health.service'
 
 export interface IncomingMessageEvent {
   conversationId: string
@@ -24,6 +25,13 @@ export interface IncomingMessageEvent {
     senderName: string
   }
 }
+
+/**
+ * Error code returned in a Coexistence `history` webhook when the business chose
+ * not to share its message history during Embedded Signup.
+ * @see https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/onboarding-business-app-users
+ */
+const HISTORY_NOT_SHARED_ERROR_CODE = 2593109
 
 @Injectable()
 export class WebhookService {
@@ -42,6 +50,7 @@ export class WebhookService {
     private catalogService: CatalogService,
     private eventsGateway: EventsGateway,
     private eventEmitter: EventEmitter2,
+    private socialHealth: SocialHealthService,
   ) {
     this.facebookAppSecret = this.configService.getOrThrow<string>('FACEBOOK_APP_SECRET')
     this.instagramAppSecret = this.configService.getOrThrow<string>('INSTAGRAM_APP_SECRET')
@@ -989,7 +998,10 @@ export class WebhookService {
       for (const change of entry.changes || []) {
         const isMessageField = change.field === 'messages'
         const isMessageEchoField = change.field === 'smb_message_echoes'
-        if (!isMessageField && !isMessageEchoField) continue
+        // Coexistence history sync. The WABA must be subscribed to the
+        // `history` webhook field (configured in the Meta App Dashboard).
+        const isHistoryField = change.field === 'history'
+        if (!isMessageField && !isMessageEchoField && !isHistoryField) continue
 
         const value = change.value
         if (!value?.metadata?.phone_number_id) continue
@@ -1024,6 +1036,13 @@ export class WebhookService {
         }
 
         const orgId = socialAccount.organisationId
+
+        // Coexistence: Meta pushes up to ~6 months of chat history through the
+        // `history` field after onboarding. We backfill the configured window.
+        if (isHistoryField) {
+          await this.handleWhatsAppHistory(socialAccount.id, phoneNumberId, value, orgId)
+          continue
+        }
 
         // Handle status updates (sent, delivered, read)
         for (const status of value.statuses || []) {
@@ -1451,6 +1470,190 @@ export class WebhookService {
       platformMsgId: status.id,
       status: status.status,
     })
+  }
+
+  /**
+   * Persist a Coexistence history-sync webhook (field: `history`).
+   *
+   * Meta pushes up to ~6 months of chat history in chunked phases; we keep only
+   * the trailing configured window (HISTORY_SYNC_WINDOW_DAYS). Every message is written through
+   * {@link MessagingService.handleHistoricalMessage}, which dedups on the
+   * provider message id (wamid) — so a live webhook arriving during the sync
+   * never produces a duplicate. The account's history status is marked COMPLETED
+   * once the final chunk reports 100% progress.
+   */
+  private async handleWhatsAppHistory(
+    socialAccountId: string,
+    phoneNumberId: string,
+    value: WhatsAppWebhookValue,
+    orgId: string,
+  ) {
+    // The business declined to share its history during Embedded Signup: Meta
+    // sends a `history` webhook carrying error 2593109 instead of any messages.
+    // Mark the account so the UI stops "awaiting history" forever.
+    const errors = [
+      ...(value.errors || []),
+      ...(value.history || []).flatMap((c) => c.errors || []),
+    ]
+    const notSharedError = errors.find((e) => e.code === HISTORY_NOT_SHARED_ERROR_CODE)
+    if (notSharedError) {
+      this.logger.warn(
+        `[WhatsApp History] Business declined to share history for account ${socialAccountId} (code ${notSharedError.code})`,
+      )
+      await this.prisma.socialAccount
+        .update({
+          where: { id: socialAccountId },
+          data: {
+            historySyncStatus: 'UNSUPPORTED',
+            historySyncedAt: new Date(),
+            historySyncError:
+              notSharedError.message || 'Business declined to share message history',
+          },
+        })
+        .catch(() => undefined)
+      return
+    }
+
+    const contacts = value.contacts
+    const cutoff = new Date(Date.now() - HISTORY_SYNC_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+    let imported = 0
+    let maxProgress = 0
+
+    for (const chunk of value.history || []) {
+      const progress = Number(chunk.metadata?.progress ?? 0)
+      if (!Number.isNaN(progress)) maxProgress = Math.max(maxProgress, progress)
+
+      for (const thread of chunk.threads || []) {
+        const participantId = thread.id
+        if (!participantId) continue
+        const contact = contacts?.find((c) => c.wa_id === participantId)
+        const participantName = contact?.profile?.name || participantId
+
+        for (const msg of thread.messages || []) {
+          // Reactions are folded into their target message live; skip in history.
+          if (msg.type === 'reaction') continue
+
+          const timestamp = new Date(parseInt(msg.timestamp) * 1000)
+          if (Number.isNaN(timestamp.getTime()) || timestamp < cutoff) continue
+
+          // Direction: prefer Meta's explicit flag, fall back to sender identity.
+          const fromMe =
+            msg.history_context?.from_me === true ||
+            (msg.from !== undefined && msg.from !== participantId)
+
+          const content = await this.mapWhatsAppHistoryContent(socialAccountId, msg)
+          const created = await this.messagingService.handleHistoricalMessage({
+            socialAccountId,
+            participantId,
+            participantName,
+            platformThreadId: participantId,
+            platformMsgId: msg.id,
+            message: content.messageText,
+            senderId: fromMe ? phoneNumberId : participantId,
+            senderName: fromMe ? 'WhatsApp' : participantName,
+            isFromPage: fromMe,
+            mediaUrl: content.mediaUrl,
+            mediaType: content.mediaType,
+            fileName: content.fileName,
+            replyToMid: msg.context?.id || null,
+            deliveryStatus: fromMe ? msg.history_context?.status?.toLowerCase() || null : null,
+            metadata: content.metadata,
+            timestamp,
+          })
+          if (created) imported++
+        }
+      }
+    }
+
+    if (maxProgress >= 100) {
+      await this.prisma.socialAccount
+        .update({
+          where: { id: socialAccountId },
+          data: {
+            historySyncStatus: 'COMPLETED',
+            historySyncedAt: new Date(),
+            historySyncError: null,
+          },
+        })
+        .catch(() => undefined)
+    }
+
+    this.logger.log(
+      `[WhatsApp History] imported ${imported} message(s) for account ${socialAccountId} (progress=${maxProgress}%)`,
+    )
+
+    this.eventsGateway.emitToOrg(orgId, 'message:new', {
+      socialAccountId,
+      provider: 'WHATSAPP',
+      historyImported: imported,
+    })
+  }
+
+  /** Extract displayable content from a historical WhatsApp message. */
+  private async mapWhatsAppHistoryContent(
+    socialAccountId: string,
+    msg: WhatsAppHistoryMessage,
+  ): Promise<{
+    messageText: string
+    mediaUrl: string | null
+    mediaType: string | null
+    fileName: string | null
+    metadata: Record<string, unknown> | null
+  }> {
+    let messageText = ''
+    let mediaUrl: string | null = null
+    let mediaType: string | null = null
+    let fileName: string | null = null
+    let metadata: Record<string, unknown> | null = null
+
+    switch (msg.type) {
+      case 'text':
+        messageText = msg.text?.body || ''
+        break
+      case 'image':
+        mediaType = 'image'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.image?.id)
+        messageText = msg.image?.caption || ''
+        break
+      case 'video':
+        mediaType = 'video'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.video?.id)
+        messageText = msg.video?.caption || ''
+        break
+      case 'audio':
+        mediaType = 'audio'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.audio?.id)
+        break
+      case 'document':
+        mediaType = 'file'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.document?.id)
+        fileName = msg.document?.filename || null
+        break
+      case 'sticker':
+        mediaType = 'image'
+        mediaUrl = await this.downloadWhatsAppMedia(socialAccountId, msg.sticker?.id)
+        break
+      case 'interactive':
+      case 'button': {
+        const reply = this.extractWhatsAppButtonReply(msg)
+        if (reply) {
+          messageText = reply.title
+          metadata = {
+            kind: reply.kind,
+            replyId: reply.id,
+            replyTitle: reply.title,
+            ...(reply.description ? { replyDescription: reply.description } : {}),
+          }
+        } else {
+          messageText = `[${msg.type}]`
+        }
+        break
+      }
+      default:
+        messageText = msg.text?.body || `[${msg.type}]`
+    }
+
+    return { messageText, mediaUrl, mediaType, fileName, metadata }
   }
 
   private async markInboundMessagesAsRead(conversationId: string, orgId: string, readAt: Date) {
@@ -2837,6 +3040,32 @@ export class WebhookService {
     return Array.from(codes).slice(0, 15)
   }
 
+  /**
+   * Feeds the result of an automated moderation call into the circuit breaker:
+   * a success resets the counter, a failure increments it (tripping past the
+   * threshold) so a page that lost its permissions eventually stops being hit.
+   */
+  private async recordModerationOutcome(
+    ok: boolean,
+    socialAccountId: string,
+    provider: 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK',
+    action: string,
+    errorText?: string,
+  ) {
+    if (ok) {
+      await this.socialHealth.recordSuccess(socialAccountId)
+      return
+    }
+    await this.socialHealth.recordError({
+      socialAccountId,
+      provider,
+      operation: `aiModerate:${action}`,
+      feature: 'COMMENT',
+      resource: provider === 'INSTAGRAM' ? 'instagram' : provider === 'TIKTOK' ? 'tiktok' : 'page',
+      error: new Error(errorText || `aiModerate ${action} failed`),
+    })
+  }
+
   private async executeAIAction(
     commentId: string,
     provider: 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK',
@@ -2846,6 +3075,23 @@ export class WebhookService {
     socialAccountId: string,
     comment: { fromName: string; fromId: string },
   ) {
+    // Circuit breaker: keep ingesting the incoming comment, but skip the
+    // automated outbound moderation when the account / COMMENT feature is
+    // disabled after repeated errors or missing permissions.
+    const health = await this.prisma.socialAccount.findUnique({
+      where: { id: socialAccountId },
+      select: { id: true, provider: true, disabled: true, featureDisabled: true },
+    })
+    if (!health) return
+    try {
+      this.socialHealth.ensureOutboundAllowed(health, 'COMMENT')
+    } catch {
+      this.logger.warn(
+        `[AI] Skipping ${result.action} on disabled account ${socialAccountId} (provider=${provider})`,
+      )
+      return
+    }
+
     if (provider === 'TIKTOK') {
       await this.executeTikTokAIAction(commentId, result, accessToken, orgId, socialAccountId)
       return
@@ -2875,6 +3121,7 @@ export class WebhookService {
           data: { status: 'HIDDEN', action: 'HIDE', actionReason: result.reason, isRead: true },
         })
         this.logger.log(`[AI] Hidden comment ${commentId}`)
+        await this.recordModerationOutcome(true, socialAccountId, provider, 'hide')
         this.eventsGateway.emitToOrg(orgId, 'comment:updated', {
           commentId,
           socialAccountId,
@@ -2882,7 +3129,9 @@ export class WebhookService {
           action: 'hide',
         })
       } else {
-        this.logger.error(`[AI] Failed to hide comment: ${await response.text()}`)
+        const errorText = await response.text()
+        this.logger.error(`[AI] Failed to hide comment: ${errorText}`)
+        await this.recordModerationOutcome(false, socialAccountId, provider, 'hide', errorText)
       }
     }
 
@@ -2897,6 +3146,7 @@ export class WebhookService {
           data: { status: 'DELETED', action: 'DELETE', actionReason: result.reason, isRead: true },
         })
         this.logger.log(`[AI] Deleted comment ${commentId}`)
+        await this.recordModerationOutcome(true, socialAccountId, provider, 'delete')
         this.eventsGateway.emitToOrg(orgId, 'comment:updated', {
           commentId,
           socialAccountId,
@@ -2904,7 +3154,9 @@ export class WebhookService {
           action: 'delete',
         })
       } else {
-        this.logger.error(`[AI] Failed to delete comment: ${await response.text()}`)
+        const errorText = await response.text()
+        this.logger.error(`[AI] Failed to delete comment: ${errorText}`)
+        await this.recordModerationOutcome(false, socialAccountId, provider, 'delete', errorText)
       }
     }
 
@@ -2963,6 +3215,7 @@ export class WebhookService {
         })
 
         this.logger.log(`[AI] Replied to comment ${commentId}`)
+        await this.recordModerationOutcome(true, socialAccountId, provider, 'reply')
         this.eventsGateway.emitToOrg(orgId, 'comment:updated', {
           commentId,
           socialAccountId,
@@ -2970,7 +3223,9 @@ export class WebhookService {
           action: 'reply',
         })
       } else {
-        this.logger.error(`[AI] Failed to reply to comment: ${await response.text()}`)
+        const errorText = await response.text()
+        this.logger.error(`[AI] Failed to reply to comment: ${errorText}`)
+        await this.recordModerationOutcome(false, socialAccountId, provider, 'reply', errorText)
       }
     }
   }
@@ -3276,12 +3531,21 @@ interface WhatsAppWebhookValue {
   contacts?: WhatsAppContact[]
   messages?: WhatsAppMessage[]
   message_echoes?: WhatsAppMessageEcho[]
+  history?: WhatsAppHistoryEntry[]
+  errors?: WhatsAppWebhookError[]
   statuses?: Array<{
     id: string
     status: string
     timestamp: string
     recipient_id: string
   }>
+}
+
+interface WhatsAppWebhookError {
+  code: number
+  title?: string
+  message?: string
+  error_data?: { details?: string }
 }
 
 interface WhatsAppContact {
@@ -3325,6 +3589,22 @@ interface WhatsAppMessageEcho extends WhatsAppMessage {
   to?: string
   to_user_id?: string
   from_user_id?: string
+}
+
+// ─── Coexistence message history (field: "history") ───
+interface WhatsAppHistoryEntry {
+  metadata?: {
+    phase?: string | number
+    chunk_order?: string | number
+    progress?: string | number
+  }
+  errors?: WhatsAppWebhookError[]
+  threads?: Array<{ id: string; messages?: WhatsAppHistoryMessage[] }>
+}
+
+interface WhatsAppHistoryMessage extends WhatsAppMessage {
+  to?: string
+  history_context?: { status?: string; from_me?: boolean }
 }
 
 // ─── TikTok webhook payload types ───
