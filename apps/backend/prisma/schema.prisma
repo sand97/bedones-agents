@@ -925,3 +925,51 @@ model ContactConsentEvent {
   @@index([campaignId])
   @@index([purpose, topic])
 }
+
+// ─── MCP (Model Context Protocol) ───
+// OAuth 2.1 layer that lets external AI assistants (Claude Connectors,
+// ChatGPT Apps SDK) drive Bedones as MCP tools. Bridged to the existing
+// User / Session / Organisation model. See src/mcp/.
+
+model McpOAuthClient {
+  id           String   @id @default(uuid())
+  clientId     String   @unique
+  clientSecret String? // null for public (PKCE) clients
+  clientName   String?
+  redirectUris String[]
+  scope        String?
+  createdAt    DateTime @default(now())
+
+  @@index([clientId])
+}
+
+model McpAuthCode {
+  id                  String   @id @default(uuid())
+  code                String   @unique
+  clientId            String
+  userId              String
+  organisationId      String
+  redirectUri         String
+  scope               String?
+  codeChallenge       String?
+  codeChallengeMethod String?
+  expiresAt           DateTime
+  createdAt           DateTime @default(now())
+
+  @@index([code])
+}
+
+model McpAccessToken {
+  id               String    @id @default(uuid()) // also the JWT `jti`
+  refreshTokenHash String?   @unique
+  clientId         String
+  userId           String
+  organisationId   String
+  scope            String?
+  expiresAt        DateTime
+  refreshExpiresAt DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId])
+  @@index([organisationId])
+}

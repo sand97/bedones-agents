@@ -23,6 +23,7 @@ import { NotificationPreferenceModule } from './notification-preference/notifica
 import { WhatsappOptinModule } from './whatsapp-optin/whatsapp-optin.module'
 import { LlmModule } from './common/llm/llm.module'
 import { ContactLanguageModule } from './contact-language/contact-language.module'
+import { BedonesMcpModule } from './mcp/mcp.module'
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { ContactLanguageModule } from './contact-language/contact-language.modul
     NotificationPreferenceModule,
     WhatsappOptinModule,
     ContactLanguageModule,
+    BedonesMcpModule,
   ],
   controllers: [AppController],
 })

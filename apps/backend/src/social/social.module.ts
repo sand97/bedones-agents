@@ -53,7 +53,13 @@ import { ProductImageSyncProcessor } from './product-image-sync.processor'
     ProductImageSyncService,
     ProductImageSyncProcessor,
   ],
-  exports: [MessagingService, LabelService, AvatarSyncService, ProductImageSyncService],
+  exports: [
+    SocialService,
+    MessagingService,
+    LabelService,
+    AvatarSyncService,
+    ProductImageSyncService,
+  ],
 })
 export class SocialModule implements OnApplicationBootstrap {
   private readonly logger = new Logger(SocialModule.name)

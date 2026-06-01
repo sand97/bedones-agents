@@ -4050,6 +4050,72 @@
           "WhatsAppOptIn"
         ]
       }
+    },
+    "/sse": {
+      "get": {
+        "operationId": "SseController_sse",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sse"
+        ]
+      }
+    },
+    "/messages": {
+      "post": {
+        "operationId": "SseController_messages",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sse"
+        ]
+      }
+    },
+    "/mcp": {
+      "post": {
+        "operationId": "StreamableHttpController_handlePostRequest",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "StreamableHttp"
+        ]
+      },
+      "get": {
+        "operationId": "StreamableHttpController_handleGetRequest",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "StreamableHttp"
+        ]
+      },
+      "delete": {
+        "operationId": "StreamableHttpController_handleDeleteRequest",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "StreamableHttp"
+        ]
+      }
     }
   },
   "info": {
