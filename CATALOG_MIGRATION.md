@@ -3,94 +3,84 @@
 Importer le catalogue **public** d'un numéro WhatsApp (catalogue WhatsApp Business / SMB,
 non accessible via l'API standard) dans un catalogue **Commerce Manager** connecté.
 
-> Tout le code vit dans **bedones-agents**. `bedones-whatsapp` n'est **pas modifié** : on
-> réutilise tel quel son `whatsapp-connector` (endpoint générique `/whatsapp/execute-script`
-> + `window.nodeFetch`) et le script `apps/backend/src/page-scripts/scripts/getCatalog.ts`
-> sert de référence.
+> Tout vit dans **bedones-agents**, y compris le service wppconnect (`apps/whatsapp-connector`).
+> Le projet séparé `bedones-whatsapp` n'a servi que de **référence** pour le scraping de catalogue.
 
 ## Architecture (pattern callback)
 
 ```
 Frontend (modale wizard)
-  └─ POST /catalog-migration ───────────────► bedones-agents (NestJS)
+  └─ POST /catalog-migration ───────────────► backend bedones-agents (apps/backend)
                                                  │
                                                  ├─ Bull queue `catalog-migration` (concurrence 1)
                                                  │     position + ETA (~1 min/sync) ──► websocket ──► browser
                                                  │
                                                  ├─ EXTRACTING:
                                                  │   POST {CONNECTOR}/whatsapp/execute-script (script + token)
-                                                 │     └─ le script (session WhatsApp) lit le catalogue du
-                                                 │        wid CLIENT (`<phone>@c.us`), et pour chaque image :
-                                                 │          nodeFetch → POST /catalog-migration/callback/upload-image
-                                                 │            └─ bedones-agents → Minio → renvoie l'URL
-                                                 │        puis nodeFetch → POST /catalog-migration/callback/save-catalog
-                                                 │            └─ bedones-agents écrit le JSON du catalogue sur Minio
+                                                 │     └─ apps/whatsapp-connector (whatsapp-web.js, un de nos numéros)
+                                                 │        lit le catalogue du wid CLIENT (`<phone>@c.us`) et, par image :
+                                                 │          window.nodeFetch → POST /catalog-migration/callback/upload-image
+                                                 │            └─ backend → Minio → renvoie l'URL
+                                                 │        puis window.nodeFetch → POST /catalog-migration/callback/save-catalog
+                                                 │            └─ backend écrit le JSON du catalogue sur Minio
                                                  │
                                                  └─ IMPORTING:
                                                        lit le JSON Minio → CatalogService.createProduct() ──► Meta
                                                        progression ──► websocket ──► browser
 ```
 
-Callbacks authentifiés par un **JWT par-migration** (`scope: catalog-migration-callback`,
-30 min), vérifié par `CatalogMigrationCallbackGuard`. Aucun produit n'est stocké en base :
-seul un **JSON temporaire sur Minio** persiste le temps de la synchronisation.
+Callbacks authentifiés par un **JWT par-migration** (`scope: catalog-migration-callback`, 30 min),
+vérifié par `CatalogMigrationCallbackGuard`. Aucun produit en base : seul un **JSON temporaire sur
+Minio** persiste le temps de la sync. À la fin d'un job, `@OnWorkerEvent('completed')` rediffuse la
+file (`catalog:migration-queue`) → l'ETA des autres décrémente.
 
-Un job se termine → `@OnWorkerEvent('completed')` → on rediffuse la file aux utilisateurs en
-attente (`catalog:migration-queue`), leur ETA décrémente.
+## Le connecteur wppconnect — `apps/whatsapp-connector`
 
-## Le script injecté
+Service NestJS minimal (inspiré du connecteur de bedones-whatsapp) : whatsapp-web.js + Puppeteer.
+- Auth par **QR** (un de nos numéros), rendu **directement dans le terminal** (`qrcode-terminal`).
+- Endpoint générique `POST /whatsapp/execute-script` : injecte WPP (`@wppconnect/wa-js`) + expose
+  `window.nodeFetch` (proxy axios côté Node, sans CSP) puis exécute le script et **retourne** sa valeur.
+- Autres routes : `POST /whatsapp/start`, `POST /whatsapp/restart`, `GET /whatsapp/qr`, `GET /whatsapp/status`.
+- Garde optionnelle `TargetInstanceGuard` (`CONNECTOR_INSTANCE_ID` ↔ header `x-bedones-target-instance`).
 
-`catalog-connector.client.ts` contient un script (adapté de `getCatalog.ts`) injecté via
-`/whatsapp/execute-script`. Différences avec l'original :
-- cible le **wid du client** (`{{CLIENT_USER_ID}}`) au lieu de `WPP.conn.getMyUserId()` ;
-- prix = `priceAmount1000 / 1000` (unités majeures), devise = `product.currency` ;
-- POST les images vers `upload-image` et le catalogue vers `save-catalog`
-  (`window.nodeFetch`, proxy server-side du connecteur → pas de CSP/CORS), avec
-  `Authorization: Bearer {{TOKEN}}`.
+Le script d'extraction (dans `apps/backend/.../catalog-connector.client.ts`) cible le **wid du client**,
+récupère prix (`priceAmount1000/1000`) + devise, et POST images/catalogue via les callbacks.
+
+### Lancer le connecteur
+```bash
+cp apps/whatsapp-connector/.env.example apps/whatsapp-connector/.env
+pnpm install
+pnpm dev:whatsapp-connector            # port 3001
+# puis : POST http://localhost:3001/whatsapp/start  (QR affiché dans le terminal)
+#        GET  http://localhost:3001/whatsapp/status  → isReady: true
+```
+(ou en Docker : `apps/whatsapp-connector/Dockerfile`, contexte = racine du repo.)
 
 ## Parcours UI (modale `commerce-manager-migration-modal.tsx`)
 
 Deux points d'entrée : **page Catalogues** (toolbar + état vide) et **carousel du Dashboard**.
-
-1. **Intro** — Commerce Manager vs WhatsApp Business + question « Avez-vous déjà un catalogue ? »
-   (Oui / Non / Je ne comprends pas).
+1. **Intro** — Commerce Manager vs WhatsApp Business + question (Oui / Non / Je ne comprends pas).
 2. **Création** (si Non / Je ne comprends pas) — explication + lien Commerce Manager.
-3. **Connexion** — connecter/sélectionner le catalogue (OAuth). Le **localStorage**
-   (`catalog-migration-draft`) rouvre la modale à l'étape suivante au retour.
+3. **Connexion** — connecter/sélectionner le catalogue (OAuth) ; **localStorage** rouvre la modale à l'étape suivante.
 4. **Numéro** — choisir un numéro WhatsApp (ou en ajouter un via l'embedded signup).
-5. **Migration** — file d'attente → extraction → import (**antd `Steps`**), ETA + progression
-   temps réel via websocket.
+5. **Migration** — file d'attente → extraction → import (**antd `Steps`**), ETA + progression en temps réel.
 
-## Variables d'environnement (bedones-agents backend)
+## Variables d'environnement (apps/backend)
 
 ```
-WHATSAPP_CATALOG_CONNECTOR_URL=http://localhost:3001   # base URL du connecteur wppconnect
+WHATSAPP_CATALOG_CONNECTOR_URL=http://localhost:3001   # apps/whatsapp-connector
 WHATSAPP_CONNECTOR_INSTANCE_ID=                        # = CONNECTOR_INSTANCE_ID du connecteur (si activé)
-WHATSAPP_MIGRATION_CALLBACK_URL=http://localhost:3005  # URL de CE backend, joignable depuis le connecteur
+WHATSAPP_MIGRATION_CALLBACK_URL=http://localhost:3005  # CE backend, joignable DEPUIS le connecteur
 ```
+> Connecteur en Docker + backend sur l'hôte → `WHATSAPP_MIGRATION_CALLBACK_URL=http://host.docker.internal:3005`.
 
-Le réhébergement d'images et le JSON temporaire utilisent la config **Minio** existante.
-
-## Mise en route
-
-1. **Connecteur** : démarrer `whatsapp-connector`, scanner le QR (terminal) avec **un de nos numéros**.
-2. **Backend** : `pnpm --filter backend exec prisma migrate deploy` (migration
-   `20260529000000_add_catalog_migration`) puis `prisma generate`. Redis requis.
-3. Renseigner `WHATSAPP_CATALOG_CONNECTOR_URL` + `WHATSAPP_MIGRATION_CALLBACK_URL` (le connecteur
-   doit joindre cette URL, et l'URL Minio publique, pour les callbacks et les images).
-4. Lancer backend + frontend.
-
-## Vérification de bout en bout
-
-1. Dashboard → carousel « catalogue » (ou page Catalogues) → la modale s'ouvre.
-2. Intro → connexion (OAuth, retour dans la modale) → choix du numéro.
-3. « Lancer l'importation » → file d'attente avec ETA, puis extraction et import en direct.
-4. À la fin, « Voir le catalogue » → les produits importés (avec prix/devise) apparaissent.
+## Mise en route (récap)
+1. Lancer `apps/whatsapp-connector`, `POST /whatsapp/start`, scanner le QR (terminal) avec un de nos numéros.
+2. `pnpm --filter backend exec prisma migrate deploy` (migration `20260529000000_add_catalog_migration`) + `prisma generate`. Redis requis.
+3. Renseigner les 3 variables ci-dessus. Lancer backend + frontend.
 
 ## Notes
-- **Prix** : `priceAmount1000/1000` (unités majeures) passé en string à `createProduct`, qui le
-  convertit vers les unités mineures de Meta (×100), comme pour la création manuelle de produits.
-- Images : téléchargées dans le navigateur (session WhatsApp), réhébergées sur Minio via
-  `upload-image`, puis fournies à Meta en `image_url`.
+- **Prix** : `priceAmount1000/1000` (unités majeures) → `createProduct` (×100 pour Meta), comme la création manuelle.
+- Images : téléchargées dans la session WhatsApp, réhébergées sur Minio via `upload-image`, fournies à Meta en `image_url`.
 - Le catalogue de destination doit être **connecté à Commerce Manager** (`providerId`) avant l'import.
 - ETA = nombre de migrations en attente devant soi × ~1 min (une extraction à la fois).
