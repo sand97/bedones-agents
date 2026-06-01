@@ -8,6 +8,7 @@ import {
   QueueModule,
   SOCIAL_AVATAR_SYNC_QUEUE,
   WHATSAPP_PRODUCT_IMAGE_SYNC_QUEUE,
+  MESSAGE_HISTORY_SYNC_QUEUE,
 } from '../queue/queue.module'
 import { PrismaService } from '../prisma/prisma.service'
 import { UploadService } from '../upload/upload.service'
@@ -25,15 +26,20 @@ import { AvatarSyncService, AVATAR_SYNC_JOB, type AvatarSyncJobData } from './av
 import { AvatarSyncProcessor } from './avatar-sync.processor'
 import { ProductImageSyncService } from './product-image-sync.service'
 import { ProductImageSyncProcessor } from './product-image-sync.processor'
+import { MessageHistorySyncService } from './message-history-sync.service'
+import { MessageHistorySyncProcessor } from './message-history-sync.processor'
+import { SocialHealthModule } from './social-health.module'
 
 @Module({
   imports: [
     AuthModule,
     UploadModule,
     CatalogModule,
+    SocialHealthModule,
     QueueModule,
     BullModule.registerQueue({ name: SOCIAL_AVATAR_SYNC_QUEUE }),
     BullModule.registerQueue({ name: WHATSAPP_PRODUCT_IMAGE_SYNC_QUEUE }),
+    BullModule.registerQueue({ name: MESSAGE_HISTORY_SYNC_QUEUE }),
   ],
   controllers: [
     SocialController,
@@ -52,8 +58,16 @@ import { ProductImageSyncProcessor } from './product-image-sync.processor'
     AvatarSyncProcessor,
     ProductImageSyncService,
     ProductImageSyncProcessor,
+    MessageHistorySyncService,
+    MessageHistorySyncProcessor,
   ],
-  exports: [MessagingService, LabelService, AvatarSyncService, ProductImageSyncService],
+  exports: [
+    MessagingService,
+    LabelService,
+    AvatarSyncService,
+    ProductImageSyncService,
+    MessageHistorySyncService,
+  ],
 })
 export class SocialModule implements OnApplicationBootstrap {
   private readonly logger = new Logger(SocialModule.name)

@@ -2277,6 +2277,393 @@
         ]
       }
     },
+    "/catalog/{catalogId}/product-contexts": {
+      "get": {
+        "operationId": "ProductContextController_listProductContexts",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ids",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/catalog/{catalogId}/collection-contexts": {
+      "get": {
+        "operationId": "ProductContextController_listCollectionContexts",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ids",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/catalog/{catalogId}/products/{productId}/context": {
+      "get": {
+        "operationId": "ProductContextController_getProductContext",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "patch": {
+        "operationId": "ProductContextController_updateProductContext",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductContextDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/catalog/{catalogId}/product-contexts/analyze": {
+      "post": {
+        "operationId": "ProductContextController_analyzeContext",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzeContextDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/catalog/{catalogId}/product-contexts/save": {
+      "post": {
+        "operationId": "ProductContextController_saveContext",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveContextDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/catalog/{catalogId}/post-links": {
+      "post": {
+        "operationId": "ProductContextController_linkPosts",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkPostsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/catalog/{catalogId}/products/{productId}/post-links": {
+      "get": {
+        "operationId": "ProductContextController_listProductLinks",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/catalog/{catalogId}/collections/{collectionId}/post-links": {
+      "get": {
+        "operationId": "ProductContextController_listCollectionLinks",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "collectionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/catalog/{catalogId}/product-post-links/{linkId}": {
+      "delete": {
+        "operationId": "ProductContextController_deleteProductLink",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "linkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/catalog/{catalogId}/collection-post-links/{linkId}": {
+      "delete": {
+        "operationId": "ProductContextController_deleteCollectionLink",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "linkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
     "/organisations/{orgId}/members": {
       "get": {
         "operationId": "MemberController_list",
@@ -4182,6 +4569,36 @@
           "WhatsAppOptIn"
         ]
       }
+    },
+    "/social/accounts/{accountId}/health": {
+      "get": {
+        "operationId": "SocialController_getAccountHealth",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialAccountHealthDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
     }
   },
   "info": {
@@ -4959,13 +5376,34 @@
           },
           "settings": {
             "$ref": "#/components/schemas/PageSettingsResponseDto"
+          },
+          "disabled": {
+            "description": "Whether outbound calls are disabled after repeated errors or missing scopes",
+            "type": "boolean"
+          },
+          "disabledReason": {
+            "description": "Why the account/feature was disabled (e.g. too_many_errors, missing_scopes:...)",
+            "type": "string"
+          },
+          "featureDisabled": {
+            "description": "Outbound features disabled granularly",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "COMMENT",
+                "MESSAGE"
+              ]
+            }
           }
         },
         "required": [
           "id",
           "provider",
           "providerAccountId",
-          "scopes"
+          "scopes",
+          "disabled",
+          "featureDisabled"
         ]
       },
       "UnreadCountDto": {
@@ -5837,6 +6275,98 @@
         },
         "required": [
           "phoneNumberId"
+        ]
+      },
+      "AnalyzeContextDto": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "User natural-language prompt describing the change to apply."
+          },
+          "productIds": {
+            "description": "Meta product IDs targeted.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "collectionIds": {
+            "description": "Meta product set (collection) IDs targeted.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      },
+      "SaveContextDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Final context content to persist on each selected entity."
+          },
+          "productIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "collectionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "UpdateProductContextDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "applyToSiblings": {
+            "type": "boolean",
+            "description": "When true, also update every product sharing the previous identical content."
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "LinkPostsDto": {
+        "type": "object",
+        "properties": {
+          "postIds": {
+            "description": "Provider post IDs (FB post / IG media) to link.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "productIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "collectionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "postIds"
         ]
       },
       "MemberUserDto": {
@@ -7015,6 +7545,72 @@
       "SendTemplateBody": {
         "type": "object",
         "properties": {}
+      },
+      "SocialAccountLastErrorDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "description": "Provider/HTTP error code (e.g. 190, OAuthException)",
+            "type": "string"
+          },
+          "resource": {
+            "description": "Resource to reconnect (page, catalog, tiktok, ...)",
+            "type": "string"
+          },
+          "technical": {
+            "description": "Raw provider error payload, for \"show details\"",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "technical",
+          "createdAt"
+        ]
+      },
+      "SocialAccountHealthDto": {
+        "type": "object",
+        "properties": {
+          "disabled": {
+            "type": "boolean"
+          },
+          "disabledReason": {
+            "type": "string"
+          },
+          "featureDisabled": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "COMMENT",
+                "MESSAGE"
+              ]
+            }
+          },
+          "message": {
+            "description": "Human-friendly explanation keyed by language (e.g. { en, fr })",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "lastError": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SocialAccountLastErrorDto"
+              }
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "disabled",
+          "featureDisabled"
+        ]
       }
     }
   }

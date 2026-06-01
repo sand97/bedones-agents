@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
 import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import { AuthGuard } from '../auth/auth.guard'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -18,6 +18,7 @@ import {
   CommentOnPostDto,
   CommentActionDto,
   TikTokBusinessCheckDto,
+  SocialAccountHealthDto,
 } from './dto/social.dto'
 
 @ApiTags('Social')
@@ -96,6 +97,32 @@ export class SocialController {
   @ApiOkResponse({ type: [PostResponseDto] })
   async getPosts(@CurrentUser() user: { id: string }, @Param('accountId') accountId: string) {
     return this.socialService.getPostsForAccount(user.id, accountId)
+  }
+
+  // ─── Account health / last error (for the reconnect prompt) ───
+
+  @Get('accounts/:accountId/health')
+  @ApiOkResponse({ type: SocialAccountHealthDto })
+  async getAccountHealth(
+    @CurrentUser() user: { id: string },
+    @Param('accountId') accountId: string,
+  ) {
+    return this.socialService.getAccountHealth(user.id, accountId)
+  }
+
+  @Get('accounts/:accountId/provider-posts')
+  async getProviderPosts(
+    @CurrentUser() user: { id: string },
+    @Param('accountId') accountId: string,
+    @Query('search') search?: string,
+    @Query('after') after?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.socialService.fetchProviderPosts(user.id, accountId, {
+      search,
+      after,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    })
   }
 
   // ─── Update page settings ───

@@ -86,6 +86,17 @@ export class CatalogController {
     })
   }
 
+  @Get(':id/products-by-ids')
+  async findProductsByIds(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Query('ids') ids: string,
+  ) {
+    await this.catalogService.assertCatalogAccess(user.id, id)
+    const list = ids ? ids.split(',').filter(Boolean) : []
+    return this.catalogService.findProductsByIds(id, list)
+  }
+
   @Post(':id/products')
   async createProduct(
     @CurrentUser() user: { id: string },

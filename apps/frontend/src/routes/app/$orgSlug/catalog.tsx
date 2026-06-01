@@ -12,6 +12,8 @@ import {
   Trash2,
   ShoppingBag,
   Smartphone,
+  Sparkles,
+  Link2,
 } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { CatalogIndexingBanner } from '@app/components/catalog/catalog-indexing-banner'
@@ -24,12 +26,20 @@ import { ProductModal } from '@app/components/catalog/product-modal'
 import { CollectionFilterSelect } from '@app/components/catalog/collection-filter-select'
 import { ArticleDescriptionCard } from '@app/components/catalog/article-description-card'
 import { useCatalogColumns } from '@app/components/catalog/catalog-columns'
+import { CatalogQuickActions } from '@app/components/catalog/catalog-quick-actions'
+import { ProductContextFlowModal } from '@app/components/catalog/product-context-flow-modal'
+import { PostLinkFlowModal } from '@app/components/catalog/post-link-flow-modal'
+import { ProductContextDetailModal } from '@app/components/catalog/product-context-detail-modal'
+import { LinkedPostsModal } from '@app/components/catalog/linked-posts-modal'
+import { SharedProductsModal } from '@app/components/catalog/shared-products-modal'
+import type { PickerEntity } from '@app/components/catalog/product-collection-picker'
 import type { CatalogArticle } from '@app/components/whatsapp/mock-data'
 import { AccountSwitcher } from '@app/components/social/account-switcher'
 import { useLayout } from '@app/contexts/layout-context'
 import { catalogApi } from '@app/lib/api/agent-api'
 import { setAuthRedirect, buildFacebookOAuthUrl } from '@app/lib/auth-redirect'
 import type { Product, Collection } from '@app/lib/api/agent-api'
+import { CatalogSocialEmpty } from '@app/components/catalog/catalog-social-empty'
 import {
   prependDirectListCache,
   prependListItemCache,
@@ -38,6 +48,9 @@ import {
   updateDirectListCache,
   updateListItemCache,
 } from '@app/lib/query-cache'
+import { getStoredSelection, setStoredSelection } from '@app/lib/selection-storage'
+
+const CATALOG_SELECTION_SCOPE = 'catalog-current'
 
 export const Route = createFileRoute('/app/$orgSlug/catalog')({
   component: CatalogPage,
@@ -88,6 +101,22 @@ function CatalogPage() {
     initialProduct?: Product
   }>({ isOpen: false })
 
+  // Quick action wizards
+  const [contextFlowOpen, setContextFlowOpen] = useState(false)
+  const [contextFlowEdit, setContextFlowEdit] = useState<{
+    targets: PickerEntity[]
+    currentContext: string
+  } | null>(null)
+  const [postLinkFlowOpen, setPostLinkFlowOpen] = useState(false)
+  // Per-product context / linked-posts modals
+  const [contextDetailFor, setContextDetailFor] = useState<Product | null>(null)
+  const [sharedProductsConfig, setSharedProductsConfig] = useState<{ ids: string[] } | null>(null)
+  const [linkedPostsFor, setLinkedPostsFor] = useState<{
+    kind: 'product' | 'collection'
+    id: string
+    name?: string
+  } | null>(null)
+
   // URL params helpers
   const updateSearch = useCallback(
     (updates: Record<string, string | undefined>) => {
@@ -103,7 +132,6 @@ function CatalogPage() {
     [navigate],
   )
 
-  const selectedCatalogId = search.catalogId || null
   const selectedCollectionId = search.collection || undefined
 
   // ─── Queries ───
@@ -115,10 +143,25 @@ function CatalogPage() {
   })
 
   const catalogs = catalogsQuery.data || []
+
+  // Selection priority: explicit URL param > last persisted choice for this org
+  // > first available catalog. Mirrors the WhatsApp chat behaviour so the user
+  // lands on the catalog they last worked on.
+  const selectedCatalogId = useMemo(() => {
+    if (search.catalogId) return search.catalogId
+    const stored = getStoredSelection(CATALOG_SELECTION_SCOPE, orgSlug)
+    if (stored && catalogs.some((c) => c.id === stored)) return stored
+    return catalogs[0]?.id ?? null
+  }, [search.catalogId, catalogs, orgSlug])
+
   const selectedCatalog = useMemo(
     () => catalogs.find((c) => c.id === selectedCatalogId) ?? catalogs[0] ?? null,
     [catalogs, selectedCatalogId],
   )
+
+  useEffect(() => {
+    if (selectedCatalog) setStoredSelection(CATALOG_SELECTION_SCOPE, orgSlug, selectedCatalog.id)
+  }, [orgSlug, selectedCatalog])
 
   const productsQuery = useQuery({
     queryKey: [
@@ -383,6 +426,25 @@ function CatalogPage() {
                     product && setModalProductConfig({ isOpen: true, initialProduct: product }),
                 },
                 {
+                  key: 'context',
+                  label: 'Voir le contexte',
+                  icon: <Sparkles size={14} />,
+                  onClick: () => product && setContextDetailFor(product),
+                },
+                {
+                  key: 'linked-posts',
+                  label: 'Posts liés',
+                  icon: <Link2 size={14} />,
+                  onClick: () =>
+                    product &&
+                    setLinkedPostsFor({
+                      kind: 'product',
+                      id: product.id,
+                      name: product.name,
+                    }),
+                },
+                { type: 'divider' as const },
+                {
                   key: 'delete',
                   label: t('catalog.delete_article'),
                   icon: <Trash2 size={14} />,
@@ -467,6 +529,13 @@ function CatalogPage() {
       <CatalogIndexingBanner catalogs={catalogs} />
 
       <div className="flex-1 p-4 pb-16 lg:p-6 lg:pb-16">
+        {selectedCatalog && (
+          <CatalogQuickActions
+            onOpenContextFlow={() => setContextFlowOpen(true)}
+            onOpenLinkPostsFlow={() => setPostLinkFlowOpen(true)}
+          />
+        )}
+
         <div className="tickets-filters catalog-filters">
           <div className="flex flex-1 items-center gap-3 lg:contents">
             <Input
@@ -534,7 +603,9 @@ function CatalogPage() {
           </div>
         </div>
 
-        {isDesktop ? (
+        {productsQuery.isError ? (
+          <CatalogSocialEmpty error={productsQuery.error} onReconnect={handleConnectCatalog} />
+        ) : isDesktop ? (
           productsQuery.isLoading ? (
             <Table
               dataSource={[]}
@@ -604,6 +675,25 @@ function CatalogPage() {
                                 product &&
                                 setModalProductConfig({ isOpen: true, initialProduct: product }),
                             },
+                            {
+                              key: 'context',
+                              label: 'Voir le contexte',
+                              icon: <Sparkles size={14} />,
+                              onClick: () => product && setContextDetailFor(product),
+                            },
+                            {
+                              key: 'linked-posts',
+                              label: 'Posts liés',
+                              icon: <Link2 size={14} />,
+                              onClick: () =>
+                                product &&
+                                setLinkedPostsFor({
+                                  kind: 'product',
+                                  id: product.id,
+                                  name: product.name,
+                                }),
+                            },
+                            { type: 'divider' as const },
                             {
                               key: 'delete',
                               label: t('catalog.delete_article'),
@@ -690,6 +780,110 @@ function CatalogPage() {
         orgSlug={orgSlug}
         onClose={() => setMigrationOpen(false)}
       />
+
+      {selectedCatalog && (
+        <>
+          <ProductContextFlowModal
+            open={contextFlowOpen || !!contextFlowEdit}
+            catalog={selectedCatalog}
+            placeholderProducts={products}
+            placeholderCollections={collections}
+            editMode={contextFlowEdit ?? undefined}
+            onClose={() => {
+              setContextFlowOpen(false)
+              setContextFlowEdit(null)
+            }}
+            onSaved={() => {
+              // Refresh context-related queries so the detail / siblings views
+              // pick the new content up next time they're opened.
+              queryClient.invalidateQueries({
+                queryKey: ['get', '/catalog/{catalogId}/products/{productId}/context'],
+              })
+            }}
+          />
+          <PostLinkFlowModal
+            open={postLinkFlowOpen}
+            catalog={selectedCatalog}
+            organisationId={orgSlug}
+            placeholderProducts={products}
+            placeholderCollections={collections}
+            onClose={() => setPostLinkFlowOpen(false)}
+            onSaved={() => {
+              queryClient.invalidateQueries({ queryKey: ['post-links', selectedCatalog.id] })
+            }}
+          />
+          {contextDetailFor && (
+            <ProductContextDetailModal
+              open={!!contextDetailFor}
+              catalogId={selectedCatalog.id}
+              productId={contextDetailFor.id}
+              productName={contextDetailFor.name}
+              onClose={() => setContextDetailFor(null)}
+              onEditOne={(detail) => {
+                if (!contextDetailFor) return
+                const target: PickerEntity = {
+                  kind: 'product',
+                  id: contextDetailFor.id,
+                  retailerId: contextDetailFor.retailerId,
+                  name: contextDetailFor.name,
+                  imageUrl: contextDetailFor.imageUrl,
+                }
+                setContextFlowEdit({ targets: [target], currentContext: detail.content })
+                setContextDetailFor(null)
+              }}
+              onEditAll={async (detail) => {
+                // Hydrate every sibling so the chips that show up if the user
+                // hits "back" in the flow have proper names / images.
+                const ids = detail.sameContentProductIds
+                const known = new Map(products.map((p) => [p.id, p]))
+                const missing = ids.filter((id) => !known.has(id))
+                let fetched: (Product | null)[] = []
+                if (missing.length > 0) {
+                  try {
+                    const res = await catalogApi.getProductsByIds(selectedCatalog.id, missing)
+                    fetched = res.products
+                  } catch {
+                    fetched = []
+                  }
+                }
+                const fetchedMap = new Map(
+                  fetched.filter((p): p is Product => p !== null).map((p) => [p.id, p]),
+                )
+                const targets: PickerEntity[] = ids.map((id) => {
+                  const p = known.get(id) ?? fetchedMap.get(id)
+                  return {
+                    kind: 'product',
+                    id,
+                    retailerId: p?.retailerId,
+                    name: p?.name ?? 'Produit',
+                    imageUrl: p?.imageUrl,
+                  }
+                })
+                setContextFlowEdit({ targets, currentContext: detail.content })
+                setContextDetailFor(null)
+              }}
+              onViewSiblings={(detail) => {
+                setSharedProductsConfig({ ids: detail.sameContentProductIds })
+              }}
+            />
+          )}
+          {sharedProductsConfig && (
+            <SharedProductsModal
+              open={!!sharedProductsConfig}
+              catalogId={selectedCatalog.id}
+              productIds={sharedProductsConfig.ids}
+              placeholderProducts={products}
+              onClose={() => setSharedProductsConfig(null)}
+            />
+          )}
+          <LinkedPostsModal
+            open={!!linkedPostsFor}
+            catalogId={selectedCatalog.id}
+            entity={linkedPostsFor}
+            onClose={() => setLinkedPostsFor(null)}
+          />
+        </>
+      )}
     </div>
   )
 }
