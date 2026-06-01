@@ -27,12 +27,6 @@ export class WhatsAppController {
     }
   }
 
-  @Post('start')
-  async start() {
-    await this.whatsapp.startClient()
-    return { success: true, message: 'WhatsApp client started' }
-  }
-
   @Post('restart')
   async restart() {
     await this.whatsapp.restartClient()

@@ -28,27 +28,19 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
     private readonly httpService: HttpService,
   ) {}
 
-  async onModuleInit() {
-    if (this.shouldAutoStart()) {
-      await this.initialize()
-      return
-    }
-    this.logger.log(
-      'WhatsApp autostart disabled. Client will start on the first explicit request (POST /whatsapp/start).',
-    )
+  onModuleInit(): void {
+    // Start the WhatsApp client directly: if the service is up, we want to use
+    // it. Fire-and-forget so the HTTP server (and /qr, /status) come up
+    // immediately; the QR is printed to the terminal as soon as it's available.
+    void this.initialize().catch((error) => {
+      this.logger.error(
+        `Failed to start WhatsApp client on boot: ${error instanceof Error ? error.message : error}`,
+      )
+    })
   }
 
   async onModuleDestroy() {
     await this.destroy()
-  }
-
-  private shouldAutoStart(): boolean {
-    const configured =
-      this.configService.get<string>(
-        'WHATSAPP_AUTOSTART',
-        process.env.NODE_ENV === 'production' ? 'false' : 'true',
-      ) || 'false'
-    return ['1', 'true', 'yes', 'on'].includes(configured.toLowerCase())
   }
 
   async startClient(): Promise<void> {

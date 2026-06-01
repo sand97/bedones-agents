@@ -40,7 +40,7 @@ Service NestJS minimal (inspiré du connecteur de bedones-whatsapp) : whatsapp-w
 - Auth par **QR** (un de nos numéros), rendu **directement dans le terminal** (`qrcode-terminal`).
 - Endpoint générique `POST /whatsapp/execute-script` : injecte WPP (`@wppconnect/wa-js`) + expose
   `window.nodeFetch` (proxy axios côté Node, sans CSP) puis exécute le script et **retourne** sa valeur.
-- Autres routes : `POST /whatsapp/start`, `POST /whatsapp/restart`, `GET /whatsapp/qr`, `GET /whatsapp/status`.
+- Démarre **automatiquement au boot** (pas de `/start`). Autres routes : `POST /whatsapp/restart`, `GET /whatsapp/qr`, `GET /whatsapp/status`.
 - Garde optionnelle `TargetInstanceGuard` (`CONNECTOR_INSTANCE_ID` ↔ header `x-bedones-target-instance`).
 
 Le script d'extraction (dans `apps/backend/.../catalog-connector.client.ts`) cible le **wid du client**,
@@ -50,9 +50,9 @@ récupère prix (`priceAmount1000/1000`) + devise, et POST images/catalogue via 
 ```bash
 cp apps/whatsapp-connector/.env.example apps/whatsapp-connector/.env
 pnpm install
-pnpm dev:whatsapp-connector            # port 3001
-# puis : POST http://localhost:3001/whatsapp/start  (QR affiché dans le terminal)
-#        GET  http://localhost:3001/whatsapp/status  → isReady: true
+pnpm dev:whatsapp-connector            # port 3001 — démarre le client directement
+# le QR s'affiche dans le terminal → scanner avec un de nos numéros
+#   GET http://localhost:3001/whatsapp/status  → isReady: true
 ```
 (ou en Docker : `apps/whatsapp-connector/Dockerfile`, contexte = racine du repo.)
 
@@ -75,7 +75,7 @@ WHATSAPP_MIGRATION_CALLBACK_URL=http://localhost:3005  # CE backend, joignable D
 > Connecteur en Docker + backend sur l'hôte → `WHATSAPP_MIGRATION_CALLBACK_URL=http://host.docker.internal:3005`.
 
 ## Mise en route (récap)
-1. Lancer `apps/whatsapp-connector`, `POST /whatsapp/start`, scanner le QR (terminal) avec un de nos numéros.
+1. Lancer `apps/whatsapp-connector` (le client démarre tout seul) et scanner le QR (terminal) avec un de nos numéros.
 2. `pnpm --filter backend exec prisma migrate deploy` (migration `20260529000000_add_catalog_migration`) + `prisma generate`. Redis requis.
 3. Renseigner les 3 variables ci-dessus. Lancer backend + frontend.
 
