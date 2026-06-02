@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Modal } from 'antd'
+import { Trans, useTranslation } from 'react-i18next'
+import { Modal, Select } from 'antd'
 import { catalogApi, type CatalogMigration } from '@app/lib/api/agent-api'
 import { $api } from '@app/lib/api/$api'
 import { getSocket } from '@app/lib/socket'
@@ -16,6 +17,8 @@ import {
   writeCatalogMigrationDraft,
 } from '@app/lib/catalog-migration-draft'
 import './commerce-manager-migration-modal.css'
+
+const NS = 'catalog_migration.flow.'
 
 /* ──────────────────────────── Iconography ──────────────────────────── */
 
@@ -183,19 +186,21 @@ function FlowNode({
 }
 
 function FlowDiagram() {
+  const { t } = useTranslation()
   return (
     <div className="mc-flow">
-      <FlowNode kind="wa" label="WhatsApp Business" sub="Catalogue actuel" dim />
+      <FlowNode kind="wa" label={t(NS + 'wa_business')} sub={t(NS + 'wa_current')} dim />
       <div className="mc-flow-arrow">
         <span className="mc-flow-track" />
         <Icon name="arrowRight" size={18} />
       </div>
-      <FlowNode kind="cm" label="Commerce Manager" sub="Catalogue officiel Meta" />
+      <FlowNode kind="cm" label={t(NS + 'commerce_manager')} sub={t(NS + 'meta_official')} />
     </div>
   )
 }
 
 function TransferDiagram({ number, catalog }: { number: string; catalog: string }) {
+  const { t } = useTranslation()
   const thumbs = Array.from({ length: 6 })
   return (
     <div className="mc-transfer">
@@ -203,7 +208,7 @@ function TransferDiagram({ number, catalog }: { number: string; catalog: string 
         <div className="mc-tcard-hd">
           <WhatsAppGlyph size={18} />
           <div className="mc-tcard-hd-tx">
-            <div className="mc-tcard-t">WhatsApp Business</div>
+            <div className="mc-tcard-t">{t(NS + 'wa_business')}</div>
             <div className="mc-tcard-num">{number}</div>
           </div>
         </div>
@@ -212,7 +217,7 @@ function TransferDiagram({ number, catalog }: { number: string; catalog: string 
             <span key={i} className="mc-tthumb" />
           ))}
         </div>
-        <div className="mc-tcard-ft">Vos produits</div>
+        <div className="mc-tcard-ft">{t(NS + 'wa_catalog_label')}</div>
       </div>
 
       <div className="mc-transfer-arrow">
@@ -225,7 +230,7 @@ function TransferDiagram({ number, catalog }: { number: string; catalog: string 
         <div className="mc-tcard-hd">
           <CommerceGlyph size={18} />
           <div className="mc-tcard-hd-tx">
-            <div className="mc-tcard-t">Commerce Manager</div>
+            <div className="mc-tcard-t">{t(NS + 'commerce_manager')}</div>
             <div className="mc-tcard-num">{catalog}</div>
           </div>
         </div>
@@ -234,7 +239,7 @@ function TransferDiagram({ number, catalog }: { number: string; catalog: string 
             <span key={i} className="mc-tthumb ghost" />
           ))}
         </div>
-        <div className="mc-tcard-ft">Catalogue officiel Meta</div>
+        <div className="mc-tcard-ft">{t(NS + 'meta_official')}</div>
       </div>
     </div>
   )
@@ -261,8 +266,6 @@ function LinkVisual({ state }: { state: 'progress' | 'success' | 'fail' }) {
   )
 }
 
-/* ──────────────────────────── Small blocks ──────────────────────────── */
-
 function BenefitCard({ icon, title, body }: { icon: string; title: string; body: string }) {
   return (
     <div className="mc-benefit">
@@ -285,27 +288,6 @@ function Note({ children }: { children: ReactNode }) {
     </div>
   )
 }
-
-const IMPORT_TASKS = [
-  'Ouverture du catalogue WhatsApp',
-  'Extraction des produits et des collections',
-  'Stockage dans le catalogue Commerce Manager',
-]
-
-const MANUAL_STEPS: [string, string][] = [
-  [
-    'Ouvrez WhatsApp Business',
-    'Sur votre téléphone, ou via Meta Business Suite, puis allez dans Paramètres.',
-  ],
-  ['Outils professionnels → Catalogue', 'Ouvrez la section Catalogue de votre compte.'],
-  [
-    'Sélectionnez votre catalogue Commerce Manager',
-    'Choisissez votre nouveau catalogue dans la liste.',
-  ],
-  ['Enregistrez, puis revenez ici', 'Cliquez ensuite sur « Revérifier la liaison » ci-dessous.'],
-]
-
-/* ──────────────────────────── Stepper ──────────────────────────── */
 
 function Stepper({ current, total }: { current: number; total: number }) {
   return (
@@ -337,12 +319,15 @@ interface Props {
  * WhatsApp Business account to the new catalogue.
  */
 export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props) {
+  const { t } = useTranslation()
+  const tf = (key: string, opts?: Record<string, unknown>) => t(NS + key, opts)
   const queryClient = useQueryClient()
 
   const [step, setStep] = useState(1) // 1..5
   const [phase, setPhase] = useState<string>('main')
   const [migrationId, setMigrationId] = useState<string>()
   const [collectionsCount, setCollectionsCount] = useState(0)
+  const [selectedAccountId, setSelectedAccountId] = useState<string>()
 
   // ─── Data ───
   const catalogsQuery = useQuery({
@@ -363,12 +348,20 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
     return [...list].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))[0]
   }, [catalogsQuery.data])
 
-  const waAccount = useMemo(
-    () => (accountsQuery.data ?? []).find((a) => a.provider === 'WHATSAPP'),
+  const whatsappAccounts = useMemo(
+    () => (accountsQuery.data ?? []).filter((a) => a.provider === 'WHATSAPP'),
     [accountsQuery.data],
   )
+  const waAccount = whatsappAccounts.find((a) => a.id === selectedAccountId) ?? whatsappAccounts[0]
   const waNumber = waAccount?.username || waAccount?.providerAccountId || ''
   const sourcePhone = waNumber.replace(/\D/g, '')
+
+  // Default the source-number selection to the first connected WhatsApp account.
+  useEffect(() => {
+    if (!selectedAccountId && whatsappAccounts.length > 0) {
+      setSelectedAccountId(whatsappAccounts[0].id)
+    }
+  }, [selectedAccountId, whatsappAccounts])
 
   // ─── Resume after the connect redirect ───
   useEffect(() => {
@@ -485,7 +478,6 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
   }
 
   const connectCatalog = () => {
-    // Already connected → skip Meta and go straight to the transfer step.
     if (connectedCatalog) {
       setStep(3)
       setPhase('main')
@@ -527,12 +519,10 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
 
   // ─── Screen descriptor ───
   const total = 5
-  const sc = buildScreen()
 
   interface BtnCfg {
     label: string
     icon?: string | null
-    variant?: 'primary' | 'ghost'
     disabled?: boolean
     onClick: () => void
   }
@@ -541,7 +531,6 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
     current: number
     body: ReactNode
     back?: () => void
-    secondary?: BtnCfg
     primary?: BtnCfg
     footStep?: ReactNode
   }
@@ -549,7 +538,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
   function buildScreen(): Screen {
     if (step === 1) {
       return {
-        title: 'Un catalogue que vos outils peuvent enfin utiliser',
+        title: tf('s1_title'),
         current: 1,
         body: (
           <div className="mc-step">
@@ -557,31 +546,17 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
               <FlowDiagram />
             </div>
             <p className="mc-lede">
-              Aujourd'hui, vos produits vivent dans WhatsApp Business. En les déplaçant vers un
-              catalogue <strong>Commerce Manager</strong> — le format officiel de Meta — ils
-              deviennent exploitables par tout Bedones.
+              <Trans i18nKey={NS + 's1_lede'} components={{ b: <strong /> }} />
             </p>
             <div className="mc-benefits">
-              <BenefitCard
-                icon="sparkles"
-                title="Votre agent IA répond avec vos produits"
-                body="Prix, photos et descriptions sont utilisés automatiquement dans les conversations."
-              />
-              <BenefitCard
-                icon="ticket"
-                title="Des tickets reliés aux bons articles"
-                body="Chaque commande se rattache aux produits concernés, sans saisie manuelle."
-              />
-              <BenefitCard
-                icon="promo"
-                title="Des promotions en quelques clics"
-                body="Créez offres et réductions directement sur les articles de votre catalogue."
-              />
+              <BenefitCard icon="sparkles" title={tf('s1_b1_t')} body={tf('s1_b1_b')} />
+              <BenefitCard icon="ticket" title={tf('s1_b2_t')} body={tf('s1_b2_b')} />
+              <BenefitCard icon="promo" title={tf('s1_b3_t')} body={tf('s1_b3_b')} />
             </div>
-            <Note>Votre catalogue WhatsApp actuel n'est pas modifié ni supprimé.</Note>
+            <Note>{tf('s1_note')}</Note>
           </div>
         ),
-        primary: { label: 'Continuer', icon: 'arrowRight', onClick: () => setStep(2) },
+        primary: { label: tf('continue'), icon: 'arrowRight', onClick: () => setStep(2) },
       }
     }
 
@@ -593,17 +568,14 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
           body: (
             <div className="mc-step mc-center">
               <span className="mc-spin xl" />
-              <div className="mc-bigtitle">Connexion à Meta…</div>
-              <p className="mc-lede mc-center-tx">
-                Nous ouvrons Meta pour connecter votre catalogue Commerce Manager. Ne fermez pas
-                cette page.
-              </p>
+              <div className="mc-bigtitle">{tf('s2_redirect_title')}</div>
+              <p className="mc-lede mc-center-tx">{tf('s2_redirect_lede')}</p>
             </div>
           ),
         }
       }
       return {
-        title: 'La connexion se fait du côté de Meta',
+        title: tf('s2_title'),
         current: 2,
         back: () => setStep(1),
         body: (
@@ -613,18 +585,15 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
                 <Icon name="external" size={30} />
               </div>
             </div>
-            <p className="mc-lede">
-              Pour connecter votre catalogue, vous allez être redirigé vers Meta, en toute sécurité.
-              C'est là que tout se passe — nous reprenons la main juste après.
-            </p>
+            <p className="mc-lede">{tf('s2_lede')}</p>
             <div className="mc-choicelist">
               <div className="mc-choice">
                 <div className="mc-choice-ic">
                   <Icon name="box" size={18} />
                 </div>
                 <div className="mc-choice-tx">
-                  <div className="mc-choice-t">Créer un nouveau catalogue</div>
-                  <div className="mc-choice-b">Si vous partez de zéro côté Meta.</div>
+                  <div className="mc-choice-t">{tf('s2_choice1_t')}</div>
+                  <div className="mc-choice-b">{tf('s2_choice1_b')}</div>
                 </div>
               </div>
               <div className="mc-choice">
@@ -632,44 +601,66 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
                   <Icon name="layers" size={18} />
                 </div>
                 <div className="mc-choice-tx">
-                  <div className="mc-choice-t">Sélectionner un catalogue existant</div>
-                  <div className="mc-choice-b">Si vous en avez déjà un dans Commerce Manager.</div>
+                  <div className="mc-choice-t">{tf('s2_choice2_t')}</div>
+                  <div className="mc-choice-b">{tf('s2_choice2_b')}</div>
                 </div>
               </div>
             </div>
-            <Note>Ces deux choix se font chez Meta. Vous revenez ici aussitôt.</Note>
+            <Note>{tf('s2_note')}</Note>
           </div>
         ),
-        primary: { label: 'Se connecter à Meta', icon: 'external', onClick: connectCatalog },
+        primary: { label: tf('connect_meta'), icon: 'external', onClick: connectCatalog },
       }
     }
 
     if (step === 3) {
-      const catalogName = connectedCatalog?.name ?? 'Votre catalogue Commerce Manager'
+      const catalogName = connectedCatalog?.name ?? tf('your_catalog')
       return {
-        title: 'Vos produits, prêts à être déplacés',
+        title: tf('s3_title'),
         current: 3,
         back: () => setStep(2),
         body: (
           <div className="mc-step">
-            <TransferDiagram number={waNumber || 'Votre numéro WhatsApp'} catalog={catalogName} />
+            <TransferDiagram number={waNumber || tf('your_number')} catalog={catalogName} />
+            {whatsappAccounts.length > 0 && (
+              <div className="mc-field">
+                <span className="mc-field-label">{tf('number_label')}</span>
+                <Select
+                  size="large"
+                  value={selectedAccountId}
+                  onChange={setSelectedAccountId}
+                  className="mc-field-select"
+                  options={whatsappAccounts.map((a) => ({
+                    value: a.id,
+                    label: a.username || a.pageName || a.providerAccountId,
+                  }))}
+                />
+              </div>
+            )}
             <div className="mc-confirm-line">
               <span className="mc-confirm-check">
                 <Icon name="check" size={12} />
               </span>
-              Connecté à <strong>{catalogName}</strong>
+              <Trans
+                i18nKey={NS + 's3_confirm'}
+                values={{ name: catalogName }}
+                components={{ b: <strong /> }}
+              />
             </div>
             <p className="mc-lede">
-              Lancez l'import pour déplacer les produits de votre numéro WhatsApp Business
-              <strong> {waNumber}</strong> vers ce catalogue Commerce Manager.
+              <Trans
+                i18nKey={NS + 's3_lede'}
+                values={{ number: waNumber }}
+                components={{ b: <strong /> }}
+              />
             </p>
             <button className="mc-textlink" onClick={() => setStep(2)}>
-              Ce n'est pas le bon catalogue ? Se reconnecter
+              {tf('s3_reconnect')}
             </button>
           </div>
         ),
         primary: {
-          label: 'Démarrer l’importation',
+          label: tf('start_import'),
           icon: 'arrowRight',
           disabled: !connectedCatalog || !sourcePhone || startMutation.isPending,
           onClick: () => startMutation.mutate(),
@@ -681,7 +672,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
       if (phase === 'result') {
         const products = migration?.importedProducts ?? migration?.totalProducts ?? 0
         return {
-          title: 'Vos produits sont dans Commerce Manager',
+          title: tf('s4_result_title'),
           current: 4,
           body: (
             <div className="mc-step">
@@ -691,7 +682,8 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
                     <Icon name="layers" size={22} />
                   </div>
                   <div className="mc-stat-v">
-                    <strong>{collectionsCount}</strong> collections
+                    <strong>{collectionsCount}</strong>{' '}
+                    {tf('stat_collections', { count: collectionsCount })}
                   </div>
                 </div>
                 <div className="mc-stat">
@@ -699,58 +691,51 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
                     <Icon name="bag" size={22} />
                   </div>
                   <div className="mc-stat-v">
-                    <strong>{products}</strong> produits
+                    <strong>{products}</strong> {tf('stat_products', { count: products })}
                   </div>
                 </div>
               </div>
               <div className="mc-ask">
-                <div className="mc-ask-t">Connecter votre compte WhatsApp Business&nbsp;?</div>
-                <div className="mc-ask-b">
-                  Reliez votre numéro {waNumber} à ce nouveau catalogue Commerce Manager pour que
-                  l'agent IA, les tickets et les promotions s'appuient dessus.
-                </div>
+                <div className="mc-ask-t">{tf('s4_ask_t')}</div>
+                <div className="mc-ask-b">{tf('s4_ask_b', { number: waNumber })}</div>
               </div>
             </div>
           ),
-          primary: {
-            label: 'Connecter mon compte WhatsApp',
-            icon: 'arrowRight',
-            onClick: connectAccount,
-          },
+          primary: { label: tf('connect_account'), icon: 'arrowRight', onClick: connectAccount },
         }
       }
       if (phase === 'failed') {
         return {
-          title: 'L’import a rencontré un problème',
+          title: tf('s4_failed_title'),
           current: 4,
           body: (
             <div className="mc-step">
               <div className="mc-banner is-warn">
                 <Icon name="alert" size={18} />
                 <div>
-                  <strong>L'import n'a pas abouti.</strong> {migration?.error || ''}
+                  <strong>{tf('s4_failed_msg')}</strong> {migration?.error || ''}
                 </div>
               </div>
             </div>
           ),
           primary: {
-            label: 'Réessayer',
+            label: tf('retry'),
             icon: 'refresh',
             disabled: startMutation.isPending,
             onClick: () => startMutation.mutate(),
           },
         }
       }
-      // progress
+      const tasks = [tf('s4_task1'), tf('s4_task2'), tf('s4_task3')]
       return {
         title: null,
         current: 4,
         body: (
           <div className="mc-step mc-center">
             <LinkVisual state="progress" />
-            <div className="mc-bigtitle">Import de vos produits en cours</div>
+            <div className="mc-bigtitle">{tf('s4_progress_title')}</div>
             <ul className="mc-tasklist">
-              {IMPORT_TASKS.map((task, i) => {
+              {tasks.map((task, i) => {
                 const st = i < importProgress ? 'done' : i === importProgress ? 'doing' : 'todo'
                 return (
                   <li key={i} className={'mc-task is-' + st}>
@@ -763,9 +748,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
                 )
               })}
             </ul>
-            <p className="mc-caption mc-center-tx">
-              Inutile d'attendre ici — nous vous préviendrons une fois l'import terminé.
-            </p>
+            <p className="mc-caption mc-center-tx">{tf('s4_caption')}</p>
           </div>
         ),
       }
@@ -779,7 +762,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
         current: 5,
         footStep: (
           <span>
-            <b>Parcours terminé</b>
+            <b>{tf('done')}</b>
           </span>
         ),
         body: (
@@ -787,16 +770,11 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
             <div className="mc-check64">
               <Icon name="check" size={34} />
             </div>
-            <div className="mc-bigtitle">
-              Votre compte WhatsApp est lié au catalogue Commerce Manager
-            </div>
-            <p className="mc-lede mc-center-tx">
-              Tout est en place. Vos {products} produits sont désormais disponibles pour l'agent IA,
-              les tickets et les promotions.
-            </p>
+            <div className="mc-bigtitle">{tf('s5_linked_title')}</div>
+            <p className="mc-lede mc-center-tx">{tf('s5_linked_lede', { count: products })}</p>
           </div>
         ),
-        primary: { label: 'Terminer', icon: 'check', onClick: close },
+        primary: { label: tf('finish'), icon: 'check', onClick: close },
       }
     }
     if (phase === 'linking') {
@@ -806,19 +784,22 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
         body: (
           <div className="mc-step mc-center">
             <LinkVisual state="progress" />
-            <div className="mc-bigtitle">Connexion de votre compte WhatsApp</div>
-            <p className="mc-lede mc-center-tx">
-              Nous relions votre numéro {waNumber} à votre catalogue Commerce Manager. Cela prend
-              quelques secondes.
-            </p>
+            <div className="mc-bigtitle">{tf('s5_linking_title')}</div>
+            <p className="mc-lede mc-center-tx">{tf('s5_linking_lede', { number: waNumber })}</p>
           </div>
         ),
       }
     }
     // manual fallback
     const checking = phase === 'checking'
+    const manual: [string, string][] = [
+      [tf('s5_m1_t'), tf('s5_m1_b')],
+      [tf('s5_m2_t'), tf('s5_m2_b')],
+      [tf('s5_m3_t'), tf('s5_m3_b')],
+      [tf('s5_m4_t'), tf('s5_m4_b')],
+    ]
     return {
-      title: 'Connectez votre compte vous-même',
+      title: tf('s5_manual_title'),
       current: 5,
       back: () => {
         setStep(4)
@@ -826,12 +807,9 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
       },
       body: (
         <div className="mc-step pres-compact">
-          <p className="mc-lede">
-            La connexion automatique n'a pas abouti. Reliez votre compte vous-même en suivant ces
-            étapes, puis revérifiez — nous vous dirons si c'est bon.
-          </p>
+          <p className="mc-lede">{tf('s5_manual_lede')}</p>
           <ol className="mc-manual">
-            {MANUAL_STEPS.map(([title, body], i) => (
+            {manual.map(([title, body], i) => (
               <li key={i} className="mc-manual-item">
                 <span className="mc-manual-num">{i + 1}</span>
                 <div className="mc-manual-tx">
@@ -844,22 +822,21 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
           {phase === 'checking' && (
             <div className="mc-banner is-neutral">
               <span className="mc-spin sm" />
-              <span>Vérification de la liaison…</span>
+              <span>{tf('s5_checking')}</span>
             </div>
           )}
           {phase === 'stillfailed' && (
             <div className="mc-banner is-warn">
               <Icon name="alert" size={18} />
               <div>
-                <strong>Toujours pas liée.</strong> Reprenez les étapes ci-dessus, ou contactez le
-                support.
+                <strong>{tf('s5_stillfailed_t')}</strong> {tf('s5_stillfailed_b')}
               </div>
             </div>
           )}
         </div>
       ),
       primary: {
-        label: checking ? 'Vérification…' : 'Revérifier la liaison',
+        label: checking ? tf('checking') : tf('recheck'),
         icon: checking ? null : 'refresh',
         disabled: checking,
         onClick: recheck,
@@ -867,16 +844,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
     }
   }
 
-  const Btn = ({ cfg, primary }: { cfg?: BtnCfg; primary?: boolean }) => {
-    if (!cfg) return null
-    const cls = primary ? 'mc-btn mc-btn-primary' : 'mc-btn mc-btn-ghost'
-    return (
-      <button className={cls} disabled={cfg.disabled} onClick={cfg.onClick}>
-        {cfg.label}
-        {cfg.icon && <Icon name={cfg.icon} size={16} />}
-      </button>
-    )
-  }
+  const sc = buildScreen()
 
   return (
     <Modal
@@ -888,12 +856,11 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
       centered
       className="cmm-modal"
       styles={{ body: { padding: 0 } }}
-      destroyOnClose={false}
     >
       <div className={'cmm-root' + (sc.title ? '' : ' no-title')} role="dialog" aria-modal="true">
         <div className="mc-head">
           <div className="mc-head-tx">{sc.title && <div className="mc-title">{sc.title}</div>}</div>
-          <button className="mc-close" aria-label="Fermer" onClick={close}>
+          <button className="mc-close" aria-label={tf('close')} onClick={close}>
             <Icon name="x" size={18} />
           </button>
         </div>
@@ -906,20 +873,24 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
 
         <div className="mc-foot">
           <div className="mc-foot-step">
-            {sc.footStep || (
-              <span>
-                Étape <b>{sc.current}</b> sur {total}
-              </span>
-            )}
+            {sc.footStep || <span>{tf('step_of', { current: sc.current, total })}</span>}
           </div>
           <div className="mc-foot-actions">
             {sc.back && (
-              <button className="mc-btn mc-btn-back" aria-label="Précédent" onClick={sc.back}>
+              <button className="mc-btn mc-btn-back" aria-label={tf('back')} onClick={sc.back}>
                 <Icon name="arrowLeft" size={16} />
               </button>
             )}
-            <Btn cfg={sc.secondary} />
-            <Btn cfg={sc.primary} primary />
+            {sc.primary && (
+              <button
+                className="mc-btn mc-btn-primary"
+                disabled={sc.primary.disabled}
+                onClick={sc.primary.onClick}
+              >
+                {sc.primary.label}
+                {sc.primary.icon && <Icon name={sc.primary.icon} size={16} />}
+              </button>
+            )}
           </div>
         </div>
       </div>
