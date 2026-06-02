@@ -36,6 +36,14 @@ export class CatalogController {
     return this.catalogService.getWhatsAppCommerceSettings(user.id, phoneNumberId)
   }
 
+  @Get('whatsapp-number-info/:phoneNumberId')
+  async getWhatsAppNumberInfo(
+    @CurrentUser() user: { id: string },
+    @Param('phoneNumberId') phoneNumberId: string,
+  ) {
+    return this.catalogService.getWhatsAppNumberInfo(user.id, phoneNumberId)
+  }
+
   @Post()
   async create(@CurrentUser() user: { id: string }, @Body() dto: CreateCatalogDto) {
     return this.catalogService.create(user.id, dto)

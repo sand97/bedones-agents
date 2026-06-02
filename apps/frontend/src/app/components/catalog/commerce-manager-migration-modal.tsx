@@ -289,6 +289,53 @@ function Note({ children }: { children: ReactNode }) {
   )
 }
 
+function RadioCard({
+  selected,
+  onSelect,
+  icon,
+  title,
+  body,
+  children,
+}: {
+  selected: boolean
+  onSelect: () => void
+  icon: string
+  title: string
+  body: string
+  children?: ReactNode
+}) {
+  return (
+    <div
+      className={'mc-optcard' + (selected ? ' is-selected' : '')}
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect()
+        }
+      }}
+    >
+      <div className="mc-optcard-row">
+        <span className={'mc-radio' + (selected ? ' is-on' : '')} />
+        <div className="mc-choice-ic">
+          <Icon name={icon} size={18} />
+        </div>
+        <div className="mc-choice-tx">
+          <div className="mc-choice-t">{title}</div>
+          <div className="mc-choice-b">{body}</div>
+        </div>
+      </div>
+      {children && (
+        <div className="mc-optcard-extra" onClick={(e) => e.stopPropagation()}>
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Stepper({ current, total }: { current: number; total: number }) {
   return (
     <div className="mc-stepper">
@@ -310,6 +357,9 @@ interface Props {
   open: boolean
   orgSlug: string
   onClose: () => void
+  /** When opened from a specific WhatsApp number (e.g. the chat page), lock the
+   * migration to that number and skip the number picker. */
+  presetAccountId?: string
 }
 
 /**
@@ -318,7 +368,7 @@ interface Props {
  * (Meta OAuth), import the products (queue + websocket progress), then link the
  * WhatsApp Business account to the new catalogue.
  */
-export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props) {
+export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAccountId }: Props) {
   const { t } = useTranslation()
   const tf = (key: string, opts?: Record<string, unknown>) => t(NS + key, opts)
   const queryClient = useQueryClient()
@@ -327,7 +377,10 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
   const [phase, setPhase] = useState<string>('main')
   const [migrationId, setMigrationId] = useState<string>()
   const [collectionsCount, setCollectionsCount] = useState(0)
-  const [selectedAccountId, setSelectedAccountId] = useState<string>()
+  const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(presetAccountId)
+  // Step-2 catalogue choice (only relevant when the org already has catalogues).
+  const [catalogChoice, setCatalogChoice] = useState<'connected' | 'new'>('connected')
+  const [selectedCatalogId, setSelectedCatalogId] = useState<string>()
 
   // ─── Data ───
   const catalogsQuery = useQuery({
@@ -343,10 +396,12 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
     { enabled: open },
   )
 
-  const connectedCatalog = useMemo(() => {
+  const connectedCatalogs = useMemo(() => {
     const list = (catalogsQuery.data ?? []).filter((c) => !!c.providerId)
-    return [...list].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))[0]
+    return [...list].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))
   }, [catalogsQuery.data])
+  const targetCatalog =
+    connectedCatalogs.find((c) => c.id === selectedCatalogId) ?? connectedCatalogs[0]
 
   const whatsappAccounts = useMemo(
     () => (accountsQuery.data ?? []).filter((a) => a.provider === 'WHATSAPP'),
@@ -362,6 +417,18 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
       setSelectedAccountId(whatsappAccounts[0].id)
     }
   }, [selectedAccountId, whatsappAccounts])
+
+  // When opened for a specific number, lock onto it.
+  useEffect(() => {
+    if (presetAccountId) setSelectedAccountId(presetAccountId)
+  }, [presetAccountId])
+
+  // Default the target catalogue to the most recently connected one.
+  useEffect(() => {
+    if (!selectedCatalogId && connectedCatalogs.length > 0) {
+      setSelectedCatalogId(connectedCatalogs[0].id)
+    }
+  }, [selectedCatalogId, connectedCatalogs])
 
   // ─── Resume after the connect redirect ───
   useEffect(() => {
@@ -449,7 +516,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
     mutationFn: () =>
       catalogApi.startMigration({
         organisationId: orgSlug,
-        catalogId: connectedCatalog!.id,
+        catalogId: targetCatalog!.id,
         sourcePhone,
         sourceSocialAccountId: waAccount?.id,
       }),
@@ -465,8 +532,8 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
   const associateMutation = useMutation({
     mutationFn: () => {
       const phoneNumberId = waAccount?.providerAccountId
-      if (!connectedCatalog || !phoneNumberId) throw new Error('Numéro WhatsApp introuvable')
-      return catalogApi.associatePhone(connectedCatalog.id, phoneNumberId)
+      if (!targetCatalog || !phoneNumberId) throw new Error('Numéro WhatsApp introuvable')
+      return catalogApi.associatePhone(targetCatalog.id, phoneNumberId)
     },
   })
 
@@ -477,12 +544,9 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
     onClose()
   }
 
+  // Always redirect to Meta to connect/create a brand-new catalogue. Reusing an
+  // already-connected catalogue is handled by the step-2 radio (skips Meta).
   const connectCatalog = () => {
-    if (connectedCatalog) {
-      setStep(3)
-      setPhase('main')
-      return
-    }
     setPhase('redirecting')
     writeCatalogMigrationDraft({ open: true, step: 3, justConnected: true })
     setAuthRedirect({
@@ -574,6 +638,64 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
           ),
         }
       }
+      // Org already has Commerce Manager catalogue(s): reuse one or connect/
+      // create another. The footer button adapts to the chosen type.
+      if (connectedCatalogs.length > 0) {
+        const useConnected = catalogChoice === 'connected'
+        return {
+          title: tf('s2_choose_title'),
+          current: 2,
+          back: () => setStep(1),
+          body: (
+            <div className="mc-step">
+              <p className="mc-lede">{tf('s2_choose_lede')}</p>
+              <div className="mc-optcards">
+                <RadioCard
+                  selected={useConnected}
+                  onSelect={() => setCatalogChoice('connected')}
+                  icon="box"
+                  title={tf('s2_use_connected_t')}
+                  body={tf('s2_use_connected_b')}
+                >
+                  {useConnected && (
+                    <div className="mc-field">
+                      <span className="mc-field-label">{tf('s2_catalog_label')}</span>
+                      <Select
+                        size="large"
+                        value={selectedCatalogId}
+                        onChange={setSelectedCatalogId}
+                        className="mc-field-select"
+                        options={connectedCatalogs.map((c) => ({ value: c.id, label: c.name }))}
+                      />
+                    </div>
+                  )}
+                </RadioCard>
+                <RadioCard
+                  selected={!useConnected}
+                  onSelect={() => setCatalogChoice('new')}
+                  icon="layers"
+                  title={tf('s2_new_catalog_t')}
+                  body={tf('s2_new_catalog_b')}
+                />
+              </div>
+              <Note>{tf('s2_note')}</Note>
+            </div>
+          ),
+          primary: useConnected
+            ? {
+                label: tf('continue'),
+                icon: 'arrowRight',
+                disabled: !targetCatalog,
+                onClick: () => {
+                  setPhase('main')
+                  setStep(3)
+                },
+              }
+            : { label: tf('connect_meta'), icon: 'external', onClick: connectCatalog },
+        }
+      }
+
+      // No catalogue connected yet → explain the Meta redirect.
       return {
         title: tf('s2_title'),
         current: 2,
@@ -614,7 +736,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
     }
 
     if (step === 3) {
-      const catalogName = connectedCatalog?.name ?? tf('your_catalog')
+      const catalogName = targetCatalog?.name ?? tf('your_catalog')
       return {
         title: tf('s3_title'),
         current: 3,
@@ -622,7 +744,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
         body: (
           <div className="mc-step">
             <TransferDiagram number={waNumber || tf('your_number')} catalog={catalogName} />
-            {whatsappAccounts.length > 0 && (
+            {!presetAccountId && whatsappAccounts.length > 0 && (
               <div className="mc-field">
                 <span className="mc-field-label">{tf('number_label')}</span>
                 <Select
@@ -662,7 +784,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
         primary: {
           label: tf('start_import'),
           icon: 'arrowRight',
-          disabled: !connectedCatalog || !sourcePhone || startMutation.isPending,
+          disabled: !targetCatalog || !sourcePhone || startMutation.isPending,
           onClick: () => startMutation.mutate(),
         },
       }

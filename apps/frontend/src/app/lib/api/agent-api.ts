@@ -316,6 +316,15 @@ export const catalogApi = {
       `/catalog/whatsapp-commerce/${phoneNumberId}`,
     ),
 
+  // Coexistence / SMB detection — only queried when no catalogue is associated.
+  getWhatsappNumberInfo: (phoneNumberId: string) =>
+    fetchJson<{
+      isOnBizApp: boolean
+      isOnBizAppSupported: boolean
+      platformType: string | null
+      displayPhoneNumber: string | null
+    }>(`/catalog/whatsapp-number-info/${phoneNumberId}`),
+
   associatePhone: (catalogId: string, phoneNumberId: string) =>
     fetchJson<{ success: boolean }>(`/catalog/${catalogId}/associate-phone`, {
       method: 'POST',

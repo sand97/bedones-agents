@@ -10,6 +10,7 @@ import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { WhatsappConfigModal } from '@app/components/whatsapp/whatsapp-config-modal'
 import { CatalogLinkModal } from '@app/components/whatsapp/catalog-link-modal'
+import { CommerceManagerMigrationModal } from '@app/components/catalog/commerce-manager-migration-modal'
 import {
   AccountSwitcher,
   formatSocialAccountDescription,
@@ -45,6 +46,7 @@ import { launchWhatsAppSignup } from '@app/lib/facebook-sdk'
 import { useTikTokBusinessCheck } from '@app/hooks/use-tiktok-business-check'
 import { TikTokBusinessGuideModal } from '@app/components/tiktok/tiktok-business-guide-modal'
 import { getStoredChatAccount, setStoredChatAccount } from '@app/lib/chat-account-storage'
+import { readCatalogMigrationDraft } from '@app/lib/catalog-migration-draft'
 import type { Conversation, Message } from '@app/components/whatsapp/mock-data'
 
 export const Route = createFileRoute('/app/$orgSlug/chats/$id')({
@@ -352,6 +354,12 @@ function ChatsPage() {
   const [templatesOpen, setTemplatesOpen] = useState(false)
   const [templateMessageOpen, setTemplateMessageOpen] = useState(false)
   const [tiktokMessageOpen, setTikTokMessageOpen] = useState(false)
+  const [migrationOpen, setMigrationOpen] = useState(false)
+
+  // Resume the catalogue-migration wizard after the Meta connect redirect.
+  useEffect(() => {
+    if (readCatalogMigrationDraft().open) setMigrationOpen(true)
+  }, [])
 
   // ─── Agents query: check if any agent covers the current provider ───
   const agentsQuery = usePersistedQuery<Agent[]>({
@@ -429,6 +437,27 @@ function ChatsPage() {
     if (!data || data.length === 0) return false
     return data.some((entry) => !!entry.id)
   }, [commerceQuery.data])
+
+  // ─── SMB (Coexistence) detection ───
+  // Only an SMB number owns an in-app WhatsApp Business catalogue worth
+  // migrating. We query Meta's phone-number node (is_on_biz_app) — but ONLY
+  // once we know no catalogue is associated yet, to avoid the extra round-trip
+  // in the steady state.
+  const numberInfoQuery = usePersistedQuery<{
+    isOnBizApp: boolean
+    isOnBizAppSupported: boolean
+    platformType: string | null
+    displayPhoneNumber: string | null
+  }>({
+    queryKey: ['whatsapp-number-info', currentAccount?.providerAccountId],
+    queryFn: () => catalogApi.getWhatsappNumberInfo(currentAccount?.providerAccountId || ''),
+    enabled:
+      id === 'whatsapp' && !!currentAccount && commerceQuery.isSuccess && !hasCatalogAssociated,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Offer "migrate your catalog" only for SMB numbers with no catalogue yet.
+  const canMigrateCatalog = !hasCatalogAssociated && numberInfoQuery.data?.isOnBizApp === true
 
   // ─── Catalogs query (for config modal) ───
   const catalogsQuery = useQuery({
@@ -1055,6 +1084,8 @@ function ChatsPage() {
         hasCatalogAssociated={id !== 'whatsapp' || hasCatalogAssociated}
         onConfigureAgent={handleConfigureAgent}
         onConfigureCatalog={() => setCatalogLinkOpen(true)}
+        canMigrateCatalog={canMigrateCatalog}
+        onMigrateCatalog={() => setMigrationOpen(true)}
         onOpenOptions={() => setWhatsappConfigOpen(true)}
         onOpenTemplates={() => setTemplatesOpen(true)}
         onOpenCampaigns={() => {
@@ -1098,6 +1129,12 @@ function ChatsPage() {
               currentAccount.pageName || currentAccount.username || currentAccount.providerAccountId
             }
             catalogs={catalogsQuery.data || []}
+          />
+          <CommerceManagerMigrationModal
+            open={migrationOpen}
+            orgSlug={orgSlug}
+            presetAccountId={currentAccount.id}
+            onClose={() => setMigrationOpen(false)}
           />
           <LoyaltyTemplateModal
             open={templatesOpen}

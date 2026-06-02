@@ -11,15 +11,12 @@ import {
   Pencil,
   Trash2,
   ShoppingBag,
-  Smartphone,
   Sparkles,
   Link2,
 } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { CatalogIndexingBanner } from '@app/components/catalog/catalog-indexing-banner'
 import { CatalogEmpty } from '@app/components/catalog/catalog-empty'
-import { CommerceManagerMigrationModal } from '@app/components/catalog/commerce-manager-migration-modal'
-import { readCatalogMigrationDraft } from '@app/lib/catalog-migration-draft'
 import { TablePagination } from '@app/components/shared/table-pagination'
 import { FilterPopover } from '@app/components/shared/filter-popover'
 import { ProductModal } from '@app/components/catalog/product-modal'
@@ -86,12 +83,6 @@ function CatalogPage() {
   const [cursorStack, setCursorStack] = useState<string[]>([])
   const [afterCursor, setAfterCursor] = useState<string | undefined>(undefined)
   const [pageSize, setPageSize] = useState(DEFAULT_LIMIT)
-
-  // Commerce Manager migration wizard (import a WhatsApp number's catalogue).
-  const [migrationOpen, setMigrationOpen] = useState(false)
-  useEffect(() => {
-    if (readCatalogMigrationDraft().open) setMigrationOpen(true)
-  }, [])
 
   const currentPage = cursorStack.length + 1
 
@@ -469,12 +460,7 @@ function CatalogPage() {
     return (
       <div className="flex min-h-screen flex-col">
         <DashboardHeader title={t('catalog.title')} />
-        <CatalogEmpty onConnect={handleConnectCatalog} onMigrate={() => setMigrationOpen(true)} />
-        <CommerceManagerMigrationModal
-          open={migrationOpen}
-          orgSlug={orgSlug}
-          onClose={() => setMigrationOpen(false)}
-        />
+        <CatalogEmpty onConnect={handleConnectCatalog} />
       </div>
     )
   }
@@ -584,15 +570,6 @@ function CatalogPage() {
               />
             </div>
             <div className="flex-1 lg:ml-auto lg:flex-none">
-              <Button
-                onClick={() => setMigrationOpen(true)}
-                icon={<Smartphone size={14} />}
-                block={!isDesktop}
-              >
-                {t('catalog_migration.import_cta')}
-              </Button>
-            </div>
-            <div className="flex-1 lg:flex-none">
               <Button
                 onClick={() => setModalProductConfig({ isOpen: true })}
                 icon={<Plus size={14} />}
@@ -775,12 +752,6 @@ function CatalogPage() {
         }}
         product={modalProductConfig.initialProduct}
         loading={createProductMutation.isPending || updateProductMutation.isPending}
-      />
-
-      <CommerceManagerMigrationModal
-        open={migrationOpen}
-        orgSlug={orgSlug}
-        onClose={() => setMigrationOpen(false)}
       />
 
       {selectedCatalog && (

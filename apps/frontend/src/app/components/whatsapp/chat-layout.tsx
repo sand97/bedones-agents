@@ -98,6 +98,11 @@ interface ChatLayoutProps {
   onConfigureAgent?: () => void
   /** Callback when user clicks the "configure catalog" button */
   onConfigureCatalog?: () => void
+  /** Whether the current WhatsApp number is an SMB (Coexistence) number with no
+   * catalog yet — show "migrate your catalog" instead of "associate a catalog". */
+  canMigrateCatalog?: boolean
+  /** Callback when user clicks the "migrate catalog" button */
+  onMigrateCatalog?: () => void
   /** Callback when user clicks the Options button */
   onOpenOptions?: () => void
   onOpenTemplates?: () => void
@@ -282,6 +287,8 @@ export function ChatLayout({
   hasCatalogAssociated = true,
   onConfigureAgent,
   onConfigureCatalog,
+  canMigrateCatalog = false,
+  onMigrateCatalog,
   onOpenOptions,
   onOpenTemplates,
   onOpenCampaigns,
@@ -350,20 +357,33 @@ export function ChatLayout({
     )
   }
 
+  /* ── Catalog setup: "migrate" (SMB number) vs "associate" (Cloud API) ── */
+  const renderCatalogSetup = () =>
+    canMigrateCatalog ? (
+      <SocialSetup
+        icon={<ShoppingBag size={40} strokeWidth={1.5} />}
+        color={providerConfig.color}
+        title={t('chat.migrate_catalog_title')}
+        description={t('chat.migrate_catalog_desc')}
+        buttonLabel={t('chat.migrate_catalog_btn')}
+        onAction={onMigrateCatalog}
+      />
+    ) : (
+      <SocialSetup
+        icon={<ShoppingBag size={40} strokeWidth={1.5} />}
+        color={providerConfig.color}
+        title={t('chat.configure_catalog_title')}
+        description={t('chat.configure_catalog_desc')}
+        buttonLabel={t('chat.configure_catalog_btn')}
+        onAction={onConfigureCatalog}
+      />
+    )
+
   /* ── Desktop SocialSetup (right panel) ── */
   const renderDesktopSetup = () => {
     // Priority: catalog > agent > empty conversations > select conversation
     if (setupState === 'catalog') {
-      return (
-        <SocialSetup
-          icon={<ShoppingBag size={40} strokeWidth={1.5} />}
-          color={providerConfig.color}
-          title={t('chat.configure_catalog_title')}
-          description={t('chat.configure_catalog_desc')}
-          buttonLabel={t('chat.configure_catalog_btn')}
-          onAction={onConfigureCatalog}
-        />
-      )
+      return renderCatalogSetup()
     }
     if (setupState === 'agent') {
       return (
@@ -404,9 +424,16 @@ export function ChatLayout({
       return (
         <HeaderHelper
           icon={<ShoppingBag size={18} strokeWidth={1.5} />}
-          title={t('chat.no_catalog_associated')}
-          subtitle={t('chat.catalog_association_desc')}
-          primaryAction={{ title: t('chat.associate'), onClick: () => onConfigureCatalog?.() }}
+          title={
+            canMigrateCatalog ? t('chat.migrate_catalog_title') : t('chat.no_catalog_associated')
+          }
+          subtitle={
+            canMigrateCatalog ? t('chat.migrate_catalog_desc') : t('chat.catalog_association_desc')
+          }
+          primaryAction={{
+            title: canMigrateCatalog ? t('chat.migrate') : t('chat.associate'),
+            onClick: () => (canMigrateCatalog ? onMigrateCatalog?.() : onConfigureCatalog?.()),
+          }}
         />
       )
     }
@@ -493,14 +520,7 @@ export function ChatLayout({
           {!hasConversations && setupState ? (
             <div className="md:hidden">
               {setupState === 'catalog' ? (
-                <SocialSetup
-                  icon={<ShoppingBag size={40} strokeWidth={1.5} />}
-                  color={providerConfig.color}
-                  title={t('chat.configure_catalog_title')}
-                  description={t('chat.configure_catalog_desc')}
-                  buttonLabel={t('chat.configure_catalog_btn')}
-                  onAction={onConfigureCatalog}
-                />
+                renderCatalogSetup()
               ) : (
                 <SocialSetup
                   icon={<Sparkles size={40} strokeWidth={1.5} />}
