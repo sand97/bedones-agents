@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 
 export interface ExtractionResult {
   productCount: number
+  collectionCount: number
 }
 
 export interface ExtractClientCatalogParams {
@@ -94,6 +95,7 @@ const CLIENT_CATALOG_SCRIPT = `(async () => {
     }
 
     const products = [];
+    const retailerByWaId = new Map();
     for (const product of productsById.values()) {
       const imageUrls = [];
       const main = product.imageCdnUrl || product.image_cdn_url || pickPreferredCdnUrl(product.image_cdn_urls);
@@ -138,21 +140,39 @@ const CLIENT_CATALOG_SCRIPT = `(async () => {
       const urls = uploaded.map((u) => u.url);
 
       const amount = toPriceAmount1000(product);
+      const retailerId = product.retailerId || product.retailer_id || product.id || null;
+      retailerByWaId.set(product.id, retailerId);
       products.push({
         name: product.name || '',
         description: product.description || null,
         price: amount !== null ? amount / 1000 : null,
         currency: product.currency || null,
         availability: product.availability || null,
-        retailerId: product.retailerId || product.retailer_id || product.id || null,
+        retailerId,
         imageUrl: urls[0] || null,
         additionalImageUrls: urls.slice(1),
       });
     }
 
-    const save = await post('/catalog-migration/callback/save-catalog', { products });
+    // Collections (product sets) — map each collection's products to retailer_ids.
+    let collections = [];
+    try {
+      const cols = await window.WPP.catalog.getCollections(userId, 50, 100);
+      if (Array.isArray(cols)) {
+        collections = cols
+          .map((c) => ({
+            name: (c && c.name) || '',
+            retailerIds: (((c && c.products) || []))
+              .map((p) => retailerByWaId.get(p && p.id))
+              .filter(Boolean),
+          }))
+          .filter((c) => c.name && c.retailerIds.length > 0);
+      }
+    } catch (e) {}
+
+    const save = await post('/catalog-migration/callback/save-catalog', { products, collections });
     const saved = !!(save && save.ok);
-    return { success: saved, productCount: products.length, saved };
+    return { success: saved, productCount: products.length, collectionCount: collections.length, saved };
   } catch (error) {
     return { success: false, error: (error && error.message) || String(error), productCount: 0 };
   }
@@ -223,7 +243,12 @@ export class CatalogConnectorClient {
 
     const payload = (await response.json()) as {
       success?: boolean
-      result?: { success?: boolean; error?: string; productCount?: number }
+      result?: {
+        success?: boolean
+        error?: string
+        productCount?: number
+        collectionCount?: number
+      }
     }
     const result = payload?.result
     if (!result?.success) {
@@ -231,7 +256,12 @@ export class CatalogConnectorClient {
         `Catalogue extraction failed: ${result?.error || 'unknown error'}`,
       )
     }
-    this.logger.log(`Extraction reported ${result.productCount ?? 0} product(s)`)
-    return { productCount: result.productCount ?? 0 }
+    this.logger.log(
+      `Extraction reported ${result.productCount ?? 0} product(s), ${result.collectionCount ?? 0} collection(s)`,
+    )
+    return {
+      productCount: result.productCount ?? 0,
+      collectionCount: result.collectionCount ?? 0,
+    }
   }
 }

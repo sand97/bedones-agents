@@ -42,8 +42,13 @@ export class CatalogMigrationCallbackController {
   @ApiOperation({ summary: 'Persist the extracted catalogue as a temporary JSON on Minio' })
   async saveCatalog(@CallbackMigrationId() migrationId: string, @Body() dto: SaveCatalogDto) {
     const products = Array.isArray(dto.products) ? dto.products : []
-    await this.upload.uploadJsonAtKey(catalogJsonKey(migrationId), { migrationId, products })
-    return { success: true, count: products.length }
+    const collections = Array.isArray(dto.collections) ? dto.collections : []
+    await this.upload.uploadJsonAtKey(catalogJsonKey(migrationId), {
+      migrationId,
+      products,
+      collections,
+    })
+    return { success: true, count: products.length, collections: collections.length }
   }
 }
 

@@ -42,7 +42,19 @@ export class SaveCatalogProductDto {
   additionalImageUrls?: string[]
 }
 
+/** A collection (product set) as assembled by the page script. */
+export class SaveCatalogCollectionDto {
+  @ApiProperty()
+  name: string
+
+  @ApiProperty({ type: [String], description: 'retailer_ids of the products in this collection' })
+  retailerIds: string[]
+}
+
 export class SaveCatalogDto {
   @ApiProperty({ type: [SaveCatalogProductDto] })
   products: SaveCatalogProductDto[]
+
+  @ApiPropertyOptional({ type: [SaveCatalogCollectionDto] })
+  collections?: SaveCatalogCollectionDto[]
 }

@@ -36,6 +36,12 @@ interface StoredProduct {
   additionalImageUrls?: string[]
 }
 
+/** A collection (product set) as stored by the page script's save-catalog callback. */
+interface StoredCollection {
+  name: string
+  retailerIds: string[]
+}
+
 /** Notion spec: an extraction is capped at ~1 minute, one at a time. */
 const MINUTES_PER_SYNC = 1
 
@@ -197,10 +203,12 @@ export class CatalogMigrationService {
 
       // 2) Load the catalogue the script just stored on Minio and shape it for
       //    the Meta catalogue.
-      const stored = await this.upload.getJson<{ products: StoredProduct[] }>(
-        catalogJsonKey(migrationId),
-      )
+      const stored = await this.upload.getJson<{
+        products: StoredProduct[]
+        collections?: StoredCollection[]
+      }>(catalogJsonKey(migrationId))
       const prepared = (stored?.products ?? []).map((p) => this.toCreateProduct(p))
+      const storedCollections = stored?.collections ?? []
 
       await this.prisma.catalogMigration.update({
         where: { id: migrationId },
@@ -241,6 +249,25 @@ export class CatalogMigrationService {
         })
       }
 
+      // Recreate the collections (product sets) on the Meta catalogue. Their
+      // membership is a retailer_id filter, so the products imported above are
+      // matched automatically.
+      let collectionsCreated = 0
+      for (const collection of storedCollections) {
+        const retailerIds = (collection.retailerIds ?? []).filter(Boolean)
+        if (!collection.name || retailerIds.length === 0) continue
+        try {
+          await this.catalogService.createCollection(catalogId, {
+            name: collection.name,
+            productIds: retailerIds,
+          })
+          collectionsCreated++
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          this.logger.warn(`Failed to create collection "${collection.name}": ${message}`)
+        }
+      }
+
       await this.prisma.catalogMigration.update({
         where: { id: migrationId },
         data: {
@@ -256,6 +283,7 @@ export class CatalogMigrationService {
         imported,
         failed,
         total: prepared.length,
+        collections: collectionsCreated,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
