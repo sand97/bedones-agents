@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Trans, useTranslation } from 'react-i18next'
-import { Modal } from 'antd'
+import { Modal, Select } from 'antd'
 import { catalogApi, type CatalogMigration } from '@app/lib/api/agent-api'
 import { $api } from '@app/lib/api/$api'
 import { getSocket } from '@app/lib/socket'
@@ -217,7 +217,7 @@ function TransferDiagram({ number, catalog }: { number: string; catalog: string 
             <span key={i} className="mc-tthumb" />
           ))}
         </div>
-        <div className="mc-tcard-ft">{t(NS + 'your_products')}</div>
+        <div className="mc-tcard-ft">{t(NS + 'wa_catalog_label')}</div>
       </div>
 
       <div className="mc-transfer-arrow">
@@ -327,6 +327,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
   const [phase, setPhase] = useState<string>('main')
   const [migrationId, setMigrationId] = useState<string>()
   const [collectionsCount, setCollectionsCount] = useState(0)
+  const [selectedAccountId, setSelectedAccountId] = useState<string>()
 
   // ─── Data ───
   const catalogsQuery = useQuery({
@@ -347,12 +348,20 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
     return [...list].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))[0]
   }, [catalogsQuery.data])
 
-  const waAccount = useMemo(
-    () => (accountsQuery.data ?? []).find((a) => a.provider === 'WHATSAPP'),
+  const whatsappAccounts = useMemo(
+    () => (accountsQuery.data ?? []).filter((a) => a.provider === 'WHATSAPP'),
     [accountsQuery.data],
   )
+  const waAccount = whatsappAccounts.find((a) => a.id === selectedAccountId) ?? whatsappAccounts[0]
   const waNumber = waAccount?.username || waAccount?.providerAccountId || ''
   const sourcePhone = waNumber.replace(/\D/g, '')
+
+  // Default the source-number selection to the first connected WhatsApp account.
+  useEffect(() => {
+    if (!selectedAccountId && whatsappAccounts.length > 0) {
+      setSelectedAccountId(whatsappAccounts[0].id)
+    }
+  }, [selectedAccountId, whatsappAccounts])
 
   // ─── Resume after the connect redirect ───
   useEffect(() => {
@@ -613,6 +622,21 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose }: Props)
         body: (
           <div className="mc-step">
             <TransferDiagram number={waNumber || tf('your_number')} catalog={catalogName} />
+            {whatsappAccounts.length > 0 && (
+              <div className="mc-field">
+                <span className="mc-field-label">{tf('number_label')}</span>
+                <Select
+                  size="large"
+                  value={selectedAccountId}
+                  onChange={setSelectedAccountId}
+                  className="mc-field-select"
+                  options={whatsappAccounts.map((a) => ({
+                    value: a.id,
+                    label: a.username || a.pageName || a.providerAccountId,
+                  }))}
+                />
+              </div>
+            )}
             <div className="mc-confirm-line">
               <span className="mc-confirm-check">
                 <Icon name="check" size={12} />
