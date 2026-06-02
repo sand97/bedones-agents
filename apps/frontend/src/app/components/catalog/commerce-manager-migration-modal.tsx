@@ -659,7 +659,6 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
                 >
                   {useConnected && (
                     <div className="mc-field">
-                      <span className="mc-field-label">{tf('s2_catalog_label')}</span>
                       <Select
                         size="large"
                         value={selectedCatalogId}
