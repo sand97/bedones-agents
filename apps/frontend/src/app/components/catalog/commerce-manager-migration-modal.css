@@ -1,0 +1,929 @@
+/* Commerce Manager migration modal — faithful port of the Bedones design
+   (Claude Design handoff). Tokens are scoped to `.cmm-root` so they don't
+   collide with the app; the `.mc-*` / `.sp-*` classes only ever live inside it. */
+
+.cmm-root {
+  --fg-1: #111b21;
+  --fg-2: #494949;
+  --fg-3: #8c8c8c;
+  --fg-4: #bfbfbf;
+  --bd-black: #111b21;
+  --bg-surface: #ffffff;
+  --bg-page: #fafafa;
+  --bg-subtle: #f5f5f5;
+  --bg-muted: #e5e5e5;
+  --border-default: #e5e7eb;
+  --border-subtle: #f0f0f0;
+  --border-strong: #d4d4d4;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --radius-2xl: 20px;
+  --font-sans: 'Geist', -apple-system, 'SF Pro Display', 'SF Pro Text', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  font-family: var(--font-sans);
+  color: var(--fg-1);
+  background: var(--bg-surface);
+}
+.cmm-root * {
+  box-sizing: border-box;
+}
+
+/* Header */
+.cmm-root .mc-head {
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.cmm-root .mc-head-tx {
+  flex: 1;
+  min-width: 0;
+}
+.cmm-root .mc-title {
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.cmm-root .mc-close {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--fg-2);
+  border: 1px solid var(--border-default);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cmm-root .mc-close:hover {
+  background: var(--bg-subtle);
+  color: var(--fg-1);
+}
+
+/* Body (scroll) */
+.cmm-root .mc-bodyscroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 24px 6px;
+  min-height: 0;
+}
+.cmm-root .mc-step {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.cmm-root .mc-step.pres-compact {
+  gap: 14px;
+}
+.cmm-root .mc-center {
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: 8px 0 12px;
+}
+.cmm-root .mc-center-tx {
+  max-width: 380px;
+}
+
+.cmm-root .mc-lede {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+.cmm-root .mc-lede strong {
+  color: var(--fg-1);
+  font-weight: 600;
+}
+.cmm-root .mc-step.pres-compact .mc-lede {
+  font-size: 14px;
+  line-height: 1.55;
+}
+.cmm-root .mc-caption {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--fg-3);
+}
+.cmm-root .mc-bigtitle {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* Hero */
+.cmm-root .mc-hero {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 2px;
+}
+
+/* Flow diagram */
+.cmm-root .mc-flow {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+}
+.cmm-root .mc-node {
+  flex: 1;
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+}
+.cmm-root .mc-node.is-dim {
+  background: var(--bg-subtle);
+  border-style: dashed;
+}
+.cmm-root .mc-node-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--bg-page);
+  border: 1px solid var(--border-subtle);
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+}
+.cmm-root .mc-node.is-dim .mc-node-icon {
+  background: #fff;
+}
+.cmm-root .mc-node-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.cmm-root .mc-node-sub {
+  font-size: 11px;
+  color: var(--fg-3);
+}
+.cmm-root .mc-flow-arrow {
+  width: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  color: var(--fg-2);
+}
+.cmm-root .mc-flow-track {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 50%;
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--border-strong) 0 4px, transparent 4px 8px);
+}
+.cmm-root .mc-flow-arrow svg {
+  position: relative;
+  background: var(--bg-surface);
+  padding: 0 4px;
+}
+
+/* Benefits row (icons hero) */
+.cmm-root .mc-benefrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cmm-root .mc-benefrow-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+}
+.cmm-root .mc-benefrow-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  display: grid;
+  place-items: center;
+}
+.cmm-root .mc-benefrow-item span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-2);
+}
+.cmm-root .mc-benefrow-plus {
+  color: var(--fg-4);
+  font-size: 16px;
+}
+
+/* Benefit cards */
+.cmm-root .mc-benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cmm-root .mc-benefit {
+  display: flex;
+  gap: 13px;
+  padding: 12px 4px;
+  align-items: flex-start;
+}
+.cmm-root .mc-benefit + .mc-benefit {
+  border-top: 1px solid var(--border-subtle);
+}
+.cmm-root .mc-benefit-ic {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--bg-subtle);
+  display: grid;
+  place-items: center;
+  color: var(--fg-1);
+}
+.cmm-root .mc-benefit-t {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 2px;
+}
+.cmm-root .mc-benefit-b {
+  font-size: 12.5px;
+  color: var(--fg-3);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* Note */
+.cmm-root .mc-note {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: var(--bg-subtle);
+  font-size: 12.5px;
+  color: var(--fg-2);
+  line-height: 1.45;
+}
+.cmm-root .mc-note svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--fg-2);
+}
+
+/* Choice list (step 2) */
+.cmm-root .mc-choicelist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cmm-root .mc-choice {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 13px 14px;
+}
+.cmm-root .mc-choice-ic {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: var(--bg-subtle);
+  display: grid;
+  place-items: center;
+}
+.cmm-root .mc-choice-t {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.cmm-root .mc-choice-b {
+  font-size: 12px;
+  color: var(--fg-3);
+  margin-top: 1px;
+}
+
+/* Redirect mark */
+.cmm-root .mc-redirect-mark {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  background: var(--bg-subtle);
+  display: grid;
+  place-items: center;
+  color: var(--fg-1);
+  position: relative;
+}
+
+/* Connected card (step 3) */
+.cmm-root .mc-connected {
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.cmm-root .mc-connected-top {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 16px 16px 14px;
+}
+.cmm-root .mc-connected-ic {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--bg-subtle);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.cmm-root .mc-connected-tx {
+  flex: 1;
+  min-width: 0;
+}
+.cmm-root .mc-connected-name {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.cmm-root .mc-pill-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--fg-1);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+.cmm-root .mc-textlink {
+  align-self: flex-start;
+  font-size: 13px;
+  color: var(--fg-2);
+  font-weight: 500;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-strong);
+}
+.cmm-root .mc-textlink:hover {
+  color: var(--fg-1);
+}
+.cmm-root .mc-textlink.inline {
+  display: inline;
+  align-self: auto;
+}
+
+/* Task list (step 4 progress) */
+.cmm-root .mc-tasklist {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 340px;
+}
+.cmm-root .mc-task {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 13.5px;
+  color: var(--fg-3);
+  transition: color 0.2s;
+}
+.cmm-root .mc-task.is-done {
+  color: var(--fg-1);
+}
+.cmm-root .mc-task.is-doing {
+  color: var(--fg-1);
+  font-weight: 500;
+}
+.cmm-root .mc-task-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--fg-1);
+}
+.cmm-root .mc-task.is-done .mc-task-dot {
+  background: var(--fg-1);
+  border-color: var(--fg-1);
+  color: #fff;
+}
+.cmm-root .mc-task.is-doing .mc-task-dot {
+  border-color: var(--fg-1);
+}
+
+/* Link visual (steps 4/5) */
+.cmm-root .mc-linkviz {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+.cmm-root .mc-linkviz-node {
+  width: 56px;
+  height: 56px;
+  border-radius: 15px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  display: grid;
+  place-items: center;
+}
+.cmm-root .mc-linkviz-spine {
+  width: 84px;
+  height: 2px;
+  background: var(--border-default);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cmm-root .mc-linkviz-pulse {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0;
+  background: var(--fg-1);
+}
+.cmm-root .mc-linkviz.is-progress .mc-linkviz-pulse {
+  animation: cmm-spine 1.4s var(--ease-out) infinite;
+}
+.cmm-root .mc-linkviz.is-success .mc-linkviz-pulse,
+.cmm-root .mc-linkviz.is-success .mc-linkviz-spine {
+  background: var(--success);
+  width: 100%;
+}
+.cmm-root .mc-linkviz.is-fail .mc-linkviz-spine {
+  background: var(--danger-border);
+}
+@keyframes cmm-spine {
+  0% { width: 0; left: 0; }
+  50% { width: 100%; left: 0; }
+  100% { width: 0; left: 100%; }
+}
+.cmm-root .mc-linkviz-badge {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  display: grid;
+  place-items: center;
+  z-index: 1;
+}
+.cmm-root .mc-linkviz.is-success .mc-linkviz-badge {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+.cmm-root .mc-linkviz.is-fail .mc-linkviz-badge {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+/* Manual steps (step 5) */
+.cmm-root .mc-manual {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cmm-root .mc-manual-item {
+  display: flex;
+  gap: 14px;
+  padding: 13px 4px;
+  position: relative;
+}
+.cmm-root .mc-manual-item + .mc-manual-item {
+  border-top: 1px solid var(--border-subtle);
+}
+.cmm-root .mc-manual-num {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--fg-1);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+.cmm-root .mc-manual-t {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.cmm-root .mc-manual-b {
+  font-size: 12.5px;
+  color: var(--fg-3);
+  margin-top: 2px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* Banner (step 5 states) */
+.cmm-root .mc-banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 13px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.cmm-root .mc-banner svg,
+.cmm-root .mc-banner .mc-spin {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.cmm-root .mc-banner strong {
+  font-weight: 600;
+}
+.cmm-root .mc-banner.is-neutral {
+  background: var(--bg-subtle);
+  color: var(--fg-2);
+  align-items: center;
+}
+.cmm-root .mc-banner.is-ok {
+  background: #f0fdf4;
+  color: #15803d;
+}
+.cmm-root .mc-banner.is-ok svg {
+  color: var(--success);
+}
+.cmm-root .mc-banner.is-warn {
+  background: var(--danger-bg);
+  color: #b91c1c;
+}
+.cmm-root .mc-banner.is-warn svg {
+  color: var(--danger);
+}
+.cmm-root .mc-banner.is-warn .mc-textlink {
+  color: #b91c1c;
+  text-decoration-color: currentColor;
+}
+
+/* Spinner */
+.cmm-root .mc-spin {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--fg-1);
+  animation: cmm-spin 0.7s linear infinite;
+}
+.cmm-root .mc-spin.sm {
+  width: 13px;
+  height: 13px;
+}
+.cmm-root .mc-spin.xl {
+  width: 40px;
+  height: 40px;
+  border-width: 3px;
+}
+@keyframes cmm-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* No-title centered "moment" screens */
+.cmm-root.no-title .mc-head {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.cmm-root.no-title .mc-bodyscroll {
+  padding-top: 8px;
+}
+
+/* Transfer diagram (step 3) */
+.cmm-root .mc-transfer {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+}
+.cmm-root .mc-tcard {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cmm-root .mc-tcard.is-dest {
+  background: var(--bg-subtle);
+}
+.cmm-root .mc-tcard-hd {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.cmm-root .mc-tcard-hd-tx {
+  min-width: 0;
+}
+.cmm-root .mc-tcard-t {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.cmm-root .mc-tcard-num {
+  font-size: 11px;
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmm-root .mc-tcard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.cmm-root .mc-tthumb {
+  aspect-ratio: 1;
+  border-radius: 7px;
+  background: var(--bg-muted);
+}
+.cmm-root .mc-tcard.is-dest .mc-tthumb {
+  background: #fff;
+}
+.cmm-root .mc-tthumb.ghost {
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+}
+.cmm-root .mc-tcard-ft {
+  font-size: 11px;
+  color: var(--fg-3);
+  margin-top: auto;
+}
+.cmm-root .mc-transfer-arrow {
+  width: 56px;
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-2);
+  position: relative;
+}
+.cmm-root .mc-transfer-arrow svg {
+  position: relative;
+  z-index: 1;
+  background: var(--bg-surface);
+  padding: 5px 3px;
+}
+.cmm-root .mc-transfer-arrow::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--border-strong) 0 4px, transparent 4px 8px);
+}
+.cmm-root .mc-transfer-dot {
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--fg-1);
+  transform: translateY(-50%);
+  animation: cmm-travel 1.6s var(--ease-out) infinite;
+}
+.cmm-root .mc-transfer-dot.d2 {
+  animation-delay: 0.8s;
+}
+@keyframes cmm-travel {
+  0% { left: 6px; opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { left: 46px; opacity: 0; }
+}
+
+/* Confirmation line (step 3) */
+.cmm-root .mc-confirm-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg-2);
+  flex-wrap: wrap;
+}
+.cmm-root .mc-confirm-line strong {
+  color: var(--fg-1);
+  font-weight: 600;
+}
+.cmm-root .mc-confirm-check {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--success);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+/* Import result (step 4) */
+.cmm-root .mc-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.cmm-root .mc-stat {
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 11px;
+  text-align: center;
+}
+.cmm-root .mc-stat-ic {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  background: var(--bg-subtle);
+  display: grid;
+  place-items: center;
+  color: var(--fg-1);
+}
+.cmm-root .mc-stat-v {
+  font-size: 15px;
+  color: var(--fg-2);
+}
+.cmm-root .mc-stat-v strong {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--fg-1);
+  font-variant-numeric: tabular-nums;
+  margin-right: 2px;
+}
+.cmm-root .mc-check64 {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  background: var(--success);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+.cmm-root .mc-ask {
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  background: var(--bg-subtle);
+  padding: 15px 16px;
+}
+.cmm-root .mc-ask-t {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.cmm-root .mc-ask-b {
+  font-size: 12.5px;
+  color: var(--fg-2);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* Stepper (above footer) */
+.cmm-root .mc-stepper {
+  padding: 14px 24px;
+  border-top: 1px solid var(--border-subtle);
+}
+.cmm-root .sp-seg {
+  display: flex;
+  gap: 5px;
+}
+.cmm-root .sp-seg span {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  transition: background 0.3s var(--ease-out);
+}
+.cmm-root .sp-seg span.done,
+.cmm-root .sp-seg span.active {
+  background: var(--fg-1);
+}
+
+/* Footer */
+.cmm-root .mc-foot {
+  padding: 14px 20px 16px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-surface);
+}
+.cmm-root .mc-foot-step {
+  font-size: 12px;
+  color: var(--fg-3);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cmm-root .mc-foot-step b {
+  color: var(--fg-1);
+  font-weight: 600;
+}
+.cmm-root .mc-foot-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cmm-root .mc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+.cmm-root .mc-btn-primary {
+  background: var(--fg-1);
+  color: #fff;
+}
+.cmm-root .mc-btn-primary:hover {
+  opacity: 0.85;
+}
+.cmm-root .mc-btn-primary:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.cmm-root .mc-btn-ghost {
+  color: var(--fg-2);
+}
+.cmm-root .mc-btn-ghost:hover {
+  background: var(--bg-subtle);
+  color: var(--fg-1);
+}
+.cmm-root .mc-btn-back {
+  width: 40px;
+  padding: 0;
+  color: var(--fg-2);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+}
+.cmm-root .mc-btn-back:hover {
+  background: var(--bg-subtle);
+  color: var(--fg-1);
+}
+
+/* Ant modal shell: let our design own the chrome */
+.cmm-modal .ant-modal-content {
+  padding: 0;
+  border-radius: var(--radius-2xl, 20px);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+}
