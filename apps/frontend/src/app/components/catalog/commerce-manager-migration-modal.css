@@ -318,6 +318,59 @@
   margin-top: 1px;
 }
 
+/* Catalogue choice — radio cards (step 2 when catalogues already exist) */
+.cmm-root .mc-optcards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cmm-root .mc-optcard {
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  padding: 14px;
+  cursor: pointer;
+  transition:
+    border-color 0.18s var(--ease-out),
+    background 0.18s var(--ease-out);
+}
+.cmm-root .mc-optcard:hover {
+  border-color: var(--border-strong);
+}
+.cmm-root .mc-optcard.is-selected {
+  border-color: var(--fg-1);
+  background: var(--bg-page);
+}
+.cmm-root .mc-optcard-row {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+}
+.cmm-root .mc-radio {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 2px solid var(--border-strong);
+  position: relative;
+  transition: border-color 0.18s var(--ease-out);
+}
+.cmm-root .mc-optcard.is-selected .mc-radio,
+.cmm-root .mc-radio.is-on {
+  border-color: var(--fg-1);
+}
+.cmm-root .mc-radio.is-on::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 999px;
+  background: var(--fg-1);
+}
+.cmm-root .mc-optcard-extra {
+  margin-top: 12px;
+  padding-left: 31px;
+  cursor: default;
+}
+
 /* Redirect mark */
 .cmm-root .mc-redirect-mark {
   width: 60px;

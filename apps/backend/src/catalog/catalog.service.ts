@@ -631,6 +631,15 @@ export class CatalogService {
 
   // ─── WhatsApp Commerce Settings ───
 
+  /**
+   * List the Commerce Manager catalogue(s) linked to the number's WABA.
+   *
+   * This same call doubles as our SMB (WhatsApp Business app) detector: Meta
+   * rejects it with error (#10) "This operation can not be performed on SMB
+   * business type" for SMB numbers. That rejection is the reliable SMB signal,
+   * so we surface `isSmb: true` instead of failing — only such numbers own an
+   * in-app catalogue worth migrating to Commerce Manager.
+   */
   async getWhatsAppCommerceSettings(userId: string, phoneNumberId: string) {
     await this.assertWhatsAppAccess(userId, phoneNumberId)
     const { accessToken, wabaId } = await this.resolveWhatsAppAccount(phoneNumberId)
@@ -641,11 +650,24 @@ export class CatalogService {
 
     if (!response.ok) {
       const error = await response.text()
+      if (this.isSmbBusinessError(error)) {
+        this.logger.log(`[WhatsApp] ${phoneNumberId} is an SMB business (product_catalogs #10)`)
+        return { data: [], isSmb: true }
+      }
       this.logger.error(`WABA product_catalogs API error: ${error}`)
       throw new BadRequestException(`Meta API error: ${error}`)
     }
 
-    return response.json()
+    const data = (await response.json()) as Record<string, unknown>
+    return { ...data, isSmb: false }
+  }
+
+  /**
+   * Meta error (#10) returned when an operation is attempted on an SMB
+   * (WhatsApp Business app) business type — our reliable SMB-number signal.
+   */
+  private isSmbBusinessError(raw: string): boolean {
+    return /SMB business type/i.test(raw)
   }
 
   // ─── Product CRUD via Meta API ───
