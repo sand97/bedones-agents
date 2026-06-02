@@ -291,7 +291,9 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
     phoneNumber: string
     wid: string
     productCount: number
+    collectionCount: number
     products: unknown[]
+    collections: unknown[]
   }> {
     const digits = (phoneNumber || '').replace(/[^0-9]/g, '')
     if (!digits) throw new Error('Invalid phone number')
@@ -306,7 +308,7 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
     )
     if (!wppAvailable) await this.ensureWPPInjected()
 
-    const products = await page.evaluate(async (targetWid: string) => {
+    const result = await page.evaluate(async (targetWid: string) => {
       const wa = window.WPP.whatsapp as any
       const byId = new Map<string, any>()
       const add = (raw: any) => {
@@ -360,7 +362,8 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      return Array.from(byId.values()).map((product: any) => {
+      const retailerByWaId = new Map<string, string>()
+      const products = Array.from(byId.values()).map((product: any) => {
         const imageUrls: string[] = []
         const main = product.imageCdnUrl || product.image_cdn_url || pick(product.image_cdn_urls)
         if (main) imageUrls.push(main)
@@ -374,9 +377,11 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
           product.priceAmount1000 ?? product.price_amount_1000 ?? product.price ?? null
         const price =
           rawPrice != null && Number.isFinite(Number(rawPrice)) ? Number(rawPrice) / 1000 : null
+        const retailerId = product.retailerId || product.retailer_id || product.id || null
+        if (product.id) retailerByWaId.set(product.id, retailerId)
         return {
           id: product.id,
-          retailerId: product.retailerId || product.retailer_id || null,
+          retailerId,
           name: product.name || '',
           description: product.description || null,
           price,
@@ -386,9 +391,36 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
           imageUrls,
         }
       })
+
+      let collections: any[] = []
+      try {
+        const cols = await window.WPP.catalog.getCollections(targetWid as any, 50, 100)
+        if (Array.isArray(cols)) {
+          collections = cols
+            .map((c: any) => ({
+              id: c && c.id,
+              name: (c && c.name) || '',
+              retailerIds: (((c && c.products) || []) as any[])
+                .map((p: any) => retailerByWaId.get(p && p.id))
+                .filter(Boolean),
+            }))
+            .filter((c: any) => c.name)
+        }
+      } catch {
+        /* ignore */
+      }
+
+      return { products, collections }
     }, wid)
 
-    return { phoneNumber: digits, wid, productCount: products.length, products }
+    return {
+      phoneNumber: digits,
+      wid,
+      productCount: result.products.length,
+      collectionCount: result.collections.length,
+      products: result.products,
+      collections: result.collections,
+    }
   }
 
   getStatus() {

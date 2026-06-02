@@ -26,6 +26,7 @@ interface ProductModalProps {
   onClose: () => void
   onSubmit: (values: {
     name: string
+    retailerId: string
     description?: string
     imageUrls?: string[]
     price?: number
@@ -136,6 +137,7 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
     const initialValues = product
       ? {
           name: product.name,
+          retailerId: product.retailerId,
           description: product.description,
           price: product.price,
           currency: normalizeCurrency(product.currency),
@@ -223,6 +225,14 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
             rules={[{ required: true, message: t('catalog.product_name_required') }]}
           >
             <Input placeholder={t('catalog.product_name_placeholder')} />
+          </Form.Item>
+
+          <Form.Item
+            name="retailerId"
+            label={t('catalog.product_code')}
+            rules={[{ required: true, message: t('catalog.product_code_required') }]}
+          >
+            <Input placeholder={t('catalog.product_code_placeholder')} />
           </Form.Item>
 
           <Form.Item name="description" label={t('catalog.product_description')}>

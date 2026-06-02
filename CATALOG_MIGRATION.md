@@ -83,5 +83,6 @@ WHATSAPP_MIGRATION_CALLBACK_URL=http://localhost:3005  # CE backend, joignable D
 ## Notes
 - **Prix** : `priceAmount1000/1000` (unités majeures) → `createProduct` (×100 pour Meta), comme la création manuelle.
 - Images : téléchargées dans la session WhatsApp, réhébergées sur Minio via `upload-image`, fournies à Meta en `image_url`.
+- **Collections** : extraites via `WPP.catalog.getCollections` (nom + retailer_ids), recréées sur Meta en `product_sets` (filtre `retailer_id is_any`) après l'import des produits.
 - Le catalogue de destination doit être **connecté à Commerce Manager** (`providerId`) avant l'import.
 - ETA = nombre de migrations en attente devant soi × ~1 min (une extraction à la fois).

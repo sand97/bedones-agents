@@ -227,6 +227,7 @@ function CatalogPage() {
       const optimistic: Product = {
         id: (result as unknown as { id: string }).id,
         name: data.name,
+        retailerId: data.retailerId,
         description: data.description,
         imageUrl: data.imageUrl,
         additionalImageUrls: data.additionalImageUrls,
@@ -752,6 +753,7 @@ function CatalogPage() {
           const [firstImage, ...extraImages] = values.imageUrls ?? []
           const apiData = {
             name: values.name,
+            retailerId: values.retailerId,
             description: values.description,
             imageUrl: firstImage,
             additionalImageUrls: extraImages,

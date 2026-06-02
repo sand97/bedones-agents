@@ -40,6 +40,11 @@ export class CreateProductDto {
   @IsNotEmpty()
   name: string
 
+  @ApiProperty({ description: 'Code produit du marchand (retailer_id / SKU)' })
+  @IsString()
+  @IsNotEmpty()
+  retailerId: string
+
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
@@ -102,6 +107,11 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   name?: string
+
+  @ApiPropertyOptional({ description: 'Code produit du marchand (retailer_id / SKU)' })
+  @IsString()
+  @IsOptional()
+  retailerId?: string
 
   @ApiPropertyOptional()
   @IsString()

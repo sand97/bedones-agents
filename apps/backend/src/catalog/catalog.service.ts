@@ -6,7 +6,6 @@ import {
   ForbiddenException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { EncryptionService } from '../auth/encryption.service'
@@ -655,6 +654,7 @@ export class CatalogService {
     catalogId: string,
     data: {
       name: string
+      retailerId: string
       description?: string
       imageUrl?: string
       additionalImageUrls?: string[]
@@ -673,11 +673,16 @@ export class CatalogService {
       this.getCatalogProviderId(catalogId),
     ])
 
-    const retailerId = randomUUID()
+    // retailer_id is the merchant's own product code (SKU) — it must be
+    // provided (manually in the modal or carried over from the scraped
+    // catalogue), never auto-generated.
+    if (!data.retailerId?.trim()) {
+      throw new BadRequestException('Le code produit (retailer_id) est requis')
+    }
 
     const body: Record<string, unknown> = {
       access_token: accessToken,
-      retailer_id: retailerId,
+      retailer_id: data.retailerId.trim(),
       name: data.name,
     }
     if (data.description) body.description = data.description
@@ -742,6 +747,7 @@ export class CatalogService {
     productId: string,
     data: {
       name?: string
+      retailerId?: string
       description?: string
       imageUrl?: string
       additionalImageUrls?: string[]
@@ -758,6 +764,7 @@ export class CatalogService {
 
     const productData: Record<string, unknown> = {}
     if (data.name) productData.name = data.name
+    if (data.retailerId) productData.retailer_id = data.retailerId
     if (data.description) productData.description = data.description
     if (data.imageUrl) productData.image_url = data.imageUrl
     if (data.additionalImageUrls) {
