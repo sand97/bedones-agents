@@ -144,7 +144,7 @@ const CLIENT_CATALOG_SCRIPT = `(async () => {
         price: amount !== null ? amount / 1000 : null,
         currency: product.currency || null,
         availability: product.availability || null,
-        retailerId: product.retailerId || product.retailer_id || null,
+        retailerId: product.retailerId || product.retailer_id || product.id || null,
         imageUrl: urls[0] || null,
         additionalImageUrls: urls.slice(1),
       });

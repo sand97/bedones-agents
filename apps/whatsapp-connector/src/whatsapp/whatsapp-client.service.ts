@@ -376,7 +376,7 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
           rawPrice != null && Number.isFinite(Number(rawPrice)) ? Number(rawPrice) / 1000 : null
         return {
           id: product.id,
-          retailerId: product.retailerId || product.retailer_id || null,
+          retailerId: product.retailerId || product.retailer_id || product.id || null,
           name: product.name || '',
           description: product.description || null,
           price,

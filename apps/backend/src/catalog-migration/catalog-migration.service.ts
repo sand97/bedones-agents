@@ -343,6 +343,8 @@ export class CatalogMigrationService {
         : undefined
     return {
       name: p.name || 'Sans nom',
+      // The merchant's product code carried over from the scraped catalogue.
+      retailerId: p.retailerId ?? '',
       description: p.description ?? undefined,
       imageUrl: p.imageUrl ?? undefined,
       additionalImageUrls: additional,

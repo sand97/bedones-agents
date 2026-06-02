@@ -248,6 +248,7 @@ export const catalogApi = {
     catalogId: string,
     data: {
       name: string
+      retailerId: string
       description?: string
       imageUrl?: string
       additionalImageUrls?: string[]
@@ -271,6 +272,7 @@ export const catalogApi = {
     productId: string,
     data: {
       name?: string
+      retailerId?: string
       description?: string
       imageUrl?: string
       additionalImageUrls?: string[]
