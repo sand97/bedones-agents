@@ -257,7 +257,7 @@ export class CatalogMigrationService {
         const retailerIds = (collection.retailerIds ?? []).filter(Boolean)
         if (!collection.name || retailerIds.length === 0) continue
         try {
-          await this.catalogService.createCollection(catalogId, {
+          await this.createCollectionWithRetry(catalogId, {
             name: collection.name,
             productIds: retailerIds,
           })
@@ -361,6 +361,30 @@ export class CatalogMigrationService {
     if (index === -1) return { position: 0, etaMinutes: 0 }
     const ahead = active.length + index
     return { position: ahead, etaMinutes: ahead * MINUTES_PER_SYNC }
+  }
+
+  /**
+   * Create a product set, retrying the "empty product set" error. Meta indexes
+   * freshly-created products asynchronously, so a set whose retailer_id filter
+   * matches products created moments earlier can momentarily look empty — we
+   * back off and let the index catch up.
+   */
+  private async createCollectionWithRetry(
+    catalogId: string,
+    data: { name: string; productIds: string[] },
+    attempts = 5,
+  ): Promise<void> {
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        await this.catalogService.createCollection(catalogId, data)
+        return
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        const isEmptySet = /1798130|empty product set/i.test(message)
+        if (!isEmptySet || attempt === attempts) throw error
+        await new Promise((resolve) => setTimeout(resolve, attempt * 2000))
+      }
+    }
   }
 
   /** Shape a stored product for CatalogService.createProduct (price → major-unit string). */
