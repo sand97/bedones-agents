@@ -423,8 +423,11 @@ function ChatsPage() {
   )
 
   // ─── WhatsApp commerce settings query ───
+  // Doubles as SMB detection: Meta rejects the WABA product_catalogs call with
+  // a (#10) "SMB business type" error for WhatsApp Business app numbers, which
+  // the backend surfaces as `isSmb`. No extra round-trip needed.
   type CommerceEntry = { is_catalog_visible: boolean; id?: string }
-  type CommerceData = { data: CommerceEntry[] }
+  type CommerceData = { data: CommerceEntry[]; isSmb?: boolean }
   const commerceQuery = usePersistedQuery<CommerceData>({
     queryKey: ['whatsapp-commerce', currentAccount?.providerAccountId],
     queryFn: () => catalogApi.getWhatsappCommerceSettings(currentAccount?.providerAccountId || ''),
@@ -438,26 +441,9 @@ function ChatsPage() {
     return data.some((entry) => !!entry.id)
   }, [commerceQuery.data])
 
-  // ─── SMB (Coexistence) detection ───
   // Only an SMB number owns an in-app WhatsApp Business catalogue worth
-  // migrating. We query Meta's phone-number node (is_on_biz_app) — but ONLY
-  // once we know no catalogue is associated yet, to avoid the extra round-trip
-  // in the steady state.
-  const numberInfoQuery = usePersistedQuery<{
-    isOnBizApp: boolean
-    isOnBizAppSupported: boolean
-    platformType: string | null
-    displayPhoneNumber: string | null
-  }>({
-    queryKey: ['whatsapp-number-info', currentAccount?.providerAccountId],
-    queryFn: () => catalogApi.getWhatsappNumberInfo(currentAccount?.providerAccountId || ''),
-    enabled:
-      id === 'whatsapp' && !!currentAccount && commerceQuery.isSuccess && !hasCatalogAssociated,
-    staleTime: 5 * 60 * 1000,
-  })
-
-  // Offer "migrate your catalog" only for SMB numbers with no catalogue yet.
-  const canMigrateCatalog = !hasCatalogAssociated && numberInfoQuery.data?.isOnBizApp === true
+  // migrating — offer "migrate your catalog" only for those, with none yet.
+  const canMigrateCatalog = !hasCatalogAssociated && commerceQuery.data?.isSmb === true
 
   // ─── Catalogs query (for config modal) ───
   const catalogsQuery = useQuery({

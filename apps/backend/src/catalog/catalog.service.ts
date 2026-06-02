@@ -631,6 +631,15 @@ export class CatalogService {
 
   // ─── WhatsApp Commerce Settings ───
 
+  /**
+   * List the Commerce Manager catalogue(s) linked to the number's WABA.
+   *
+   * This same call doubles as our SMB (WhatsApp Business app) detector: Meta
+   * rejects it with error (#10) "This operation can not be performed on SMB
+   * business type" for SMB numbers. That rejection is the reliable SMB signal,
+   * so we surface `isSmb: true` instead of failing — only such numbers own an
+   * in-app catalogue worth migrating to Commerce Manager.
+   */
   async getWhatsAppCommerceSettings(userId: string, phoneNumberId: string) {
     await this.assertWhatsAppAccess(userId, phoneNumberId)
     const { accessToken, wabaId } = await this.resolveWhatsAppAccount(phoneNumberId)
@@ -641,72 +650,24 @@ export class CatalogService {
 
     if (!response.ok) {
       const error = await response.text()
+      if (this.isSmbBusinessError(error)) {
+        this.logger.log(`[WhatsApp] ${phoneNumberId} is an SMB business (product_catalogs #10)`)
+        return { data: [], isSmb: true }
+      }
       this.logger.error(`WABA product_catalogs API error: ${error}`)
       throw new BadRequestException(`Meta API error: ${error}`)
     }
 
-    return response.json()
+    const data = (await response.json()) as Record<string, unknown>
+    return { ...data, isSmb: false }
   }
 
-  // ─── WhatsApp number type (Coexistence / SMB detection) ───
-
   /**
-   * Determine whether a WhatsApp number is also running on the WhatsApp
-   * Business app (Coexistence / SMB). Only such numbers own an in-app
-   * catalogue worth migrating to Commerce Manager — pure Cloud API numbers do
-   * not. Meta exposes this on the phone-number node via `is_on_biz_app`.
-   *
-   * NOTE: `is_on_biz_app` is the field to confirm against the live Graph API.
-   * If the current API version does not expose it, we degrade gracefully
-   * (log + fall back to `platform_type`) so the rest of the response is usable.
-   * The frontend only calls this when no catalogue is associated yet, so the
-   * extra Graph round-trip never runs in the steady state.
+   * Meta error (#10) returned when an operation is attempted on an SMB
+   * (WhatsApp Business app) business type — our reliable SMB-number signal.
    */
-  async getWhatsAppNumberInfo(userId: string, phoneNumberId: string) {
-    await this.assertWhatsAppAccess(userId, phoneNumberId)
-    const { accessToken } = await this.resolveWhatsAppAccount(phoneNumberId)
-
-    const fetchFields = (fields: string) =>
-      fetch(`${this.META_API_BASE}/${phoneNumberId}?fields=${fields}&access_token=${accessToken}`)
-
-    let response = await fetchFields('is_on_biz_app,platform_type,display_phone_number')
-    let isOnBizAppSupported = true
-
-    // Meta fails the whole request if any requested field is invalid. Older
-    // API versions may not expose `is_on_biz_app`; detect that specific case
-    // and retry without it instead of erroring out the whole check.
-    if (!response.ok) {
-      const error = await response.text()
-      if (/nonexisting field|is_on_biz_app/i.test(error)) {
-        this.logger.warn(
-          `[WhatsApp] is_on_biz_app unavailable for ${phoneNumberId} — verify field/API version: ${error}`,
-        )
-        isOnBizAppSupported = false
-        response = await fetchFields('platform_type,display_phone_number')
-      } else {
-        this.logger.error(`[WhatsApp] phone-number node fetch error: ${error}`)
-        throw new BadRequestException(`Meta API error: ${error}`)
-      }
-    }
-
-    if (!response.ok) {
-      const error = await response.text()
-      this.logger.error(`[WhatsApp] phone-number node fetch error: ${error}`)
-      throw new BadRequestException(`Meta API error: ${error}`)
-    }
-
-    const data = (await response.json()) as {
-      is_on_biz_app?: boolean
-      platform_type?: string
-      display_phone_number?: string
-    }
-
-    return {
-      isOnBizApp: Boolean(data.is_on_biz_app),
-      isOnBizAppSupported,
-      platformType: data.platform_type ?? null,
-      displayPhoneNumber: data.display_phone_number ?? null,
-    }
+  private isSmbBusinessError(raw: string): boolean {
+    return /SMB business type/i.test(raw)
   }
 
   // ─── Product CRUD via Meta API ───

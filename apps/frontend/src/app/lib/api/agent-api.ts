@@ -311,19 +311,12 @@ export const catalogApi = {
   deleteCollection: (catalogId: string, collectionId: string) =>
     fetchJson<void>(`/catalog/${catalogId}/collections/${collectionId}`, { method: 'DELETE' }),
 
+  // `isSmb` is set when Meta rejects the WABA product_catalogs call with the
+  // (#10) "SMB business type" error — the reliable WhatsApp Business app signal.
   getWhatsappCommerceSettings: (phoneNumberId: string) =>
-    fetchJson<{ data: Array<{ is_catalog_visible: boolean; id?: string }> }>(
+    fetchJson<{ data: Array<{ is_catalog_visible: boolean; id?: string }>; isSmb?: boolean }>(
       `/catalog/whatsapp-commerce/${phoneNumberId}`,
     ),
-
-  // Coexistence / SMB detection — only queried when no catalogue is associated.
-  getWhatsappNumberInfo: (phoneNumberId: string) =>
-    fetchJson<{
-      isOnBizApp: boolean
-      isOnBizAppSupported: boolean
-      platformType: string | null
-      displayPhoneNumber: string | null
-    }>(`/catalog/whatsapp-number-info/${phoneNumberId}`),
 
   associatePhone: (catalogId: string, phoneNumberId: string) =>
     fetchJson<{ success: boolean }>(`/catalog/${catalogId}/associate-phone`, {
