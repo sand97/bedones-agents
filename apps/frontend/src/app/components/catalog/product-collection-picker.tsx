@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useDebouncedValue } from '@app/hooks/use-debounced-value'
 import { useQuery } from '@tanstack/react-query'
 import { Input, Segmented, Spin, Button, Checkbox } from 'antd'
 import { Search, X, ShoppingBag, Layers } from 'lucide-react'
@@ -48,6 +49,8 @@ export function ProductCollectionPicker({
 }: ProductCollectionPickerProps) {
   const [mode, setMode] = useState<Mode>('products')
   const [search, setSearch] = useState('')
+  // Debounce the API query; the placeholder below still tracks `search` instantly.
+  const debouncedSearch = useDebouncedValue(search.trim(), 350)
 
   // Filter the placeholder client-side so it tracks the search input even
   // before the network call returns.
@@ -66,8 +69,9 @@ export function ProductCollectionPicker({
   }, [placeholderProducts, search])
 
   const productsQuery = useQuery({
-    queryKey: ['catalog-products-picker', catalog.id, search],
-    queryFn: () => catalogApi.getProducts(catalog.id, { search: search || undefined, limit: 50 }),
+    queryKey: ['catalog-products-picker', catalog.id, debouncedSearch],
+    queryFn: () =>
+      catalogApi.getProducts(catalog.id, { search: debouncedSearch || undefined, limit: 50 }),
     enabled: mode === 'products',
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,

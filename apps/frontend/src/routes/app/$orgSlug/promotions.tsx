@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useDebouncedValue } from '@app/hooks/use-debounced-value'
 import { createFileRoute, useParams } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -69,6 +70,10 @@ function PromotionsPage() {
   // Build API status param: only pass if single status selected (API accepts one status)
   const apiStatus = selectedStatuses.length === 1 ? selectedStatuses[0] : undefined
 
+  // Debounce search so typing doesn't fire a request per keystroke.
+  const debouncedSearch = useDebouncedValue(searchText.trim(), 350)
+  useEffect(() => setCurrentPage(1), [debouncedSearch])
+
   const catalogsQuery = useQuery({
     queryKey: ['catalogs', orgSlug],
     queryFn: () => catalogApi.list(orgSlug),
@@ -77,10 +82,10 @@ function PromotionsPage() {
   })
 
   const { data, isLoading } = useQuery({
-    queryKey: ['promotions', orgSlug, searchText, apiStatus, currentPage, pageSize],
+    queryKey: ['promotions', orgSlug, debouncedSearch, apiStatus, currentPage, pageSize],
     queryFn: () =>
       promotionApi.list(orgSlug, {
-        search: searchText || undefined,
+        search: debouncedSearch || undefined,
         status: apiStatus,
         page: currentPage,
         pageSize,
