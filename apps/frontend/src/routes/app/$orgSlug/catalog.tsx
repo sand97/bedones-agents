@@ -46,6 +46,7 @@ import {
   updateListItemCache,
 } from '@app/lib/query-cache'
 import { getStoredSelection, setStoredSelection } from '@app/lib/selection-storage'
+import { useDebouncedValue } from '@app/hooks/use-debounced-value'
 
 const CATALOG_SELECTION_SCOPE = 'catalog-current'
 
@@ -83,6 +84,15 @@ function CatalogPage() {
   const [cursorStack, setCursorStack] = useState<string[]>([])
   const [afterCursor, setAfterCursor] = useState<string | undefined>(undefined)
   const [pageSize, setPageSize] = useState(DEFAULT_LIMIT)
+
+  // Debounce the search box so typing doesn't fire an API call per keystroke.
+  const debouncedSearch = useDebouncedValue(searchText.trim(), 350)
+  // When the (debounced) term changes, jump back to the first page so the
+  // cursor we send matches the term being queried.
+  useEffect(() => {
+    setCursorStack([])
+    setAfterCursor(undefined)
+  }, [debouncedSearch])
 
   const currentPage = cursorStack.length + 1
 
@@ -158,7 +168,7 @@ function CatalogPage() {
     queryKey: [
       'catalog-products',
       selectedCatalog?.id,
-      searchText,
+      debouncedSearch,
       selectedStatuses,
       selectedCollectionId,
       afterCursor,
@@ -167,7 +177,7 @@ function CatalogPage() {
     queryFn: () =>
       selectedCatalog
         ? catalogApi.getProducts(selectedCatalog.id, {
-            search: searchText || undefined,
+            search: debouncedSearch || undefined,
             status: selectedStatuses.length === 1 ? selectedStatuses[0] : undefined,
             collectionId: selectedCollectionId,
             after: afterCursor,
@@ -529,10 +539,7 @@ function CatalogPage() {
               placeholder={t('catalog.search_placeholder')}
               prefix={<Search size={16} className="text-text-muted" />}
               value={searchText}
-              onChange={(e) => {
-                setSearchText(e.target.value)
-                resetPagination()
-              }}
+              onChange={(e) => setSearchText(e.target.value)}
               allowClear
               className="tickets-filter-input"
             />

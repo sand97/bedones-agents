@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useDebouncedValue } from '@app/hooks/use-debounced-value'
 import { createFileRoute, useParams } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Table, Input, DatePicker, Button, Modal, App } from 'antd'
@@ -75,13 +76,17 @@ function TicketsPage() {
   const [articlePickerOpen, setArticlePickerOpen] = useState(false)
   const [selectedArticles, setSelectedArticles] = useState<SelectedArticle[]>([])
 
+  // Debounce search so typing doesn't fire a request per keystroke.
+  const debouncedSearch = useDebouncedValue(searchText.trim(), 350)
+  useEffect(() => setCurrentPage(1), [debouncedSearch])
+
   // ─── Queries ───
 
   const { data, isLoading } = useQuery({
     queryKey: [
       'tickets',
       orgSlug,
-      searchText,
+      debouncedSearch,
       selectedPriorities,
       selectedStatuses,
       currentPage,
@@ -89,7 +94,7 @@ function TicketsPage() {
     ],
     queryFn: () =>
       ticketApi.list(orgSlug, {
-        search: searchText || undefined,
+        search: debouncedSearch || undefined,
         priority: selectedPriorities.length === 1 ? selectedPriorities[0] : undefined,
         statusId: selectedStatuses.length === 1 ? selectedStatuses[0] : undefined,
         page: currentPage,

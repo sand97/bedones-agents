@@ -418,6 +418,20 @@ export class CatalogService {
       summary: 'true',
       access_token: accessToken,
     })
+
+    // Run search server-side across the WHOLE catalogue via Meta's `filter` (the
+    // /products edge supports it) so results, cursors and summary.total_count are
+    // correct — not just the current page. For a collection we hit the
+    // product-set edge and narrow in-memory below (sets are small).
+    const search = params?.search?.trim()
+    if (search && !params?.collectionId) {
+      query.set(
+        'filter',
+        JSON.stringify({
+          or: [{ name: { i_contains: search } }, { retailer_id: { i_contains: search } }],
+        }),
+      )
+    }
     if (params?.after) query.set('after', params.after)
 
     const url = `${this.META_API_BASE}/${baseId}/products?${query}`
@@ -466,25 +480,37 @@ export class CatalogService {
 
     const products = (data.data || []).map((p) => this.mapMetaProduct(p))
 
-    // Server-side filtering (Meta doesn't support filter/search on products endpoint)
+    // Search already ran server-side for the full catalogue. We still narrow
+    // in-memory (same fields, a superset) — a no-op when Meta honoured the
+    // filter, and the actual search for the product-set (collection) edge.
+    // Status stays a client-side narrowing.
     let filtered = products
 
     if (params?.status) {
       filtered = filtered.filter((p) => p.status === params.status)
     }
 
-    if (params?.search) {
-      const q = params.search.toLowerCase()
+    if (search) {
+      const q = search.toLowerCase()
       filtered = filtered.filter(
         (p) =>
           (p.name as string)?.toLowerCase().includes(q) ||
+          (p.retailerId as string)?.toLowerCase().includes(q) ||
           (p.description as string)?.toLowerCase().includes(q),
       )
     }
 
+    // With an active filter: when the whole (filtered) edge fit in one page the
+    // filtered length is the exact count; otherwise trust Meta's filtered
+    // summary. Without a filter, the summary is the catalogue total.
+    const allFetched = !data.paging?.next
+    const hasFilter = !!search || !!params?.status
+    const total =
+      hasFilter && allFetched ? filtered.length : (data.summary?.total_count ?? filtered.length)
+
     return {
       products: filtered,
-      total: data.summary?.total_count ?? filtered.length,
+      total,
       cursors: data.paging?.cursors,
       hasMore: !!data.paging?.next,
     }
