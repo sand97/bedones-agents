@@ -1,12 +1,14 @@
 import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
 import { Skeleton, Typography } from 'antd'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { $api } from '@app/lib/api/$api'
 import { SetupCarousel } from '@app/components/dashboard/setup-carousel'
 import { AccountOverview } from '@app/components/dashboard/account-overview'
 import { CommentsConfigModal } from '@app/components/comments/comments-config'
+import { CommerceManagerMigrationModal } from '@app/components/catalog/commerce-manager-migration-modal'
+import { readCatalogMigrationDraft } from '@app/lib/catalog-migration-draft'
 import type { components } from '@app/lib/api/v1'
 
 const { Title, Text } = Typography
@@ -43,26 +45,24 @@ function DashboardPage() {
   // back to slide 0 every time the children count changes.
   const [completedKeys, setCompletedKeys] = useState<Set<string>>(() => new Set())
 
+  // Commerce Manager migration wizard — opened from the carousel "catalogue"
+  // step. Reopens itself after the connect/add-number round-trips via the draft.
+  const [migrationOpen, setMigrationOpen] = useState(false)
+  useEffect(() => {
+    if (readCatalogMigrationDraft().open) setMigrationOpen(true)
+  }, [])
+
   const status = setupStatusQuery.data
   const accounts = accountsQuery.data ?? []
 
-  const handleConfigureCatalog = () => {
-    navigate({
-      to: '/app/$orgSlug/catalog',
-      params: { orgSlug },
-      search: {
-        catalogId: undefined,
-        status: undefined,
-        collection: undefined,
-        page: undefined,
-      },
-    })
-  }
+  const handleConfigureCatalog = () => setMigrationOpen(true)
 
   const handleConfigureComments = (step: PendingComment) => {
     setCommentsModal({
       accountId: step.socialAccountId,
-      pageName: step.pageName ?? step.provider,
+      // Generated openapi types model pageName as `Record<string,never> | null`;
+      // it is a string at runtime — fall back to the provider when absent.
+      pageName: typeof step.pageName === 'string' ? step.pageName : step.provider,
     })
   }
 
@@ -163,6 +163,13 @@ function DashboardPage() {
           onSaved={handleCommentsSaved}
         />
       )}
+
+      {/* Commerce Manager catalogue migration wizard */}
+      <CommerceManagerMigrationModal
+        open={migrationOpen}
+        orgSlug={orgSlug}
+        onClose={() => setMigrationOpen(false)}
+      />
     </div>
   )
 }

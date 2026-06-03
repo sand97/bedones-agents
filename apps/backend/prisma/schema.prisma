@@ -97,6 +97,15 @@ enum CatalogAnalysisStatus {
   FAILED
 }
 
+// Lifecycle of a "WhatsApp catalog → Commerce Manager" migration job.
+enum CatalogMigrationStatus {
+  QUEUED // waiting in the Bull queue for its turn (single extraction at a time)
+  EXTRACTING // the connector is pulling the public catalogue from WhatsApp
+  IMPORTING // pushing the extracted products into the Meta catalogue
+  COMPLETED
+  FAILED
+}
+
 enum TicketPriority {
   LOW
   MEDIUM
@@ -193,6 +202,7 @@ model Organisation {
   ticketStatuses       TicketStatus[]
   creditOperations     CreditOperation[]
   whatsappOptInWindows WhatsAppOptInWindow[]
+  catalogMigrations    CatalogMigration[]
 }
 
 model OrganisationMember {
@@ -319,6 +329,7 @@ model Catalog {
   collectionContexts  CollectionContext[]
   productPostLinks    ProductPostLink[]
   collectionPostLinks CollectionPostLink[]
+  migrations          CatalogMigration[]
 
   @@index([organisationId])
 }
@@ -424,6 +435,35 @@ model CatalogSocialAccount {
   @@unique([catalogId, socialAccountId])
   @@index([catalogId])
   @@index([socialAccountId])
+}
+
+// One "import the products of a WhatsApp number into a Commerce Manager
+// catalogue" request. Processed one-at-a-time through the `catalog-migration`
+// Bull queue; progress is streamed to the browser over websockets.
+model CatalogMigration {
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  catalogId      String
+  catalog        Catalog      @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  // Source WhatsApp number whose public catalogue is imported (digits only, no '+').
+  sourcePhone           String
+  // Optional link to the connected SocialAccount the number belongs to.
+  sourceSocialAccountId String?
+  status                CatalogMigrationStatus @default(QUEUED)
+  totalProducts         Int                    @default(0)
+  importedProducts      Int                    @default(0)
+  failedProducts        Int                    @default(0)
+  jobId                 String?
+  error                 String?
+  startedAt             DateTime?
+  finishedAt            DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@index([organisationId])
+  @@index([catalogId])
+  @@index([status])
 }
 
 // ─── Agent ───

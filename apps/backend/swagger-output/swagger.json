@@ -709,6 +709,83 @@
         ]
       }
     },
+    "/social/accounts/{accountId}/health": {
+      "get": {
+        "operationId": "SocialController_getAccountHealth",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialAccountHealthDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/accounts/{accountId}/provider-posts": {
+      "get": {
+        "operationId": "SocialController_getProviderPosts",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
     "/social/accounts/{accountId}/settings": {
       "patch": {
         "operationId": "SocialController_updateSettings",
@@ -1945,6 +2022,37 @@
         ]
       }
     },
+    "/catalog/{id}/products-by-ids": {
+      "get": {
+        "operationId": "CatalogController_findProductsByIds",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ids",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
     "/catalog/{catalogId}/products/{productId}": {
       "patch": {
         "operationId": "CatalogController_updateProduct",
@@ -2908,6 +3016,129 @@
         },
         "tags": [
           "Invitations"
+        ]
+      }
+    },
+    "/catalog-migration": {
+      "post": {
+        "operationId": "CatalogMigrationController_start",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartCatalogMigrationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Queue a WhatsApp catalogue → Commerce Manager migration",
+        "tags": [
+          "Catalog Migration"
+        ]
+      }
+    },
+    "/catalog-migration/org/{organisationId}/active": {
+      "get": {
+        "operationId": "CatalogMigrationController_getActive",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Latest in-flight migration for an org (for resuming the wizard)",
+        "tags": [
+          "Catalog Migration"
+        ]
+      }
+    },
+    "/catalog-migration/{id}": {
+      "get": {
+        "operationId": "CatalogMigrationController_getOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Status + live queue position of a migration",
+        "tags": [
+          "Catalog Migration"
+        ]
+      }
+    },
+    "/catalog-migration/callback/upload-image": {
+      "post": {
+        "operationId": "CatalogMigrationCallbackController_uploadImage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadImageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Re-host a product image on our storage (called by the page script)",
+        "tags": [
+          "Catalog Migration Callback"
+        ]
+      }
+    },
+    "/catalog-migration/callback/save-catalog": {
+      "post": {
+        "operationId": "CatalogMigrationCallbackController_saveCatalog",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCatalogDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Persist the extracted catalogue as a temporary JSON on Minio",
+        "tags": [
+          "Catalog Migration Callback"
         ]
       }
     },
@@ -4569,36 +4800,6 @@
           "WhatsAppOptIn"
         ]
       }
-    },
-    "/social/accounts/{accountId}/health": {
-      "get": {
-        "operationId": "SocialController_getAccountHealth",
-        "parameters": [
-          {
-            "name": "accountId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SocialAccountHealthDto"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Social"
-        ]
-      }
     }
   },
   "info": {
@@ -5374,20 +5575,17 @@
               "type": "string"
             }
           },
-          "settings": {
-            "$ref": "#/components/schemas/PageSettingsResponseDto"
-          },
           "disabled": {
-            "description": "Whether outbound calls are disabled after repeated errors or missing scopes",
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether outbound calls are disabled after repeated errors or missing scopes"
           },
           "disabledReason": {
-            "description": "Why the account/feature was disabled (e.g. too_many_errors, missing_scopes:...)",
-            "type": "string"
+            "type": "string",
+            "description": "Why the account/feature was disabled (e.g. too_many_errors, missing_scopes:...)"
           },
           "featureDisabled": {
-            "description": "Outbound features disabled granularly",
             "type": "array",
+            "description": "Outbound features disabled granularly",
             "items": {
               "type": "string",
               "enum": [
@@ -5395,6 +5593,9 @@
                 "MESSAGE"
               ]
             }
+          },
+          "settings": {
+            "$ref": "#/components/schemas/PageSettingsResponseDto"
           }
         },
         "required": [
@@ -5525,6 +5726,71 @@
           "totalComments",
           "unreadComments",
           "comments"
+        ]
+      },
+      "SocialAccountLastErrorDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Provider/HTTP error code (e.g. 190, OAuthException)"
+          },
+          "resource": {
+            "type": "string",
+            "description": "Resource to reconnect (page, catalog, tiktok, …)"
+          },
+          "technical": {
+            "type": "string",
+            "description": "Raw provider error payload, for \"show details\""
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "technical",
+          "createdAt"
+        ]
+      },
+      "SocialAccountHealthDto": {
+        "type": "object",
+        "properties": {
+          "disabled": {
+            "type": "boolean"
+          },
+          "disabledReason": {
+            "type": "string"
+          },
+          "featureDisabled": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "COMMENT",
+                "MESSAGE"
+              ]
+            }
+          },
+          "message": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Human-friendly explanation keyed by language (e.g. { en, fr })"
+          },
+          "lastError": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SocialAccountLastErrorDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "disabled",
+          "featureDisabled"
         ]
       },
       "FAQRuleDto": {
@@ -6504,6 +6770,110 @@
             "example": "Diallo"
           }
         }
+      },
+      "StartCatalogMigrationDto": {
+        "type": "object",
+        "properties": {
+          "organisationId": {
+            "type": "string",
+            "description": "Organisation owning the target Commerce Manager catalogue"
+          },
+          "catalogId": {
+            "type": "string",
+            "description": "Local id of the destination (Commerce Manager) catalogue"
+          },
+          "sourcePhone": {
+            "type": "string",
+            "description": "WhatsApp number to import the public catalogue from (digits only, no \"+\")",
+            "example": "237657888690"
+          },
+          "sourceSocialAccountId": {
+            "type": "string",
+            "description": "Id of the connected SocialAccount the number belongs to, when known"
+          }
+        },
+        "required": [
+          "organisationId",
+          "catalogId",
+          "sourcePhone"
+        ]
+      },
+      "UploadImageDto": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "type": "string",
+            "description": "Image as a data URL (data:image/...;base64,...) or raw base64"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "imageIndex": {
+            "type": "object"
+          },
+          "imageType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "image"
+        ]
+      },
+      "SaveCatalogProductDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "price": {
+            "type": "object",
+            "nullable": true,
+            "description": "Major currency units (e.g. 1500.0)"
+          },
+          "currency": {
+            "type": "object",
+            "nullable": true
+          },
+          "availability": {
+            "type": "object",
+            "nullable": true
+          },
+          "retailerId": {
+            "type": "object",
+            "nullable": true
+          },
+          "imageUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "additionalImageUrls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "SaveCatalogDto": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaveCatalogProductDto"
+            }
+          }
+        },
+        "required": [
+          "products"
+        ]
       },
       "CreateAgentDto": {
         "type": "object",
@@ -7545,72 +7915,6 @@
       "SendTemplateBody": {
         "type": "object",
         "properties": {}
-      },
-      "SocialAccountLastErrorDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "description": "Provider/HTTP error code (e.g. 190, OAuthException)",
-            "type": "string"
-          },
-          "resource": {
-            "description": "Resource to reconnect (page, catalog, tiktok, ...)",
-            "type": "string"
-          },
-          "technical": {
-            "description": "Raw provider error payload, for \"show details\"",
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "required": [
-          "technical",
-          "createdAt"
-        ]
-      },
-      "SocialAccountHealthDto": {
-        "type": "object",
-        "properties": {
-          "disabled": {
-            "type": "boolean"
-          },
-          "disabledReason": {
-            "type": "string"
-          },
-          "featureDisabled": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "COMMENT",
-                "MESSAGE"
-              ]
-            }
-          },
-          "message": {
-            "description": "Human-friendly explanation keyed by language (e.g. { en, fr })",
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            },
-            "nullable": true
-          },
-          "lastError": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SocialAccountLastErrorDto"
-              }
-            ],
-            "nullable": true
-          }
-        },
-        "required": [
-          "disabled",
-          "featureDisabled"
-        ]
       }
     }
   }
