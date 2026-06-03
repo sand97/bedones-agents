@@ -988,6 +988,25 @@
   width: 100%;
 }
 
+/* Icon accent tones — a few pops of colour (blue / violet / emerald / pink)
+   so the journey isn't all-monochrome. Applied to the rounded icon chips. */
+.cmm-root .mc-tone-violet {
+  background: #f4f1fe;
+  color: #7c3aed;
+}
+.cmm-root .mc-tone-blue {
+  background: #eef3ff;
+  color: #2563eb;
+}
+.cmm-root .mc-tone-emerald {
+  background: #ecfdf5;
+  color: #059669;
+}
+.cmm-root .mc-tone-pink {
+  background: #fdf2f8;
+  color: #db2777;
+}
+
 /* Ant modal shell: let our design own the chrome */
 .cmm-modal .ant-modal-content {
   padding: 0;

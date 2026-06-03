@@ -911,26 +911,9 @@ export class CatalogService {
       throw new BadRequestException(`Meta API error: ${error}`)
     }
 
-    const result = (await response.json()) as { id: string }
-
-    // If productIds provided, add products to the collection
-    if (data.productIds?.length) {
-      const addResponse = await fetch(`${this.META_API_BASE}/${result.id}/products`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          access_token: accessToken,
-          product_ids: data.productIds,
-        }),
-      })
-
-      if (!addResponse.ok) {
-        const error = await addResponse.text()
-        this.logger.warn(`Meta add products to collection error: ${error}`)
-      }
-    }
-
-    return result
+    // Product-set membership is defined entirely by the filter above — Meta has
+    // no "add product to set by id" operation — so there's nothing else to do.
+    return (await response.json()) as { id: string }
   }
 
   async updateCollection(catalogId: string, collectionId: string, data: { name?: string }) {

@@ -266,10 +266,20 @@ function LinkVisual({ state }: { state: 'progress' | 'success' | 'fail' }) {
   )
 }
 
-function BenefitCard({ icon, title, body }: { icon: string; title: string; body: string }) {
+function BenefitCard({
+  icon,
+  title,
+  body,
+  tone,
+}: {
+  icon: string
+  title: string
+  body: string
+  tone?: string
+}) {
   return (
     <div className="mc-benefit">
-      <div className="mc-benefit-ic">
+      <div className={'mc-benefit-ic' + (tone ? ' mc-tone-' + tone : '')}>
         <Icon name={icon} size={18} />
       </div>
       <div className="mc-benefit-tx">
@@ -296,6 +306,7 @@ function RadioCard({
   title,
   body,
   children,
+  tone,
 }: {
   selected: boolean
   onSelect: () => void
@@ -303,6 +314,7 @@ function RadioCard({
   title: string
   body: string
   children?: ReactNode
+  tone?: string
 }) {
   return (
     <div
@@ -319,7 +331,7 @@ function RadioCard({
     >
       <div className="mc-optcard-row">
         <span className={'mc-radio' + (selected ? ' is-on' : '')} />
-        <div className="mc-choice-ic">
+        <div className={'mc-choice-ic' + (tone ? ' mc-tone-' + tone : '')}>
           <Icon name={icon} size={18} />
         </div>
         <div className="mc-choice-tx">
@@ -613,9 +625,14 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
               <Trans i18nKey={NS + 's1_lede'} components={{ b: <strong /> }} />
             </p>
             <div className="mc-benefits">
-              <BenefitCard icon="sparkles" title={tf('s1_b1_t')} body={tf('s1_b1_b')} />
-              <BenefitCard icon="ticket" title={tf('s1_b2_t')} body={tf('s1_b2_b')} />
-              <BenefitCard icon="promo" title={tf('s1_b3_t')} body={tf('s1_b3_b')} />
+              <BenefitCard
+                icon="sparkles"
+                tone="violet"
+                title={tf('s1_b1_t')}
+                body={tf('s1_b1_b')}
+              />
+              <BenefitCard icon="ticket" tone="blue" title={tf('s1_b2_t')} body={tf('s1_b2_b')} />
+              <BenefitCard icon="promo" tone="pink" title={tf('s1_b3_t')} body={tf('s1_b3_b')} />
             </div>
             <Note>{tf('s1_note')}</Note>
           </div>
@@ -654,6 +671,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
                   selected={useConnected}
                   onSelect={() => setCatalogChoice('connected')}
                   icon="box"
+                  tone="blue"
                   title={tf('s2_use_connected_t')}
                   body={tf('s2_use_connected_b')}
                 >
@@ -673,6 +691,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
                   selected={!useConnected}
                   onSelect={() => setCatalogChoice('new')}
                   icon="layers"
+                  tone="violet"
                   title={tf('s2_new_catalog_t')}
                   body={tf('s2_new_catalog_b')}
                 />
@@ -702,14 +721,14 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
         body: (
           <div className="mc-step">
             <div className="mc-hero">
-              <div className="mc-redirect-mark">
+              <div className="mc-redirect-mark mc-tone-blue">
                 <Icon name="external" size={30} />
               </div>
             </div>
             <p className="mc-lede">{tf('s2_lede')}</p>
             <div className="mc-choicelist">
               <div className="mc-choice">
-                <div className="mc-choice-ic">
+                <div className="mc-choice-ic mc-tone-blue">
                   <Icon name="box" size={18} />
                 </div>
                 <div className="mc-choice-tx">
@@ -718,7 +737,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
                 </div>
               </div>
               <div className="mc-choice">
-                <div className="mc-choice-ic">
+                <div className="mc-choice-ic mc-tone-violet">
                   <Icon name="layers" size={18} />
                 </div>
                 <div className="mc-choice-tx">
@@ -799,7 +818,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
             <div className="mc-step">
               <div className="mc-stats">
                 <div className="mc-stat">
-                  <div className="mc-stat-ic">
+                  <div className="mc-stat-ic mc-tone-violet">
                     <Icon name="layers" size={22} />
                   </div>
                   <div className="mc-stat-v">
@@ -808,7 +827,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
                   </div>
                 </div>
                 <div className="mc-stat">
-                  <div className="mc-stat-ic">
+                  <div className="mc-stat-ic mc-tone-emerald">
                     <Icon name="bag" size={22} />
                   </div>
                   <div className="mc-stat-v">
