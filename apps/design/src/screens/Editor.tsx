@@ -659,7 +659,22 @@ export function Editor({
         </button>
       </div>
 
-      <div className="editor-stage" ref={stageRef}>
+      <div
+        className="editor-stage"
+        ref={stageRef}
+        onMouseDown={(e) => {
+          // Clic sur la zone grise autour du cadre (pas sur le canvas ni les
+          // barres d'outils) → désélectionne et réaffiche la liste des calques.
+          if (e.target === e.currentTarget) {
+            const canvas = fabricRef.current
+            if (canvas) {
+              canvas.discardActiveObject()
+              canvas.renderAll()
+            }
+            setSelId(null)
+          }
+        }}
+      >
         <div className="editor-stage-bar">
           <div className="seg">
             {FORMAT_KEYS.map((k) => (
