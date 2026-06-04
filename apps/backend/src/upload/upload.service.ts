@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import * as Minio from 'minio'
 import * as crypto from 'crypto'
+// sharp expose `export = sharp` (CommonJS) ; sous `module: commonjs` sans
+// esModuleInterop, l'import-equals est la seule forme correcte au runtime.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import sharp = require('sharp')
 
 @Injectable()
 export class UploadService {
@@ -131,6 +135,46 @@ export class UploadService {
     } catch (error) {
       this.logger.error(`[Upload] Failed to upload buffer "${name}":`, error)
       return null
+    }
+  }
+
+  /**
+   * Optimise une image produit avant stockage commerce :
+   * - auto-rotation selon l'EXIF,
+   * - redimensionnement dans une boîte max (sans jamais agrandir),
+   * - compression (JPEG progressif par défaut, PNG si transparence).
+   * Garantit une taille de fichier raisonnable tout en gardant une
+   * résolution adaptée aux catalogues (Meta recommande ≥ 500px).
+   */
+  async optimizeProductImage(
+    buffer: Buffer,
+  ): Promise<{ buffer: Buffer; contentType: string; width: number; height: number }> {
+    const MAX_DIM = 1600
+    const base = sharp(buffer, { failOn: 'none' }).rotate()
+    const meta = await base.metadata()
+    const resized = base.resize({
+      width: MAX_DIM,
+      height: MAX_DIM,
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+
+    let outBuffer: Buffer
+    let contentType: string
+    if (meta.hasAlpha) {
+      outBuffer = await resized.png({ compressionLevel: 9, palette: true }).toBuffer()
+      contentType = 'image/png'
+    } else {
+      outBuffer = await resized.jpeg({ quality: 82, mozjpeg: true, progressive: true }).toBuffer()
+      contentType = 'image/jpeg'
+    }
+
+    const outMeta = await sharp(outBuffer).metadata()
+    return {
+      buffer: outBuffer,
+      contentType,
+      width: outMeta.width ?? 0,
+      height: outMeta.height ?? 0,
     }
   }
 

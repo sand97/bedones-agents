@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import { useTranslation } from 'react-i18next'
 import { Modal, Form, Input, InputNumber, Select, Upload, Button, message } from 'antd'
 import { X } from 'lucide-react'
-import { uploadChatMedia } from '@app/lib/api'
+import { uploadProductImage } from '@app/lib/api'
 import type { Product, Collection } from '@app/lib/api/agent-api'
 import { getCategoryOptions } from '@app/lib/product-categories'
 
@@ -213,7 +213,7 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
           const uploadedByPreview = new Map<string, string>()
           await Promise.all(
             pendingFiles.map(async (pf) => {
-              uploadedByPreview.set(pf.previewUrl, await uploadChatMedia(pf.file))
+              uploadedByPreview.set(pf.previewUrl, await uploadProductImage(pf.file))
             }),
           )
           finalImageUrls = imageUrls.map((u) => uploadedByPreview.get(u) ?? u)

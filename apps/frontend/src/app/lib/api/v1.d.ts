@@ -277,6 +277,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/upload/product-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload and optimize a product image */
+        post: operations["UploadController_uploadProductImage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/social/connect/facebook": {
         parameters: {
             query?: never;
@@ -365,6 +382,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["SocialController_getPosts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/accounts/{accountId}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SocialController_getAccountHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/accounts/{accountId}/provider-posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SocialController_getProviderPosts"];
         put?: never;
         post?: never;
         delete?: never;
@@ -981,6 +1030,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/catalog/{id}/products-by-ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CatalogController_findProductsByIds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/catalog/{catalogId}/products/{productId}": {
         parameters: {
             query?: never;
@@ -1375,6 +1440,91 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["InvitationController_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog-migration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queue a WhatsApp catalogue → Commerce Manager migration */
+        post: operations["CatalogMigrationController_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog-migration/org/{organisationId}/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Latest in-flight migration for an org (for resuming the wizard) */
+        get: operations["CatalogMigrationController_getActive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog-migration/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status + live queue position of a migration */
+        get: operations["CatalogMigrationController_getOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog-migration/callback/upload-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Re-host a product image on our storage (called by the page script) */
+        post: operations["CatalogMigrationCallbackController_uploadImage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog-migration/callback/save-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Persist the extracted catalogue as a temporary JSON on Minio */
+        post: operations["CatalogMigrationCallbackController_saveCatalog"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2085,22 +2235,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/social/accounts/{accountId}/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["SocialController_getAccountHealth"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2322,13 +2456,13 @@ export interface components {
             };
             /** @description Feature scopes (e.g. comments, messages) */
             scopes: string[];
-            settings?: components["schemas"]["PageSettingsResponseDto"];
             /** @description Whether outbound calls are disabled after repeated errors or missing scopes */
             disabled: boolean;
             /** @description Why the account/feature was disabled (e.g. too_many_errors, missing_scopes:...) */
             disabledReason?: string;
             /** @description Outbound features disabled granularly */
             featureDisabled: ("COMMENT" | "MESSAGE")[];
+            settings?: components["schemas"]["PageSettingsResponseDto"];
         };
         UnreadCountDto: {
             provider: string;
@@ -2361,6 +2495,26 @@ export interface components {
             totalComments: number;
             unreadComments: number;
             comments: components["schemas"]["CommentResponseDto"][];
+        };
+        SocialAccountLastErrorDto: {
+            /** @description Provider/HTTP error code (e.g. 190, OAuthException) */
+            code?: string;
+            /** @description Resource to reconnect (page, catalog, tiktok, …) */
+            resource?: string;
+            /** @description Raw provider error payload, for "show details" */
+            technical: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SocialAccountHealthDto: {
+            disabled: boolean;
+            disabledReason?: string;
+            featureDisabled: ("COMMENT" | "MESSAGE")[];
+            /** @description Human-friendly explanation keyed by language (e.g. { en, fr }) */
+            message?: {
+                [key: string]: string;
+            };
+            lastError?: components["schemas"]["SocialAccountLastErrorDto"] | null;
         };
         FAQRuleDto: {
             question: string;
@@ -2664,6 +2818,40 @@ export interface components {
             firstName?: string;
             /** @example Diallo */
             lastName?: string;
+        };
+        StartCatalogMigrationDto: {
+            /** @description Organisation owning the target Commerce Manager catalogue */
+            organisationId: string;
+            /** @description Local id of the destination (Commerce Manager) catalogue */
+            catalogId: string;
+            /**
+             * @description WhatsApp number to import the public catalogue from (digits only, no "+")
+             * @example 237657888690
+             */
+            sourcePhone: string;
+            /** @description Id of the connected SocialAccount the number belongs to, when known */
+            sourceSocialAccountId?: string;
+        };
+        UploadImageDto: {
+            /** @description Image as a data URL (data:image/...;base64,...) or raw base64 */
+            image: string;
+            productId?: string;
+            imageIndex?: Record<string, never>;
+            imageType?: string;
+        };
+        SaveCatalogProductDto: {
+            name: string;
+            description?: Record<string, never> | null;
+            /** @description Major currency units (e.g. 1500.0) */
+            price?: Record<string, never> | null;
+            currency?: Record<string, never> | null;
+            availability?: Record<string, never> | null;
+            retailerId?: Record<string, never> | null;
+            imageUrl?: Record<string, never> | null;
+            additionalImageUrls?: string[];
+        };
+        SaveCatalogDto: {
+            products: components["schemas"]["SaveCatalogProductDto"][];
         };
         CreateAgentDto: {
             organisationId: string;
@@ -2969,26 +3157,6 @@ export interface components {
             enabled: boolean;
         };
         SendTemplateBody: Record<string, never>;
-        SocialAccountLastErrorDto: {
-            /** @description Provider/HTTP error code (e.g. 190, OAuthException) */
-            code?: string;
-            /** @description Resource to reconnect (page, catalog, tiktok, ...) */
-            resource?: string;
-            /** @description Raw provider error payload, for "show details" */
-            technical: string;
-            /** Format: date-time */
-            createdAt: string;
-        };
-        SocialAccountHealthDto: {
-            disabled: boolean;
-            disabledReason?: string;
-            featureDisabled: ("COMMENT" | "MESSAGE")[];
-            /** @description Human-friendly explanation keyed by language (e.g. { en, fr }) */
-            message?: {
-                [key: string]: string;
-            } | null;
-            lastError?: components["schemas"]["SocialAccountLastErrorDto"] | null;
-        };
     };
     responses: never;
     parameters: never;
@@ -3388,6 +3556,32 @@ export interface operations {
             };
         };
     };
+    UploadController_uploadProductImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResponseDto"];
+                };
+            };
+        };
+    };
     SocialController_connectFacebook: {
         parameters: {
             query?: never;
@@ -3516,6 +3710,50 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PostResponseDto"][];
                 };
+            };
+        };
+    };
+    SocialController_getAccountHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountHealthDto"];
+                };
+            };
+        };
+    };
+    SocialController_getProviderPosts: {
+        parameters: {
+            query: {
+                search: string;
+                after: string;
+                limit: string;
+            };
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -4427,6 +4665,27 @@ export interface operations {
             };
         };
     };
+    CatalogController_findProductsByIds: {
+        parameters: {
+            query: {
+                ids: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CatalogController_deleteProduct: {
         parameters: {
             query?: never;
@@ -5068,6 +5327,107 @@ export interface operations {
         responses: {
             /** @description Invitation rejected */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CatalogMigrationController_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartCatalogMigrationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CatalogMigrationController_getActive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CatalogMigrationController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CatalogMigrationCallbackController_uploadImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UploadImageDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CatalogMigrationCallbackController_saveCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveCatalogDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6237,27 +6597,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    SocialController_getAccountHealth: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                accountId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SocialAccountHealthDto"];
-                };
             };
         };
     };

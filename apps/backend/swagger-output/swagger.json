@@ -521,6 +521,47 @@
         ]
       }
     },
+    "/upload/product-image": {
+      "post": {
+        "operationId": "UploadController_uploadProductImage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Upload"
+        ],
+        "summary": "Upload and optimize a product image"
+      }
+    },
     "/social/connect/facebook": {
       "post": {
         "operationId": "SocialController_connectFacebook",
