@@ -1102,9 +1102,15 @@ export class WebhookService {
     const timestamp = new Date(parseInt(msg.timestamp) * 1000)
     const platformMsgId = msg.id
 
-    // Get sender name from contacts array
+    // Get sender name from contacts array. A name synced from the business
+    // address book (smb_app_state_sync) wins over the WhatsApp profile name.
     const contact = contacts?.find((c) => c.wa_id === senderId)
-    const senderName = contact?.profile?.name || senderId
+    const senderName =
+      (await this.resolveWhatsAppContactName(
+        socialAccountId,
+        senderId,
+        contact?.profile?.name || null,
+      )) || senderId
 
     // Extract message content
     let messageText = ''
@@ -1281,7 +1287,13 @@ export class WebhookService {
     const timestamp = new Date(parseInt(msg.timestamp) * 1000)
     const platformMsgId = msg.id
     const contact = contacts?.find((c) => c.wa_id === recipientId)
-    const recipientName = contact?.profile?.name || null
+    // A name synced from the business address book (smb_app_state_sync) wins
+    // over the WhatsApp profile name.
+    const recipientName = await this.resolveWhatsAppContactName(
+      socialAccountId,
+      recipientId,
+      contact?.profile?.name || null,
+    )
 
     let messageText = ''
     let mediaUrl: string | null = null
@@ -1543,7 +1555,14 @@ export class WebhookService {
         const participantId = thread.id
         if (!participantId) continue
         const contact = contacts?.find((c) => c.wa_id === participantId)
-        const participantName = contact?.profile?.name || participantId
+        // A name synced from the business address book (smb_app_state_sync) wins
+        // over the WhatsApp profile name.
+        const participantName =
+          (await this.resolveWhatsAppContactName(
+            socialAccountId,
+            participantId,
+            contact?.profile?.name || null,
+          )) || participantId
 
         for (const msg of thread.messages || []) {
           // Reactions are folded into their target message live; skip in history.
@@ -1656,9 +1675,11 @@ export class WebhookService {
           socialAccountId,
           participantId,
           participantName: name,
+          contactNameSynced: true,
         },
         update: {
           participantName: name,
+          contactNameSynced: true,
         },
       })
       synced++
@@ -1675,6 +1696,30 @@ export class WebhookService {
       socialAccountId,
       provider: 'WHATSAPP',
     })
+  }
+
+  /**
+   * Resolve the display name to persist for a WhatsApp contact on an inbound
+   * message / echo / history item.
+   *
+   * Once a conversation's name comes from the business address-book sync
+   * (smb_app_state_sync, {@link handleWhatsAppAppStateSync}), it is
+   * authoritative: it must win over the WhatsApp profile name (or bare number)
+   * carried by later messages, and only another contact sync may change it.
+   * Returns the locked synced name when the conversation is flagged, otherwise
+   * the candidate name extracted from the message.
+   */
+  private async resolveWhatsAppContactName(
+    socialAccountId: string,
+    participantId: string,
+    candidateName: string | null,
+  ): Promise<string | null> {
+    const existing = await this.prisma.conversation.findUnique({
+      where: { socialAccountId_participantId: { socialAccountId, participantId } },
+      select: { participantName: true, contactNameSynced: true },
+    })
+    if (existing?.contactNameSynced) return existing.participantName
+    return candidateName
   }
 
   /** Extract displayable content from a historical WhatsApp message. */

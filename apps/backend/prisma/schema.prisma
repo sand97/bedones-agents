@@ -721,6 +721,7 @@ model Conversation {
   participantName          String
   participantUsername      String? // Platform username/handle (e.g. TikTok @username)
   participantAvatar        String?
+  contactNameSynced        Boolean                          @default(false) // participantName came from the WhatsApp Business address-book sync (smb_app_state_sync); authoritative, not overwritten by message profile names
   languageCode             String?
   languageSource           ContactLanguageSource            @default(UNKNOWN)
   languageConfidence       Float?
