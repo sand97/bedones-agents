@@ -696,6 +696,8 @@
     "product_code": "Code produit",
     "product_code_required": "Le code produit est requis",
     "product_code_placeholder": "Ex: robe-wax-001 (votre référence)",
+    "product_code_locked": "Le code produit ne peut pas être modifié après la création.",
+    "product_save_error": "Échec de l'enregistrement du produit",
     "product_description": "Description",
     "product_description_placeholder": "Décrivez votre produit...",
     "product_image": "Images",

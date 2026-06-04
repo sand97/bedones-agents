@@ -2671,7 +2671,7 @@ a {
   pointer-events: none;
 }
 .ant-btn-icon {
-  @apply flex;
+  @apply flex items-center justify-center;
 }
 /* ─── OTP Input ─── */
 .ant-otp-input {
