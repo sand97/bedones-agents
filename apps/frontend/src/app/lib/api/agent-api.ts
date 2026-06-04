@@ -19,6 +19,37 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+/**
+ * Extracts a human-readable message from an error thrown by fetchJson
+ * (format: `API error <status>: <body>`). Unwraps the NestJS error body
+ * `{ message }` and any nested Meta Graph error `{ error: { message } }`.
+ */
+export function getApiErrorMessage(err: unknown, fallback = 'Une erreur est survenue'): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  const jsonStart = raw.indexOf('{')
+  if (jsonStart !== -1) {
+    try {
+      const body = JSON.parse(raw.slice(jsonStart)) as { message?: unknown }
+      const m = body.message
+      const msg = Array.isArray(m) ? m.filter(Boolean).join(', ') : typeof m === 'string' ? m : ''
+      // Unwrap nested "Meta API error: {\"error\":{\"message\":\"...\"}}"
+      const metaStart = msg.indexOf('{')
+      if (metaStart !== -1) {
+        try {
+          const meta = JSON.parse(msg.slice(metaStart)) as { error?: { message?: string } }
+          if (meta.error?.message) return meta.error.message
+        } catch {
+          /* keep the outer message */
+        }
+      }
+      if (msg) return msg
+    } catch {
+      /* fall through to raw */
+    }
+  }
+  return raw || fallback
+}
+
 // ─── Agent ───
 
 export interface AgentSocialAccount {
