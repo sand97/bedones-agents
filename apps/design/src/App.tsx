@@ -10,8 +10,13 @@ import { Gallery } from './screens/Gallery'
 import { Editor, type EditorHandle } from './screens/Editor'
 import { ImagePicker } from './screens/ImagePicker'
 import { ExportPreview } from './screens/ExportPreview'
-import { blankTemplate } from './lib/data'
-import { getParams, loadCatalogOrDemo, loadTemplates, persistTemplates } from './lib/api'
+import { blankTemplate, DEMO_TEMPLATES } from './lib/data'
+import {
+  getParams,
+  loadCatalogOrDemo,
+  loadTemplates,
+  saveTemplate as apiSaveTemplate,
+} from './lib/api'
 import type { Collection, SelectionItem, Template } from './lib/types'
 
 const NEW_ACCENT = '#f5c518'
@@ -21,7 +26,7 @@ type Screen = 'gallery' | 'editor' | 'picker' | 'export'
 export default function App() {
   const params = useRef(getParams()).current
   const [screen, setScreen] = useState<Screen>('gallery')
-  const [templates, setTemplates] = useState<Template[]>(() => loadTemplates(params.catalogId))
+  const [templates, setTemplates] = useState<Template[]>(DEMO_TEMPLATES)
   const [active, setActive] = useState<Template | null>(null)
   const [selection, setSelection] = useState<SelectionItem[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
@@ -44,10 +49,16 @@ export default function App() {
     }
   }, [params.catalogId])
 
-  // Persiste les templates à chaque changement.
+  // Charge les templates persistés en base (fusionnés avec les statiques).
   useEffect(() => {
-    persistTemplates(params.catalogId, templates)
-  }, [params.catalogId, templates])
+    let cancelled = false
+    loadTemplates(params.catalogId).then((tpls) => {
+      if (!cancelled) setTemplates(tpls)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [params.catalogId])
 
   const sample = collections[0]?.products[0] || null
 
@@ -81,19 +92,33 @@ export default function App() {
       return exists ? prev.map((x) => (x.id === tpl.id ? stamped : x)) : [stamped, ...prev]
     })
 
-  const saveTemplate = (stayInEditor: boolean) => {
+  const saveTemplate = async (stayInEditor: boolean) => {
     const tpl = editorApi.current?.getTemplate() ?? active
     if (!tpl) return
-    upsert(tpl)
+    upsert(tpl) // optimiste
     setActive(tpl)
-    showToast('Template enregistré')
+    try {
+      const saved = await apiSaveTemplate(params.catalogId, tpl)
+      upsert(saved) // attache le dbId
+      setActive(saved)
+      showToast('Template enregistré')
+    } catch {
+      showToast('Enregistré localement (hors-ligne)')
+    }
     if (!stayInEditor) goGallery()
   }
-  const saveAndUse = () => {
+  const saveAndUse = async () => {
     const tpl = editorApi.current?.getTemplate() ?? active
     if (!tpl) return
     upsert(tpl)
-    openPicker(tpl)
+    let finalTpl = tpl
+    try {
+      finalTpl = await apiSaveTemplate(params.catalogId, tpl)
+      upsert(finalTpl)
+    } catch {
+      // garde l'état local si la persistance échoue
+    }
+    openPicker(finalTpl)
   }
 
   // ── App bar pieces ──
