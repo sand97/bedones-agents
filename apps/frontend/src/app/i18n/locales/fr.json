@@ -702,6 +702,8 @@
     "image_required": "Au moins une image est requise",
     "upload_images_title": "Cliquez ou glissez pour ajouter",
     "upload_images_hint": "JPG, PNG ou WebP",
+    "reorder_images_hint": "Glissez-déposez les images pour les réordonner. La première sera l'image principale.",
+    "main_image": "Principale",
     "product_price": "Prix",
     "product_currency": "Devise",
     "product_url": "URL",

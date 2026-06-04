@@ -134,6 +134,21 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
     // Pending files waiting to be uploaded on submit
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
 
+    // Drag & drop reordering state (index being dragged / index hovered over)
+    const [dragIndex, setDragIndex] = useState<number | null>(null)
+    const [overIndex, setOverIndex] = useState<number | null>(null)
+
+    /** Move an image from one position to another (drag & drop reorder) */
+    const handleReorderImage = (from: number, to: number) => {
+      if (from === to) return
+      setImageUrls((prev) => {
+        const next = [...prev]
+        const [moved] = next.splice(from, 1)
+        next.splice(to, 0, moved)
+        return next
+      })
+    }
+
     const initialValues = product
       ? {
           name: product.name,
@@ -189,13 +204,19 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
 
       let finalImageUrls = imageUrls
 
-      // Upload pending files to the server (like chat media upload)
+      // Upload pending files to the server (like chat media upload).
+      // Map each blob preview to its uploaded URL and replace it in place so
+      // the user-defined order (drag & drop) is preserved on save.
       if (pendingFiles.length > 0) {
         setUploading(true)
         try {
-          const uploadedUrls = await Promise.all(pendingFiles.map((pf) => uploadChatMedia(pf.file)))
-          const existingRemoteUrls = imageUrls.filter((u) => !u.startsWith('blob:'))
-          finalImageUrls = [...existingRemoteUrls, ...uploadedUrls]
+          const uploadedByPreview = new Map<string, string>()
+          await Promise.all(
+            pendingFiles.map(async (pf) => {
+              uploadedByPreview.set(pf.previewUrl, await uploadChatMedia(pf.file))
+            }),
+          )
+          finalImageUrls = imageUrls.map((u) => uploadedByPreview.get(u) ?? u)
         } catch {
           message.error(t('upload.error'))
           setUploading(false)
@@ -246,14 +267,54 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
           >
             {imageUrls.length > 0 ? (
               <div className="flex flex-col gap-3">
+                {imageUrls.length > 1 && (
+                  <span className="text-xs text-text-muted">
+                    {t('catalog.reorder_images_hint')}
+                  </span>
+                )}
                 <div className="flex flex-wrap gap-2">
                   {imageUrls.map((url, i) => (
-                    <div key={`${url}-${i}`} className="relative">
+                    <div
+                      key={`${url}-${i}`}
+                      className={`product-modal-img-item relative${
+                        dragIndex === i ? ' is-dragging' : ''
+                      }${
+                        overIndex === i && dragIndex !== null && dragIndex !== i
+                          ? ' is-drop-target'
+                          : ''
+                      }`}
+                      draggable
+                      onDragStart={(e) => {
+                        setDragIndex(i)
+                        e.dataTransfer.effectAllowed = 'move'
+                        // Required for Firefox to actually start the drag
+                        e.dataTransfer.setData('text/plain', String(i))
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        e.dataTransfer.dropEffect = 'move'
+                        if (overIndex !== i) setOverIndex(i)
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        if (dragIndex !== null) handleReorderImage(dragIndex, i)
+                        setDragIndex(null)
+                        setOverIndex(null)
+                      }}
+                      onDragEnd={() => {
+                        setDragIndex(null)
+                        setOverIndex(null)
+                      }}
+                    >
                       <img
                         src={url}
                         alt={`image-${i + 1}`}
                         className="h-20 w-20 rounded-lg object-cover"
+                        draggable={false}
                       />
+                      {i === 0 && imageUrls.length > 1 && (
+                        <span className="product-modal-img-badge">{t('catalog.main_image')}</span>
+                      )}
                       <Button
                         type="text"
                         size="small"

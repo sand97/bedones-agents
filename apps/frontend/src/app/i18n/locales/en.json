@@ -702,6 +702,8 @@
     "image_required": "At least one image is required",
     "upload_images_title": "Click or drag to upload",
     "upload_images_hint": "JPG, PNG or WebP",
+    "reorder_images_hint": "Drag and drop images to reorder them. The first one will be the main image.",
+    "main_image": "Main",
     "product_price": "Price",
     "product_currency": "Currency",
     "product_url": "URL",
