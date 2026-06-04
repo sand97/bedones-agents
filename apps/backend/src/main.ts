@@ -18,7 +18,12 @@ async function bootstrap() {
   app.use(cookieParser())
 
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'https://moderator.bedones.local',
+    // Liste d'origines autorisées, séparées par des virgules (frontend,
+    // studio design, etc.), définies dans CORS_URLS du .env.
+    origin: (process.env.CORS_URLS || 'https://moderator.bedones.local')
+      .split(',')
+      .map((url) => url.trim())
+      .filter(Boolean),
     credentials: true,
   })
 
