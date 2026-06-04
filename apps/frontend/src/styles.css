@@ -503,6 +503,23 @@ a {
   border-radius: 0 !important;
 }
 
+/* Inline list search row (chat conversations + comments posts) */
+.list-search {
+  flex-shrink: 0;
+}
+
+.list-search__progress {
+  line-height: 0;
+}
+
+.list-search__progress .ant-progress-outer {
+  padding: 0 !important;
+}
+
+.list-search__progress .ant-progress-inner {
+  border-radius: 0 !important;
+}
+
 /* Comments split layout */
 .comments-split {
   display: flex;
