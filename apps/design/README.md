@@ -47,10 +47,37 @@ pnpm --filter design dev      # http://localhost:3008
 # ou, derrière Caddy : https://design.bedones.local
 ```
 
-## Build / Docker
+## Build
 
 ```bash
 pnpm --filter design build    # → dist/
+```
+
+## Déploiement — Cloudflare (Workers Static Assets)
+
+Déployé comme **Worker Cloudflare `bedones-design`** servant le SPA statique
+(`dist/`) via Workers Static Assets (fallback SPA sur `index.html`). Config :
+`wrangler.jsonc`.
+
+- **CI/CD** : `.github/workflows/design-cloudflare.yml` — sur push `main`
+  touchant `apps/design/**` (ou déclenchement manuel). Build pnpm puis
+  `wrangler deploy` via `cloudflare/wrangler-action`.
+- **Secrets / vars** (déjà configurés pour le frontend, réutilisés) :
+  `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, et les `VITE_*` (dont
+  `VITE_API_URL`) injectées depuis les *repository variables*.
+- **Déploiement manuel** :
+
+```bash
+pnpm --filter design build
+pnpm --filter design deploy   # wrangler deploy
+```
+
+> Si l'app Cloudflare a été créée en **Pages** (et non Worker), remplacer la
+> commande du workflow par `pages deploy dist --project-name=bedones-design`.
+
+## Docker (alternative self-host)
+
+```bash
 docker build -t bedones-design apps/design   # sert le SPA via Caddy sur :3008
 ```
 
