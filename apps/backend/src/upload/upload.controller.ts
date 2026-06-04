@@ -153,4 +153,62 @@ export class UploadController {
     const url = await this.uploadService.uploadFile(file, 'chat-media')
     return { url }
   }
+
+  @Post('product-image')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiCreatedResponse({ type: UploadResponseDto })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB
+      fileFilter: (_req, file, cb) => {
+        const allowed = ['image/png', 'image/jpeg', 'image/webp']
+        if (!allowed.includes(file.mimetype)) {
+          cb(
+            new BadRequestException(
+              I18nContext.current()?.t('errors.upload.unsupported_image_format') ??
+                'Format non supporté. Utilisez PNG, JPG ou WEBP.',
+            ),
+            false,
+          )
+          return
+        }
+        cb(null, true)
+      },
+    }),
+  )
+  async uploadProductImage(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException(
+        I18nContext.current()?.t('errors.upload.no_file') ?? 'Aucun fichier fourni',
+      )
+    }
+
+    // Optimise (redimension + compression) avant stockage commerce.
+    const optimized = await this.uploadService.optimizeProductImage(file.buffer)
+    const baseName = file.originalname.replace(/\.[^.]+$/, '') || 'product'
+    const url = await this.uploadService.uploadBuffer(
+      optimized.buffer,
+      baseName,
+      optimized.contentType,
+      'product-images',
+    )
+    if (!url) {
+      throw new BadRequestException(
+        I18nContext.current()?.t('errors.upload.failed') ?? "Échec de l'envoi de l'image",
+      )
+    }
+    this.logger.log(
+      `[ProductImage] Optimized → ${optimized.width}×${optimized.height} (${optimized.contentType})`,
+    )
+    return { url }
+  }
 }

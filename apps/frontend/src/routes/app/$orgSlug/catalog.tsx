@@ -530,6 +530,13 @@ function CatalogPage() {
           <CatalogQuickActions
             onOpenContextFlow={() => setContextFlowOpen(true)}
             onOpenLinkPostsFlow={() => setPostLinkFlowOpen(true)}
+            onOpenStudio={() => {
+              const base = import.meta.env.VITE_DESIGN_STUDIO_URL || 'https://design.bedones.com'
+              const url = `${base}/?catalogId=${encodeURIComponent(
+                selectedCatalog.id,
+              )}&org=${encodeURIComponent(orgSlug)}`
+              window.open(url, '_blank', 'noopener,noreferrer')
+            }}
           />
         )}
 

@@ -13,3 +13,11 @@ api-moderator.bedones.local {
 	# Reverse proxy to NestJS development server
 	reverse_proxy 127.0.0.1:3005
 }
+
+design.bedones.local {
+	# Enable automatic HTTPS with self-signed certificate for local development
+	tls internal
+
+	# Reverse proxy to the Studio images (Vite) development server
+	reverse_proxy 127.0.0.1:3008
+}

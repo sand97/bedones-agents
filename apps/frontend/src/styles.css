@@ -2635,6 +2635,41 @@ a {
 .product-modal-img-remove:hover {
   background: rgba(0, 0, 0, 0.8) !important;
 }
+
+/* ─── Product Modal Image Reorder (drag & drop) ─── */
+.product-modal-img-item {
+  cursor: grab;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.product-modal-img-item:active {
+  cursor: grabbing;
+}
+
+.product-modal-img-item.is-dragging {
+  opacity: 0.4;
+}
+
+.product-modal-img-item.is-drop-target img {
+  outline: 2px dashed #111b21;
+  outline-offset: 2px;
+}
+
+.product-modal-img-badge {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
 .ant-btn-icon {
   @apply flex;
 }

@@ -15,3 +15,6 @@
 /apps/whatsapp-connector/.env
 /apps/whatsapp-connector/data/
 /apps/whatsapp-connector/.wwebjs_cache/
+/apps/design/node_modules/
+/apps/design/dist/
+/apps/design/.env
