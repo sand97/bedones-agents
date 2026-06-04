@@ -63,7 +63,9 @@ export function resolveText(el: TemplateElement, product: Product | null): strin
     code: product.code,
     price: product.price,
   }
-  return map[el.bind] != null ? map[el.bind] : (el.value ?? '')
+  const value = map[el.bind] != null ? map[el.bind] : (el.value ?? '')
+  // Gabarit "préfixe {} suffixe" si défini, sinon la valeur brute.
+  return el.pattern && el.pattern.includes('{}') ? el.pattern.replace(/\{\}/g, value) : value
 }
 
 // Rendu d'un élément unique (positionné en % du cadre)

@@ -15,6 +15,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { Canvas, Ellipse, FabricImage, Group, Rect, Textbox, type FabricObject } from 'fabric'
+import { initAligningGuidelines } from 'fabric/extensions'
 import { I, type IconProps } from '../components/icons'
 import { FORMATS, FORMAT_KEYS, DYN_FIELDS, TONE } from '../lib/data'
 import { resolveText } from '../components/TemplateCanvas'
@@ -46,12 +47,23 @@ const SWATCHES = [
 ]
 const TONES: ToneKey[] = ['light', 'mid', 'ink']
 
+// Indicateurs de sélection (poignées/bordures) en noir de la charte (pas bleu).
+const CONTROL = {
+  borderColor: '#111b21',
+  cornerColor: '#111b21',
+  cornerStrokeColor: '#ffffff',
+  transparentCorners: false,
+  cornerSize: 9,
+  borderScaleFactor: 1.5,
+} as const
+
 // ─── Métadonnées portées par chaque objet Fabric (hors géométrie) ───
 interface Meta {
   id: string
   type: ElementType
   bind?: DynKey | null
   value?: string
+  pattern?: string
   font?: FontKey
   radius?: number // px natif (rect/image)
 }
@@ -223,7 +235,14 @@ export function Editor({
         textAlign: el.align || 'left',
         fontFamily: el.font === 'mono' ? "'Geist Mono', monospace" : 'Geist, sans-serif',
       })
-      setMeta(o, { id: el.id, type: 'text', bind: el.bind ?? null, value: el.value, font: el.font })
+      setMeta(o, {
+        id: el.id,
+        type: 'text',
+        bind: el.bind ?? null,
+        value: el.value,
+        pattern: el.pattern,
+        font: el.font,
+      })
       return o
     },
     [cw, ch, fontScale, template.accent, sampleImg, tone, sample],
@@ -252,6 +271,7 @@ export function Editor({
           ...base,
           bind: m.bind ?? null,
           value: m.value ?? tb.text,
+          pattern: m.pattern,
           size: Math.max(8, Math.round((tb.fontSize ?? 20) / fs)),
           weight: Number(tb.fontWeight) || 500,
           color: typeof tb.fill === 'string' ? tb.fill : '#111b21',
@@ -299,6 +319,7 @@ export function Editor({
     for (const el of elsRef.current) {
       const obj = buildObject(el)
       if (!obj) continue
+      obj.set(CONTROL)
       canvas.add(obj)
       // Charge la vraie image produit dans la zone image (async)
       if (el.type === 'image' && sampleImg) {
@@ -317,6 +338,7 @@ export function Editor({
               scaleX: tw / (img.width || tw),
               scaleY: th / (img.height || th),
             })
+            img.set(CONTROL)
             setMeta(img, { id: el.id, type: 'image', radius: el.radius })
             const idx = canvas.getObjects().indexOf(placeholder)
             canvas.remove(placeholder)
@@ -330,6 +352,50 @@ export function Editor({
     bump()
   }, [cw, ch, buildObject, sampleImg, pxX, pxY, bump])
 
+  // ─── Historique (undo / redo via Ctrl/Cmd+Z) ───
+  const buildSceneRef = useRef(buildScene)
+  buildSceneRef.current = buildScene
+  const historyRef = useRef<TemplateElement[][]>([])
+  const histIdx = useRef(-1)
+  const isRestoring = useRef(false)
+
+  const pushHistory = useCallback(() => {
+    if (isRestoring.current) return
+    const snap = JSON.parse(JSON.stringify(elsRef.current)) as TemplateElement[]
+    const h = historyRef.current
+    h.splice(histIdx.current + 1) // coupe la branche "redo"
+    h.push(snap)
+    if (h.length > 80) h.shift()
+    histIdx.current = h.length - 1
+  }, [])
+
+  const restore = useCallback((snap: TemplateElement[]) => {
+    isRestoring.current = true
+    elsRef.current = JSON.parse(JSON.stringify(snap)) as TemplateElement[]
+    buildSceneRef.current()
+    setSelId(null)
+    isRestoring.current = false
+  }, [])
+
+  const undo = useCallback(() => {
+    if (histIdx.current > 0) {
+      histIdx.current -= 1
+      restore(historyRef.current[histIdx.current])
+    }
+  }, [restore])
+
+  const redo = useCallback(() => {
+    if (histIdx.current < historyRef.current.length - 1) {
+      histIdx.current += 1
+      restore(historyRef.current[histIdx.current])
+    }
+  }, [restore])
+
+  // Snapshot initial (baseline du 1er undo)
+  useEffect(() => {
+    pushHistory()
+  }, [pushHistory])
+
   // Init Fabric (une fois)
   useEffect(() => {
     if (!canvasElRef.current) return
@@ -337,7 +403,14 @@ export function Editor({
       preserveObjectStacking: true,
       selection: true,
     })
+    // sélection multiple en noir (pas bleu)
+    canvas.selectionColor = 'rgba(17,27,33,0.08)'
+    canvas.selectionBorderColor = '#111b21'
+    canvas.selectionLineWidth = 1
     fabricRef.current = canvas
+
+    // Guides d'alignement + magnétisme (bordures du cadre, centre, autres éléments)
+    const stopGuides = initAligningGuidelines(canvas, { color: '#111b21', width: 1, margin: 5 })
 
     const onSel = () => {
       const a = canvas.getActiveObject()
@@ -359,9 +432,28 @@ export function Editor({
       }
       elsRef.current = canvas.getObjects().map(readObject)
       bump()
+      pushHistory()
     })
 
+    // Undo / redo clavier (sauf pendant la saisie dans un champ ou un texte)
+    const onKey = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey
+      const k = e.key.toLowerCase()
+      if (!meta || (k !== 'z' && k !== 'y')) return
+      const ae = document.activeElement as HTMLElement | null
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable))
+        return
+      const act = fabricRef.current?.getActiveObject() as { isEditing?: boolean } | undefined
+      if (act?.isEditing) return
+      e.preventDefault()
+      if (k === 'y' || e.shiftKey) redo()
+      else undo()
+    }
+    window.addEventListener('keydown', onKey)
+
     return () => {
+      window.removeEventListener('keydown', onKey)
+      stopGuides()
       canvas.dispose()
       fabricRef.current = null
     }
@@ -385,6 +477,11 @@ export function Editor({
     if (canvas) elsRef.current = canvas.getObjects().map(readObject)
     bump()
   }
+  // sync + snapshot historique (à appeler après toute mutation utilisateur)
+  const commit = () => {
+    syncEls()
+    pushHistory()
+  }
 
   const addEl = (type: ElementType) => {
     const canvas = fabricRef.current
@@ -392,11 +489,12 @@ export function Editor({
     const el = newEl(type)
     const obj = buildObject(el)
     if (!obj) return
+    obj.set(CONTROL)
     canvas.add(obj)
     canvas.setActiveObject(obj)
     canvas.renderAll()
     setSelId(el.id)
-    syncEls()
+    commit()
   }
 
   const removeSel = () => {
@@ -407,7 +505,7 @@ export function Editor({
       canvas.discardActiveObject()
       canvas.renderAll()
       setSelId(null)
-      syncEls()
+      commit()
     }
   }
 
@@ -418,7 +516,19 @@ export function Editor({
     if (dir > 0) canvas.bringObjectForward(o)
     else canvas.sendObjectBackwards(o)
     canvas.renderAll()
-    syncEls()
+    commit()
+  }
+
+  // Réordonne un calque par id (boutons de la liste des calques)
+  const reorderById = (id: string, dir: number) => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const o = canvas.getObjects().find((x) => getMeta(x)?.id === id)
+    if (!o) return
+    if (dir > 0) canvas.bringObjectForward(o)
+    else canvas.sendObjectBackwards(o)
+    canvas.renderAll()
+    commit()
   }
 
   const selectById = (id: string) => {
@@ -440,17 +550,13 @@ export function Editor({
     const m = getMeta(o)
     if (m.type === 'text') {
       const tb = o as Textbox
-      if (patch.value !== undefined) {
-        m.value = patch.value
-        if (!m.bind) tb.set('text', patch.value)
-      }
-      if (patch.bind !== undefined) {
-        m.bind = patch.bind
+      if (patch.value !== undefined) m.value = patch.value
+      if (patch.bind !== undefined) m.bind = patch.bind
+      if (patch.pattern !== undefined) m.pattern = patch.pattern
+      if (patch.value !== undefined || patch.bind !== undefined || patch.pattern !== undefined) {
         tb.set(
           'text',
-          patch.bind
-            ? resolveText(asEl(m, patch), sampleProduct(sample, tone))
-            : m.value || 'Texte',
+          m.bind ? resolveText(asEl(m), sampleProduct(sample, tone)) : m.value || 'Texte',
         )
       }
       if (patch.size !== undefined) tb.set('fontSize', patch.size * fontScale)
@@ -481,7 +587,7 @@ export function Editor({
     if (patch.h !== undefined) o.set('height', pxY(patch.h))
     o.setCoords()
     canvas.renderAll()
-    syncEls()
+    commit()
   }
 
   // panel resizer
@@ -607,6 +713,7 @@ export function Editor({
             els={descriptors}
             selId={selId}
             selectById={selectById}
+            reorderById={reorderById}
             elIcon={elIcon}
             elName={elName}
             fmt={fmt}
@@ -619,8 +726,8 @@ export function Editor({
   )
 }
 
-// helper : produit un élément texte minimal pour resolveText lors d'un changement de bind
-function asEl(m: Meta, patch: Partial<TemplateElement>): TemplateElement {
+// helper : produit un élément texte minimal (depuis la meta) pour resolveText
+function asEl(m: Meta): TemplateElement {
   return {
     id: m.id,
     type: 'text',
@@ -628,8 +735,9 @@ function asEl(m: Meta, patch: Partial<TemplateElement>): TemplateElement {
     y: 0,
     w: 0,
     h: 0,
-    bind: patch.bind ?? m.bind ?? null,
+    bind: m.bind ?? null,
     value: m.value,
+    pattern: m.pattern,
   }
 }
 
@@ -666,6 +774,7 @@ function PropsTemplate({
   els,
   selId,
   selectById,
+  reorderById,
   elIcon,
   elName,
   fmt,
@@ -676,6 +785,7 @@ function PropsTemplate({
   els: TemplateElement[]
   selId: string | null
   selectById: (id: string) => void
+  reorderById: (id: string, dir: number) => void
   elIcon: (t: ElementType) => FC<IconProps>
   elName: (e: TemplateElement) => string
   fmt: { label: string; sub: string }
@@ -723,6 +833,26 @@ function PropsTemplate({
                 </span>
                 <span className="lt">{elName(e)}</span>
                 {e.type === 'text' && e.bind && <span className="dyn">dyn</span>}
+                <span
+                  className="layer-actions"
+                  style={{ display: 'flex', gap: 2 }}
+                  onClick={(ev) => ev.stopPropagation()}
+                >
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    title="Avancer (vers l'avant)"
+                    onClick={() => reorderById(e.id, 1)}
+                  >
+                    <I.chevD size={13} style={{ transform: 'rotate(180deg)' }} />
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    title="Reculer (vers l'arrière)"
+                    onClick={() => reorderById(e.id, -1)}
+                  >
+                    <I.chevD size={13} />
+                  </button>
+                </span>
               </div>
             )
           })}
@@ -839,6 +969,15 @@ function PropsElement({
                   </option>
                 ))}
               </select>
+              <div className="field" style={{ marginTop: 10, marginBottom: 0 }}>
+                <label>Format du texte</label>
+                <input
+                  className="inp"
+                  value={sel.pattern || ''}
+                  placeholder="ex : Prix : {} FCFA"
+                  onChange={(e) => patch({ pattern: e.target.value })}
+                />
+              </div>
               <p
                 style={{
                   margin: '8px 0 0',
@@ -849,8 +988,8 @@ function PropsElement({
                   gap: 6,
                 }}
               >
-                <I.bind size={13} style={{ color: 'var(--info)' }} /> Rempli automatiquement pour
-                chaque produit.
+                <I.bind size={13} style={{ color: 'var(--fg-2)' }} /> {'{}'} est remplacé par la
+                valeur du produit (laisser vide = valeur brute).
               </p>
             </div>
           )}

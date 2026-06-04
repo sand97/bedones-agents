@@ -33,6 +33,9 @@ export interface TemplateElement {
   strokeW?: number
   bind?: DynKey | null
   value?: string
+  /** Gabarit appliqué à un champ dynamique : "{}" est remplacé par la valeur
+   *  (ex: "Prix : {} FCFA"). Vide → la valeur brute. */
+  pattern?: string
   size?: number
   weight?: number
   color?: string

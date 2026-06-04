@@ -126,7 +126,7 @@ textarea.inp { height: auto; padding: 8px 10px; resize: vertical; min-height: 64
 .layer-row .ic { width: 26px; height: 26px; border-radius: 7px; background: var(--bg-subtle); display: flex; align-items: center; justify-content: center; color: var(--fg-2); flex-shrink: 0; }
 .layer-row.on .ic { background: #fff; }
 .layer-row .lt { flex: 1; min-width: 0; font-size: 12px; color: var(--fg-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.layer-row .dyn { font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--info); background: #eff6ff; padding: 1px 6px; border-radius: 99px; flex-shrink: 0; }
+.layer-row .dyn { font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--fg-1); background: var(--bg-muted); padding: 1px 6px; border-radius: 99px; flex-shrink: 0; }
 .del-link { color: var(--danger); font-size: 12px; display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 8px; }
 .del-link:hover { background: var(--danger-bg); }
 
@@ -199,7 +199,7 @@ textarea.inp { height: auto; padding: 8px 10px; resize: vertical; min-height: 64
 .kv .v { color: var(--fg-1); font-weight: 500; text-align: right; }
 .dyn-map { display: flex; flex-direction: column; gap: 8px; }
 .dyn-map .item { display: flex; align-items: center; gap: 10px; font-size: 12px; }
-.dyn-map .item .badge { font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--info); background: #eff6ff; padding: 2px 7px; border-radius: 99px; flex-shrink: 0; }
+.dyn-map .item .badge { font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--fg-1); background: var(--bg-muted); padding: 2px 7px; border-radius: 99px; flex-shrink: 0; }
 .dyn-map .item .val { color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .export-side .foot { margin-top: auto; padding: 18px; }
 
