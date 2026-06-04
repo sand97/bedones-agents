@@ -834,6 +834,10 @@ a {
 }
 
 .chat-bubble--video {
+  /* The placeholder/player sizes with width:100%, so the bubble needs a definite
+     width to resolve against — without it the shrink-to-fit bubble collapses to the
+     play button's size, producing a tiny square card. */
+  min-width: 280px;
   max-width: 40%;
 }
 
