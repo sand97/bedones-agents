@@ -48,6 +48,10 @@ export interface Template {
   edited: string
   uses: number
   elements: TemplateElement[]
+  /** Id en base (présent dès qu'il a été persisté). */
+  dbId?: string
+  /** Id du template statique d'origine (pour les overrides). */
+  sourceKey?: string
 }
 
 /** Une image d'un produit : URL réelle (MinIO/Meta) ou ton de placeholder. */

@@ -12,6 +12,8 @@ import {
   CreateCollectionDto,
   UpdateCollectionDto,
   AssociatePhoneDto,
+  CreateImageTemplateDto,
+  UpdateImageTemplateDto,
 } from './dto/catalog.dto'
 
 @ApiTags('Catalog')
@@ -165,6 +167,45 @@ export class CatalogController {
   ) {
     await this.catalogService.assertCatalogAccess(user.id, catalogId)
     return this.catalogService.deleteCollection(catalogId, collectionId)
+  }
+
+  // ─── Image Studio Templates ───
+
+  @Get(':id/image-templates')
+  async findImageTemplates(@CurrentUser() user: { id: string }, @Param('id') id: string) {
+    await this.catalogService.assertCatalogAccess(user.id, id)
+    return this.catalogService.findImageTemplates(id)
+  }
+
+  @Post(':id/image-templates')
+  async createImageTemplate(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: CreateImageTemplateDto,
+  ) {
+    await this.catalogService.assertCatalogAccess(user.id, id)
+    return this.catalogService.createImageTemplate(id, dto)
+  }
+
+  @Patch(':catalogId/image-templates/:templateId')
+  async updateImageTemplate(
+    @CurrentUser() user: { id: string },
+    @Param('catalogId') catalogId: string,
+    @Param('templateId') templateId: string,
+    @Body() dto: UpdateImageTemplateDto,
+  ) {
+    await this.catalogService.assertCatalogAccess(user.id, catalogId)
+    return this.catalogService.updateImageTemplate(catalogId, templateId, dto)
+  }
+
+  @Delete(':catalogId/image-templates/:templateId')
+  async deleteImageTemplate(
+    @CurrentUser() user: { id: string },
+    @Param('catalogId') catalogId: string,
+    @Param('templateId') templateId: string,
+  ) {
+    await this.catalogService.assertCatalogAccess(user.id, catalogId)
+    return this.catalogService.deleteImageTemplate(catalogId, templateId)
   }
 
   // ─── Analysis Progress ───

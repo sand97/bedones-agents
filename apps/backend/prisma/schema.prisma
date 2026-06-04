@@ -330,8 +330,33 @@ model Catalog {
   productPostLinks    ProductPostLink[]
   collectionPostLinks CollectionPostLink[]
   migrations          CatalogMigration[]
+  imageTemplates      ImageTemplate[]
 
   @@index([organisationId])
+}
+
+// ─── Image Studio Templates ───
+// Habillages réutilisables (cadres / overlays marketing) créés dans le Studio
+// images. Par défaut le studio affiche des templates statiques ; dès qu'un user
+// en modifie un, il est persisté ici (sourceKey = id du template statique
+// d'origine, null pour un template créé de zéro). `definition` contient les
+// éléments (texte, formes, zones, champs dynamiques) en JSON.
+model ImageTemplate {
+  id             String   @id @default(uuid())
+  organisationId String
+  catalogId      String
+  catalog        Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  name           String
+  format         String   @default("1:1")
+  accent         String?
+  definition     Json
+  sourceKey      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([catalogId, sourceKey])
+  @@index([organisationId])
+  @@index([catalogId])
 }
 
 // ─── Product / Collection AI Context ───

@@ -3,11 +3,18 @@
    Partage la session cookie avec api-moderator.bedones.com
    (credentials: 'include'). Charge le catalogue réel quand un
    catalogId est présent dans l'URL, sinon repli sur la démo.
-   Les templates sont persistés par catalogue (localStorage v1 ;
-   point de bascule prêt pour un endpoint backend).
+   Les templates sont persistés en base via l'API catalogue
+   (/catalog/:id/image-templates), fusionnés avec les statiques.
    ========================================================= */
 import { DEMO_COLLECTIONS, DEMO_TEMPLATES } from './data'
-import type { Collection, Product, ProductImageRef, Template } from './types'
+import type {
+  Collection,
+  FormatKey,
+  Product,
+  ProductImageRef,
+  Template,
+  TemplateElement,
+} from './types'
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.com'
 
@@ -149,23 +156,90 @@ export async function loadCatalogOrDemo(catalogId: string | null): Promise<{
   }
 }
 
-// ─── Persistance des templates (v1 localStorage par catalogue) ───
-const tplKey = (catalogId: string | null) => `bedones.studio.templates.${catalogId || 'demo'}`
+// ─── Persistance des templates (BD, scopée au catalogue) ───
+// Par défaut le studio affiche des templates statiques ; dès qu'un user en
+// modifie un, il est persisté en base (POST) puis mis à jour (PATCH). Les
+// changements suivent ainsi l'utilisateur d'un appareil à l'autre.
 
-export function loadTemplates(catalogId: string | null): Template[] {
-  try {
-    const raw = localStorage.getItem(tplKey(catalogId))
-    if (raw) return JSON.parse(raw) as Template[]
-  } catch {
-    // ignore malformed cache
-  }
-  return DEMO_TEMPLATES
+const STATIC_IDS = new Set(DEMO_TEMPLATES.map((t) => t.id))
+
+interface ImageTemplateRow {
+  id: string
+  name: string
+  format: string
+  accent?: string | null
+  sourceKey?: string | null
+  definition?: { elements?: TemplateElement[] } | null
 }
 
-export function persistTemplates(catalogId: string | null, templates: Template[]): void {
-  try {
-    localStorage.setItem(tplKey(catalogId), JSON.stringify(templates))
-  } catch {
-    // storage unavailable — non bloquant
+async function apiSend<T>(method: string, path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return (await res.json()) as T
+}
+
+function mapRow(row: ImageTemplateRow): Template {
+  const base = row.sourceKey ? DEMO_TEMPLATES.find((t) => t.id === row.sourceKey) : undefined
+  return {
+    id: row.sourceKey || row.id,
+    dbId: row.id,
+    sourceKey: row.sourceKey ?? undefined,
+    name: row.name,
+    format: (row.format as FormatKey) || '1:1',
+    accent: row.accent || base?.accent || '#111b21',
+    elements: row.definition?.elements ?? base?.elements ?? [],
+    uses: base?.uses ?? 0,
+    edited: 'enregistré',
   }
+}
+
+/** Charge les templates : statiques fusionnés avec les overrides en base. */
+export async function loadTemplates(catalogId: string | null): Promise<Template[]> {
+  if (!catalogId) return DEMO_TEMPLATES
+  let rows: ImageTemplateRow[]
+  try {
+    rows = await apiGet<ImageTemplateRow[]>(`/catalog/${catalogId}/image-templates`)
+  } catch {
+    return DEMO_TEMPLATES
+  }
+  const overrides = new Map<string, Template>()
+  const created: Template[] = []
+  for (const row of rows) {
+    const mapped = mapRow(row)
+    if (row.sourceKey) overrides.set(row.sourceKey, mapped)
+    else created.push(mapped)
+  }
+  const statics = DEMO_TEMPLATES.map((s) => overrides.get(s.id) ?? s)
+  return [...created, ...statics]
+}
+
+/**
+ * Persiste un template. PATCH s'il a déjà un dbId, sinon POST (avec
+ * sourceKey = id du template statique d'origine si c'en est un). Renvoie le
+ * template enrichi de son dbId. Mode démo (sans catalogId) : pas de persistance.
+ */
+export async function saveTemplate(catalogId: string | null, tpl: Template): Promise<Template> {
+  if (!catalogId) return tpl
+  const definition = { elements: tpl.elements }
+  const body = { name: tpl.name, format: tpl.format, accent: tpl.accent, definition }
+  let row: ImageTemplateRow
+  if (tpl.dbId) {
+    row = await apiSend<ImageTemplateRow>(
+      'PATCH',
+      `/catalog/${catalogId}/image-templates/${tpl.dbId}`,
+      body,
+    )
+  } else {
+    const sourceKey = STATIC_IDS.has(tpl.id) ? tpl.id : undefined
+    row = await apiSend<ImageTemplateRow>('POST', `/catalog/${catalogId}/image-templates`, {
+      ...body,
+      sourceKey,
+    })
+  }
+  return { ...tpl, dbId: row.id, sourceKey: row.sourceKey ?? tpl.sourceKey }
 }
