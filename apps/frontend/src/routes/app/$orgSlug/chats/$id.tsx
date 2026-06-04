@@ -314,7 +314,10 @@ function mapApiConversation(
     labels: [],
     tickets: [],
     lastMessage: conv.lastMessageText || '',
-    lastMessageTime: conv.lastMessageAt || new Date().toISOString(),
+    // No timestamp for contacts synced from the address book that have no
+    // message yet (smb_app_state_sync) — keep it empty so the list neither
+    // shows a fake "now" time nor floats them to the top.
+    lastMessageTime: conv.lastMessageAt || '',
   }
 }
 
