@@ -696,6 +696,8 @@
     "product_code": "Product code",
     "product_code_required": "The product code is required",
     "product_code_placeholder": "E.g. wax-dress-001 (your SKU)",
+    "product_code_locked": "The product code can't be changed after creation.",
+    "product_save_error": "Failed to save the product",
     "product_description": "Description",
     "product_description_placeholder": "Describe your product...",
     "product_image": "Images",

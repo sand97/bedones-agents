@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Table, Input, Button, Skeleton, Dropdown, Modal } from 'antd'
+import { Table, Input, Button, Skeleton, Dropdown, Modal, App } from 'antd'
 import {
   Search,
   ChevronDown,
@@ -33,7 +33,7 @@ import type { PickerEntity } from '@app/components/catalog/product-collection-pi
 import type { CatalogArticle } from '@app/components/whatsapp/mock-data'
 import { AccountSwitcher } from '@app/components/social/account-switcher'
 import { useLayout } from '@app/contexts/layout-context'
-import { catalogApi } from '@app/lib/api/agent-api'
+import { catalogApi, getApiErrorMessage } from '@app/lib/api/agent-api'
 import { setAuthRedirect, buildFacebookOAuthUrl } from '@app/lib/auth-redirect'
 import type { Product, Collection } from '@app/lib/api/agent-api'
 import { CatalogSocialEmpty } from '@app/components/catalog/catalog-social-empty'
@@ -70,6 +70,7 @@ const STATUS_FILTER_OPTIONS = [
 
 function CatalogPage() {
   const { t } = useTranslation()
+  const { message } = App.useApp()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
   const search = useSearch({ from: '/app/$orgSlug/catalog' })
   const navigate = useNavigate()
@@ -251,6 +252,9 @@ function CatalogPage() {
       )
       setModalProductConfig({ isOpen: false })
     },
+    onError: (err) => {
+      message.error(getApiErrorMessage(err, t('catalog.product_save_error')))
+    },
   })
 
   const updateProductMutation = useMutation({
@@ -279,6 +283,9 @@ function CatalogPage() {
         patch,
       )
       setModalProductConfig({ isOpen: false })
+    },
+    onError: (err) => {
+      message.error(getApiErrorMessage(err, t('catalog.product_save_error')))
     },
   })
 

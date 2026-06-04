@@ -252,8 +252,9 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
             name="retailerId"
             label={t('catalog.product_code')}
             rules={[{ required: true, message: t('catalog.product_code_required') }]}
+            extra={product ? t('catalog.product_code_locked') : undefined}
           >
-            <Input placeholder={t('catalog.product_code_placeholder')} />
+            <Input placeholder={t('catalog.product_code_placeholder')} disabled={!!product} />
           </Form.Item>
 
           <Form.Item name="description" label={t('catalog.product_description')}>
