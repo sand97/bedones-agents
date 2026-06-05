@@ -63,6 +63,7 @@ export function ListSearchInput({
           status="active"
           showInfo={false}
           strokeLinecap="square"
+          strokeColor="#111b21"
           size={[undefined as unknown as number, 2]}
           className="list-search__progress"
         />
