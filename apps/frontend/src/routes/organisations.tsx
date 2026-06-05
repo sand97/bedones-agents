@@ -23,7 +23,11 @@ function OrganisationsPage() {
   const rejectMutation = $api.useMutation('post', '/invitations/reject')
 
   const organisations = meQuery.data?.organisations ?? []
-  const invitations = meQuery.data?.pendingInvitations ?? []
+  // You can't be invited to an org you're already a member of (e.g. one you
+  // created) — filter out such phantom invitations defensively.
+  const invitations = (meQuery.data?.pendingInvitations ?? []).filter(
+    (inv) => !organisations.some((o) => o.id === inv.organisationId),
+  )
 
   const invalidateMe = () => {
     queryClient.invalidateQueries({ queryKey: ['get', '/auth/me'] })

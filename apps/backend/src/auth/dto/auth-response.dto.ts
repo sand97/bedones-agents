@@ -63,13 +63,19 @@ export class UserDto {
   @ApiPropertyOptional({ nullable: true })
   phone: string | null
 
+  @ApiPropertyOptional({ nullable: true })
+  phoneCountryCode: string | null
+
+  @ApiPropertyOptional({ nullable: true })
+  phoneLocal: string | null
+
   @ApiProperty()
   name: string
 
   @ApiProperty({ nullable: true })
   avatar: string | null
 
-  @ApiProperty({ enum: ['PASSWORD', 'FACEBOOK', 'INSTAGRAM'] })
+  @ApiProperty({ enum: ['PASSWORD', 'FACEBOOK', 'INSTAGRAM', 'WHATSAPP'] })
   authType: string
 
   @ApiProperty({ enum: ['PENDING', 'VERIFIED'] })
@@ -85,4 +91,9 @@ export class MeResponseDto {
 
   @ApiProperty({ type: [PendingInvitationDto] })
   pendingInvitations: PendingInvitationDto[]
+}
+
+export class UpdateNameDto {
+  @ApiProperty({ example: 'Aminata Diallo' })
+  name: string
 }

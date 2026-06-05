@@ -1,4 +1,138 @@
 {
+  "catalog_migration": {
+    "title": "Commerce Manager catalog",
+    "step_catalog": "Catalog",
+    "step_connect": "Connection",
+    "step_number": "WhatsApp number",
+    "step_migrate": "Import",
+    "intro_title": "What is a Commerce Manager catalog?",
+    "intro_desc": "The Commerce Manager catalog is Meta's official catalog. Unlike the catalog created from the WhatsApp Business app, it is accessible through the API — so we can use it in your agents, tickets and campaigns.",
+    "intro_diff_title": "Difference with the WhatsApp Business catalog",
+    "intro_diff_desc": "The catalog created directly in WhatsApp Business (SMB) is not reachable through the standard API. We can't use it as-is — but we can copy its products into a Commerce Manager catalog.",
+    "question": "Do you already have a Commerce Manager catalog?",
+    "answer_yes": "Yes, I already have one",
+    "answer_no": "No, I don't",
+    "answer_unknown": "I don't understand",
+    "unknown_help": "No worries: a Commerce Manager catalog is free to create on Meta. In the next step we show you how to create one, then we automatically copy the products from your WhatsApp number into it.",
+    "create_title": "Create your catalog on Commerce Manager",
+    "create_desc": "Open Commerce Manager on Meta and create a new catalog (type “Products”). Then come back here to connect it — your WhatsApp products will be copied automatically.",
+    "create_link": "Open Commerce Manager",
+    "create_has_existing_btn": "I already have a catalog",
+    "create_done_btn": "I created my catalog",
+    "connect_title": "Connect your catalog",
+    "connect_desc": "Connect your Commerce Manager catalog to Bedones so we can add your products to it.",
+    "connect_select_label": "Destination catalog",
+    "connect_select_placeholder": "Choose a catalog",
+    "connect_another": "Connect another catalog",
+    "connect_none": "No catalog is connected yet.",
+    "connect_btn": "Connect my catalog",
+    "number_title": "Import from a WhatsApp number",
+    "number_desc": "Would you like to import the products from one of your WhatsApp numbers?",
+    "number_select_label": "Source number",
+    "number_select_placeholder": "Choose a number",
+    "number_none": "No WhatsApp number is connected.",
+    "number_add": "Add a WhatsApp number",
+    "number_start": "Start the import",
+    "migrate_takes_time": "The import can take a few minutes. You can close this window — the migration keeps running in the background.",
+    "migrate_queue": "In the queue",
+    "migrate_queue_eta_one": "≈ {{count}} minute before your turn",
+    "migrate_queue_eta_other": "≈ {{count}} minutes before your turn",
+    "migrate_queue_eta_now": "It's almost your turn…",
+    "migrate_extracting": "Extracting the WhatsApp catalog",
+    "migrate_importing": "Importing products",
+    "migrate_importing_count": "{{imported}} / {{total}} products imported",
+    "migrate_done": "Done",
+    "migrate_success_title": "Migration complete",
+    "migrate_success_desc": "{{imported}} product(s) imported out of {{total}}.",
+    "migrate_view_catalog": "View catalog",
+    "migrate_failed_title": "The migration failed",
+    "migrate_retry": "Try again",
+    "empty_cta": "Import from WhatsApp",
+    "import_cta": "Import from WhatsApp",
+    "flow": {
+      "step_of": "Step {{current}} of {{total}}",
+      "done": "All done",
+      "close": "Close",
+      "back": "Back",
+      "continue": "Continue",
+      "connect_meta": "Connect to Meta",
+      "start_import": "Start the import",
+      "connect_account": "Connect my WhatsApp account",
+      "finish": "Finish",
+      "recheck": "Re-check the link",
+      "checking": "Checking…",
+      "retry": "Try again",
+      "wa_business": "WhatsApp Business",
+      "wa_current": "Current catalog",
+      "commerce_manager": "Commerce Manager",
+      "meta_official": "Meta's official catalog",
+      "your_products": "Your products",
+      "wa_catalog_label": "WhatsApp Business catalog",
+      "number_label": "Source WhatsApp number",
+      "your_number": "Your WhatsApp number",
+      "your_catalog": "Your Commerce Manager catalog",
+      "s1_title": "A catalog your tools can finally use",
+      "s1_lede": "Today your products live in WhatsApp Business. By moving them to a <b>Commerce Manager</b> catalog — Meta's official format — they become usable across all of Bedones.",
+      "s1_b1_t": "Your AI agent replies with your products",
+      "s1_b1_b": "Prices, photos and descriptions are used automatically in conversations.",
+      "s1_b2_t": "Tickets linked to the right items",
+      "s1_b2_b": "Each order attaches to the relevant products, with no manual entry.",
+      "s1_b3_t": "Promotions in a few clicks",
+      "s1_b3_b": "Create offers and discounts directly on your catalog items.",
+      "s1_note": "Your current WhatsApp catalog is not modified or deleted.",
+      "s2_title": "The connection happens on Meta's side",
+      "s2_lede": "To connect your catalog, you'll be redirected to Meta, securely. That's where it all happens — we take over right after.",
+      "s2_choice1_t": "Create a new catalog",
+      "s2_choice1_b": "If you're starting from scratch on Meta.",
+      "s2_choice2_t": "Select an existing catalog",
+      "s2_choice2_b": "If you already have one in Commerce Manager.",
+      "s2_note": "Both choices happen on Meta. You come straight back here.",
+      "s2_choose_title": "Choose a Commerce Manager catalog",
+      "s2_choose_lede": "You already have one or more catalogs connected to Bedones. Reuse one or connect a new one.",
+      "s2_use_connected_t": "Use a connected catalog",
+      "s2_use_connected_b": "Import your products into a catalog already linked to Bedones.",
+      "s2_new_catalog_t": "Connect or create another catalog",
+      "s2_new_catalog_b": "You'll be redirected to Meta to connect or create a new one.",
+      "s2_redirect_title": "Connecting to Meta…",
+      "s2_redirect_lede": "We're opening Meta to connect your Commerce Manager catalog. Don't close this page.",
+      "s3_title": "Your products, ready to move",
+      "s3_confirm": "Connected to <b>{{name}}</b>",
+      "s3_lede": "Start the import to move the products from your WhatsApp Business number <b>{{number}}</b> into this Commerce Manager catalog.",
+      "s3_reconnect": "Not the right catalog? Reconnect",
+      "s4_progress_title": "Importing your products",
+      "s4_task1": "Opening the WhatsApp catalog",
+      "s4_task2": "Extracting products and collections",
+      "s4_task3": "Storing into the Commerce Manager catalog",
+      "s4_caption": "No need to wait here — we'll let you know once the import is done.",
+      "s4_result_title": "Your products are in Commerce Manager",
+      "stat_collections_one": "collection",
+      "stat_collections_other": "collections",
+      "stat_products_one": "product",
+      "stat_products_other": "products",
+      "s4_ask_t": "Connect your WhatsApp Business account?",
+      "s4_ask_b": "Link your number {{number}} to this new Commerce Manager catalog so the AI agent, tickets and promotions rely on it.",
+      "s4_failed_title": "The import hit a problem",
+      "s4_failed_msg": "The import didn't complete.",
+      "s5_linking_title": "Connecting your WhatsApp account",
+      "s5_linking_lede": "We're linking your number {{number}} to your Commerce Manager catalog. It takes a few seconds.",
+      "s5_linked_title": "Your WhatsApp account is linked to the Commerce Manager catalog",
+      "s5_linked_lede_one": "Everything's set. Your {{count}} product is now available for the AI agent, tickets and promotions.",
+      "s5_linked_lede_other": "Everything's set. Your {{count}} products are now available for the AI agent, tickets and promotions.",
+      "s5_manual_title": "Connect your account yourself",
+      "s5_manual_lede": "Automatic connection didn't work. Link your account yourself with these steps, then re-check — we'll tell you if it's good.",
+      "s5_m1_t": "Open WhatsApp Business",
+      "s5_m1_b": "On your phone, or via Meta Business Suite, then go to Settings.",
+      "s5_m2_t": "Business tools → Catalog",
+      "s5_m2_b": "Open the Catalog section of your account.",
+      "s5_m3_t": "Select your Commerce Manager catalog",
+      "s5_m3_b": "Pick your new catalog from the list.",
+      "s5_m4_t": "Save, then come back here",
+      "s5_m4_b": "Then click “Re-check the link” below.",
+      "s5_checking": "Checking the link…",
+      "s5_stillfailed_t": "Still not linked.",
+      "s5_stillfailed_b": "Go through the steps above again, or contact support."
+    }
+  },
   "common": {
     "yes": "Yes",
     "no": "No",
@@ -24,9 +158,10 @@
     "change": "Change",
     "details": "Details",
     "all": "All",
-    "none": "None"
+    "none": "None",
+    "previous": "Previous",
+    "next": "Next"
   },
-
   "sidebar": {
     "agents": "My Agents",
     "tickets": "Tickets",
@@ -55,15 +190,14 @@
     "use_french": "Utiliser le Français",
     "recap": "Overview"
   },
-
   "errors": {
     "AUTH_INVALID_CREDENTIALS": "Invalid email or password",
     "AUTH_SESSION_MISSING": "Session missing",
     "AUTH_SESSION_EXPIRED": "Session expired",
     "AUTH_SESSION_INVALID": "Invalid session"
   },
-
   "auth": {
+    "title": "Login / Sign up",
     "login": "Login",
     "login_error": "Login error",
     "email": "Email",
@@ -80,21 +214,27 @@
     "fetch_user_error": "Unable to retrieve your information. Please try again.",
     "back_to_login": "Back to login",
     "user_info_error": "Unable to retrieve your information from the social network.",
-    "unexpected_error": "An unexpected error occurred. Please try again."
+    "unexpected_error": "An unexpected error occurred. Please try again.",
+    "whatsapp_subtitle": "Enter your WhatsApp number to receive a verification code.",
+    "send_verification_code": "Send verification code",
+    "remember_phone": "Remember this number",
+    "invalid_phone": "Invalid phone number",
+    "verify_code": "Verify code",
+    "welcome": "Welcome!",
+    "your_name": "How would you like to be called?",
+    "full_name_placeholder": "Ex: Jane Smith",
+    "name_required": "Please enter your name"
   },
-
   "org": {
     "create": "Create an organization",
     "create_error": "Error creating organization",
     "update_error": "Error updating organization"
   },
-
   "upload": {
     "error": "Upload error",
     "media_error": "Media upload error",
     "label": "Upload"
   },
-
   "social": {
     "connected_accounts": "Connected accounts",
     "facebook_connect_error": "Facebook connection error",
@@ -107,9 +247,18 @@
     "reply_error": "Error replying",
     "hide_error": "Error hiding",
     "delete_error": "Error deleting",
-    "connection_error": "Connection error"
+    "connection_error": "Connection error",
+    "error_details_title": "Error details",
+    "error_generic": "Something went wrong with this resource. Please reconnect it.",
+    "error_show_details": "Show details",
+    "error_reconnect_hint": "Reconnect the affected resource to restore the service.",
+    "feature_messaging": "Messaging",
+    "feature_comments": "Comments",
+    "feature_disabled_tooltip": "Unavailable: {{features}}. Reconnect to re-enable.",
+    "account_disabled_tooltip": "This account is disabled after repeated errors. Reconnect it.",
+    "reconnect_unavailable": "Reconnect is unavailable for this resource.",
+    "reconnect_success": "Resource reconnected successfully."
   },
-
   "comments": {
     "facebook_label": "Facebook Comments",
     "instagram_label": "Instagram Comments",
@@ -171,7 +320,6 @@
     "no_comments_desc": "Comments on your {{provider}} posts will appear here",
     "view_comments": "View comments"
   },
-
   "comments_config": {
     "title_short": "Configuration",
     "title": "Comments configuration",
@@ -204,7 +352,6 @@
     "catalog_description": "Link a catalog to this page so the agent can detect product references in comments and respond.",
     "catalog_placeholder": "No catalog linked"
   },
-
   "chat": {
     "no_conversations": "No conversations",
     "select_conversation": "Select a conversation",
@@ -322,6 +469,10 @@
     "configure_catalog_title": "Associate a catalog",
     "configure_catalog_desc": "Link a product catalog to this number so your customers can browse your products on WhatsApp.",
     "configure_catalog_btn": "Associate a catalog",
+    "migrate_catalog_title": "Migrate your current catalog",
+    "migrate_catalog_desc": "Move your products from your WhatsApp Business app catalog to a Commerce Manager catalog so our AI can see them and reply to your customers efficiently.",
+    "migrate_catalog_btn": "Migrate my catalog",
+    "migrate": "Migrate",
     "options": "Options",
     "tools": "Tools",
     "tools_catalog": "Catalog",
@@ -358,7 +509,6 @@
     "preview_message": "Message",
     "preview_reaction": "Reaction"
   },
-
   "feedback": {
     "title": "Improve the response",
     "subtitle": "Help the agent answer better next time",
@@ -374,7 +524,6 @@
     "you": "You",
     "error_generic": "Something went wrong. Please try again."
   },
-
   "catalog_link": {
     "title": "Associate a catalog",
     "phone_number": "WhatsApp number",
@@ -382,7 +531,6 @@
     "select_placeholder": "Select a catalog...",
     "associate": "Associate"
   },
-
   "whatsapp_config": {
     "title": "WhatsApp Configuration",
     "phone_info": "Phone Information",
@@ -400,7 +548,6 @@
     "associate_catalog": "Associate catalog",
     "label_placeholder": "Label name"
   },
-
   "members": {
     "title": "Members",
     "selected_count": "{{count}} member(s) selected",
@@ -436,7 +583,6 @@
     "copy_invite": "Copy invitation",
     "invitation_share_message": "The invitation for {{name}} has been created. Share this link so they can join the organization."
   },
-
   "notifications": {
     "eyebrow": "Notifications",
     "title_prefix": "Settings for",
@@ -475,7 +621,6 @@
       "message_daily_summary_desc": "Number of conversations, messages and tickets for the day."
     }
   },
-
   "tickets": {
     "title": "Tickets",
     "create": "Create a ticket",
@@ -519,7 +664,6 @@
     "all_statuses": "All statuses",
     "view_diff": "View before / after"
   },
-
   "catalog": {
     "title": "Catalog",
     "connect_title": "Connect your catalog",
@@ -549,12 +693,19 @@
     "product_name": "Product name",
     "product_name_required": "Product name is required",
     "product_name_placeholder": "E.g. Wax dress, Jersey, Bag...",
+    "product_code": "Product code",
+    "product_code_required": "The product code is required",
+    "product_code_placeholder": "E.g. wax-dress-001 (your SKU)",
+    "product_code_locked": "The product code can't be changed after creation.",
+    "product_save_error": "Failed to save the product",
     "product_description": "Description",
     "product_description_placeholder": "Describe your product...",
     "product_image": "Images",
     "image_required": "At least one image is required",
     "upload_images_title": "Click or drag to upload",
     "upload_images_hint": "JPG, PNG or WebP",
+    "reorder_images_hint": "Drag and drop images to reorder them. The first one will be the main image.",
+    "main_image": "Main",
     "product_price": "Price",
     "product_currency": "Currency",
     "product_url": "URL",
@@ -580,9 +731,10 @@
     "connect_button": "Connect",
     "status_published": "Published",
     "status_draft": "Draft",
-    "status_archived": "Archived"
+    "status_archived": "Archived",
+    "error_title": "Unable to load your catalog",
+    "error_description": "We couldn't load your products. Please reconnect your catalog."
   },
-
   "promotions": {
     "title": "Promotions",
     "create": "Create a promotion",
@@ -654,7 +806,6 @@
     "created": "Promotion created successfully",
     "updated": "Promotion updated successfully"
   },
-
   "agent": {
     "title": "My Agent",
     "setup_title": "Configure your AI agent",
@@ -691,6 +842,8 @@
     "thinking": "The agent is thinking...",
     "score_ready_tooltip": "Your agent can be activated.",
     "score_not_ready_tooltip": "Your agent must have a score > 80 to be activated.",
+    "default_name": "your agent",
+    "activation_success_title": "Agent {{name}} successfully activated",
     "activate_banner_title": "You can activate or test your agent",
     "activate_banner_desc": "We have enough information to respond to your customers. You can activate the agent for specific contacts only or for all incoming messages.",
     "activate_banner_btn": "Activate",
@@ -713,7 +866,6 @@
     "select_exclude_labels_placeholder": "Select labels to exclude",
     "no_labels_found": "No labels found. Create labels in your messaging pages."
   },
-
   "stats": {
     "title": "Statistics & Usage",
     "comments": "comments",
@@ -722,13 +874,11 @@
     "messages_by_network": "Messages by network",
     "comments_by_network": "Comments by network"
   },
-
   "plan": {
     "title": "Subscription",
     "pay_card": "Pay by card",
     "pay_mobile": "Pay by Mobile Money"
   },
-
   "legal": {
     "title": "Help & Resources",
     "faq_title": "Frequently asked questions",
@@ -740,7 +890,6 @@
     "privacy": "Privacy policy",
     "terms": "Terms of service"
   },
-
   "help": {
     "page_title": "Help & Resources",
     "faq_section_title": "Frequently asked questions",
@@ -794,7 +943,6 @@
     "legal_section_title": "Legal information",
     "legal_section_subtitle": "View legal documents related to using Bedones"
   },
-
   "invitation": {
     "invalid_link": "This invitation link is invalid, expired, or has already been used.",
     "phone": "Phone",
@@ -815,7 +963,6 @@
     "accept": "Accept invitation",
     "rejected": "Invitation declined"
   },
-
   "pagination": {
     "item": "item",
     "items": "items",
@@ -823,21 +970,19 @@
     "next": "Next",
     "of": "of"
   },
-
   "date": {
     "today": "Today",
     "yesterday": "Yesterday",
     "at": "at"
   },
-
   "format": {
     "date_time": "MM/DD at HH:mm"
   },
-
   "dashboard": {
     "title": "Overview",
     "welcome_title": "Welcome to Bedones",
     "welcome_description": "Centralize your social interactions and convert your prospects into customers. Connect your networks to get started.",
+    "welcome_setup_subtitle": "We now have access to your pages — set up how the AI should respond to your customers.",
     "comments_title": "Comments",
     "comments_description": "Connect your social media and let AI manage your comments for you.",
     "messaging_title": "Messaging",
@@ -845,25 +990,46 @@
     "agent_title": "Create your agent",
     "agent_description": "Create an agent to manage your conversations and create tickets that will be sent to your team members.",
     "agent_members_link": "Add team members",
-    "agent_description_2": " to your team. You can also create promotions that will be taken into account by the agent."
+    "agent_description_2": " to your team. You can also create promotions that will be taken into account by the agent.",
+    "step_catalog_title": "Catalog",
+    "step_catalog_desc": "We need to understand your products. Add a Commerce Manager catalog to get started — we'll walk you through it step by step.",
+    "step_catalog_action": "Configure my catalog",
+    "step_comments_desc": "Tell our AI how it should handle comments on {{page}}.",
+    "step_comments_action": "Configure replies now",
+    "step_comments_action_edit": "Edit configuration",
+    "step_agent_desc_none": "Create an agent for {{page}} so the AI can reply to your customers on {{channel}}.",
+    "step_agent_desc_configuring": "Your agent is being configured ({{score}}%). Keep going to reach the 80% threshold.",
+    "step_agent_desc_below_threshold": "The agent is ready but its score is still {{score}}%. Keep configuring it before activating.",
+    "step_agent_action": "Continue configuration",
+    "step_agent_action_edit": "Edit agent",
+    "step_progress": "Step {{current}} of {{total}}",
+    "no_accounts_title": "No connected accounts",
+    "no_accounts_desc": "Connect a social network to start managing your interactions from Bedones.",
+    "network_accounts_count_one": "{{count}} connected account",
+    "network_accounts_count_other": "{{count}} connected accounts",
+    "account_no_name": "{{provider}} account",
+    "action_comments": "Comments",
+    "action_messaging": "Messaging",
+    "setup_success_title": "{{subject}} successfully configured",
+    "setup_success_desc": "You can now move on to configuring one of your other accounts.",
+    "setup_success_later": "Later",
+    "setup_success_continue": "Continue",
+    "account_needs_reconnect": "Needs reconnect",
+    "action_reconnect": "Reconnect"
   },
-
   "meta": {
     "title": "Bedones — Social CRM",
     "description": "Centralize your social interactions into business opportunities."
   },
-
   "loyalty": {
     "title": "Loyalty program",
     "setup_title": "Connect a WhatsApp number to get started",
     "setup_desc": "You need to connect a WhatsApp account so we can send loyalty reminders to your customers.",
     "setup_btn": "Connect a WhatsApp number",
     "connect_label": "Connect a number",
-
     "tab_contacts": "Contacts",
     "tab_bonus": "Bonus",
     "tab_campaigns": "Campaigns",
-
     "contact_create_title": "Add a contact",
     "contact_edit_title": "Edit contact",
     "contact_name": "Name",
@@ -879,7 +1045,6 @@
     "contact_updated": "Contact updated",
     "confirm_delete_contact_title": "Delete contact",
     "confirm_delete_contact_message": "Are you sure you want to delete the contact \"{{name}}\"?",
-
     "bonus_create_title": "Create a bonus",
     "bonus_edit_title": "Edit bonus",
     "bonus_name": "Name",
@@ -895,7 +1060,6 @@
     "bonus_updated": "Bonus updated",
     "confirm_delete_bonus_title": "Delete bonus",
     "confirm_delete_bonus_message": "Are you sure you want to delete the bonus \"{{name}}\"?",
-
     "target_spend": "Total amount spent",
     "target_order_count": "Number of orders",
     "target_products": "Ordered products",
@@ -908,7 +1072,6 @@
     "select_products": "Select products",
     "edit_selection": "Edit selection",
     "products_count": "{{count}} products",
-
     "reward": "Reward",
     "reward_type": "Reward type",
     "reward_products": "Free products",
@@ -918,7 +1081,6 @@
     "reward_percent_value": "Discount percentage",
     "no_reward_products": "No free products",
     "reward_products_hint": "Pick the products offered to the customer when targets are met.",
-
     "templates": "Templates",
     "templates_title": "Templates",
     "templates_manage": "Manage your templates",
@@ -1015,7 +1177,6 @@
     "template_updated": "Template updated",
     "confirm_delete_template_title": "Delete template",
     "confirm_delete_template_message": "Are you sure you want to delete the template \"{{name}}\"?",
-
     "campaign_create_title": "Launch a campaign",
     "campaign_edit_title": "Edit campaign",
     "campaign_general_title": "Campaigns",
@@ -1091,22 +1252,18 @@
     "campaign_updated": "Campaign updated",
     "confirm_delete_campaign_title": "Delete campaign",
     "confirm_delete_campaign_message": "Are you sure you want to delete the campaign \"{{name}}\"?",
-
     "segment_criteria": "Segment criteria",
     "segment_criteria_hint": "Pick the minimum thresholds to target customers worth re-engaging.",
     "criteria_min_spend": "Minimum spend reached (FCFA)",
     "criteria_min_orders": "Minimum number of orders",
     "criteria_min_products": "Minimum count of eligible products",
-
     "frequency_once": "Once",
     "frequency_daily": "Daily",
     "frequency_weekly": "Weekly",
     "frequency_monthly": "Monthly",
-
     "status_scheduled": "Scheduled",
     "status_running": "Running",
     "status_completed": "Completed",
-
     "col_schedule": "Schedule",
     "col_started": "Started",
     "col_ends": "Ends",
@@ -1115,7 +1272,6 @@
     "col_read": "Read",
     "col_replied": "Replies"
   },
-
   "tiktok_business": {
     "modal_title": "TikTok Business Account Required",
     "description": "To use TikTok direct messages, your account must be a Business account (not Creator or Personal). Follow these steps to convert it:",

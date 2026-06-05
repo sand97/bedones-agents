@@ -95,6 +95,41 @@ body {
   background-size: 24px 24px;
 }
 
+.ant-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Login line grid — centered on the form card, opacity fades outward via a radial mask */
+.login-grid-lines {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1600px;
+  height: 1600px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.07) 1px, transparent 1px);
+  background-size: 44px 44px;
+  background-position: center;
+  -webkit-mask-image: radial-gradient(
+    circle 760px at center,
+    #000 0%,
+    rgba(0, 0, 0, 0.45) 45%,
+    transparent 80%
+  );
+  mask-image: radial-gradient(
+    circle 760px at center,
+    #000 0%,
+    rgba(0, 0, 0, 0.45) 45%,
+    transparent 80%
+  );
+}
+
 /* Corner marks — positioned relative to card wrapper */
 .onboarding-corner {
   position: absolute;
@@ -799,6 +834,10 @@ a {
 }
 
 .chat-bubble--video {
+  /* The placeholder/player sizes with width:100%, so the bubble needs a definite
+     width to resolve against — without it the shrink-to-fit bubble collapses to the
+     play button's size, producing a tiny square card. */
+  min-width: 280px;
   max-width: 40%;
 }
 
@@ -1622,6 +1661,165 @@ a {
   background: var(--color-bg-surface);
 }
 
+.catalog-quick-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0 0 4px 0;
+  margin-bottom: 16px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.catalog-quick-actions__card {
+  flex: 0 0 280px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-bg-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  scroll-snap-align: start;
+}
+
+.catalog-quick-actions__card:hover {
+  border-color: var(--color-border-strong, #b4bcc4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.catalog-quick-actions__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+  flex-shrink: 0;
+}
+
+.catalog-quick-actions__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.catalog-quick-actions__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.3;
+}
+
+.catalog-quick-actions__subtitle {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.picker-selected-strip {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 12px 4px 20px 4px;
+  margin: -12px 0;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.picker-selected-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 6px;
+  max-width: 220px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-bg-surface);
+}
+
+.picker-selected-chip__img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--color-bg-subtle);
+}
+
+.picker-selected-chip__img--placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.picker-selected-chip__label {
+  font-size: 12px;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.picker-selected-chip__remove.ant-btn {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+.context-flow-mini-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.context-flow-mini-chat__bubble {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--color-bg-subtle);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.context-flow-mini-chat__bubble--warning {
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+}
+
+.context-flow-mini-chat__footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border-default);
+}
+
 .catalog-card__header {
   display: flex;
   align-items: center;
@@ -2437,8 +2635,43 @@ a {
 .product-modal-img-remove:hover {
   background: rgba(0, 0, 0, 0.8) !important;
 }
+
+/* ─── Product Modal Image Reorder (drag & drop) ─── */
+.product-modal-img-item {
+  cursor: grab;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.product-modal-img-item:active {
+  cursor: grabbing;
+}
+
+.product-modal-img-item.is-dragging {
+  opacity: 0.4;
+}
+
+.product-modal-img-item.is-drop-target img {
+  outline: 2px dashed #111b21;
+  outline-offset: 2px;
+}
+
+.product-modal-img-badge {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
 .ant-btn-icon {
-  @apply flex;
+  @apply flex items-center justify-center;
 }
 /* ─── OTP Input ─── */
 .ant-otp-input {
@@ -3254,6 +3487,23 @@ a {
 .mk-hero-form button:hover {
   opacity: 0.92;
   transform: translateY(-1px);
+}
+.mk-hero-form .cc {
+  cursor: pointer;
+}
+.mk-hero-cc-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font: inherit;
+  font-weight: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  max-width: 80px;
 }
 .mk-hero-disclaimer {
   font-size: 12.5px;
@@ -6018,5 +6268,97 @@ a {
   .mk-typing-dots span {
     animation: none !important;
     opacity: 0.7;
+  }
+}
+
+/* ─── Dashboard setup carousel ─── */
+
+.dashboard-setup-card {
+  background: #fff;
+  border: 1px solid var(--color-border-default, #e5e7eb);
+  border-radius: 16px;
+  padding: 32px 24px 0;
+  max-width: 560px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.dashboard-setup-card__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 24px;
+  text-align: center;
+}
+
+.dashboard-setup-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard-setup-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--color-border-subtle, #f1f5f9);
+  padding: 16px 0;
+  margin-top: 8px;
+}
+
+.dashboard-setup-card__count {
+  font-size: 12px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+/* The Carousel container doesn't need its own dots — we have a custom footer */
+.dashboard-setup-card .ant-carousel .slick-dots {
+  display: none !important;
+}
+
+/* ═══════════════════════════════════════════
+   Global: keep every modal inside the viewport
+   ═══════════════════════════════════════════
+   Some Antd modals overflow the viewport on mobile, hiding the footer
+   below the fold. Cap the content to the available height and let the
+   body scroll so the header & footer stay visible. */
+
+.ant-modal {
+  max-width: calc(100vw - 16px);
+  padding-bottom: 0 !important;
+}
+
+.ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+}
+
+.ant-modal-body {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ant-modal-header,
+.ant-modal-footer {
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .ant-modal {
+    margin: 8px auto;
+    top: 8px !important;
+  }
+
+  .ant-modal.ant-modal-centered {
+    top: 0 !important;
+  }
+
+  .ant-modal-content {
+    max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
   }
 }

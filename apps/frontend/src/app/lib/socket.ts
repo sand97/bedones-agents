@@ -15,6 +15,31 @@ export interface CommentRemovedEvent {
   commentId: string
 }
 
+/** Catalogue migration websocket events (catalog:migration-*). */
+export interface MigrationQueueEvent {
+  migrationId: string
+  position: number
+  etaMinutes: number
+}
+
+export interface MigrationProgressEvent {
+  migrationId: string
+  status: string
+  imported: number
+  failed: number
+  total: number
+  percentage: number
+}
+
+export interface MigrationDoneEvent {
+  migrationId: string
+  catalogId: string
+  imported?: number
+  failed?: number
+  total?: number
+  error?: string
+}
+
 export function getSocket(orgId: string): Socket {
   if (socket?.connected && socket.io.opts.query?.orgId === orgId) {
     return socket
@@ -25,7 +50,7 @@ export function getSocket(orgId: string): Socket {
     socket.disconnect()
   }
 
-  const backendUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
+  const backendUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
 
   socket = io(backendUrl, {
     query: { orgId },

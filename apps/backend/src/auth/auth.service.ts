@@ -211,6 +211,13 @@ export class AuthService {
     })
   }
 
+  async updateName(userId: string, name: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { name },
+    })
+  }
+
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -218,6 +225,8 @@ export class AuthService {
         id: true,
         email: true,
         phone: true,
+        phoneCountryCode: true,
+        phoneLocal: true,
         name: true,
         avatar: true,
         authType: true,
@@ -257,6 +266,8 @@ export class AuthService {
         id: user.id,
         email: user.email,
         phone: user.phone,
+        phoneCountryCode: user.phoneCountryCode,
+        phoneLocal: user.phoneLocal,
         name: user.name,
         avatar: user.avatar,
         authType: user.authType,

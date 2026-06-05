@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
+const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
 
 /**
  * Typed API client for Agent, Catalog, Ticket, Promotion endpoints.
@@ -17,6 +17,37 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(`API error ${res.status}: ${text}`)
   }
   return res.json()
+}
+
+/**
+ * Extracts a human-readable message from an error thrown by fetchJson
+ * (format: `API error <status>: <body>`). Unwraps the NestJS error body
+ * `{ message }` and any nested Meta Graph error `{ error: { message } }`.
+ */
+export function getApiErrorMessage(err: unknown, fallback = 'Une erreur est survenue'): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  const jsonStart = raw.indexOf('{')
+  if (jsonStart !== -1) {
+    try {
+      const body = JSON.parse(raw.slice(jsonStart)) as { message?: unknown }
+      const m = body.message
+      const msg = Array.isArray(m) ? m.filter(Boolean).join(', ') : typeof m === 'string' ? m : ''
+      // Unwrap nested "Meta API error: {\"error\":{\"message\":\"...\"}}"
+      const metaStart = msg.indexOf('{')
+      if (metaStart !== -1) {
+        try {
+          const meta = JSON.parse(msg.slice(metaStart)) as { error?: { message?: string } }
+          if (meta.error?.message) return meta.error.message
+        } catch {
+          /* keep the outer message */
+        }
+      }
+      if (msg) return msg
+    } catch {
+      /* fall through to raw */
+    }
+  }
+  return raw || fallback
 }
 
 // ─── Agent ───
@@ -172,6 +203,22 @@ export interface Collection {
   product_count?: number
 }
 
+export interface CatalogMigration {
+  id: string
+  catalogId: string
+  sourcePhone: string
+  status: 'QUEUED' | 'EXTRACTING' | 'IMPORTING' | 'COMPLETED' | 'FAILED'
+  totalProducts: number
+  importedProducts: number
+  failedProducts: number
+  error?: string | null
+  /** Number of migrations ahead in the queue (0 = running / next). */
+  position: number
+  /** Estimated minutes before this migration starts (~1 min per sync). */
+  etaMinutes: number
+  createdAt: string
+}
+
 export const catalogApi = {
   list: (orgId: string) => fetchJson<Catalog[]>(`/catalog/org/${orgId}`),
 
@@ -215,6 +262,11 @@ export const catalogApi = {
     }>(`/catalog/${id}/products?${query}`)
   },
 
+  getProductsByIds: (catalogId: string, ids: string[]) =>
+    fetchJson<{ products: Array<Product | null> }>(
+      `/catalog/${catalogId}/products-by-ids?ids=${encodeURIComponent(ids.join(','))}`,
+    ),
+
   getAnalysisProgress: (id: string) =>
     fetchJson<{
       analysisStatus: string
@@ -227,6 +279,7 @@ export const catalogApi = {
     catalogId: string,
     data: {
       name: string
+      retailerId: string
       description?: string
       imageUrl?: string
       additionalImageUrls?: string[]
@@ -250,6 +303,7 @@ export const catalogApi = {
     productId: string,
     data: {
       name?: string
+      retailerId?: string
       description?: string
       imageUrl?: string
       additionalImageUrls?: string[]
@@ -288,8 +342,10 @@ export const catalogApi = {
   deleteCollection: (catalogId: string, collectionId: string) =>
     fetchJson<void>(`/catalog/${catalogId}/collections/${collectionId}`, { method: 'DELETE' }),
 
+  // `isSmb` is set when Meta rejects the WABA product_catalogs call with the
+  // (#10) "SMB business type" error — the reliable WhatsApp Business app signal.
   getWhatsappCommerceSettings: (phoneNumberId: string) =>
-    fetchJson<{ data: Array<{ is_catalog_visible: boolean; id?: string }> }>(
+    fetchJson<{ data: Array<{ is_catalog_visible: boolean; id?: string }>; isSmb?: boolean }>(
       `/catalog/whatsapp-commerce/${phoneNumberId}`,
     ),
 
@@ -303,6 +359,145 @@ export const catalogApi = {
     fetchJson<{ success: boolean }>(`/catalog/${catalogId}/dissociate-phone/${phoneNumberId}`, {
       method: 'DELETE',
     }),
+
+  // ─── AI Context ───
+
+  listProductContexts: (catalogId: string, providerProductIds?: string[]) => {
+    const q = providerProductIds?.length ? `?ids=${providerProductIds.join(',')}` : ''
+    return fetchJson<Array<{ providerProductId: string; content: string }>>(
+      `/catalog/${catalogId}/product-contexts${q}`,
+    )
+  },
+
+  listCollectionContexts: (catalogId: string, providerCollectionIds?: string[]) => {
+    const q = providerCollectionIds?.length ? `?ids=${providerCollectionIds.join(',')}` : ''
+    return fetchJson<Array<{ providerCollectionId: string; content: string }>>(
+      `/catalog/${catalogId}/collection-contexts${q}`,
+    )
+  },
+
+  getProductContext: (catalogId: string, providerProductId: string) =>
+    fetchJson<{
+      content: string
+      sameContentCount: number
+      sameContentProductIds: string[]
+    }>(`/catalog/${catalogId}/products/${providerProductId}/context`),
+
+  analyzeContext: (
+    catalogId: string,
+    data: { prompt: string; productIds?: string[]; collectionIds?: string[] },
+  ) =>
+    fetchJson<{ hasConflict: boolean; conflictReason: string; suggestedContent: string }>(
+      `/catalog/${catalogId}/product-contexts/analyze`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+
+  saveContext: (
+    catalogId: string,
+    data: { content: string; productIds?: string[]; collectionIds?: string[] },
+  ) =>
+    fetchJson<{ savedProductIds: string[]; savedCollectionIds: string[] }>(
+      `/catalog/${catalogId}/product-contexts/save`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+
+  updateProductContext: (
+    catalogId: string,
+    providerProductId: string,
+    data: { content: string; applyToSiblings?: boolean },
+  ) =>
+    fetchJson<{ success: boolean }>(`/catalog/${catalogId}/products/${providerProductId}/context`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  // ─── Post links ───
+
+  linkPosts: (
+    catalogId: string,
+    data: { postIds: string[]; productIds?: string[]; collectionIds?: string[] },
+  ) =>
+    fetchJson<{ linkedPostIds: string[] }>(`/catalog/${catalogId}/post-links`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  listProductPostLinks: (
+    catalogId: string,
+    providerProductId: string,
+    params?: { limit?: number; offset?: number },
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.limit) q.set('limit', String(params.limit))
+    if (params?.offset) q.set('offset', String(params.offset))
+    return fetchJson<PostLinkList>(
+      `/catalog/${catalogId}/products/${providerProductId}/post-links?${q}`,
+    )
+  },
+
+  listCollectionPostLinks: (
+    catalogId: string,
+    providerCollectionId: string,
+    params?: { limit?: number; offset?: number },
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.limit) q.set('limit', String(params.limit))
+    if (params?.offset) q.set('offset', String(params.offset))
+    return fetchJson<PostLinkList>(
+      `/catalog/${catalogId}/collections/${providerCollectionId}/post-links?${q}`,
+    )
+  },
+
+  deleteProductPostLink: (catalogId: string, linkId: string) =>
+    fetchJson<{ success: boolean }>(`/catalog/${catalogId}/product-post-links/${linkId}`, {
+      method: 'DELETE',
+    }),
+
+  deleteCollectionPostLink: (catalogId: string, linkId: string) =>
+    fetchJson<{ success: boolean }>(`/catalog/${catalogId}/collection-post-links/${linkId}`, {
+      method: 'DELETE',
+    }),
+
+  // ─── Commerce Manager migration (import a WhatsApp number's catalogue) ───
+
+  startMigration: (data: {
+    organisationId: string
+    catalogId: string
+    sourcePhone: string
+    sourceSocialAccountId?: string
+  }) =>
+    fetchJson<CatalogMigration>('/catalog-migration', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getMigration: (id: string) => fetchJson<CatalogMigration>(`/catalog-migration/${id}`),
+
+  getActiveMigration: (orgId: string) =>
+    fetchJson<CatalogMigration | null>(`/catalog-migration/org/${orgId}/active`),
+}
+
+export interface PostLink {
+  id: string
+  createdAt: string
+  post: {
+    id: string
+    message?: string | null
+    imageUrl?: string | null
+    permalinkUrl?: string | null
+    createdAt: string
+  }
+  socialAccount: {
+    id: string
+    provider: string
+    pageName?: string | null
+    username?: string | null
+  }
+}
+
+export interface PostLinkList {
+  total: number
+  links: PostLink[]
 }
 
 // ─── Ticket ───

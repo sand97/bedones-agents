@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator'
+import { IsArray, IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator'
 
 export class CreateCatalogDto {
   @ApiProperty()
@@ -39,6 +39,11 @@ export class CreateProductDto {
   @IsString()
   @IsNotEmpty()
   name: string
+
+  @ApiProperty({ description: 'Code produit du marchand (retailer_id / SKU)' })
+  @IsString()
+  @IsNotEmpty()
+  retailerId: string
 
   @ApiPropertyOptional()
   @IsString()
@@ -102,6 +107,11 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   name?: string
+
+  @ApiPropertyOptional({ description: 'Code produit du marchand (retailer_id / SKU)' })
+  @IsString()
+  @IsOptional()
+  retailerId?: string
 
   @ApiPropertyOptional()
   @IsString()
@@ -175,6 +185,133 @@ export class UpdateCollectionDto {
   @IsString()
   @IsOptional()
   name?: string
+}
+
+// ─── Image Studio Template DTOs ───
+
+export class CreateImageTemplateDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  name: string
+
+  @ApiProperty({ description: "Format réseau social (ex: '1:1', '4:5', '9:16', '16:9')" })
+  @IsString()
+  @IsNotEmpty()
+  format: string
+
+  @ApiPropertyOptional({ description: "Couleur d'accent (hex)" })
+  @IsString()
+  @IsOptional()
+  accent?: string
+
+  @ApiProperty({ description: 'Définition du template (éléments, etc.) en JSON.' })
+  @IsObject()
+  definition: Record<string, unknown>
+
+  @ApiPropertyOptional({
+    description: "Id du template statique d'origine (absent si créé de zéro).",
+  })
+  @IsString()
+  @IsOptional()
+  sourceKey?: string
+}
+
+export class UpdateImageTemplateDto {
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  name?: string
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  format?: string
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  accent?: string
+
+  @ApiPropertyOptional({ description: 'Définition du template en JSON.' })
+  @IsObject()
+  @IsOptional()
+  definition?: Record<string, unknown>
+}
+
+// ─── Context DTOs ───
+
+export class AnalyzeContextDto {
+  @ApiProperty({ description: 'User natural-language prompt describing the change to apply.' })
+  @IsString()
+  @IsNotEmpty()
+  prompt: string
+
+  @ApiPropertyOptional({ type: [String], description: 'Meta product IDs targeted.' })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  productIds?: string[]
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Meta product set (collection) IDs targeted.',
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  collectionIds?: string[]
+}
+
+export class SaveContextDto {
+  @ApiProperty({ description: 'Final context content to persist on each selected entity.' })
+  @IsString()
+  content: string
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  productIds?: string[]
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  collectionIds?: string[]
+}
+
+export class UpdateProductContextDto {
+  @ApiProperty()
+  @IsString()
+  content: string
+
+  @ApiPropertyOptional({
+    description: 'When true, also update every product sharing the previous identical content.',
+  })
+  @IsOptional()
+  applyToSiblings?: boolean
+}
+
+// ─── Post linking DTOs ───
+
+export class LinkPostsDto {
+  @ApiProperty({ type: [String], description: 'Provider post IDs (FB post / IG media) to link.' })
+  @IsArray()
+  @IsString({ each: true })
+  postIds: string[]
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  productIds?: string[]
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  collectionIds?: string[]
 }
 
 // ─── Phone Association DTOs ───

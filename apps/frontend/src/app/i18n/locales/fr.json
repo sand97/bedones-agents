@@ -1,4 +1,138 @@
 {
+  "catalog_migration": {
+    "title": "Catalogue Commerce Manager",
+    "step_catalog": "Catalogue",
+    "step_connect": "Connexion",
+    "step_number": "Numéro WhatsApp",
+    "step_migrate": "Importation",
+    "intro_title": "Qu'est-ce qu'un catalogue Commerce Manager ?",
+    "intro_desc": "Le catalogue Commerce Manager est le catalogue officiel de Meta. Contrairement au catalogue créé depuis l'application WhatsApp Business, il est accessible via l'API : nous pouvons donc l'utiliser dans vos agents, vos tickets et vos campagnes.",
+    "intro_diff_title": "Différence avec le catalogue WhatsApp Business",
+    "intro_diff_desc": "Le catalogue créé directement dans WhatsApp Business (SMB) n'est pas accessible via l'API standard. Nous ne pouvons pas l'utiliser tel quel — mais nous pouvons copier ses produits vers un catalogue Commerce Manager.",
+    "question": "Avez-vous déjà un catalogue Commerce Manager ?",
+    "answer_yes": "Oui, j'en ai déjà un",
+    "answer_no": "Non, je n'en ai pas",
+    "answer_unknown": "Je ne comprends pas",
+    "unknown_help": "Pas d'inquiétude : un catalogue Commerce Manager se crée gratuitement sur Meta. À l'étape suivante nous vous montrons comment en créer un, puis nous y copions automatiquement les produits de votre numéro WhatsApp.",
+    "create_title": "Créer votre catalogue sur Commerce Manager",
+    "create_desc": "Ouvrez Commerce Manager sur Meta et créez un nouveau catalogue (type « Produits »). Revenez ensuite ici pour le connecter — vos produits WhatsApp y seront copiés automatiquement.",
+    "create_link": "Ouvrir Commerce Manager",
+    "create_has_existing_btn": "J'ai déjà un catalogue",
+    "create_done_btn": "J'ai créé mon catalogue",
+    "connect_title": "Connecter votre catalogue",
+    "connect_desc": "Connectez votre catalogue Commerce Manager à Bedones pour que nous puissions y ajouter vos produits.",
+    "connect_select_label": "Catalogue de destination",
+    "connect_select_placeholder": "Choisir un catalogue",
+    "connect_another": "Connecter un autre catalogue",
+    "connect_none": "Aucun catalogue n'est encore connecté.",
+    "connect_btn": "Connecter mon catalogue",
+    "number_title": "Importer depuis un numéro WhatsApp",
+    "number_desc": "Souhaitez-vous importer les produits présents sur l'un de vos numéros WhatsApp ?",
+    "number_select_label": "Numéro source",
+    "number_select_placeholder": "Choisir un numéro",
+    "number_none": "Aucun numéro WhatsApp n'est connecté.",
+    "number_add": "Ajouter un numéro WhatsApp",
+    "number_start": "Lancer l'importation",
+    "migrate_takes_time": "L'importation peut prendre quelques minutes. Vous pouvez fermer cette fenêtre, la migration continue en arrière-plan.",
+    "migrate_queue": "En file d'attente",
+    "migrate_queue_eta_one": "≈ {{count}} minute avant votre tour",
+    "migrate_queue_eta_other": "≈ {{count}} minutes avant votre tour",
+    "migrate_queue_eta_now": "C'est bientôt votre tour…",
+    "migrate_extracting": "Extraction du catalogue WhatsApp",
+    "migrate_importing": "Import des produits",
+    "migrate_importing_count": "{{imported}} / {{total}} produits importés",
+    "migrate_done": "Terminé",
+    "migrate_success_title": "Migration terminée",
+    "migrate_success_desc": "{{imported}} produit(s) importé(s) sur {{total}}.",
+    "migrate_view_catalog": "Voir le catalogue",
+    "migrate_failed_title": "La migration a échoué",
+    "migrate_retry": "Réessayer",
+    "empty_cta": "Importer depuis WhatsApp",
+    "import_cta": "Importer depuis WhatsApp",
+    "flow": {
+      "step_of": "Étape {{current}} sur {{total}}",
+      "done": "Parcours terminé",
+      "close": "Fermer",
+      "back": "Précédent",
+      "continue": "Continuer",
+      "connect_meta": "Se connecter à Meta",
+      "start_import": "Démarrer l’importation",
+      "connect_account": "Connecter mon compte WhatsApp",
+      "finish": "Terminer",
+      "recheck": "Revérifier la liaison",
+      "checking": "Vérification…",
+      "retry": "Réessayer",
+      "wa_business": "WhatsApp Business",
+      "wa_current": "Catalogue actuel",
+      "commerce_manager": "Commerce Manager",
+      "meta_official": "Catalogue officiel Meta",
+      "your_products": "Vos produits",
+      "wa_catalog_label": "Catalogue WhatsApp Business",
+      "number_label": "Numéro WhatsApp source",
+      "your_number": "Votre numéro WhatsApp",
+      "your_catalog": "Votre catalogue Commerce Manager",
+      "s1_title": "Un catalogue que vos outils peuvent enfin utiliser",
+      "s1_lede": "Aujourd'hui, vos produits vivent dans WhatsApp Business. En les déplaçant vers un catalogue <b>Commerce Manager</b> — le format officiel de Meta — ils deviennent exploitables par tout Bedones.",
+      "s1_b1_t": "Votre agent IA répond avec vos produits",
+      "s1_b1_b": "Prix, photos et descriptions sont utilisés automatiquement dans les conversations.",
+      "s1_b2_t": "Des tickets reliés aux bons articles",
+      "s1_b2_b": "Chaque commande se rattache aux produits concernés, sans saisie manuelle.",
+      "s1_b3_t": "Des promotions en quelques clics",
+      "s1_b3_b": "Créez offres et réductions directement sur les articles de votre catalogue.",
+      "s1_note": "Votre catalogue WhatsApp actuel n'est pas modifié ni supprimé.",
+      "s2_title": "La connexion se fait du côté de Meta",
+      "s2_lede": "Pour connecter votre catalogue, vous allez être redirigé vers Meta, en toute sécurité. C'est là que tout se passe — nous reprenons la main juste après.",
+      "s2_choice1_t": "Créer un nouveau catalogue",
+      "s2_choice1_b": "Si vous partez de zéro côté Meta.",
+      "s2_choice2_t": "Sélectionner un catalogue existant",
+      "s2_choice2_b": "Si vous en avez déjà un dans Commerce Manager.",
+      "s2_note": "Ces deux choix se font chez Meta. Vous revenez ici aussitôt.",
+      "s2_choose_title": "Choisissez un catalogue Commerce Manager",
+      "s2_choose_lede": "Vous avez déjà un ou plusieurs catalogues connectés à Bedones. Réutilisez-en un ou connectez-en un nouveau.",
+      "s2_use_connected_t": "Utiliser un catalogue connecté",
+      "s2_use_connected_b": "Importer vos produits dans un catalogue déjà relié à Bedones.",
+      "s2_new_catalog_t": "Connecter ou créer un autre catalogue",
+      "s2_new_catalog_b": "Vous serez redirigé vers Meta pour en connecter ou en créer un nouveau.",
+      "s2_redirect_title": "Connexion à Meta…",
+      "s2_redirect_lede": "Nous ouvrons Meta pour connecter votre catalogue Commerce Manager. Ne fermez pas cette page.",
+      "s3_title": "Vos produits, prêts à être déplacés",
+      "s3_confirm": "Connecté à <b>{{name}}</b>",
+      "s3_lede": "Lancez l'import pour déplacer les produits de votre numéro WhatsApp Business <b>{{number}}</b> vers ce catalogue Commerce Manager.",
+      "s3_reconnect": "Ce n'est pas le bon catalogue ? Se reconnecter",
+      "s4_progress_title": "Import de vos produits en cours",
+      "s4_task1": "Ouverture du catalogue WhatsApp",
+      "s4_task2": "Extraction des produits et des collections",
+      "s4_task3": "Stockage dans le catalogue Commerce Manager",
+      "s4_caption": "Inutile d'attendre ici — nous vous préviendrons une fois l'import terminé.",
+      "s4_result_title": "Vos produits sont dans Commerce Manager",
+      "stat_collections_one": "collection",
+      "stat_collections_other": "collections",
+      "stat_products_one": "produit",
+      "stat_products_other": "produits",
+      "s4_ask_t": "Connecter votre compte WhatsApp Business ?",
+      "s4_ask_b": "Reliez votre numéro {{number}} à ce nouveau catalogue Commerce Manager pour que l'agent IA, les tickets et les promotions s'appuient dessus.",
+      "s4_failed_title": "L'import a rencontré un problème",
+      "s4_failed_msg": "L'import n'a pas abouti.",
+      "s5_linking_title": "Connexion de votre compte WhatsApp",
+      "s5_linking_lede": "Nous relions votre numéro {{number}} à votre catalogue Commerce Manager. Cela prend quelques secondes.",
+      "s5_linked_title": "Votre compte WhatsApp est lié au catalogue Commerce Manager",
+      "s5_linked_lede_one": "Tout est en place. Votre {{count}} produit est désormais disponible pour l'agent IA, les tickets et les promotions.",
+      "s5_linked_lede_other": "Tout est en place. Vos {{count}} produits sont désormais disponibles pour l'agent IA, les tickets et les promotions.",
+      "s5_manual_title": "Connectez votre compte vous-même",
+      "s5_manual_lede": "La connexion automatique n'a pas abouti. Reliez votre compte vous-même en suivant ces étapes, puis revérifiez — nous vous dirons si c'est bon.",
+      "s5_m1_t": "Ouvrez WhatsApp Business",
+      "s5_m1_b": "Sur votre téléphone, ou via Meta Business Suite, puis allez dans Paramètres.",
+      "s5_m2_t": "Outils professionnels → Catalogue",
+      "s5_m2_b": "Ouvrez la section Catalogue de votre compte.",
+      "s5_m3_t": "Sélectionnez votre catalogue Commerce Manager",
+      "s5_m3_b": "Choisissez votre nouveau catalogue dans la liste.",
+      "s5_m4_t": "Enregistrez, puis revenez ici",
+      "s5_m4_b": "Cliquez ensuite sur « Revérifier la liaison » ci-dessous.",
+      "s5_checking": "Vérification de la liaison…",
+      "s5_stillfailed_t": "Toujours pas liée.",
+      "s5_stillfailed_b": "Reprenez les étapes ci-dessus, ou contactez le support."
+    }
+  },
   "common": {
     "yes": "Oui",
     "no": "Non",
@@ -24,9 +158,10 @@
     "change": "Changer",
     "details": "Détails",
     "all": "Tout",
-    "none": "Aucun"
+    "none": "Aucun",
+    "previous": "Précédent",
+    "next": "Suivant"
   },
-
   "sidebar": {
     "agents": "Mes Agents",
     "tickets": "Tickets",
@@ -55,15 +190,14 @@
     "use_french": "Utiliser le Français",
     "recap": "Récapitulatif"
   },
-
   "errors": {
     "AUTH_INVALID_CREDENTIALS": "Email ou mot de passe incorrect",
     "AUTH_SESSION_MISSING": "Session manquante",
     "AUTH_SESSION_EXPIRED": "Session expirée",
     "AUTH_SESSION_INVALID": "Session invalide"
   },
-
   "auth": {
+    "title": "Connexion / Inscription",
     "login": "Connexion",
     "login_error": "Erreur de connexion",
     "email": "Email",
@@ -80,21 +214,27 @@
     "fetch_user_error": "Impossible de récupérer vos informations. Veuillez réessayer.",
     "back_to_login": "Retour à la connexion",
     "user_info_error": "Impossible de récupérer vos informations depuis le réseau social.",
-    "unexpected_error": "Une erreur inattendue est survenue. Veuillez réessayer."
+    "unexpected_error": "Une erreur inattendue est survenue. Veuillez réessayer.",
+    "whatsapp_subtitle": "Saisissez votre numéro WhatsApp pour recevoir un code de vérification.",
+    "send_verification_code": "Envoyer un code de vérification",
+    "remember_phone": "Retenir ce numéro",
+    "invalid_phone": "Numéro de téléphone invalide",
+    "verify_code": "Vérification du code",
+    "welcome": "Bienvenue !",
+    "your_name": "Comment souhaitez-vous être appelé ?",
+    "full_name_placeholder": "Ex: Aminata Diallo",
+    "name_required": "Veuillez saisir votre nom"
   },
-
   "org": {
     "create": "Créer une organisation",
     "create_error": "Erreur lors de la création",
     "update_error": "Erreur lors de la mise à jour"
   },
-
   "upload": {
     "error": "Erreur lors de l'upload",
     "media_error": "Erreur lors de l'upload du média",
     "label": "Télécharger"
   },
-
   "social": {
     "connected_accounts": "Comptes connectés",
     "facebook_connect_error": "Erreur de connexion Facebook",
@@ -107,9 +247,18 @@
     "reply_error": "Erreur lors de la réponse",
     "hide_error": "Erreur lors du masquage",
     "delete_error": "Erreur lors de la suppression",
-    "connection_error": "Erreur lors de la connexion"
+    "connection_error": "Erreur lors de la connexion",
+    "error_details_title": "Détails de l'erreur",
+    "error_generic": "Une erreur est survenue avec cette ressource. Veuillez la reconnecter.",
+    "error_show_details": "Voir les détails",
+    "error_reconnect_hint": "Reconnectez la ressource concernée pour rétablir le service.",
+    "feature_messaging": "Messagerie",
+    "feature_comments": "Commentaires",
+    "feature_disabled_tooltip": "Indisponible : {{features}}. Reconnectez pour réactiver.",
+    "account_disabled_tooltip": "Ce compte est désactivé après des erreurs répétées. Reconnectez-le.",
+    "reconnect_unavailable": "Reconnexion indisponible pour cette ressource.",
+    "reconnect_success": "Ressource reconnectée avec succès."
   },
-
   "comments": {
     "facebook_label": "Commentaires Facebook",
     "instagram_label": "Commentaires Instagram",
@@ -171,7 +320,6 @@
     "no_comments_desc": "Les commentaires de vos publications {{provider}} apparaîtront ici",
     "view_comments": "Voir les commentaires"
   },
-
   "comments_config": {
     "title_short": "Configuration",
     "title": "Configuration des commentaires",
@@ -204,7 +352,6 @@
     "catalog_description": "Associez un catalogue à cette page pour que l'agent puisse détecter les références produits dans les commentaires et y répondre.",
     "catalog_placeholder": "Aucun catalogue associé"
   },
-
   "chat": {
     "no_conversations": "Aucune conversation",
     "select_conversation": "Sélectionnez une conversation",
@@ -322,6 +469,10 @@
     "configure_catalog_title": "Associer un catalogue",
     "configure_catalog_desc": "Liez un catalogue de produits à ce numéro pour que vos clients puissent parcourir vos produits sur WhatsApp.",
     "configure_catalog_btn": "Associer un catalogue",
+    "migrate_catalog_title": "Migrez votre catalogue actuel",
+    "migrate_catalog_desc": "Déplacez les produits de votre application WhatsApp Business vers un catalogue Commerce Manager pour que notre IA puisse les voir et répondre efficacement à vos clients.",
+    "migrate_catalog_btn": "Migrer mon catalogue",
+    "migrate": "Migrer",
     "options": "Options",
     "tools": "Outils",
     "tools_catalog": "Catalogue",
@@ -358,7 +509,6 @@
     "preview_message": "Message",
     "preview_reaction": "Réaction"
   },
-
   "feedback": {
     "title": "Améliorer la réponse",
     "subtitle": "Aidez l'agent à mieux répondre la prochaine fois",
@@ -374,7 +524,6 @@
     "you": "Vous",
     "error_generic": "Une erreur est survenue. Réessayez."
   },
-
   "catalog_link": {
     "title": "Associer un catalogue",
     "phone_number": "Numéro WhatsApp",
@@ -382,7 +531,6 @@
     "select_placeholder": "Sélectionner un catalogue...",
     "associate": "Associer"
   },
-
   "whatsapp_config": {
     "title": "Configuration WhatsApp",
     "phone_info": "Informations du numéro",
@@ -400,7 +548,6 @@
     "associate_catalog": "Associer un catalogue",
     "label_placeholder": "Nom de l'étiquette"
   },
-
   "members": {
     "title": "Membres",
     "selected_count": "{{count}} membre(s) sélectionné(s)",
@@ -436,7 +583,6 @@
     "copy_invite": "Copier l'invitation",
     "invitation_share_message": "L'invitation pour {{name}} a été créée. Partagez ce lien pour qu'il puisse rejoindre l'organisation."
   },
-
   "notifications": {
     "eyebrow": "Notifications",
     "title_prefix": "Paramètres pour",
@@ -475,7 +621,6 @@
       "message_daily_summary_desc": "Nombre de conversations, de messages et de tickets du jour."
     }
   },
-
   "tickets": {
     "title": "Tickets",
     "create": "Créer un ticket",
@@ -519,7 +664,6 @@
     "all_statuses": "Tous les status",
     "view_diff": "Voir avant / après"
   },
-
   "catalog": {
     "title": "Catalogue",
     "connect_title": "Connectez votre catalogue",
@@ -549,12 +693,19 @@
     "product_name": "Nom du produit",
     "product_name_required": "Le nom du produit est requis",
     "product_name_placeholder": "Ex: Robe wax, Maillot, Sac...",
+    "product_code": "Code produit",
+    "product_code_required": "Le code produit est requis",
+    "product_code_placeholder": "Ex: robe-wax-001 (votre référence)",
+    "product_code_locked": "Le code produit ne peut pas être modifié après la création.",
+    "product_save_error": "Échec de l'enregistrement du produit",
     "product_description": "Description",
     "product_description_placeholder": "Décrivez votre produit...",
     "product_image": "Images",
     "image_required": "Au moins une image est requise",
     "upload_images_title": "Cliquez ou glissez pour ajouter",
     "upload_images_hint": "JPG, PNG ou WebP",
+    "reorder_images_hint": "Glissez-déposez les images pour les réordonner. La première sera l'image principale.",
+    "main_image": "Principale",
     "product_price": "Prix",
     "product_currency": "Devise",
     "product_url": "URL",
@@ -580,9 +731,10 @@
     "connect_button": "Connecter",
     "status_published": "Publié",
     "status_draft": "Brouillon",
-    "status_archived": "Archivé"
+    "status_archived": "Archivé",
+    "error_title": "Impossible de récupérer votre catalogue",
+    "error_description": "Nous n'avons pas pu charger vos produits. Veuillez reconnecter votre catalogue."
   },
-
   "promotions": {
     "title": "Promotions",
     "create": "Créer une promotion",
@@ -654,7 +806,6 @@
     "created": "Promotion créée avec succès",
     "updated": "Promotion mise à jour avec succès"
   },
-
   "agent": {
     "title": "Mon Agent",
     "setup_title": "Configurez votre agent IA",
@@ -691,6 +842,8 @@
     "thinking": "L'agent réfléchit...",
     "score_ready_tooltip": "Votre agent peut être activé.",
     "score_not_ready_tooltip": "Votre agent doit avoir un score > 80 pour être activé.",
+    "default_name": "votre agent",
+    "activation_success_title": "Agent {{name}} activé avec succès",
     "activate_banner_title": "Vous pouvez activer ou tester votre agent",
     "activate_banner_desc": "Nous avons suffisamment d'informations pour répondre à vos clients. Vous pouvez activer l'agent pour certains contacts uniquement ou pour tous les messages entrants.",
     "activate_banner_btn": "Activer",
@@ -729,7 +882,6 @@
     "setup_error_desc": "Une erreur est survenue lors de la configuration de votre agent. Veuillez réessayer.",
     "setup_retry": "Réessayer"
   },
-
   "stats": {
     "title": "Statistiques et usages",
     "comments": "commentaires",
@@ -738,13 +890,11 @@
     "messages_by_network": "Messages par réseau",
     "comments_by_network": "Commentaires par réseau"
   },
-
   "plan": {
     "title": "Souscription",
     "pay_card": "Payer par carte",
     "pay_mobile": "Payer par Mobile Money"
   },
-
   "legal": {
     "title": "Aides et ressources",
     "faq_title": "Questions fréquentes",
@@ -756,7 +906,6 @@
     "privacy": "Politique de confidentialité",
     "terms": "Conditions d'utilisation"
   },
-
   "help": {
     "page_title": "Aides et ressources",
     "faq_section_title": "Questions fréquentes",
@@ -810,7 +959,6 @@
     "legal_section_title": "Informations légales",
     "legal_section_subtitle": "Consultez les documents juridiques relatifs à l'utilisation de Bedones"
   },
-
   "invitation": {
     "invalid_link": "Ce lien d'invitation est invalide, expiré ou a déjà été utilisé.",
     "phone": "Téléphone",
@@ -831,7 +979,6 @@
     "accept": "Accepter l'invitation",
     "rejected": "Invitation refusée"
   },
-
   "pagination": {
     "item": "élément",
     "items": "éléments",
@@ -839,21 +986,19 @@
     "next": "Suivant",
     "of": "sur"
   },
-
   "date": {
     "today": "Aujourd'hui",
     "yesterday": "Hier",
     "at": "à"
   },
-
   "format": {
     "date_time": "DD/MM à HH:mm"
   },
-
   "dashboard": {
     "title": "Récapitulatif",
     "welcome_title": "Bienvenue sur Bedones",
     "welcome_description": "Centralisez vos interactions sociales et convertissez vos prospects en clients. Connectez vos réseaux pour commencer.",
+    "welcome_setup_subtitle": "Nous avons maintenant accès à vos pages, vous devez maintenant configurer comment l'IA doit répondre à vos clients.",
     "comments_title": "Commentaires",
     "comments_description": "Connectez vos réseaux sociaux et laissez l'IA gérer vos commentaires pour vous.",
     "messaging_title": "Messagerie",
@@ -861,25 +1006,46 @@
     "agent_title": "Créez votre agent",
     "agent_description": "Créez un agent pour gérer vos conversations et créer des tickets qui seront envoyés aux membres de votre équipe.",
     "agent_members_link": "Ajoutez des membres",
-    "agent_description_2": " à votre équipe. Vous pouvez aussi créer des promotions qui seront prises en compte par l'agent."
+    "agent_description_2": " à votre équipe. Vous pouvez aussi créer des promotions qui seront prises en compte par l'agent.",
+    "step_catalog_title": "Catalogue",
+    "step_catalog_desc": "Nous avons besoin de comprendre vos produits. Ajoutez un Catalogue Commerce Manager pour commencer — nous vous guidons pas à pas.",
+    "step_catalog_action": "Configurer mon catalogue",
+    "step_comments_desc": "Indiquez à notre IA comment elle doit s'occuper des commentaires de {{page}}.",
+    "step_comments_action": "Configurer les réponses maintenant",
+    "step_comments_action_edit": "Modifier la configuration",
+    "step_agent_desc_none": "Créez un agent pour {{page}} afin que l'IA puisse répondre à vos clients sur {{channel}}.",
+    "step_agent_desc_configuring": "Votre agent est en cours de configuration ({{score}}%). Continuez la configuration pour qu'il atteigne 80%.",
+    "step_agent_desc_below_threshold": "L'agent est prêt mais son score est encore de {{score}}%. Continuez la configuration pour pouvoir l'activer.",
+    "step_agent_action": "Continuer la configuration",
+    "step_agent_action_edit": "Modifier l'agent",
+    "step_progress": "Étape {{current}} sur {{total}}",
+    "no_accounts_title": "Aucun compte connecté",
+    "no_accounts_desc": "Connectez un réseau social pour commencer à gérer vos interactions depuis Bedones.",
+    "network_accounts_count_one": "{{count}} compte connecté",
+    "network_accounts_count_other": "{{count}} comptes connectés",
+    "account_no_name": "Compte {{provider}}",
+    "action_comments": "Commentaires",
+    "action_messaging": "Messagerie",
+    "setup_success_title": "{{subject}} configuré avec succès",
+    "setup_success_desc": "Vous pouvez maintenant passer à la configuration d'un de vos autres comptes.",
+    "setup_success_later": "Plus tard",
+    "setup_success_continue": "Continuer",
+    "account_needs_reconnect": "À reconnecter",
+    "action_reconnect": "Reconnecter"
   },
-
   "meta": {
     "title": "Bedones — CRM Social",
     "description": "Centralisez vos interactions sociales en opportunités commerciales."
   },
-
   "loyalty": {
     "title": "Programme de fidélité",
     "setup_title": "Connectez un numéro WhatsApp pour démarrer",
     "setup_desc": "Vous devez connecter un compte WhatsApp pour envoyer des rappels de fidélité à vos clients.",
     "setup_btn": "Connecter un numéro WhatsApp",
     "connect_label": "Connecter un numéro",
-
     "tab_contacts": "Contacts",
     "tab_bonus": "Bonus",
     "tab_campaigns": "Campagnes",
-
     "contact_create_title": "Ajouter un contact",
     "contact_edit_title": "Modifier le contact",
     "contact_name": "Nom",
@@ -895,7 +1061,6 @@
     "contact_updated": "Contact mis à jour",
     "confirm_delete_contact_title": "Supprimer le contact",
     "confirm_delete_contact_message": "Voulez-vous vraiment supprimer le contact \"{{name}}\" ?",
-
     "bonus_create_title": "Créer un bonus",
     "bonus_edit_title": "Modifier le bonus",
     "bonus_name": "Nom",
@@ -911,7 +1076,6 @@
     "bonus_updated": "Bonus mis à jour",
     "confirm_delete_bonus_title": "Supprimer le bonus",
     "confirm_delete_bonus_message": "Voulez-vous vraiment supprimer le bonus \"{{name}}\" ?",
-
     "target_spend": "Montant dépensé",
     "target_order_count": "Nombre de commandes",
     "target_products": "Produits commandés",
@@ -924,7 +1088,6 @@
     "select_products": "Sélectionner des produits",
     "edit_selection": "Modifier la sélection",
     "products_count": "{{count}} produits",
-
     "reward": "Récompense",
     "reward_type": "Type de récompense",
     "reward_products": "Produits offerts",
@@ -934,7 +1097,6 @@
     "reward_percent_value": "Pourcentage de réduction",
     "no_reward_products": "Aucun produit offert",
     "reward_products_hint": "Sélectionnez les produits offerts au client lorsqu'il atteint les objectifs.",
-
     "templates": "Templates",
     "templates_title": "Templates",
     "templates_manage": "Manager vos templates",
@@ -1031,7 +1193,6 @@
     "template_updated": "Template mis à jour",
     "confirm_delete_template_title": "Supprimer le template",
     "confirm_delete_template_message": "Voulez-vous vraiment supprimer le template \"{{name}}\" ?",
-
     "campaign_create_title": "Lancer une campagne",
     "campaign_edit_title": "Modifier la campagne",
     "campaign_general_title": "Campagnes",
@@ -1107,22 +1268,18 @@
     "campaign_updated": "Campagne mise à jour",
     "confirm_delete_campaign_title": "Supprimer la campagne",
     "confirm_delete_campaign_message": "Voulez-vous vraiment supprimer la campagne \"{{name}}\" ?",
-
     "segment_criteria": "Critères de segment",
     "segment_criteria_hint": "Choisissez les seuils minimums pour cibler les clients à relancer.",
     "criteria_min_spend": "Dépense minimum atteinte (FCFA)",
     "criteria_min_orders": "Nombre minimum de commandes",
     "criteria_min_products": "Nombre minimum de produits éligibles",
-
     "frequency_once": "Une seule fois",
     "frequency_daily": "Quotidienne",
     "frequency_weekly": "Hebdomadaire",
     "frequency_monthly": "Mensuelle",
-
     "status_scheduled": "Programmée",
     "status_running": "En cours",
     "status_completed": "Terminée",
-
     "col_schedule": "Programmation",
     "col_started": "Lancée le",
     "col_ends": "Termine le",
@@ -1131,7 +1288,6 @@
     "col_read": "Lus",
     "col_replied": "Réponses"
   },
-
   "tiktok_business": {
     "modal_title": "Compte TikTok Business requis",
     "description": "Pour utiliser les messages directs TikTok, votre compte doit être un compte Business (pas Creator ni Personnel). Suivez ces étapes pour le convertir :",

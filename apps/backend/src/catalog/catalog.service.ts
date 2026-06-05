@@ -6,21 +6,49 @@ import {
   ForbiddenException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { EncryptionService } from '../auth/encryption.service'
+import { SocialHealthService } from '../social/social-health.service'
+import { ErrorExplanationService, redactSecrets } from '../social/error-explanation.service'
+import type { SocialFeature, SocialProvider } from 'generated/prisma/enums'
+import { Prisma } from 'generated/prisma/client'
 
 @Injectable()
 export class CatalogService {
   private readonly logger = new Logger(CatalogService.name)
   private readonly META_API_BASE = 'https://graph.facebook.com/v22.0'
 
+  /**
+   * In-memory TTL cache for product lookups by retailer_id, keyed by
+   * `${catalogProviderId}::${retailerId}`. Comment moderation resolves product codes
+   * on (potentially) every incoming comment, so without a cache a popular post would
+   * hammer the Meta Graph API. A `null` value is cached too (negative caching) so codes
+   * that don't match a real product aren't re-queried on each comment.
+   */
+  private readonly productCache = new Map<
+    string,
+    {
+      value: {
+        retailerId: string
+        name: string | null
+        imageUrl: string | null
+        price: number | null
+        currency: string | null
+      } | null
+      expiresAt: number
+    }
+  >()
+  private readonly PRODUCT_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+  private readonly PRODUCT_CACHE_MAX_ENTRIES = 5000
+
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
     private gateway: EventsGateway,
     private encryptionService: EncryptionService,
+    private socialHealth: SocialHealthService,
+    private errorExplanation: ErrorExplanationService,
   ) {}
 
   // ─── CRUD ───
@@ -168,6 +196,36 @@ export class CatalogService {
   }
 
   /**
+   * Fetch a subset of catalog products by their Meta product IDs. Missing
+   * products are returned as `null` at the matching index so the caller can
+   * align the response with the request order (handy for placeholder rendering
+   * on the frontend).
+   */
+  async findProductsByIds(catalogId: string, productIds: string[]) {
+    const ids = Array.from(new Set(productIds.filter(Boolean)))
+    if (ids.length === 0)
+      return { products: [] as Array<ReturnType<typeof this.mapMetaProduct> | null> }
+    const accessToken = await this.resolveAccessToken(catalogId)
+
+    const results = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const url = `${this.META_API_BASE}/${id}?fields=${CatalogService.META_PRODUCT_FIELDS}&access_token=${accessToken}`
+          const res = await fetch(url)
+          if (!res.ok) return null
+          const data = (await res.json()) as Record<string, unknown>
+          return this.mapMetaProduct(data)
+        } catch {
+          return null
+        }
+      }),
+    )
+
+    const map = new Map(results.filter((r) => r !== null).map((r) => [String(r!.id), r]))
+    return { products: productIds.map((id) => map.get(id) ?? null) }
+  }
+
+  /**
    * Fetch a subset of catalog products by their retailer IDs, via Meta Graph API.
    * Resolves the access token from any social account linked to the catalog whose
    * providerId matches `catalogProviderId` (Meta catalog ID).
@@ -226,12 +284,35 @@ export class CatalogService {
   > {
     const ids = Array.from(new Set(retailerIds.filter(Boolean)))
     if (ids.length === 0) return []
+
+    const now = Date.now()
+    const hydrated: Array<{
+      retailerId: string
+      name: string | null
+      imageUrl: string | null
+      price: number | null
+      currency: string | null
+    }> = []
+    const misses: string[] = []
+
+    // Serve from cache where possible; collect the rest as misses.
+    for (const id of ids) {
+      const cached = this.productCache.get(this.productCacheKey(catalogProviderId, id))
+      if (cached && cached.expiresAt > now) {
+        if (cached.value) hydrated.push(cached.value)
+      } else {
+        misses.push(id)
+      }
+    }
+
+    if (misses.length === 0) return hydrated
+
     // Meta Graph API supports filtering products by retailer_id via a JSON filter
     // on the catalog's /products edge. We request only the fields we need for UI.
-    const filter = JSON.stringify({ retailer_id: { is_any: ids } })
+    const filter = JSON.stringify({ retailer_id: { is_any: misses } })
     const query = new URLSearchParams({
       fields: 'id,retailer_id,name,image_url,price,currency',
-      limit: String(Math.max(ids.length, 50)),
+      limit: String(Math.max(misses.length, 50)),
       filter,
       access_token: accessToken,
     })
@@ -242,12 +323,13 @@ export class CatalogService {
       if (!response.ok) {
         const errorText = await response.text()
         this.logger.warn(`hydrateProducts: Meta API error ${response.status}: ${errorText}`)
-        return []
+        // Return whatever we already had cached; don't cache failures.
+        return hydrated
       }
       const data = (await response.json()) as {
         data: Array<Record<string, unknown>>
       }
-      return (data.data || []).map((p) => {
+      const fetched = (data.data || []).map((p) => {
         const priceInfo = p.price ? this.parseMetaPrice(String(p.price)) : null
         return {
           retailerId: String(p.retailer_id ?? ''),
@@ -257,12 +339,55 @@ export class CatalogService {
           currency: (p.currency as string) ?? priceInfo?.currency ?? null,
         }
       })
+
+      const byId = new Map(fetched.map((p) => [p.retailerId, p]))
+      // Cache each miss — including the ones Meta didn't return (negative cache).
+      for (const id of misses) {
+        const value = byId.get(id) ?? null
+        this.setProductCache(catalogProviderId, id, value)
+        if (value) hydrated.push(value)
+      }
+
+      return hydrated
     } catch (error: unknown) {
       this.logger.warn(
         `hydrateProducts: fetch failed: ${error instanceof Error ? error.message : error}`,
       )
-      return []
+      // Return whatever we already had cached; don't cache failures.
+      return hydrated
     }
+  }
+
+  private productCacheKey(catalogProviderId: string, retailerId: string): string {
+    return `${catalogProviderId}::${retailerId}`
+  }
+
+  private setProductCache(
+    catalogProviderId: string,
+    retailerId: string,
+    value: {
+      retailerId: string
+      name: string | null
+      imageUrl: string | null
+      price: number | null
+      currency: string | null
+    } | null,
+  ): void {
+    // Cheap bound: when the cache grows too large, drop expired entries first and,
+    // if still over budget, clear it entirely. Avoids unbounded memory growth.
+    if (this.productCache.size >= this.PRODUCT_CACHE_MAX_ENTRIES) {
+      const now = Date.now()
+      for (const [k, v] of this.productCache) {
+        if (v.expiresAt <= now) this.productCache.delete(k)
+      }
+      if (this.productCache.size >= this.PRODUCT_CACHE_MAX_ENTRIES) {
+        this.productCache.clear()
+      }
+    }
+    this.productCache.set(this.productCacheKey(catalogProviderId, retailerId), {
+      value,
+      expiresAt: Date.now() + this.PRODUCT_CACHE_TTL_MS,
+    })
   }
 
   async findProducts(
@@ -275,10 +400,15 @@ export class CatalogService {
       collectionId?: string
     },
   ) {
-    const [accessToken, providerId] = await Promise.all([
+    const [accessToken, providerId, account] = await Promise.all([
       this.resolveAccessToken(catalogId),
       this.getCatalogProviderId(catalogId),
+      this.resolveCatalogSocialAccount(catalogId),
     ])
+
+    // Note: catalog listing is a user-triggered READ, so we never gate it on the
+    // circuit breaker (and React Query retries would trip it almost instantly).
+    // We still surface a friendly error + log it for visibility on failure.
 
     // When filtering by collection, fetch from the product set endpoint
     const baseId = params?.collectionId || providerId
@@ -289,15 +419,58 @@ export class CatalogService {
       summary: 'true',
       access_token: accessToken,
     })
+
+    // Run search server-side across the WHOLE catalogue via Meta's `filter` (the
+    // /products edge supports it) so results, cursors and summary.total_count are
+    // correct — not just the current page. For a collection we hit the
+    // product-set edge and narrow in-memory below (sets are small).
+    const search = params?.search?.trim()
+    if (search && !params?.collectionId) {
+      query.set(
+        'filter',
+        JSON.stringify({
+          or: [{ name: { i_contains: search } }, { retailer_id: { i_contains: search } }],
+        }),
+      )
+    }
     if (params?.after) query.set('after', params.after)
 
     const url = `${this.META_API_BASE}/${baseId}/products?${query}`
     const response = await fetch(url)
 
     if (!response.ok) {
-      const error = await response.text()
-      this.logger.error(`Meta list products error: ${error}`)
-      throw new BadRequestException(`Meta API error: ${error}`)
+      const errorText = await response.text()
+      this.logger.error(`Meta list products error: ${errorText}`)
+
+      // Log the failure (for visibility + the error bank) WITHOUT tripping the
+      // circuit breaker, then resolve a human-friendly, multilingual explanation
+      // so the frontend can show a "social empty" state with a reconnect prompt.
+      let messages: Record<string, string> | null = null
+      if (account) {
+        await this.socialHealth.logError({
+          socialAccountId: account.id,
+          provider: account.provider,
+          operation: 'findProducts',
+          resource: 'catalog',
+          error: new BadRequestException(`Meta API error: ${errorText}`),
+        })
+        messages = await this.errorExplanation.getOrCreate({
+          provider: account.provider,
+          errorCode: this.extractProviderErrorCode(errorText),
+          errorTrace: errorText,
+          resource: 'catalog',
+        })
+      }
+
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'CatalogFetchError',
+        code: 'catalog_fetch_failed',
+        resource: 'catalog',
+        message: messages?.en ?? 'Unable to load your catalogue. Please reconnect it to continue.',
+        messages,
+        technical: redactSecrets(errorText).slice(0, 2000),
+      })
     }
 
     const data = (await response.json()) as {
@@ -308,25 +481,37 @@ export class CatalogService {
 
     const products = (data.data || []).map((p) => this.mapMetaProduct(p))
 
-    // Server-side filtering (Meta doesn't support filter/search on products endpoint)
+    // Search already ran server-side for the full catalogue. We still narrow
+    // in-memory (same fields, a superset) — a no-op when Meta honoured the
+    // filter, and the actual search for the product-set (collection) edge.
+    // Status stays a client-side narrowing.
     let filtered = products
 
     if (params?.status) {
       filtered = filtered.filter((p) => p.status === params.status)
     }
 
-    if (params?.search) {
-      const q = params.search.toLowerCase()
+    if (search) {
+      const q = search.toLowerCase()
       filtered = filtered.filter(
         (p) =>
           (p.name as string)?.toLowerCase().includes(q) ||
+          (p.retailerId as string)?.toLowerCase().includes(q) ||
           (p.description as string)?.toLowerCase().includes(q),
       )
     }
 
+    // With an active filter: when the whole (filtered) edge fit in one page the
+    // filtered length is the exact count; otherwise trust Meta's filtered
+    // summary. Without a filter, the summary is the catalogue total.
+    const allFetched = !data.paging?.next
+    const hasFilter = !!search || !!params?.status
+    const total =
+      hasFilter && allFetched ? filtered.length : (data.summary?.total_count ?? filtered.length)
+
     return {
       products: filtered,
-      total: data.summary?.total_count ?? filtered.length,
+      total,
       cursors: data.paging?.cursors,
       hasMore: !!data.paging?.next,
     }
@@ -369,6 +554,93 @@ export class CatalogService {
   }
 
   // ─── Authorization helpers ───
+
+  // ─── Image Studio Templates ───
+
+  async findImageTemplates(catalogId: string) {
+    return this.prisma.imageTemplate.findMany({
+      where: { catalogId },
+      orderBy: { updatedAt: 'desc' },
+    })
+  }
+
+  async createImageTemplate(
+    catalogId: string,
+    dto: {
+      name: string
+      format: string
+      accent?: string
+      definition: Record<string, unknown>
+      sourceKey?: string
+    },
+  ) {
+    const catalog = await this.prisma.catalog.findUnique({
+      where: { id: catalogId },
+      select: { organisationId: true },
+    })
+    if (!catalog) throw new NotFoundException('Catalogue introuvable')
+
+    const data = {
+      organisationId: catalog.organisationId,
+      catalogId,
+      name: dto.name,
+      format: dto.format,
+      accent: dto.accent ?? null,
+      definition: dto.definition as Prisma.InputJsonValue,
+      sourceKey: dto.sourceKey ?? null,
+    }
+
+    // Fork d'un template statique (sourceKey) : un seul override par
+    // (catalogue, sourceKey) — on met à jour l'existant le cas échéant.
+    if (dto.sourceKey) {
+      const existing = await this.prisma.imageTemplate.findFirst({
+        where: { catalogId, sourceKey: dto.sourceKey },
+        select: { id: true },
+      })
+      if (existing) {
+        return this.prisma.imageTemplate.update({ where: { id: existing.id }, data })
+      }
+    }
+    return this.prisma.imageTemplate.create({ data })
+  }
+
+  async updateImageTemplate(
+    catalogId: string,
+    templateId: string,
+    dto: {
+      name?: string
+      format?: string
+      accent?: string
+      definition?: Record<string, unknown>
+    },
+  ) {
+    const existing = await this.prisma.imageTemplate.findFirst({
+      where: { id: templateId, catalogId },
+      select: { id: true },
+    })
+    if (!existing) throw new NotFoundException('Template introuvable')
+    return this.prisma.imageTemplate.update({
+      where: { id: templateId },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.format !== undefined ? { format: dto.format } : {}),
+        ...(dto.accent !== undefined ? { accent: dto.accent } : {}),
+        ...(dto.definition !== undefined
+          ? { definition: dto.definition as Prisma.InputJsonValue }
+          : {}),
+      },
+    })
+  }
+
+  async deleteImageTemplate(catalogId: string, templateId: string) {
+    const existing = await this.prisma.imageTemplate.findFirst({
+      where: { id: templateId, catalogId },
+      select: { id: true },
+    })
+    if (!existing) throw new NotFoundException('Template introuvable')
+    await this.prisma.imageTemplate.delete({ where: { id: templateId } })
+    return { id: templateId }
+  }
 
   private async assertMembership(userId: string, organisationId: string) {
     const membership = await this.prisma.organisationMember.findUnique({
@@ -440,8 +712,48 @@ export class CatalogService {
     return catalog.providerId
   }
 
+  /** The social account backing a catalog — used to gate/record outbound calls. */
+  private async resolveCatalogSocialAccount(catalogId: string): Promise<{
+    id: string
+    provider: SocialProvider
+    disabled: boolean
+    featureDisabled: SocialFeature[]
+  } | null> {
+    const catalog = await this.prisma.catalog.findUnique({
+      where: { id: catalogId },
+      include: {
+        socialAccounts: {
+          include: {
+            socialAccount: {
+              select: { id: true, provider: true, disabled: true, featureDisabled: true },
+            },
+          },
+        },
+      },
+    })
+    return catalog?.socialAccounts[0]?.socialAccount ?? null
+  }
+
+  /** Parses a Meta/TikTok error code from a raw provider error payload. */
+  private extractProviderErrorCode(text: string): string | null {
+    const code = text.match(/"code"\s*:\s*(\d+)/)
+    const sub = text.match(/"error_subcode"\s*:\s*(\d+)/)
+    if (code) return sub ? `${code[1]}/${sub[1]}` : code[1]
+    const type = text.match(/"type"\s*:\s*"([A-Za-z]+Exception)"/)
+    return type ? type[1] : null
+  }
+
   // ─── WhatsApp Commerce Settings ───
 
+  /**
+   * List the Commerce Manager catalogue(s) linked to the number's WABA.
+   *
+   * This same call doubles as our SMB (WhatsApp Business app) detector: Meta
+   * rejects it with error (#10) "This operation can not be performed on SMB
+   * business type" for SMB numbers. That rejection is the reliable SMB signal,
+   * so we surface `isSmb: true` instead of failing — only such numbers own an
+   * in-app catalogue worth migrating to Commerce Manager.
+   */
   async getWhatsAppCommerceSettings(userId: string, phoneNumberId: string) {
     await this.assertWhatsAppAccess(userId, phoneNumberId)
     const { accessToken, wabaId } = await this.resolveWhatsAppAccount(phoneNumberId)
@@ -452,11 +764,24 @@ export class CatalogService {
 
     if (!response.ok) {
       const error = await response.text()
+      if (this.isSmbBusinessError(error)) {
+        this.logger.log(`[WhatsApp] ${phoneNumberId} is an SMB business (product_catalogs #10)`)
+        return { data: [], isSmb: true }
+      }
       this.logger.error(`WABA product_catalogs API error: ${error}`)
       throw new BadRequestException(`Meta API error: ${error}`)
     }
 
-    return response.json()
+    const data = (await response.json()) as Record<string, unknown>
+    return { ...data, isSmb: false }
+  }
+
+  /**
+   * Meta error (#10) returned when an operation is attempted on an SMB
+   * (WhatsApp Business app) business type — our reliable SMB-number signal.
+   */
+  private isSmbBusinessError(raw: string): boolean {
+    return /SMB business type/i.test(raw)
   }
 
   // ─── Product CRUD via Meta API ───
@@ -465,6 +790,7 @@ export class CatalogService {
     catalogId: string,
     data: {
       name: string
+      retailerId: string
       description?: string
       imageUrl?: string
       additionalImageUrls?: string[]
@@ -483,11 +809,16 @@ export class CatalogService {
       this.getCatalogProviderId(catalogId),
     ])
 
-    const retailerId = randomUUID()
+    // retailer_id is the merchant's own product code (SKU) — it must be
+    // provided (manually in the modal or carried over from the scraped
+    // catalogue), never auto-generated.
+    if (!data.retailerId?.trim()) {
+      throw new BadRequestException('Le code produit (retailer_id) est requis')
+    }
 
     const body: Record<string, unknown> = {
       access_token: accessToken,
-      retailer_id: retailerId,
+      retailer_id: data.retailerId.trim(),
       name: data.name,
     }
     if (data.description) body.description = data.description
@@ -552,6 +883,7 @@ export class CatalogService {
     productId: string,
     data: {
       name?: string
+      retailerId?: string
       description?: string
       imageUrl?: string
       additionalImageUrls?: string[]
@@ -568,6 +900,7 @@ export class CatalogService {
 
     const productData: Record<string, unknown> = {}
     if (data.name) productData.name = data.name
+    if (data.retailerId) productData.retailer_id = data.retailerId
     if (data.description) productData.description = data.description
     if (data.imageUrl) productData.image_url = data.imageUrl
     if (data.additionalImageUrls) {
@@ -692,26 +1025,9 @@ export class CatalogService {
       throw new BadRequestException(`Meta API error: ${error}`)
     }
 
-    const result = (await response.json()) as { id: string }
-
-    // If productIds provided, add products to the collection
-    if (data.productIds?.length) {
-      const addResponse = await fetch(`${this.META_API_BASE}/${result.id}/products`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          access_token: accessToken,
-          product_ids: data.productIds,
-        }),
-      })
-
-      if (!addResponse.ok) {
-        const error = await addResponse.text()
-        this.logger.warn(`Meta add products to collection error: ${error}`)
-      }
-    }
-
-    return result
+    // Product-set membership is defined entirely by the filter above — Meta has
+    // no "add product to set by id" operation — so there's nothing else to do.
+    return (await response.json()) as { id: string }
   }
 
   async updateCollection(catalogId: string, collectionId: string, data: { name?: string }) {

@@ -1,0 +1,283 @@
+import { useMemo, useRef, useState } from 'react'
+import { Avatar, Button, Carousel } from 'antd'
+import type { CarouselRef } from 'antd/es/carousel'
+import { ArrowLeft, ArrowRight, CheckCircle2, ShoppingBag } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import {
+  FacebookIcon,
+  InstagramIcon,
+  MessengerIcon,
+  TikTokIcon,
+  WhatsAppIcon,
+} from '@app/components/icons/social-icons'
+import type { components } from '@app/lib/api/v1'
+
+type SetupStatus = components['schemas']['SetupStatusResponseDto']
+type PendingComment = components['schemas']['PendingCommentsStepDto']
+type PendingAgent = components['schemas']['PendingAgentStepDto']
+
+/** Unified step shape consumed by the carousel renderer. */
+export interface SetupStep {
+  key: string
+  kind: 'catalog' | 'comments' | 'agent'
+  socialAccountId?: string
+  title: string
+  description: string
+  actionLabel: string
+  onAction: () => void
+  /** Either a brand icon (renders inside a colored chip) or a generic Lucide icon. */
+  icon: React.ReactNode
+  iconColor: string
+  /** Page avatar to display in the centered chip; falls back to `icon`. */
+  pageAvatarUrl?: string | null
+  pageName?: string | null
+}
+
+interface SetupCarouselProps {
+  status: SetupStatus
+  /**
+   * Step keys (e.g. `comments-<accountId>`, `agent-<accountId>`) that the user
+   * configured during the current session. They stay in the carousel — only
+   * their visual state and action label change — so the user keeps a sense of
+   * the work already done without slides disappearing under them.
+   */
+  completedKeys?: ReadonlySet<string>
+  onConfigureCatalog: () => void
+  onConfigureComments: (step: PendingComment) => void
+  onConfigureAgent: (step: PendingAgent) => void
+}
+
+/**
+ * Builds the ordered list of remaining onboarding steps and renders them as a
+ * navigable carousel. The order is catalog → comments → agent, matching the
+ * back-end and the task description.
+ */
+export function SetupCarousel({
+  status,
+  completedKeys,
+  onConfigureCatalog,
+  onConfigureComments,
+  onConfigureAgent,
+}: SetupCarouselProps) {
+  const { t } = useTranslation()
+  const carouselRef = useRef<CarouselRef | null>(null)
+  const [current, setCurrent] = useState(0)
+  const completed = completedKeys ?? EMPTY_KEYS
+
+  const steps = useMemo<SetupStep[]>(() => {
+    const out: SetupStep[] = []
+
+    if (status.catalogPending) {
+      out.push({
+        key: 'catalog',
+        kind: 'catalog',
+        title: t('dashboard.step_catalog_title'),
+        description: t('dashboard.step_catalog_desc'),
+        actionLabel: t('dashboard.step_catalog_action'),
+        onAction: onConfigureCatalog,
+        icon: <ShoppingBag size={24} strokeWidth={1.6} />,
+        iconColor: 'var(--color-text-muted)',
+      })
+    }
+
+    for (const step of status.pendingComments) {
+      const key = `comments-${step.socialAccountId}`
+      const branding = providerBranding(step.provider)
+      const isDone = completed.has(key)
+      const pageName = asString(step.pageName)
+      const avatarUrl = asString(step.profilePictureUrl)
+      out.push({
+        key,
+        kind: 'comments',
+        socialAccountId: step.socialAccountId,
+        title: pageName ?? branding.name,
+        description: t('dashboard.step_comments_desc', { page: pageName ?? branding.name }),
+        actionLabel: isDone
+          ? t('dashboard.step_comments_action_edit')
+          : t('dashboard.step_comments_action'),
+        onAction: () => onConfigureComments(step),
+        icon: <branding.Icon width={24} height={24} />,
+        iconColor: branding.color,
+        pageAvatarUrl: avatarUrl,
+        pageName,
+      })
+    }
+
+    for (const step of status.pendingAgents) {
+      const key = `agent-${step.socialAccountId}`
+      const branding = channelBranding(step.channel)
+      const description = describeAgentStep(t, step, branding.name)
+      const isDone = completed.has(key)
+      const pageName = asString(step.pageName)
+      const avatarUrl = asString(step.profilePictureUrl)
+      out.push({
+        key,
+        kind: 'agent',
+        socialAccountId: step.socialAccountId,
+        title: pageName ?? branding.name,
+        description,
+        actionLabel: isDone
+          ? t('dashboard.step_agent_action_edit')
+          : t('dashboard.step_agent_action'),
+        onAction: () => onConfigureAgent(step),
+        icon: <branding.Icon width={24} height={24} />,
+        iconColor: branding.color,
+        pageAvatarUrl: avatarUrl,
+        pageName,
+      })
+    }
+
+    return out
+  }, [status, t, onConfigureCatalog, onConfigureComments, onConfigureAgent, completed])
+
+  if (steps.length === 0) return null
+
+  const isFirst = current === 0
+  const isLast = current === steps.length - 1
+
+  return (
+    <div className="dashboard-setup-card">
+      <Carousel
+        ref={carouselRef}
+        dots={false}
+        infinite={false}
+        beforeChange={(_, next) => setCurrent(next)}
+      >
+        {steps.map((step) => (
+          <div key={step.key}>
+            <StepBody step={step} isCompleted={completed.has(step.key)} />
+          </div>
+        ))}
+      </Carousel>
+
+      <div className="dashboard-setup-card__footer">
+        <div className="dashboard-setup-card__count">
+          {t('dashboard.step_progress', { current: current + 1, total: steps.length })}
+        </div>
+        <div className="flex items-center gap-2">
+          {!isFirst && (
+            <Button
+              size={'small'}
+              icon={<ArrowLeft size={14} />}
+              onClick={() => carouselRef.current?.prev()}
+            >
+              {t('common.previous')}
+            </Button>
+          )}
+          {!isLast && (
+            <Button
+              size={'small'}
+              iconPosition="end"
+              icon={<ArrowRight size={14} />}
+              onClick={() => carouselRef.current?.next()}
+            >
+              {t('common.next')}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StepBody({ step, isCompleted }: { step: SetupStep; isCompleted: boolean }) {
+  return (
+    <div className="dashboard-setup-card__body">
+      <div className="dashboard-setup-card__icon" style={{ color: step.iconColor }}>
+        {step.pageAvatarUrl ? (
+          <Avatar
+            size={56}
+            src={step.pageAvatarUrl}
+            shape="square"
+            style={{ background: `${step.iconColor}14`, color: step.iconColor }}
+          />
+        ) : (
+          <div
+            className="flex h-14 w-14 items-center justify-center rounded-2xl"
+            style={{ background: `${step.iconColor}14`, color: step.iconColor }}
+          >
+            {step.icon}
+          </div>
+        )}
+      </div>
+
+      <h3 className="m-0 flex items-center gap-2 text-base font-semibold text-text-primary">
+        {isCompleted && <CheckCircle2 size={18} className="text-green-500" strokeWidth={2.2} />}
+        {step.title}
+      </h3>
+      <p className="m-0 max-w-md text-sm text-text-secondary">{step.description}</p>
+
+      <Button type={isCompleted ? 'default' : 'primary'} size="middle" onClick={step.onAction}>
+        {step.actionLabel}
+      </Button>
+    </div>
+  )
+}
+
+const EMPTY_KEYS: ReadonlySet<string> = new Set()
+
+/**
+ * The generated openapi types model some nullable string fields as
+ * `Record<string, never> | null`; at runtime they are plain strings. Coerce
+ * safely to `string | null`.
+ */
+function asString(v: unknown): string | null {
+  return typeof v === 'string' ? v : null
+}
+
+function describeAgentStep(
+  t: (k: string, opts?: Record<string, unknown>) => string,
+  step: PendingAgent,
+  channelName: string,
+): string {
+  switch (step.agentStatus) {
+    case 'NONE':
+      return t('dashboard.step_agent_desc_none', {
+        channel: channelName,
+        page: step.pageName ?? channelName,
+      })
+    case 'DRAFT_OR_CONFIGURING':
+      return t('dashboard.step_agent_desc_configuring', { score: step.agentScore })
+    case 'READY_BELOW_THRESHOLD':
+      return t('dashboard.step_agent_desc_below_threshold', { score: step.agentScore })
+    default:
+      return t('dashboard.step_agent_desc_none', {
+        channel: channelName,
+        page: step.pageName ?? channelName,
+      })
+  }
+}
+
+interface Branding {
+  name: string
+  Icon: (props: React.SVGProps<SVGSVGElement>) => React.ReactNode
+  color: string
+}
+
+function providerBranding(provider: string): Branding {
+  switch (provider) {
+    case 'FACEBOOK':
+      return { name: 'Facebook', Icon: FacebookIcon, color: 'var(--color-brand-facebook)' }
+    case 'INSTAGRAM':
+      return { name: 'Instagram', Icon: InstagramIcon, color: 'var(--color-brand-instagram)' }
+    case 'TIKTOK':
+      return { name: 'TikTok', Icon: TikTokIcon, color: 'var(--color-brand-tiktok)' }
+    default:
+      return { name: provider, Icon: FacebookIcon, color: 'var(--color-text-muted)' }
+  }
+}
+
+function channelBranding(channel: string): Branding {
+  switch (channel) {
+    case 'WHATSAPP':
+      return { name: 'WhatsApp', Icon: WhatsAppIcon, color: 'var(--color-brand-whatsapp)' }
+    case 'MESSENGER':
+      return { name: 'Messenger', Icon: MessengerIcon, color: 'var(--color-brand-messenger)' }
+    case 'INSTAGRAM_DM':
+      return { name: 'Instagram', Icon: InstagramIcon, color: 'var(--color-brand-instagram)' }
+    case 'TIKTOK_DM':
+      return { name: 'TikTok', Icon: TikTokIcon, color: 'var(--color-brand-tiktok)' }
+    default:
+      return { name: channel, Icon: WhatsAppIcon, color: 'var(--color-text-muted)' }
+  }
+}

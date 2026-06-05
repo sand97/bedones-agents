@@ -13,6 +13,7 @@ enum AuthType {
   PASSWORD
   FACEBOOK
   INSTAGRAM
+  WHATSAPP
 }
 
 enum SocialProvider {
@@ -21,6 +22,21 @@ enum SocialProvider {
   INSTAGRAM
   WHATSAPP
   TIKTOK
+}
+
+// Granular outbound capabilities that can be disabled independently on a
+// SocialAccount (e.g. lose messaging permission but keep comment moderation).
+enum SocialFeature {
+  COMMENT
+  MESSAGE
+}
+
+enum MessageHistorySyncStatus {
+  PENDING // not started yet
+  RUNNING // backfill jobs in flight (or, for WhatsApp, awaiting Coexistence history webhooks)
+  COMPLETED // backfill finished
+  FAILED // backfill failed (see historySyncError)
+  UNSUPPORTED // provider does not expose history for this account
 }
 
 enum OrgRole {
@@ -81,6 +97,15 @@ enum CatalogAnalysisStatus {
   FAILED
 }
 
+// Lifecycle of a "WhatsApp catalog → Commerce Manager" migration job.
+enum CatalogMigrationStatus {
+  QUEUED // waiting in the Bull queue for its turn (single extraction at a time)
+  EXTRACTING // the connector is pulling the public catalogue from WhatsApp
+  IMPORTING // pushing the extracted products into the Meta catalogue
+  COMPLETED
+  FAILED
+}
+
 enum TicketPriority {
   LOW
   MEDIUM
@@ -120,20 +145,27 @@ enum NotificationType {
 // ─── Models ───
 
 model User {
-  id             String     @id @default(uuid())
-  email          String?    @unique
-  phone          String?    @unique
-  name           String
-  avatar         String?
-  passwordHash   String?
-  authType       AuthType
-  providerUserId String?
-  status         UserStatus @default(VERIFIED)
+  id               String     @id @default(uuid())
+  email            String?    @unique
+  // Full phone number in E.164 format (e.g. "+237657888690"). Kept as the
+  // unique key used for lookups across modules (members, invitations, OTP).
+  phone            String?    @unique
+  // Split components for display/formatting. `phoneCountryCode` is the dial
+  // code with leading "+" (e.g. "+237"); `phoneLocal` is the local part
+  // without the dial code (e.g. "657888690").
+  phoneCountryCode String?
+  phoneLocal       String?
+  name             String
+  avatar           String?
+  passwordHash     String?
+  authType         AuthType
+  providerUserId   String?
+  status           UserStatus @default(VERIFIED)
   // BCP-47 short tag ("fr", "en") used for outbound messages (e.g. WhatsApp
   // template language) and as the i18n hint until the user changes it.
-  locale         String     @default("fr")
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  locale           String     @default("fr")
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   memberships             OrganisationMember[]
   sessions                Session[]
@@ -170,6 +202,7 @@ model Organisation {
   ticketStatuses       TicketStatus[]
   creditOperations     CreditOperation[]
   whatsappOptInWindows WhatsAppOptInWindow[]
+  catalogMigrations    CatalogMigration[]
 }
 
 model OrganisationMember {
@@ -201,8 +234,32 @@ model SocialAccount {
   refreshToken      String?
   tokenExpiresAt    DateTime?
   scopes            String[]
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+
+  // ─── Account health / circuit breaker ───
+  // Set to true once the account accumulates too many consecutive outbound
+  // errors (or loses required permissions). When disabled we keep processing
+  // INCOMING webhooks but stop all OUTBOUND calls (send/get/post). Re-enabled
+  // only by a successful (re)connect through the OAuth callback.
+  disabled          Boolean         @default(false)
+  disabledReason    String?
+  disabledAt        DateTime?
+  // Count of consecutive outbound failures; reset to 0 on any success.
+  consecutiveErrors Int             @default(0)
+  // Features turned off granularly (e.g. TikTok messaging when the user is no
+  // longer a business account) without disabling the whole account.
+  featureDisabled   SocialFeature[]
+
+  // ─── Message history sync (14-day backfill on connect) ───
+  // Tracks the initial backfill of the last 14 days of conversations/messages
+  // that runs once when an account is connected. WhatsApp delivers its history
+  // through Coexistence webhooks (no pull API), so for WHATSAPP this only
+  // reflects whether the history webhook(s) have been received.
+  historySyncStatus MessageHistorySyncStatus @default(PENDING)
+  historySyncedAt   DateTime?
+  historySyncError  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   settings                PageSettings?
   posts                   Post[]
@@ -211,6 +268,7 @@ model SocialAccount {
   agentLink               AgentSocialAccount?
   labels                  Label[]
   notificationPreferences NotificationPreference[]
+  errorLogs               SocialAccountErrorLog[]
 
   loyaltyContacts                 LoyaltyContact[]
   loyaltyBonuses                  LoyaltyBonus[]
@@ -264,11 +322,106 @@ model Catalog {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
-  products       Product[]
-  socialAccounts CatalogSocialAccount[]
-  pageSettings   PageSettings[]
+  products            Product[]
+  socialAccounts      CatalogSocialAccount[]
+  pageSettings        PageSettings[]
+  productContexts     ProductContext[]
+  collectionContexts  CollectionContext[]
+  productPostLinks    ProductPostLink[]
+  collectionPostLinks CollectionPostLink[]
+  migrations          CatalogMigration[]
+  imageTemplates      ImageTemplate[]
 
   @@index([organisationId])
+}
+
+// ─── Image Studio Templates ───
+// Habillages réutilisables (cadres / overlays marketing) créés dans le Studio
+// images. Par défaut le studio affiche des templates statiques ; dès qu'un user
+// en modifie un, il est persisté ici (sourceKey = id du template statique
+// d'origine, null pour un template créé de zéro). `definition` contient les
+// éléments (texte, formes, zones, champs dynamiques) en JSON.
+model ImageTemplate {
+  id             String   @id @default(uuid())
+  organisationId String
+  catalogId      String
+  catalog        Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  name           String
+  format         String   @default("1:1")
+  accent         String?
+  definition     Json
+  sourceKey      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([catalogId, sourceKey])
+  @@index([organisationId])
+  @@index([catalogId])
+}
+
+// ─── Product / Collection AI Context ───
+// Products and collections live in Meta (Facebook Catalog), not in our DB. We
+// store the user-curated AI context keyed by (catalogId, providerProductId) /
+// (catalogId, providerCollectionId). The `content` field is plain text/markdown
+// authored or refined by the AI from the user's natural-language prompt.
+
+model ProductContext {
+  id                String   @id @default(uuid())
+  catalogId         String
+  catalog           Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  providerProductId String // Meta product ID
+  content           String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([catalogId, providerProductId])
+  @@index([catalogId])
+  @@index([catalogId, content])
+}
+
+model CollectionContext {
+  id                   String   @id @default(uuid())
+  catalogId            String
+  catalog              Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  providerCollectionId String // Meta product set ID
+  content              String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([catalogId, providerCollectionId])
+  @@index([catalogId])
+  @@index([catalogId, content])
+}
+
+// Posts are stored locally (model Post) keyed by their provider ID (FB Post ID
+// or IG Media ID). Link rows tie a Meta product/collection to a stored post.
+
+model ProductPostLink {
+  id                String   @id @default(uuid())
+  catalogId         String
+  catalog           Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  providerProductId String
+  postId            String
+  post              Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+
+  @@unique([catalogId, providerProductId, postId])
+  @@index([catalogId, providerProductId])
+  @@index([postId])
+}
+
+model CollectionPostLink {
+  id                   String   @id @default(uuid())
+  catalogId            String
+  catalog              Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  providerCollectionId String
+  postId               String
+  post                 Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt            DateTime @default(now())
+
+  @@unique([catalogId, providerCollectionId, postId])
+  @@index([catalogId, providerCollectionId])
+  @@index([postId])
 }
 
 model Product {
@@ -307,6 +460,35 @@ model CatalogSocialAccount {
   @@unique([catalogId, socialAccountId])
   @@index([catalogId])
   @@index([socialAccountId])
+}
+
+// One "import the products of a WhatsApp number into a Commerce Manager
+// catalogue" request. Processed one-at-a-time through the `catalog-migration`
+// Bull queue; progress is streamed to the browser over websockets.
+model CatalogMigration {
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  catalogId      String
+  catalog        Catalog      @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  // Source WhatsApp number whose public catalogue is imported (digits only, no '+').
+  sourcePhone           String
+  // Optional link to the connected SocialAccount the number belongs to.
+  sourceSocialAccountId String?
+  status                CatalogMigrationStatus @default(QUEUED)
+  totalProducts         Int                    @default(0)
+  importedProducts      Int                    @default(0)
+  failedProducts        Int                    @default(0)
+  jobId                 String?
+  error                 String?
+  startedAt             DateTime?
+  finishedAt            DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@index([organisationId])
+  @@index([catalogId])
+  @@index([status])
 }
 
 // ─── Agent ───
@@ -497,6 +679,9 @@ model Post {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  productLinks    ProductPostLink[]
+  collectionLinks CollectionPostLink[]
+
   @@index([socialAccountId])
 }
 
@@ -543,6 +728,7 @@ model Conversation {
   lastMessageText          String?
   lastMessageAt            DateTime?
   unreadCount              Int                              @default(0)
+  historySyncedAt          DateTime? // last time the 14-day message backfill ran for this thread
   aiOverride               AiConversationOverride? // Per-conversation override of agent activation rules
   messages                 DirectMessage[]
   conversationLabels       ConversationLabel[]
@@ -924,6 +1110,46 @@ model ContactConsentEvent {
   @@index([socialAccountId])
   @@index([campaignId])
   @@index([purpose, topic])
+}
+
+// Append-only log of outbound provider API failures. Powers the consecutive
+// error counter / circuit breaker and feeds the human-friendly error bank.
+model SocialAccountErrorLog {
+  id              String         @id @default(uuid())
+  socialAccountId String
+  socialAccount   SocialAccount  @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  provider        SocialProvider
+  // Outbound capability that failed, when applicable (helps target a granular
+  // disable instead of the whole account).
+  feature         SocialFeature?
+  // Service method that triggered the call (e.g. "sendMessage", "findProducts").
+  operation       String?
+  // Logical resource the user must reconnect to fix this (e.g. "page",
+  // "catalog", "tiktok", "instagram"). Passed to the LLM explanation prompt.
+  resource        String?
+  // Provider/HTTP error code (e.g. "190", "OAuthException", "400").
+  errorCode       String?
+  // Raw provider error payload / stack for debugging and "show details".
+  errorTrace      String
+  createdAt       DateTime       @default(now())
+
+  @@index([socialAccountId, createdAt])
+}
+
+// Cache of human-friendly, multilingual explanations generated by an LLM for a
+// given class of provider error. Reused across accounts so we only pay the LLM
+// once per distinct error signature.
+model ProviderErrorMessage {
+  id        String         @id @default(uuid())
+  // Stable hash of provider + errorCode + resource used to dedupe/lookups.
+  signature String         @unique
+  provider  SocialProvider
+  errorCode String?
+  resource  String?
+  // Localized explanations, shape: { "en": string, "fr": string, ... }.
+  messages  Json
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 }
 
 // ─── MCP (Model Context Protocol) ───

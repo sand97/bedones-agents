@@ -13,6 +13,7 @@ import { GatewayModule } from './gateway/gateway.module'
 import { MemberModule } from './member/member.module'
 import { InvitationModule } from './invitation/invitation.module'
 import { CatalogModule } from './catalog/catalog.module'
+import { CatalogMigrationModule } from './catalog-migration/catalog-migration.module'
 import { AgentModule } from './agent/agent.module'
 import { TicketModule } from './ticket/ticket.module'
 import { PromotionModule } from './promotion/promotion.module'
@@ -47,6 +48,7 @@ import { BedonesMcpModule } from './mcp/mcp.module'
     MemberModule,
     InvitationModule,
     CatalogModule,
+    CatalogMigrationModule,
     AgentModule,
     TicketModule,
     PromotionModule,

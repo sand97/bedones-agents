@@ -130,6 +130,24 @@ export async function uploadChatMedia(file: File): Promise<string> {
   return data.url
 }
 
+/** Upload a product image — the backend optimizes (resize + compress) it. */
+export async function uploadProductImage(file: File): Promise<string> {
+  const { data, error } = await apiClient.POST('/upload/product-image', {
+    body: { file } as unknown as { file: string },
+    bodySerializer: () => {
+      const formData = new FormData()
+      formData.append('file', file)
+      return formData
+    },
+  })
+
+  if (error) {
+    throw new Error(getErrorMessage(error, i18n.t('upload.error')))
+  }
+
+  return data.url
+}
+
 // ─── Social / Comments ───
 
 export async function connectFacebook(
@@ -155,7 +173,7 @@ export async function connectFacebookCatalog(
   redirectUri: string,
   scopes?: string[],
 ): Promise<unknown> {
-  const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
   const res = await fetch(`${API_URL}/social/connect/facebook-catalog`, {
     method: 'POST',
     credentials: 'include',
@@ -227,6 +245,34 @@ export async function getPostsForAccount(accountId: string): Promise<PostRespons
   }
 
   return data
+}
+
+export interface ProviderPost {
+  id: string
+  message: string | null
+  imageUrl: string | null
+  permalinkUrl: string | null
+  createdTime: string | null
+}
+
+export async function getProviderPostsForAccount(
+  accountId: string,
+  params?: { search?: string; after?: string; limit?: number },
+): Promise<{ posts: ProviderPost[]; cursorAfter?: string }> {
+  const query = new URLSearchParams()
+  if (params?.search) query.set('search', params.search)
+  if (params?.after) query.set('after', params.after)
+  if (params?.limit) query.set('limit', String(params.limit))
+  const qs = query.toString()
+  const baseUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+  const res = await fetch(
+    `${baseUrl}/social/accounts/${accountId}/provider-posts${qs ? `?${qs}` : ''}`,
+    { credentials: 'include' },
+  )
+  if (!res.ok) {
+    throw new Error(`API error ${res.status}: ${await res.text()}`)
+  }
+  return res.json() as Promise<{ posts: ProviderPost[]; cursorAfter?: string }>
 }
 
 export async function updatePageSettings(

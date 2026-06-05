@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core'
+import { NestExpressApplication } from '@nestjs/platform-express'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import type { NextFunction, Request, Response } from 'express'
 import * as cookieParser from 'cookie-parser'
@@ -7,7 +8,13 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { AppModule } from './app.module'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { rawBody: true })
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true })
+
+  // Lift the default 100kb body-parser limit: catalog-migration callbacks stream
+  // base64 product images (hundreds of KB each) and Coexistence history webhooks
+  // can be large too. rawBody capture (webhook signature checks) is preserved.
+  app.useBodyParser('json', { limit: '25mb' })
+  app.useBodyParser('urlencoded', { limit: '25mb', extended: true })
 
   app.use(cookieParser())
 
@@ -34,7 +41,12 @@ async function bootstrap() {
   })
 
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'https://moderator.bedones.test',
+    // Liste d'origines autorisées, séparées par des virgules (frontend,
+    // studio design, etc.), définies dans CORS_URLS du .env.
+    origin: (process.env.CORS_URLS || 'https://moderator.bedones.local')
+      .split(',')
+      .map((url) => url.trim())
+      .filter(Boolean),
     credentials: true,
   })
 

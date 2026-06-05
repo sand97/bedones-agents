@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { createFileRoute, useParams } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, Spin } from 'antd'
+import { SetupSuccessModal } from '@app/components/dashboard/setup-success-modal'
 import { Plus, Sparkles, Bot, Zap, MoreHorizontal, Loader2 } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
@@ -47,12 +48,17 @@ function mapApiMessage(m: ApiAgentMessage): AgentMessage {
 function AgentsPage() {
   const { t } = useTranslation()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
+  const navigate = useNavigate()
   const { isDesktop } = useLayout()
   const queryClient = useQueryClient()
 
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [activateOpen, setActivateOpen] = useState(false)
+  const [activationSuccess, setActivationSuccess] = useState<{
+    agentName: string
+    remaining: number
+  } | null>(null)
   const [editAgent, setEditAgent] = useState<import('@app/lib/api/agent-api').Agent | null>(null)
   const [messages, setMessages] = useState<AgentMessage[]>([])
   const [pendingQuestion, setPendingQuestion] = useState<AgentMessage | null>(null)
@@ -227,9 +233,37 @@ function AgentsPage() {
       labelIds?: string[]
       contacts?: Record<string, string[]>
     }) => agentApi.activate(selectedAgentId!, data),
-    onSuccess: () => {
+    onSuccess: async (activated) => {
       queryClient.invalidateQueries({ queryKey: ['agents', orgSlug] })
       setActivateOpen(false)
+
+      // Reflect the activation in the setup status — if any work remains, prompt the
+      // user to head back to the dashboard to continue.
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+      try {
+        const res = await fetch(`${apiUrl}/organisations/${orgSlug}/setup-status`, {
+          credentials: 'include',
+        })
+        if (res.ok) {
+          const status = (await res.json()) as { pendingCount: number }
+          // Invalidate so the dashboard re-fetches when the user navigates back.
+          queryClient.invalidateQueries({
+            queryKey: [
+              'get',
+              '/organisations/{id}/setup-status',
+              { params: { path: { id: orgSlug } } },
+            ],
+          })
+          if (status.pendingCount > 0) {
+            setActivationSuccess({
+              agentName: activated.name ?? t('agent.default_name'),
+              remaining: status.pendingCount,
+            })
+          }
+        }
+      } catch {
+        // Setup status is non-critical here — activation already succeeded.
+      }
     },
   })
 
@@ -579,6 +613,22 @@ function AgentsPage() {
           loading={activateMutation.isPending}
         />
       )}
+
+      <SetupSuccessModal
+        open={Boolean(activationSuccess)}
+        subjectName={activationSuccess?.agentName ?? ''}
+        title={
+          activationSuccess
+            ? t('agent.activation_success_title', { name: activationSuccess.agentName })
+            : undefined
+        }
+        remainingCount={activationSuccess?.remaining ?? 0}
+        onContinue={() => {
+          setActivationSuccess(null)
+          navigate({ to: '/app/$orgSlug/dashboard', params: { orgSlug } })
+        }}
+        onLater={() => setActivationSuccess(null)}
+      />
     </div>
   )
 }

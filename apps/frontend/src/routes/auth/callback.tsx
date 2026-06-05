@@ -15,6 +15,7 @@ import {
   setAuthRedirect,
   buildTikTokOAuthUrl,
 } from '@app/lib/auth-redirect'
+import { resolvePostAuthRoute } from '@app/lib/post-auth-route'
 import { TikTokBusinessGuideModal } from '@app/components/tiktok/tiktok-business-guide-modal'
 import i18n from '@app/i18n'
 
@@ -65,7 +66,7 @@ function AuthCallbackPage() {
       setLoadingMessage(i18n.t('auth.finalizing_connection'))
 
       const provider = redirect.provider || 'facebook'
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.test'
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
       const redirectUri = `${apiUrl}/auth/callback/${provider}`
 
       const featureScopes = redirect.scopes
@@ -132,14 +133,11 @@ function AuthCallbackPage() {
             return
           }
 
-          const orgWithSocial = data.organisations.find((o) => o.socialAccounts.length > 0)
-          if (orgWithSocial) {
-            navigate({
-              to: '/app/$orgSlug/dashboard',
-              params: { orgSlug: orgWithSocial.id },
-            })
-          } else if (data.organisations.length > 0) {
-            navigate({ to: '/create-organisation', search: { step: undefined } })
+          const route = resolvePostAuthRoute(data)
+          if (route.kind === 'dashboard') {
+            navigate({ to: '/app/$orgSlug/dashboard', params: { orgSlug: route.orgId } })
+          } else if (route.kind === 'organisations') {
+            navigate({ to: '/organisations' })
           } else {
             navigate({ to: '/create-organisation', search: { step: undefined } })
           }

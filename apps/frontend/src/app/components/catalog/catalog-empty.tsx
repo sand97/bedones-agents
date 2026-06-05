@@ -1,13 +1,15 @@
 import { useTranslation } from 'react-i18next'
 import { SocialSetup } from '@app/components/social/social-setup'
-import { ShoppingBag } from 'lucide-react'
+import { ShoppingBag, Smartphone } from 'lucide-react'
 
 interface CatalogEmptyProps {
   onConnect: () => void
+  /** Opens the Commerce Manager migration wizard (import a WhatsApp catalogue). */
+  onMigrate?: () => void
   loading?: boolean
 }
 
-export function CatalogEmpty({ onConnect, loading }: CatalogEmptyProps) {
+export function CatalogEmpty({ onConnect, onMigrate, loading }: CatalogEmptyProps) {
   const { t } = useTranslation()
 
   return (
@@ -19,6 +21,10 @@ export function CatalogEmpty({ onConnect, loading }: CatalogEmptyProps) {
       buttonLabel={t('catalog.connect_button')}
       onAction={onConnect}
       loading={loading}
+      secondaryButtonLabel={onMigrate ? t('catalog_migration.empty_cta') : undefined}
+      secondaryButtonIcon={onMigrate ? <Smartphone size={18} /> : undefined}
+      onSecondaryAction={onMigrate}
+      actionsLayout="stack"
     />
   )
 }
