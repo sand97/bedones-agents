@@ -505,10 +505,16 @@ a {
 
 /* Inline list search row (chat conversations + comments posts) */
 .list-search {
+  position: relative;
   flex-shrink: 0;
 }
 
+/* Progress overlays the bottom edge so it never shifts the list below it. */
 .list-search__progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   line-height: 0;
 }
 
@@ -518,6 +524,10 @@ a {
 
 .list-search__progress .ant-progress-inner {
   border-radius: 0 !important;
+}
+
+.list-search__progress .ant-progress-bg {
+  background-color: #111b21 !important;
 }
 
 /* Comments split layout */
