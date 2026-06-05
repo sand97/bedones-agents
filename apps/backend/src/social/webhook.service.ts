@@ -1001,7 +1001,17 @@ export class WebhookService {
         // Coexistence history sync. The WABA must be subscribed to the
         // `history` webhook field (configured in the Meta App Dashboard).
         const isHistoryField = change.field === 'history'
-        if (!isMessageField && !isMessageEchoField && !isHistoryField) continue
+        // Coexistence contact sync: Meta pushes the business's WhatsApp Business
+        // app address-book contacts (and later additions/changes) so we can show
+        // the name the business saved instead of the raw phone number.
+        const isAppStateSyncField = change.field === 'smb_app_state_sync'
+        if (
+          !isMessageField &&
+          !isMessageEchoField &&
+          !isHistoryField &&
+          !isAppStateSyncField
+        )
+          continue
 
         const value = change.value
         if (!value?.metadata?.phone_number_id) continue
@@ -1041,6 +1051,12 @@ export class WebhookService {
         // `history` field after onboarding. We backfill the configured window.
         if (isHistoryField) {
           await this.handleWhatsAppHistory(socialAccount.id, phoneNumberId, value, orgId)
+          continue
+        }
+
+        // Coexistence contact sync (field: `smb_app_state_sync`).
+        if (isAppStateSyncField) {
+          await this.handleWhatsAppAppStateSync(socialAccount.id, value, orgId)
           continue
         }
 
@@ -1086,9 +1102,15 @@ export class WebhookService {
     const timestamp = new Date(parseInt(msg.timestamp) * 1000)
     const platformMsgId = msg.id
 
-    // Get sender name from contacts array
+    // Get sender name from contacts array. A name synced from the business
+    // address book (smb_app_state_sync) wins over the WhatsApp profile name.
     const contact = contacts?.find((c) => c.wa_id === senderId)
-    const senderName = contact?.profile?.name || senderId
+    const senderName =
+      (await this.resolveWhatsAppContactName(
+        socialAccountId,
+        senderId,
+        contact?.profile?.name || null,
+      )) || senderId
 
     // Extract message content
     let messageText = ''
@@ -1265,7 +1287,13 @@ export class WebhookService {
     const timestamp = new Date(parseInt(msg.timestamp) * 1000)
     const platformMsgId = msg.id
     const contact = contacts?.find((c) => c.wa_id === recipientId)
-    const recipientName = contact?.profile?.name || null
+    // A name synced from the business address book (smb_app_state_sync) wins
+    // over the WhatsApp profile name.
+    const recipientName = await this.resolveWhatsAppContactName(
+      socialAccountId,
+      recipientId,
+      contact?.profile?.name || null,
+    )
 
     let messageText = ''
     let mediaUrl: string | null = null
@@ -1527,7 +1555,14 @@ export class WebhookService {
         const participantId = thread.id
         if (!participantId) continue
         const contact = contacts?.find((c) => c.wa_id === participantId)
-        const participantName = contact?.profile?.name || participantId
+        // A name synced from the business address book (smb_app_state_sync) wins
+        // over the WhatsApp profile name.
+        const participantName =
+          (await this.resolveWhatsAppContactName(
+            socialAccountId,
+            participantId,
+            contact?.profile?.name || null,
+          )) || participantId
 
         for (const msg of thread.messages || []) {
           // Reactions are folded into their target message live; skip in history.
@@ -1587,6 +1622,104 @@ export class WebhookService {
       provider: 'WHATSAPP',
       historyImported: imported,
     })
+  }
+
+  /**
+   * Persist a Coexistence contact-sync webhook (field: `smb_app_state_sync`).
+   *
+   * Meta delivers the contacts saved in the business's WhatsApp Business app
+   * address book (right after onboarding) plus any later additions/changes, so
+   * we can display the name the business chose instead of a bare phone number.
+   * A "contact" in our model is a {@link Conversation} keyed by
+   * (socialAccountId, participantId) — the participantId being the wa_id
+   * (digits only) used everywhere else in the WhatsApp flows.
+   *
+   * - `add` / `update` (and any other non-removal action carrying a name):
+   *   upsert the conversation, touching only `participantName`. An existing
+   *   thread keeps its messages, unread count and last-message preview; a
+   *   brand-new contact is created without a fake last message so it sorts
+   *   below active chats (lastMessageAt stays null).
+   * - `remove`: ignored — we never delete a contact or its message history.
+   */
+  private async handleWhatsAppAppStateSync(
+    socialAccountId: string,
+    value: WhatsAppWebhookValue,
+    orgId: string,
+  ) {
+    let synced = 0
+
+    for (const entry of value.state_sync || []) {
+      if (entry.type !== 'contact' || !entry.contact) continue
+
+      const action = (entry.action || '').toLowerCase()
+      // Normalize the phone number to the wa_id format (digits only) that the
+      // message/echo/history flows use as the conversation participantId.
+      const participantId = (entry.contact.phone_number || '').replace(/\D+/g, '')
+      if (!participantId) continue
+
+      // Per product decision: contact removals are ignored — keep the
+      // conversation (and any history) untouched.
+      if (action === 'remove' || action === 'delete') {
+        this.logger.log(`[WhatsApp StateSync] Ignoring "${action}" for ${participantId}`)
+        continue
+      }
+
+      const name = (entry.contact.full_name || entry.contact.first_name || '').trim()
+      if (!name) continue
+
+      await this.prisma.conversation.upsert({
+        where: {
+          socialAccountId_participantId: { socialAccountId, participantId },
+        },
+        create: {
+          socialAccountId,
+          participantId,
+          participantName: name,
+          contactNameSynced: true,
+        },
+        update: {
+          participantName: name,
+          contactNameSynced: true,
+        },
+      })
+      synced++
+    }
+
+    if (synced === 0) return
+
+    this.logger.log(
+      `[WhatsApp StateSync] Synced ${synced} contact name(s) for account ${socialAccountId}`,
+    )
+
+    // Refresh the conversation list so the new/updated names show up live.
+    this.eventsGateway.emitToOrg(orgId, 'conversation:updated', {
+      socialAccountId,
+      provider: 'WHATSAPP',
+    })
+  }
+
+  /**
+   * Resolve the display name to persist for a WhatsApp contact on an inbound
+   * message / echo / history item.
+   *
+   * Once a conversation's name comes from the business address-book sync
+   * (smb_app_state_sync, {@link handleWhatsAppAppStateSync}), it is
+   * authoritative: it must win over the WhatsApp profile name (or bare number)
+   * carried by later messages, and only another contact sync may change it.
+   * Returns the locked synced name when the conversation is flagged, otherwise
+   * the candidate name extracted from the message.
+   */
+  private async resolveWhatsAppContactName(
+    socialAccountId: string,
+    participantId: string,
+    candidateName: string | null,
+  ): Promise<string | null> {
+    const existing = await this.prisma.conversation.findUnique({
+      where: { socialAccountId_participantId: { socialAccountId, participantId } },
+      select: { participantName: true, contactNameSynced: true },
+    })
+    if (existing?.contactNameSynced) return existing.participantName
+    return candidateName
   }
 
   /** Extract displayable content from a historical WhatsApp message. */
@@ -3532,6 +3665,7 @@ interface WhatsAppWebhookValue {
   messages?: WhatsAppMessage[]
   message_echoes?: WhatsAppMessageEcho[]
   history?: WhatsAppHistoryEntry[]
+  state_sync?: WhatsAppStateSync[]
   errors?: WhatsAppWebhookError[]
   statuses?: Array<{
     id: string
@@ -3605,6 +3739,18 @@ interface WhatsAppHistoryEntry {
 interface WhatsAppHistoryMessage extends WhatsAppMessage {
   to?: string
   history_context?: { status?: string; from_me?: boolean }
+}
+
+// ─── Coexistence contact sync (field: "smb_app_state_sync") ───
+interface WhatsAppStateSync {
+  type: string // "contact"
+  contact?: {
+    full_name?: string
+    first_name?: string
+    phone_number?: string
+  }
+  action?: string // "add" | "update" | "remove"
+  metadata?: { timestamp?: string }
 }
 
 // ─── TikTok webhook payload types ───

@@ -205,6 +205,15 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       queryClient.removeQueries({ queryKey: ['catalog-indexing-progress', data.catalogId] })
     }
 
+    const handleConversationUpdated = (_data: { socialAccountId?: string }) => {
+      // Conversation-level change with no new message (e.g. contact names synced
+      // from the WhatsApp Business address book via smb_app_state_sync). Refresh
+      // the list so updated names appear; no notification sound.
+      queryClient.invalidateQueries({
+        queryKey: ['get', '/messaging/conversations/{accountId}'],
+      })
+    }
+
     socket.on('comment:new', handleCommentNew)
     socket.on('comment:updated', handleCommentUpdated)
     socket.on('comment:removed', handleCommentRemoved)
@@ -212,6 +221,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socket.on('message:reaction', handleMessageReaction)
     socket.on('message:status', handleMessageStatus)
     socket.on('conversation:read', handleConversationRead)
+    socket.on('conversation:updated', handleConversationUpdated)
     socket.on('catalog:indexing-progress', handleCatalogIndexingProgress)
     socket.on('catalog:indexing-completed', handleCatalogIndexingCompleted)
     socket.on('catalog:indexing-failed', handleCatalogIndexingFailed)
@@ -224,6 +234,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socket.off('message:reaction', handleMessageReaction)
       socket.off('message:status', handleMessageStatus)
       socket.off('conversation:read', handleConversationRead)
+      socket.off('conversation:updated', handleConversationUpdated)
       socket.off('catalog:indexing-progress', handleCatalogIndexingProgress)
       socket.off('catalog:indexing-completed', handleCatalogIndexingCompleted)
       socket.off('catalog:indexing-failed', handleCatalogIndexingFailed)
