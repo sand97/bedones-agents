@@ -25,7 +25,7 @@ peut varier par environnement).
 | `POSTHOG_HOST` | backend | `https://us.i.posthog.com` (région US). |
 | `POSTHOG_CAPTURE_INFO_LOGS` | backend | `true` pour aussi remonter les logs `info` (défaut `false`). |
 | `VITE_POSTHOG_KEY` | frontend | Même valeur que `POSTHOG_PROJECT_TOKEN`. Vide ⇒ désactivé. |
-| `VITE_POSTHOG_HOST` | frontend | `https://us.i.posthog.com`. |
+| `VITE_POSTHOG_HOST` | frontend | Domaine du **reverse proxy managé** (`https://post-moderator.bedones.com`) — anti ad-blockers. |
 
 Voir `apps/backend/.env.example` et `apps/frontend/.env.example`.
 
@@ -67,6 +67,14 @@ Voir `apps/backend/.env.example` et `apps/frontend/.env.example`.
   Query, **sans requête réseau supplémentaire**), `posthog.identify(user.id,…)`
   + `posthog.group('organisation', orgId)`. `reset()` au logout.
 - **Error tracking** navigateur + dead clicks / heatmaps (via `defaults`).
+- **Reverse proxy** : `api_host` pointe sur `post-moderator.bedones.com` (proxy
+  managé PostHog) → events **et** assets (recorder du session replay, surveys)
+  passent par notre domaine, donc non bloqués par les ad-blockers. `ui_host`
+  reste `us.posthog.com` pour que les liens in-app pointent vers la vraie UI.
+- **`person_profiles: 'identified_only'`** : pas de profil pour les visiteurs
+  anonymes (moins cher + privacy) ; un profil est créé à l'`identify()`. Les
+  page views anonymes restent capturées. Passer à `'always'` pour profiler aussi
+  les anonymes.
 
 > Les events backend et frontend partagent la même clé de group
 > `organisation` = **id de l'organisation** ⇒ analytics par org cohérent
@@ -88,13 +96,12 @@ Voir `apps/backend/.env.example` et `apps/frontend/.env.example`.
 ## 5. Suggestions (debug & marketing) pour plus tard
 
 Déjà branché : product analytics, session replay, error tracking, LLM
-observability, logs serveur. Pistes complémentaires utiles :
+observability, logs serveur, **reverse proxy** (anti ad-blockers). Pistes
+complémentaires utiles :
 
 - **Feature flags** : déploiements progressifs / kill-switch d'une feature
   agent. `posthog-js/react` expose déjà `useFeatureFlagEnabled`.
 - **Surveys** : NPS / feedback in-app ciblé (ex. après N tickets traités).
-- **Reverse proxy** : servir PostHog derrière votre domaine (via le Worker
-  Cloudflare) pour contourner les ad-blockers et fiabiliser la collecte.
 - **Attribution per-org plus fine** sur les traces LLM : passer
   `trace: { distinctId, traceId }` à `createChatModel(...)` depuis l'agent pour
   rattacher chaque génération à une organisation / conversation précise.
