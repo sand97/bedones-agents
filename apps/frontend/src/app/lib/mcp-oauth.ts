@@ -23,32 +23,38 @@ export interface McpAuthorizeDecisionInput extends McpAuthorizeParams {
 }
 
 /**
- * Approve the connection for a given organisation and get back the URL the
- * browser must navigate to so the AI client (ChatGPT / Claude) receives its
- * authorization code.
+ * Approve the connection for a given organisation by submitting a real,
+ * full-page form POST to the backend decision endpoint. The backend then
+ * issues a server-side 302 to the AI client's redirect_uri — the final hop that
+ * OAuth clients (ChatGPT / Claude) track to complete the connection. A
+ * client-side fetch + JS navigation breaks that detection, so we deliberately
+ * use a top-level navigation here (and build the form imperatively to keep the
+ * session cookie and avoid raw markup in the page).
  */
-export async function submitMcpAuthorizeDecision(
-  input: McpAuthorizeDecisionInput,
-): Promise<string> {
-  const res = await fetch(`${API_URL}/mcp/oauth/authorize/decision`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  })
+export function submitMcpAuthorizeDecision(input: McpAuthorizeDecisionInput): void {
+  const form = document.createElement('form')
+  form.method = 'POST'
+  form.action = `${API_URL}/mcp/oauth/authorize/decision`
 
-  if (!res.ok) {
-    let error = 'authorization_failed'
-    try {
-      error = ((await res.json()) as { error?: string }).error ?? error
-    } catch {
-      /* ignore non-JSON body */
-    }
-    throw new Error(error)
+  const addField = (name: string, value?: string) => {
+    if (value == null) return
+    const field = document.createElement('input')
+    field.type = 'hidden'
+    field.name = name
+    field.value = value
+    form.appendChild(field)
   }
 
-  const data = (await res.json()) as { redirectUrl: string }
-  return data.redirectUrl
+  addField('client_id', input.client_id)
+  addField('redirect_uri', input.redirect_uri)
+  addField('state', input.state)
+  addField('scope', input.scope)
+  addField('code_challenge', input.code_challenge)
+  addField('code_challenge_method', input.code_challenge_method)
+  addField('organisationId', input.organisationId)
+
+  document.body.appendChild(form)
+  form.submit()
 }
 
 /**

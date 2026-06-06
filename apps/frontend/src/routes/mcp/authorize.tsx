@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Button, Card, Radio, Result, Space, Spin, Typography, message } from 'antd'
+import { Button, Card, Radio, Result, Space, Spin, Typography } from 'antd'
 import { useEffect, useState, type ReactNode } from 'react'
 import { $api } from '@app/lib/api/$api'
 import {
@@ -10,13 +10,13 @@ import {
 
 const { Title, Text } = Typography
 
-type McpAuthorizeSearch = Partial<McpAuthorizeParams>
+type McpAuthorizeSearch = Partial<McpAuthorizeParams> & { error?: string }
 
 /**
  * In-app consent screen for the MCP OAuth flow. The backend authorize endpoint
  * redirects here with the OAuth params; we list the user's organisations and
- * post the decision, then show a success screen before handing the
- * authorization code back to the AI client (ChatGPT / Claude).
+ * submit the decision as a full-page POST. The backend then 302s to the AI
+ * client's redirect_uri (the hop ChatGPT / Claude track to finish connecting).
  */
 export const Route = createFileRoute('/mcp/authorize')({
   component: McpAuthorizePage,
@@ -29,6 +29,7 @@ export const Route = createFileRoute('/mcp/authorize')({
       scope: str(search.scope),
       code_challenge: str(search.code_challenge),
       code_challenge_method: str(search.code_challenge_method),
+      error: str(search.error),
     }
   },
 })
@@ -48,7 +49,6 @@ function McpAuthorizePage() {
 
   const [selectedOrg, setSelectedOrg] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [done, setDone] = useState(false)
 
   const hasParams = Boolean(search.client_id && search.redirect_uri)
 
@@ -88,41 +88,16 @@ function McpAuthorizePage() {
     )
   }
 
-  if (done) {
-    return (
-      <Centered>
-        <Result
-          status="success"
-          title="Accès autorisé"
-          subTitle="Bedones est connecté. Vous pouvez retourner sur ChatGPT — la fenêtre va se fermer automatiquement."
-        />
-      </Centered>
-    )
-  }
-
   const orgs = meQuery.data?.organisations ?? []
 
-  const handleAuthorize = async () => {
+  const handleAuthorize = () => {
     if (!selectedOrg) return
     setSubmitting(true)
-    try {
-      const redirectUrl = await submitMcpAuthorizeDecision({
-        ...(search as McpAuthorizeParams),
-        organisationId: selectedOrg,
-      })
-      setDone(true)
-      // Hand the authorization code back to the AI client.
-      setTimeout(() => {
-        window.location.href = redirectUrl
-      }, 1200)
-    } catch (err) {
-      message.error(
-        err instanceof Error && err.message === 'organisation_not_authorised'
-          ? "Vous n'avez pas accès à cette organisation."
-          : "L'autorisation a échoué, réessayez.",
-      )
-      setSubmitting(false)
-    }
+    // Full-page navigation: the backend will 302 back to the AI client.
+    submitMcpAuthorizeDecision({
+      ...(search as McpAuthorizeParams),
+      organisationId: selectedOrg,
+    })
   }
 
   return (
@@ -138,6 +113,12 @@ function McpAuthorizePage() {
               commentaires via Bedones. Choisissez l&apos;organisation à connecter.
             </Text>
           </div>
+
+          {search.error === 'org' && (
+            <Text type="danger">
+              Vous n&apos;avez pas accès à cette organisation, choisissez-en une autre.
+            </Text>
+          )}
 
           {orgs.length === 0 ? (
             <Text type="danger">Aucune organisation active sur ce compte.</Text>
