@@ -3,15 +3,34 @@ import { ConfigService } from '@nestjs/config'
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
 import { ChatOpenAI } from '@langchain/openai'
 import type { Runnable } from '@langchain/core/runnables'
+import type { BaseCallbackHandler } from '@langchain/core/callbacks/base'
 import type { BaseLanguageModelInput } from '@langchain/core/language_models/base'
 import type { AIMessageChunk } from '@langchain/core/messages'
 import type { ZodV4Like } from '@langchain/core/utils/types'
+import { LangChainCallbackHandler } from '@posthog/ai/langchain'
+import { PostHogService } from '../../posthog/posthog.service'
 
 export type LlmTier = 'thinking' | 'flash'
+
+/**
+ * Optional PostHog LLM-observability context. When provided, the LLM call is
+ * traced in PostHog (tokens, cost, latency, prompts/responses, errors) and
+ * attributed to the given person/organisation.
+ */
+export interface LlmTraceContext {
+  /** Person the call belongs to (org id, contact id, member id…). */
+  distinctId?: string
+  /** Groups several LLM calls under one trace (e.g. a whole agent turn). */
+  traceId?: string
+  properties?: Record<string, unknown>
+  groups?: Record<string, string>
+}
 
 export interface LlmFactoryOptions {
   temperature?: number
   maxOutputTokens?: number
+  /** Enable PostHog LLM observability for calls made with the returned model. */
+  trace?: LlmTraceContext
 }
 
 export type ChatModel = Runnable<BaseLanguageModelInput, AIMessageChunk>
@@ -40,21 +59,27 @@ export type StructuredChatModel<T> = Runnable<BaseLanguageModelInput, T>
 export class LlmFactoryService {
   private readonly logger = new Logger(LlmFactoryService.name)
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly posthog: PostHogService,
+  ) {}
 
   createChatModel(tier: LlmTier, options: LlmFactoryOptions = {}): ChatModel {
     const gemini = this.buildGemini(tier, options)
     const openai = this.buildOpenAI(tier, options)
 
-    if (gemini && openai) {
-      return gemini.withFallbacks([openai])
-    }
-    if (gemini) return gemini
-    if (openai) return openai
+    let model: ChatModel | null = null
+    if (gemini && openai) model = gemini.withFallbacks([openai])
+    else if (gemini) model = gemini
+    else if (openai) model = openai
 
-    throw new Error(
-      'No LLM API key configured. Set GEMINI_API_KEY and/or OPENAI_API_KEY in your env.',
-    )
+    if (!model) {
+      throw new Error(
+        'No LLM API key configured. Set GEMINI_API_KEY and/or OPENAI_API_KEY in your env.',
+      )
+    }
+
+    return this.withPosthogTracing(model, options.trace)
   }
 
   /**
@@ -77,15 +102,40 @@ export class LlmFactoryService {
       ? (openai.withStructuredOutput(schema) as StructuredChatModel<T>)
       : null
 
+    let model: StructuredChatModel<T> | null = null
     if (geminiStructured && openaiStructured) {
-      return geminiStructured.withFallbacks([openaiStructured]) as StructuredChatModel<T>
-    }
-    if (geminiStructured) return geminiStructured
-    if (openaiStructured) return openaiStructured
+      model = geminiStructured.withFallbacks([openaiStructured]) as StructuredChatModel<T>
+    } else if (geminiStructured) model = geminiStructured
+    else if (openaiStructured) model = openaiStructured
 
-    throw new Error(
-      'No LLM API key configured. Set GEMINI_API_KEY and/or OPENAI_API_KEY in your env.',
-    )
+    if (!model) {
+      throw new Error(
+        'No LLM API key configured. Set GEMINI_API_KEY and/or OPENAI_API_KEY in your env.',
+      )
+    }
+
+    return this.withPosthogTracing(model, options.trace)
+  }
+
+  /**
+   * Attaches the PostHog LangChain callback handler so the call shows up in
+   * PostHog's LLM analytics. No-op when PostHog is disabled — the model is
+   * returned unchanged.
+   */
+  private withPosthogTracing<I, O>(model: Runnable<I, O>, trace?: LlmTraceContext): Runnable<I, O> {
+    const client = this.posthog.getClient()
+    if (!client) return model
+
+    const handler = new LangChainCallbackHandler({
+      client,
+      distinctId: trace?.distinctId ?? 'backend-agent',
+      traceId: trace?.traceId,
+      properties: { service: 'backend', ...trace?.properties },
+      groups: trace?.groups,
+      privacyMode: false,
+    })
+
+    return model.withConfig({ callbacks: [handler as BaseCallbackHandler] }) as Runnable<I, O>
   }
 
   private buildGemini(tier: LlmTier, options: LlmFactoryOptions): ChatGoogleGenerativeAI | null {

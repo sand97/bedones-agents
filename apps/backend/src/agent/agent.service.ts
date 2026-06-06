@@ -603,7 +603,9 @@ export class AgentService {
    * extended thinking enabled. Gemini primary, OpenAI fallback.
    */
   private createModel() {
-    return this.llmFactory.createChatModel('thinking')
+    return this.llmFactory.createChatModel('thinking', {
+      trace: { properties: { feature: 'agent-context' } },
+    })
   }
 
   private parseAgentResponse(text: string): {

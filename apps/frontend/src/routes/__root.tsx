@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import '@app/i18n'
 import { getStoredLocale } from '@app/i18n'
 import { LocaleProvider } from '@app/contexts/locale-context'
+import { PostHogProvider } from '@app/contexts/posthog-provider'
 
 import appStyles from '../styles.css?url'
 
@@ -67,15 +68,17 @@ function RootComponent() {
   return (
     <RootDocument>
       <QueryClientProvider client={queryClient}>
-        <LocaleProvider>
-          {AntdProviders ? (
-            <AntdProviders>
-              <Outlet />
-            </AntdProviders>
-          ) : (
-            <div />
-          )}
-        </LocaleProvider>
+        <PostHogProvider>
+          <LocaleProvider>
+            {AntdProviders ? (
+              <AntdProviders>
+                <Outlet />
+              </AntdProviders>
+            ) : (
+              <div />
+            )}
+          </LocaleProvider>
+        </PostHogProvider>
       </QueryClientProvider>
     </RootDocument>
   )
