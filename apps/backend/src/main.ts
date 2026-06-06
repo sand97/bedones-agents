@@ -7,6 +7,7 @@ import { join } from 'path'
 import { mkdirSync, writeFileSync } from 'fs'
 import { AppModule } from './app.module'
 import { PostHogLoggerService } from './posthog/posthog-logger.service'
+import { PostHogHttpMiddleware } from './posthog/posthog-http.middleware'
 import { requestContextMiddleware } from './posthog/request-context'
 
 async function bootstrap() {
@@ -19,8 +20,11 @@ async function bootstrap() {
   app.enableShutdownHooks()
 
   // Open an AsyncLocalStorage scope for every request FIRST, so logs and the
-  // analytics interceptor can attach the current request/user downstream.
+  // analytics middleware can attach the current request/user downstream.
   app.use(requestContextMiddleware)
+  // Track every webhook + API call (runs as a middleware so even auth-rejected
+  // requests are captured — interceptors run after guards and would miss them).
+  app.use(app.get(PostHogHttpMiddleware).handle)
 
   // Lift the default 100kb body-parser limit: catalog-migration callbacks stream
   // base64 product images (hundreds of KB each) and Coexistence history webhooks

@@ -38,13 +38,17 @@ Voir `apps/backend/.env.example` et `apps/frontend/.env.example`.
   `duration_ms` et un **résumé sans PII** du payload (`object`, `entry_count`,
   `fields`). Le contenu détaillé reste dans les logs applicatifs.
 - **Appels API** → event `api_request` (route, méthode, statut, latence,
-  `request_id`, user). Permet de chercher/filtrer le trafic API dans PostHog.
+  `request_id`, user). Émis par un **middleware** `res.on('finish')`
+  (`posthog-http.middleware.ts`) → couvre **toutes** les réponses, y compris les
+  401/403/404/500 (un interceptor Nest, lui, tourne après les guards et raterait
+  les requêtes rejetées par l'auth).
 - **Logs applicatifs** → le logger Nest est remplacé par `PostHogLoggerService` :
   - `this.logger.error(..., error)` avec une vraie `Error` ⇒ **Error tracking**.
   - les lignes `error` / `warn` (et `info` si activé) ⇒ event `backend_log`.
   - Chaque log est enrichi du contexte de requête (`request_id`, route, user)
     grâce à un `AsyncLocalStorage` (`request-context.ts`).
-- **Exceptions** des handlers HTTP ⇒ Error tracking (via l'interceptor).
+- **Exceptions** : les 500 non gérés sont loggués par le filtre d'exception Nest
+  par défaut ⇒ remontés en **Error tracking** via `PostHogLoggerService`.
 - **Observabilité LLM** (agent LangChain / LangGraph, Gemini + OpenAI) : le
   `LlmFactoryService` attache le `LangChainCallbackHandler` de `@posthog/ai`.
   Chaque appel LLM est tracé (tokens, **coût**, latence, prompts/réponses,
