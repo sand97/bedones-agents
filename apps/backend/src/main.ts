@@ -18,12 +18,20 @@ async function bootstrap() {
 
   app.use(cookieParser())
 
-  // Permissive CORS for the public MCP + OAuth discovery surface so that
-  // Claude / ChatGPT clients can reach them cross-origin. Kept separate from
-  // the credentialed app CORS below (these endpoints use Bearer tokens, not
-  // the session cookie).
+  // Permissive CORS for the public MCP *transport* + OAuth discovery surface so
+  // that Claude / ChatGPT clients can reach them cross-origin. These are reached
+  // server-to-server with Bearer tokens (no cookie), hence the wildcard origin.
+  // The interactive OAuth endpoints (/mcp/oauth/*) are deliberately EXCLUDED:
+  // they are driven by our own frontend with the session cookie, so they go
+  // through the credentialed app CORS below instead.
+  const isPublicMcpSurface = (path: string) =>
+    path === '/mcp' ||
+    path === '/sse' ||
+    path === '/messages' ||
+    path.startsWith('/.well-known/oauth')
+
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.path.startsWith('/mcp') || req.path.startsWith('/.well-known')) {
+    if (isPublicMcpSurface(req.path)) {
       res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
       res.setHeader('Vary', 'Origin')
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS')

@@ -12,8 +12,39 @@ import { CountryPhoneInput } from '@app/components/shared/country-phone-input'
 
 const { Title, Text } = Typography
 
+/**
+ * Validate a `return_to` query param so it can only send the user back to our
+ * own MCP OAuth authorize endpoint (prevents open-redirect abuse). Used when an
+ * external AI assistant (Claude / ChatGPT MCP connector) bounces an
+ * unauthenticated user here to log in before consenting.
+ */
+function resolveReturnTo(raw?: string): string | null {
+  if (!raw) return null
+  try {
+    const url = new URL(raw)
+    const apiUrl = new URL(import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local')
+    if (url.origin !== apiUrl.origin) return null
+    if (!url.pathname.startsWith('/mcp/oauth/authorize')) return null
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
 /** Send the user to the right place after authentication (see resolvePostAuthRoute). */
-function navigateAfterAuth(navigate: ReturnType<typeof useNavigate>, data: MeResponse) {
+function navigateAfterAuth(
+  navigate: ReturnType<typeof useNavigate>,
+  data: MeResponse,
+  returnTo?: string,
+) {
+  // An MCP/OAuth flow takes precedence: bounce the browser back to the authorize
+  // endpoint (full-page navigation so the freshly-set session cookie is sent).
+  const target = resolveReturnTo(returnTo)
+  if (target) {
+    window.location.href = target
+    return
+  }
+
   const route = resolvePostAuthRoute(data)
   if (route.kind === 'dashboard') {
     navigate({ to: '/app/$orgSlug/dashboard', params: { orgSlug: route.orgId } })
@@ -40,6 +71,8 @@ interface LoginSearch {
   method?: LoginMethod
   country?: string
   phone?: string
+  /** Full URL to return to after login — used by the MCP OAuth connector flow. */
+  return_to?: string
 }
 
 export const Route = createFileRoute('/auth/login')({
@@ -50,6 +83,7 @@ export const Route = createFileRoute('/auth/login')({
       method,
       country: typeof search.country === 'string' ? search.country : undefined,
       phone: typeof search.phone === 'string' ? search.phone : undefined,
+      return_to: typeof search.return_to === 'string' ? search.return_to : undefined,
     }
   },
 })
@@ -83,8 +117,8 @@ function LoginPage() {
   const meQuery = $api.useQuery('get', '/auth/me', {}, { retry: false })
 
   useEffect(() => {
-    if (meQuery.data) navigateAfterAuth(navigate, meQuery.data)
-  }, [meQuery.data, navigate])
+    if (meQuery.data) navigateAfterAuth(navigate, meQuery.data, search.return_to)
+  }, [meQuery.data, navigate, search.return_to])
 
   const method: LoginMethod = search.method === 'email' ? 'email' : 'whatsapp'
 
@@ -122,12 +156,13 @@ function LoginPage() {
           <div className="login-grid-lines" />
           <div className="relative z-1">
             {method === 'email' ? (
-              <EmailLoginCard navigate={navigate} t={t} />
+              <EmailLoginCard navigate={navigate} returnTo={search.return_to} t={t} />
             ) : (
               <WhatsAppLoginCard
                 initialCountry={search.country}
                 initialPhone={search.phone}
                 navigate={navigate}
+                returnTo={search.return_to}
                 t={t}
               />
             )}
@@ -286,11 +321,13 @@ function WhatsAppLoginCard({
   initialCountry,
   initialPhone,
   navigate,
+  returnTo,
   t,
 }: {
   initialCountry?: string
   initialPhone?: string
   navigate: ReturnType<typeof useNavigate>
+  returnTo?: string
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const [step, setStep] = useState<WhatsAppStep>('phone')
@@ -400,7 +437,7 @@ function WhatsAppLoginCard({
 
   const goToNextScreen = async () => {
     const data = await fetchMe()
-    navigateAfterAuth(navigate, data)
+    navigateAfterAuth(navigate, data, returnTo)
   }
 
   if (step === 'name') {
@@ -563,9 +600,11 @@ function normalizeCountry(input: string): string {
 
 function EmailLoginCard({
   navigate,
+  returnTo,
   t,
 }: {
   navigate: ReturnType<typeof useNavigate>
+  returnTo?: string
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const [email, setEmail] = useState('')
@@ -578,7 +617,7 @@ function EmailLoginCard({
     try {
       await login(email, password)
       const data = await fetchMe()
-      navigateAfterAuth(navigate, data)
+      navigateAfterAuth(navigate, data, returnTo)
     } catch (err) {
       message.error(err instanceof Error ? err.message : t('auth.login_error'))
     } finally {
