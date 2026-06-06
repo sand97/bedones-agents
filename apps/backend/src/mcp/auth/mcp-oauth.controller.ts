@@ -66,25 +66,28 @@ export class McpOAuthController {
 
   @Post('authorize/decision')
   async decision(@Req() req: Request, @Res() res: Response, @Body() body: Record<string, string>) {
-    const user = await this.oauth.resolveBedonesSession(req)
-    if (!user) {
-      return res.status(401).json({ error: 'session_expired' })
-    }
-
     const { client_id, redirect_uri, state, scope, code_challenge, code_challenge_method } = body
     const organisationId = body.organisationId
+    const frontend = (this.config.get<string>('FRONTEND_URL') ?? '').replace(/\/$/, '')
+
+    const user = await this.oauth.resolveBedonesSession(req)
+    if (!user) {
+      // Session lost mid-flow → resume through login then back to authorize.
+      const authorizeUrl = `${this.oauth.issuer}/mcp/oauth/authorize?${this.consentQuery(body, { response_type: 'code' })}`
+      return res.redirect(`${frontend}/auth/login?return_to=${encodeURIComponent(authorizeUrl)}`)
+    }
 
     try {
       await this.oauth.assertClientRedirect(client_id, redirect_uri)
     } catch {
-      return res.status(400).json({ error: 'invalid_client' })
+      return res.status(400).send('invalid client_id or redirect_uri')
     }
 
     const membership = await this.prisma.organisationMember.findUnique({
       where: { userId_organisationId: { userId: user.id, organisationId } },
     })
     if (!membership || membership.status !== 'ACTIVE') {
-      return res.status(403).json({ error: 'organisation_not_authorised' })
+      return res.redirect(`${frontend}/mcp/authorize?${this.consentQuery(body, { error: 'org' })}`)
     }
 
     const code = await this.oauth.createAuthCode({
@@ -100,8 +103,10 @@ export class McpOAuthController {
     const url = new URL(redirect_uri)
     url.searchParams.set('code', code)
     if (state) url.searchParams.set('state', state)
-    // The frontend performs the final navigation so it can show a success screen.
-    return res.json({ redirectUrl: url.toString() })
+    // Server-side 302 to the client's redirect_uri — the final hop OAuth clients
+    // (ChatGPT / Claude) track to complete the connection. Must stay a real
+    // redirect (not a client-side navigation).
+    return res.redirect(url.toString())
   }
 
   // ─── Token endpoint ───
@@ -139,6 +144,23 @@ export class McpOAuthController {
   async revoke(@Body() body: Record<string, string>) {
     if (body.token) await this.oauth.revoke(body.token)
     return {}
+  }
+
+  /** Rebuild the OAuth query string (consent params + extras) for a redirect. */
+  private consentQuery(body: Record<string, string>, extra: Record<string, string> = {}): string {
+    const params = new URLSearchParams()
+    for (const key of [
+      'client_id',
+      'redirect_uri',
+      'state',
+      'scope',
+      'code_challenge',
+      'code_challenge_method',
+    ]) {
+      if (body[key]) params.set(key, body[key])
+    }
+    for (const [key, value] of Object.entries(extra)) params.set(key, value)
+    return params.toString()
   }
 
   private redirectError(

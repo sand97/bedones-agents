@@ -3,6 +3,7 @@ import { Tool } from '@rekog/mcp-nest'
 import { z } from 'zod'
 import { PrismaService } from '../../prisma/prisma.service'
 import { mcpContext } from '../mcp-context'
+import { READ_ONLY, WRITE_INTERNAL } from './annotations'
 import { createTicketSchema, listTicketsSchema, updateTicketStatusSchema } from './tool-schemas'
 
 @Injectable()
@@ -11,6 +12,7 @@ export class McpTicketTools {
 
   @Tool({
     name: 'create_ticket',
+    annotations: WRITE_INTERNAL,
     description:
       'Créer un ticket de suivi pour une demande client (lié optionnellement à une conversation).',
     parameters: createTicketSchema,
@@ -38,6 +40,7 @@ export class McpTicketTools {
 
   @Tool({
     name: 'list_tickets',
+    annotations: READ_ONLY,
     description: "Lister les tickets de l'organisation (filtrable par statut et priorité).",
     parameters: listTicketsSchema,
   })
@@ -68,6 +71,7 @@ export class McpTicketTools {
 
   @Tool({
     name: 'update_ticket_status',
+    annotations: WRITE_INTERNAL,
     description: "Changer le statut d'un ticket.",
     parameters: updateTicketStatusSchema,
   })

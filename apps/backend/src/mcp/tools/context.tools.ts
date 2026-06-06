@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { PrismaService } from '../../prisma/prisma.service'
 import { SocialService } from '../../social/social.service'
 import { mcpContext, requireAdmin } from '../mcp-context'
+import { READ_ONLY, WRITE_INTERNAL } from './annotations'
 import {
   accountIdSchema,
   emptySchema,
@@ -26,6 +27,7 @@ export class McpContextTools {
 
   @Tool({
     name: 'get_business_context',
+    annotations: READ_ONLY,
     description:
       "Récupère le contexte business des agents IA de l'organisation (contexte markdown, score de complétude).",
     parameters: emptySchema,
@@ -41,6 +43,7 @@ export class McpContextTools {
 
   @Tool({
     name: 'update_agent_context',
+    annotations: WRITE_INTERNAL,
     description:
       "Mettre à jour le contexte business (markdown) et le score d'un agent IA. Sert à définir directement le contexte sans passer par le dashboard.",
     parameters: updateAgentContextSchema,
@@ -65,6 +68,7 @@ export class McpContextTools {
 
   @Tool({
     name: 'get_page_settings',
+    annotations: READ_ONLY,
     description:
       "Récupère les réglages de modération d'un compte social (actions spam/indésirables, instructions, règles FAQ).",
     parameters: accountIdSchema,
@@ -81,6 +85,7 @@ export class McpContextTools {
 
   @Tool({
     name: 'update_page_settings',
+    annotations: WRITE_INTERNAL,
     description:
       "Mettre à jour les réglages de modération d'un compte social. Réservé aux administrateurs.",
     parameters: updatePageSettingsSchema,
@@ -102,6 +107,7 @@ export class McpContextTools {
 
   @Tool({
     name: 'add_faq_rule',
+    annotations: WRITE_INTERNAL,
     description:
       "Ajouter une règle FAQ (question → réponse) utilisée pour l'auto-réponse aux commentaires d'un compte social.",
     parameters: faqRuleSchema,

@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common'
+import { Controller, Get, Header, NotFoundException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { ApiExcludeController } from '@nestjs/swagger'
 import { McpOAuthService } from './mcp-oauth.service'
 
@@ -9,7 +10,23 @@ import { McpOAuthService } from './mcp-oauth.service'
 @ApiExcludeController()
 @Controller('.well-known')
 export class WellKnownController {
-  constructor(private readonly oauth: McpOAuthService) {}
+  constructor(
+    private readonly oauth: McpOAuthService,
+    private readonly config: ConfigService,
+  ) {}
+
+  // ─── ChatGPT Apps SDK domain verification ───
+  // Returns the token shown in the ChatGPT app's "Domain verification" step.
+  // Set OPENAI_APPS_CHALLENGE_TOKEN to the value ChatGPT gives you (it can be
+  // rotated at will). Until set, the endpoint 404s so the domain stays
+  // unverified rather than verifying against an empty value.
+  @Get('openai-apps-challenge')
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  openaiAppsChallenge(): string {
+    const token = this.config.get<string>('OPENAI_APPS_CHALLENGE_TOKEN')
+    if (!token) throw new NotFoundException('Domain verification token not configured')
+    return token
+  }
 
   @Get('oauth-authorization-server')
   authorizationServer() {
