@@ -18,3 +18,4 @@
 /apps/design/node_modules/
 /apps/design/dist/
 /apps/design/.env
+.env

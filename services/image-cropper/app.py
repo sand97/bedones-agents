@@ -7,17 +7,36 @@ Stratégie: Pure OpenCV (0 coût, ~5ms par image)
 
 import base64
 import os
+from contextlib import asynccontextmanager
 from typing import Optional
 
 import cv2
 import numpy as np
+import posthog
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from posthog import identify_context, new_context
 from pydantic import BaseModel
+
+_POSTHOG_TOKEN = os.getenv("POSTHOG_PROJECT_TOKEN", "")
+_POSTHOG_HOST = os.getenv("POSTHOG_HOST", "https://us.i.posthog.com")
+_SERVICE_ID = "image_cropper_service"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if _POSTHOG_TOKEN:
+        posthog.api_key = _POSTHOG_TOKEN
+        posthog.host = _POSTHOG_HOST
+    yield
+    if _POSTHOG_TOKEN:
+        posthog.flush()
+
 
 app = FastAPI(
     title="Image Cropper Service",
     description="Smart screenshot cropping using OpenCV",
     version="2.0.0",
+    lifespan=lifespan,
 )
 
 
@@ -157,17 +176,33 @@ async def crop_with_opencv_endpoint(file: UploadFile = File(...)):
     Crop une image en utilisant OpenCV.
     Gratuit et rapide (~5ms)
     """
+    file_size = 0
     try:
         contents = await file.read()
+        file_size = len(contents)
+
+        posthog.capture(_SERVICE_ID, "image_crop_requested", {
+            "file_size_bytes": file_size,
+            "content_type": file.content_type or "unknown",
+        })
+
         nparr = np.frombuffer(contents, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if img is None:
+            posthog.capture(_SERVICE_ID, "image_crop_failed", {
+                "error_type": "invalid_image",
+                "file_size_bytes": file_size,
+            })
             raise HTTPException(status_code=400, detail="Invalid image file")
 
         result = crop_opencv(img)
 
         if result is None:
+            posthog.capture(_SERVICE_ID, "image_crop_failed", {
+                "error_type": "no_crop_area",
+                "file_size_bytes": file_size,
+            })
             raise HTTPException(
                 status_code=400, detail="Could not find suitable crop area"
             )
@@ -176,6 +211,13 @@ async def crop_with_opencv_endpoint(file: UploadFile = File(...)):
         img_b64 = base64.b64encode(buffer).decode("utf-8")
 
         h, w = result["image"].shape[:2]
+
+        posthog.capture(_SERVICE_ID, "image_crop_succeeded", {
+            "output_width": w,
+            "output_height": h,
+            "confidence": result["confidence"],
+            "method": "opencv",
+        })
 
         return CropResult(
             success=True,
@@ -190,6 +232,13 @@ async def crop_with_opencv_endpoint(file: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception as e:
+        with new_context():
+            identify_context(_SERVICE_ID)
+            posthog.capture_exception(e)
+        posthog.capture(_SERVICE_ID, "image_crop_failed", {
+            "error_type": "processing_error",
+            "file_size_bytes": file_size,
+        })
         raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
 
 
