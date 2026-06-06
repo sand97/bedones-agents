@@ -15,6 +15,7 @@ import { Route as InvitationRouteImport } from './routes/invitation'
 import { Route as CreateOrganisationRouteImport } from './routes/create-organisation'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BlogIndexRouteImport } from './routes/blog/index'
+import { Route as McpAuthorizeRouteImport } from './routes/mcp/authorize'
 import { Route as LegalPrivacyRouteImport } from './routes/legal/privacy'
 import { Route as LegalMentionsRouteImport } from './routes/legal/mentions'
 import { Route as LegalConditionsRouteImport } from './routes/legal/conditions'
@@ -70,6 +71,11 @@ const IndexRoute = IndexRouteImport.update({
 const BlogIndexRoute = BlogIndexRouteImport.update({
   id: '/blog/',
   path: '/blog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const McpAuthorizeRoute = McpAuthorizeRouteImport.update({
+  id: '/mcp/authorize',
+  path: '/mcp/authorize',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LegalPrivacyRoute = LegalPrivacyRouteImport.update({
@@ -217,6 +223,7 @@ export interface FileRoutesByFullPath {
   '/legal/conditions': typeof LegalConditionsRoute
   '/legal/mentions': typeof LegalMentionsRoute
   '/legal/privacy': typeof LegalPrivacyRoute
+  '/mcp/authorize': typeof McpAuthorizeRoute
   '/blog/': typeof BlogIndexRoute
   '/app/$orgSlug/agents': typeof AppOrgSlugAgentsRoute
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
@@ -251,6 +258,7 @@ export interface FileRoutesByTo {
   '/legal/conditions': typeof LegalConditionsRoute
   '/legal/mentions': typeof LegalMentionsRoute
   '/legal/privacy': typeof LegalPrivacyRoute
+  '/mcp/authorize': typeof McpAuthorizeRoute
   '/blog': typeof BlogIndexRoute
   '/app/$orgSlug/agents': typeof AppOrgSlugAgentsRoute
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
@@ -286,6 +294,7 @@ export interface FileRoutesById {
   '/legal/conditions': typeof LegalConditionsRoute
   '/legal/mentions': typeof LegalMentionsRoute
   '/legal/privacy': typeof LegalPrivacyRoute
+  '/mcp/authorize': typeof McpAuthorizeRoute
   '/blog/': typeof BlogIndexRoute
   '/app/$orgSlug/agents': typeof AppOrgSlugAgentsRoute
   '/app/$orgSlug/catalog': typeof AppOrgSlugCatalogRoute
@@ -322,6 +331,7 @@ export interface FileRouteTypes {
     | '/legal/conditions'
     | '/legal/mentions'
     | '/legal/privacy'
+    | '/mcp/authorize'
     | '/blog/'
     | '/app/$orgSlug/agents'
     | '/app/$orgSlug/catalog'
@@ -356,6 +366,7 @@ export interface FileRouteTypes {
     | '/legal/conditions'
     | '/legal/mentions'
     | '/legal/privacy'
+    | '/mcp/authorize'
     | '/blog'
     | '/app/$orgSlug/agents'
     | '/app/$orgSlug/catalog'
@@ -390,6 +401,7 @@ export interface FileRouteTypes {
     | '/legal/conditions'
     | '/legal/mentions'
     | '/legal/privacy'
+    | '/mcp/authorize'
     | '/blog/'
     | '/app/$orgSlug/agents'
     | '/app/$orgSlug/catalog'
@@ -425,6 +437,7 @@ export interface RootRouteChildren {
   LegalConditionsRoute: typeof LegalConditionsRoute
   LegalMentionsRoute: typeof LegalMentionsRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
+  McpAuthorizeRoute: typeof McpAuthorizeRoute
   BlogIndexRoute: typeof BlogIndexRoute
   LegalEnConditionsRoute: typeof LegalEnConditionsRoute
   LegalEnPrivacyRoute: typeof LegalEnPrivacyRoute
@@ -474,6 +487,13 @@ declare module '@tanstack/react-router' {
       path: '/blog'
       fullPath: '/blog/'
       preLoaderRoute: typeof BlogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mcp/authorize': {
+      id: '/mcp/authorize'
+      path: '/mcp/authorize'
+      fullPath: '/mcp/authorize'
+      preLoaderRoute: typeof McpAuthorizeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/legal/privacy': {
@@ -715,6 +735,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalConditionsRoute: LegalConditionsRoute,
   LegalMentionsRoute: LegalMentionsRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
+  McpAuthorizeRoute: McpAuthorizeRoute,
   BlogIndexRoute: BlogIndexRoute,
   LegalEnConditionsRoute: LegalEnConditionsRoute,
   LegalEnPrivacyRoute: LegalEnPrivacyRoute,
