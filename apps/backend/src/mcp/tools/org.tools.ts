@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { Tool } from '@rekog/mcp-nest'
 import { PrismaService } from '../../prisma/prisma.service'
 import { mcpContext } from '../mcp-context'
+import { READ_ONLY } from './annotations'
 import { emptySchema } from './tool-schemas'
 
 @Injectable()
@@ -13,6 +14,7 @@ export class McpOrgTools {
     description:
       "Renvoie l'organisation Bedones actuellement active pour cette connexion (déterminée lors de l'autorisation) ainsi que le rôle de l'utilisateur.",
     parameters: emptySchema,
+    annotations: READ_ONLY,
   })
   async getActiveOrganisation(_args: unknown, _ctx: unknown, request: unknown) {
     const ctx = mcpContext(request)
@@ -28,6 +30,7 @@ export class McpOrgTools {
     description:
       "Liste les organisations Bedones auxquelles l'utilisateur appartient. L'organisation active reste celle choisie à la connexion.",
     parameters: emptySchema,
+    annotations: READ_ONLY,
   })
   async listOrganisations(_args: unknown, _ctx: unknown, request: unknown) {
     const ctx = mcpContext(request)

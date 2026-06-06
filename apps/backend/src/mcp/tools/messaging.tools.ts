@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { PrismaService } from '../../prisma/prisma.service'
 import { MessagingService } from '../../social/messaging.service'
 import { mcpContext } from '../mcp-context'
+import { READ_ONLY, WRITE_EXTERNAL } from './annotations'
 import {
   accountIdSchema,
   conversationIdSchema,
@@ -23,6 +24,7 @@ export class McpMessagingTools {
 
   @Tool({
     name: 'list_conversations',
+    annotations: READ_ONLY,
     description:
       "Lister les conversations (DM) récentes de l'organisation sur WhatsApp, Messenger, Instagram et TikTok. Filtrable par réseau.",
     parameters: listConversationsSchema,
@@ -54,6 +56,7 @@ export class McpMessagingTools {
 
   @Tool({
     name: 'read_conversation_messages',
+    annotations: READ_ONLY,
     description: "Lire les messages d'une conversation spécifique (du plus ancien au plus récent).",
     parameters: conversationIdSchema,
   })
@@ -73,6 +76,7 @@ export class McpMessagingTools {
 
   @Tool({
     name: 'send_message',
+    annotations: WRITE_EXTERNAL,
     description:
       'Envoyer un message texte et/ou média dans une conversation (WhatsApp, Messenger, Instagram DM, TikTok).',
     parameters: sendMessageSchema,
@@ -93,6 +97,7 @@ export class McpMessagingTools {
 
   @Tool({
     name: 'send_product_message',
+    annotations: WRITE_EXTERNAL,
     description: 'Envoyer un message produit du catalogue WhatsApp dans une conversation.',
     parameters: sendProductMessageSchema,
   })
@@ -117,6 +122,7 @@ export class McpMessagingTools {
 
   @Tool({
     name: 'send_template_message',
+    annotations: WRITE_EXTERNAL,
     description:
       'Envoyer un message template WhatsApp approuvé (utile pour réengager hors fenêtre de 24h).',
     parameters: sendTemplateSchema,
@@ -134,6 +140,7 @@ export class McpMessagingTools {
 
   @Tool({
     name: 'send_reaction',
+    annotations: WRITE_EXTERNAL,
     description: 'Réagir à un message avec un emoji (WhatsApp).',
     parameters: sendReactionSchema,
   })
@@ -144,6 +151,7 @@ export class McpMessagingTools {
 
   @Tool({
     name: 'mark_conversation_read',
+    annotations: WRITE_EXTERNAL,
     description: 'Marquer une conversation comme lue (remet le compteur de non-lus à zéro).',
     parameters: z.object({ conversationId: z.string() }),
   })
@@ -154,6 +162,7 @@ export class McpMessagingTools {
 
   @Tool({
     name: 'sync_conversations',
+    annotations: WRITE_EXTERNAL,
     description:
       "Synchroniser les conversations d'un compte social depuis la plateforme (récupère les derniers échanges).",
     parameters: accountIdSchema,

@@ -3,6 +3,7 @@ import { Tool } from '@rekog/mcp-nest'
 import { z } from 'zod'
 import { PrismaService } from '../../prisma/prisma.service'
 import { mcpContext } from '../mcp-context'
+import { READ_ONLY } from './annotations'
 import { listProductsSchema } from './tool-schemas'
 
 @Injectable()
@@ -11,6 +12,7 @@ export class McpCatalogTools {
 
   @Tool({
     name: 'list_catalog_products',
+    annotations: READ_ONLY,
     description:
       "Lister/rechercher les produits des catalogues de l'organisation (nom, prix, devise, catégorie).",
     parameters: listProductsSchema,
