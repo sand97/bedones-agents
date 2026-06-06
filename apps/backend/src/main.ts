@@ -6,9 +6,21 @@ import * as cookieParser from 'cookie-parser'
 import { join } from 'path'
 import { mkdirSync, writeFileSync } from 'fs'
 import { AppModule } from './app.module'
+import { PostHogLoggerService } from './posthog/posthog-logger.service'
+import { requestContextMiddleware } from './posthog/request-context'
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true })
+
+  // Route all Nest logs through the PostHog logger (keeps console output AND
+  // mirrors warn/error lines + exceptions to PostHog so they are searchable).
+  app.useLogger(app.get(PostHogLoggerService))
+  // Flush pending PostHog events on SIGTERM/SIGINT (see PostHogService).
+  app.enableShutdownHooks()
+
+  // Open an AsyncLocalStorage scope for every request FIRST, so logs and the
+  // analytics interceptor can attach the current request/user downstream.
+  app.use(requestContextMiddleware)
 
   // Lift the default 100kb body-parser limit: catalog-migration callbacks stream
   // base64 product images (hundreds of KB each) and Coexistence history webhooks

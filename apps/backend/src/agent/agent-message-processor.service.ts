@@ -345,7 +345,9 @@ export class AgentMessageProcessorService {
    * Gemini primary, OpenAI fallback.
    */
   private createModel() {
-    return this.llmFactory.createChatModel('flash')
+    return this.llmFactory.createChatModel('flash', {
+      trace: { properties: { feature: 'agent-live-response' } },
+    })
   }
 
   private async downloadMedia(url: string): Promise<Buffer> {

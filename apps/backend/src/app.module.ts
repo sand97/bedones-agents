@@ -25,11 +25,13 @@ import { WhatsappOptinModule } from './whatsapp-optin/whatsapp-optin.module'
 import { LlmModule } from './common/llm/llm.module'
 import { ContactLanguageModule } from './contact-language/contact-language.module'
 import { BedonesMcpModule } from './mcp/mcp.module'
+import { PostHogModule } from './posthog/posthog.module'
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     EventEmitterModule.forRoot(),
+    PostHogModule,
     LlmModule,
     I18nModule.forRoot({
       fallbackLanguage: 'fr',
