@@ -9,13 +9,20 @@ import type { PostHogConfig } from 'posthog-js'
  */
 export const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined
 export const POSTHOG_HOST =
-  (import.meta.env.VITE_POSTHOG_HOST as string | undefined) || 'https://us.i.posthog.com'
+  (import.meta.env.VITE_POSTHOG_HOST as string | undefined) || 'https://post-moderator.bedones.com'
 
 export const posthogOptions: Partial<PostHogConfig> = {
+  // Events AND static assets (the session-replay recorder, surveys…) go through
+  // our managed reverse proxy so ad-blockers don't drop analytics. Override per
+  // environment with VITE_POSTHOG_HOST.
   api_host: POSTHOG_HOST,
+  // Keep pointing at PostHog directly so in-app links resolve to the real UI.
   ui_host: 'https://us.posthog.com',
   // Modern defaults: exception autocapture, dead clicks, heatmaps, etc.
-  defaults: '2025-05-24',
+  defaults: '2026-05-30',
+  // Don't create person profiles for anonymous visitors (cheaper + privacy);
+  // a profile is created on identify(). Anonymous page views are still captured.
+  person_profiles: 'identified_only',
   // We capture $pageview manually on TanStack Router navigations (SPA), so the
   // history-based auto pageview is turned off to avoid double counting.
   capture_pageview: false,
