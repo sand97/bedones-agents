@@ -20,6 +20,9 @@ export class CatalogIndexingProcessor extends WorkerHost {
 
   async process(job: Job<CatalogIndexingJobData>): Promise<void> {
     const { catalogId, organisationId } = job.data
+    if (process.env.DISABLE_CATALOG_INDEXING === 'true') {
+      return
+    }
     this.logger.log(`Processing catalog sync job for catalog ${catalogId}`)
 
     const result = await this.indexingService.syncCatalog(

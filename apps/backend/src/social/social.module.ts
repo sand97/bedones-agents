@@ -62,6 +62,7 @@ import { SocialHealthModule } from './social-health.module'
     MessageHistorySyncProcessor,
   ],
   exports: [
+    SocialService,
     MessagingService,
     LabelService,
     AvatarSyncService,

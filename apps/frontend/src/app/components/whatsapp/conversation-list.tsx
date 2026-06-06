@@ -30,7 +30,10 @@ interface ConversationListProps {
 }
 
 function formatLastMessageTime(timestamp: string): string {
+  // Contacts synced from the address book with no message yet have no time.
+  if (!timestamp) return ''
   const date = dayjs(timestamp)
+  if (!date.isValid()) return ''
   const now = dayjs()
 
   if (date.isSame(now, 'day')) return date.format('HH:mm')
@@ -186,10 +189,16 @@ function MessagePreview({ text }: { text: string }) {
 }
 
 export function ConversationList({ conversations, selectedId, onSelect }: ConversationListProps) {
+  // Empty/invalid time → treat as oldest so contact-only entries (synced from
+  // the address book, no message yet) sort below conversations with messages.
+  const timeValue = (timestamp: string) => {
+    const ms = new Date(timestamp).getTime()
+    return Number.isNaN(ms) ? 0 : ms
+  }
   const sorted = [...conversations].sort((a, b) => {
     if (a.unreadCount > 0 && b.unreadCount === 0) return -1
     if (a.unreadCount === 0 && b.unreadCount > 0) return 1
-    return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
+    return timeValue(b.lastMessageTime) - timeValue(a.lastMessageTime)
   })
 
   return (

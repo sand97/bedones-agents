@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Button } from 'antd'
-import { CheckCircle, MessageSquare, Settings, Wrench } from 'lucide-react'
+import { CheckCircle, MessageSquare, Search, Settings, Wrench } from 'lucide-react'
 import { SocialSetup } from '@app/components/social/social-setup'
+import { ListSearchInput } from '@app/components/shared/list-search-input'
 import { CommentsIcon } from '@app/components/icons/social-icons'
 import { useLayout } from '@app/contexts/layout-context'
 import { PostList } from './post-list'
@@ -58,14 +59,44 @@ export function CommentsLayout({
   const search = useSearch({ strict: false }) as { post?: string }
   const [configOpen, setConfigOpen] = useState(false)
   const [mobileShowComments, setMobileShowComments] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const selectedPostId = search.post
   const filter =
     (search as { filter?: string }).filter === 'unread' ? ('unread' as const) : ('all' as const)
 
+  // Debounce the raw input into the applied query; the gap is the "searching" window.
+  useEffect(() => {
+    if (searchInput === searchQuery) return
+    const id = window.setTimeout(() => setSearchQuery(searchInput), 350)
+    return () => window.clearTimeout(id)
+  }, [searchInput, searchQuery])
+
+  const isSearching = searchInput !== searchQuery
+
+  const closeSearch = () => {
+    setSearchOpen(false)
+    setSearchInput('')
+    setSearchQuery('')
+  }
+
   const filteredPosts = useMemo(() => {
-    if (filter === 'unread') return posts.filter((p) => p.unreadComments > 0)
-    return posts
-  }, [posts, filter])
+    let result = posts
+    if (filter === 'unread') {
+      result = result.filter((p) => p.unreadComments > 0)
+    }
+    const q = searchQuery.trim().toLowerCase()
+    if (q) {
+      result = result.filter((p) => {
+        if (p.message?.toLowerCase().includes(q)) return true
+        return p.comments.some(
+          (c) => c.message.toLowerCase().includes(q) || c.fromName.toLowerCase().includes(q),
+        )
+      })
+    }
+    return result
+  }, [posts, filter, searchQuery])
 
   const selectedPost = posts.find((p) => p.id === selectedPostId)
 
@@ -156,17 +187,34 @@ export function CommentsLayout({
           >
             {t('comments.unread')}
           </Button>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-0.5">
+            <Button
+              type="text"
+              size="small"
+              icon={<Search size={16} />}
+              onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+              aria-label={t('common.search')}
+              title={t('common.search')}
+            />
             <Button
               type="text"
               size="small"
               icon={<Wrench size={16} />}
               onClick={() => setConfigOpen(true)}
-            >
-              {t('chat.tools')}
-            </Button>
+              aria-label={t('chat.tools')}
+              title={t('chat.tools')}
+            />
           </div>
         </div>
+        {searchOpen && (
+          <ListSearchInput
+            value={searchInput}
+            onChange={setSearchInput}
+            onClose={closeSearch}
+            searching={isSearching}
+            placeholder={t('comments.search')}
+          />
+        )}
         <div className="flex-1 overflow-y-auto">
           <PostList posts={filteredPosts} selectedPostId={selectedPostId} onSelect={selectPost} />
         </div>

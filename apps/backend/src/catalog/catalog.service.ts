@@ -6,13 +6,13 @@ import {
   ForbiddenException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { EncryptionService } from '../auth/encryption.service'
 import { SocialHealthService } from '../social/social-health.service'
 import { ErrorExplanationService, redactSecrets } from '../social/error-explanation.service'
 import type { SocialFeature, SocialProvider } from 'generated/prisma/enums'
+import { Prisma } from 'generated/prisma/client'
 
 @Injectable()
 export class CatalogService {
@@ -419,6 +419,20 @@ export class CatalogService {
       summary: 'true',
       access_token: accessToken,
     })
+
+    // Run search server-side across the WHOLE catalogue via Meta's `filter` (the
+    // /products edge supports it) so results, cursors and summary.total_count are
+    // correct — not just the current page. For a collection we hit the
+    // product-set edge and narrow in-memory below (sets are small).
+    const search = params?.search?.trim()
+    if (search && !params?.collectionId) {
+      query.set(
+        'filter',
+        JSON.stringify({
+          or: [{ name: { i_contains: search } }, { retailer_id: { i_contains: search } }],
+        }),
+      )
+    }
     if (params?.after) query.set('after', params.after)
 
     const url = `${this.META_API_BASE}/${baseId}/products?${query}`
@@ -467,25 +481,37 @@ export class CatalogService {
 
     const products = (data.data || []).map((p) => this.mapMetaProduct(p))
 
-    // Server-side filtering (Meta doesn't support filter/search on products endpoint)
+    // Search already ran server-side for the full catalogue. We still narrow
+    // in-memory (same fields, a superset) — a no-op when Meta honoured the
+    // filter, and the actual search for the product-set (collection) edge.
+    // Status stays a client-side narrowing.
     let filtered = products
 
     if (params?.status) {
       filtered = filtered.filter((p) => p.status === params.status)
     }
 
-    if (params?.search) {
-      const q = params.search.toLowerCase()
+    if (search) {
+      const q = search.toLowerCase()
       filtered = filtered.filter(
         (p) =>
           (p.name as string)?.toLowerCase().includes(q) ||
+          (p.retailerId as string)?.toLowerCase().includes(q) ||
           (p.description as string)?.toLowerCase().includes(q),
       )
     }
 
+    // With an active filter: when the whole (filtered) edge fit in one page the
+    // filtered length is the exact count; otherwise trust Meta's filtered
+    // summary. Without a filter, the summary is the catalogue total.
+    const allFetched = !data.paging?.next
+    const hasFilter = !!search || !!params?.status
+    const total =
+      hasFilter && allFetched ? filtered.length : (data.summary?.total_count ?? filtered.length)
+
     return {
       products: filtered,
-      total: data.summary?.total_count ?? filtered.length,
+      total,
       cursors: data.paging?.cursors,
       hasMore: !!data.paging?.next,
     }
@@ -528,6 +554,93 @@ export class CatalogService {
   }
 
   // ─── Authorization helpers ───
+
+  // ─── Image Studio Templates ───
+
+  async findImageTemplates(catalogId: string) {
+    return this.prisma.imageTemplate.findMany({
+      where: { catalogId },
+      orderBy: { updatedAt: 'desc' },
+    })
+  }
+
+  async createImageTemplate(
+    catalogId: string,
+    dto: {
+      name: string
+      format: string
+      accent?: string
+      definition: Record<string, unknown>
+      sourceKey?: string
+    },
+  ) {
+    const catalog = await this.prisma.catalog.findUnique({
+      where: { id: catalogId },
+      select: { organisationId: true },
+    })
+    if (!catalog) throw new NotFoundException('Catalogue introuvable')
+
+    const data = {
+      organisationId: catalog.organisationId,
+      catalogId,
+      name: dto.name,
+      format: dto.format,
+      accent: dto.accent ?? null,
+      definition: dto.definition as Prisma.InputJsonValue,
+      sourceKey: dto.sourceKey ?? null,
+    }
+
+    // Fork d'un template statique (sourceKey) : un seul override par
+    // (catalogue, sourceKey) — on met à jour l'existant le cas échéant.
+    if (dto.sourceKey) {
+      const existing = await this.prisma.imageTemplate.findFirst({
+        where: { catalogId, sourceKey: dto.sourceKey },
+        select: { id: true },
+      })
+      if (existing) {
+        return this.prisma.imageTemplate.update({ where: { id: existing.id }, data })
+      }
+    }
+    return this.prisma.imageTemplate.create({ data })
+  }
+
+  async updateImageTemplate(
+    catalogId: string,
+    templateId: string,
+    dto: {
+      name?: string
+      format?: string
+      accent?: string
+      definition?: Record<string, unknown>
+    },
+  ) {
+    const existing = await this.prisma.imageTemplate.findFirst({
+      where: { id: templateId, catalogId },
+      select: { id: true },
+    })
+    if (!existing) throw new NotFoundException('Template introuvable')
+    return this.prisma.imageTemplate.update({
+      where: { id: templateId },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.format !== undefined ? { format: dto.format } : {}),
+        ...(dto.accent !== undefined ? { accent: dto.accent } : {}),
+        ...(dto.definition !== undefined
+          ? { definition: dto.definition as Prisma.InputJsonValue }
+          : {}),
+      },
+    })
+  }
+
+  async deleteImageTemplate(catalogId: string, templateId: string) {
+    const existing = await this.prisma.imageTemplate.findFirst({
+      where: { id: templateId, catalogId },
+      select: { id: true },
+    })
+    if (!existing) throw new NotFoundException('Template introuvable')
+    await this.prisma.imageTemplate.delete({ where: { id: templateId } })
+    return { id: templateId }
+  }
 
   private async assertMembership(userId: string, organisationId: string) {
     const membership = await this.prisma.organisationMember.findUnique({
@@ -632,6 +745,15 @@ export class CatalogService {
 
   // ─── WhatsApp Commerce Settings ───
 
+  /**
+   * List the Commerce Manager catalogue(s) linked to the number's WABA.
+   *
+   * This same call doubles as our SMB (WhatsApp Business app) detector: Meta
+   * rejects it with error (#10) "This operation can not be performed on SMB
+   * business type" for SMB numbers. That rejection is the reliable SMB signal,
+   * so we surface `isSmb: true` instead of failing — only such numbers own an
+   * in-app catalogue worth migrating to Commerce Manager.
+   */
   async getWhatsAppCommerceSettings(userId: string, phoneNumberId: string) {
     await this.assertWhatsAppAccess(userId, phoneNumberId)
     const { accessToken, wabaId } = await this.resolveWhatsAppAccount(phoneNumberId)
@@ -642,11 +764,24 @@ export class CatalogService {
 
     if (!response.ok) {
       const error = await response.text()
+      if (this.isSmbBusinessError(error)) {
+        this.logger.log(`[WhatsApp] ${phoneNumberId} is an SMB business (product_catalogs #10)`)
+        return { data: [], isSmb: true }
+      }
       this.logger.error(`WABA product_catalogs API error: ${error}`)
       throw new BadRequestException(`Meta API error: ${error}`)
     }
 
-    return response.json()
+    const data = (await response.json()) as Record<string, unknown>
+    return { ...data, isSmb: false }
+  }
+
+  /**
+   * Meta error (#10) returned when an operation is attempted on an SMB
+   * (WhatsApp Business app) business type — our reliable SMB-number signal.
+   */
+  private isSmbBusinessError(raw: string): boolean {
+    return /SMB business type/i.test(raw)
   }
 
   // ─── Product CRUD via Meta API ───
@@ -655,6 +790,7 @@ export class CatalogService {
     catalogId: string,
     data: {
       name: string
+      retailerId: string
       description?: string
       imageUrl?: string
       additionalImageUrls?: string[]
@@ -673,11 +809,16 @@ export class CatalogService {
       this.getCatalogProviderId(catalogId),
     ])
 
-    const retailerId = randomUUID()
+    // retailer_id is the merchant's own product code (SKU) — it must be
+    // provided (manually in the modal or carried over from the scraped
+    // catalogue), never auto-generated.
+    if (!data.retailerId?.trim()) {
+      throw new BadRequestException('Le code produit (retailer_id) est requis')
+    }
 
     const body: Record<string, unknown> = {
       access_token: accessToken,
-      retailer_id: retailerId,
+      retailer_id: data.retailerId.trim(),
       name: data.name,
     }
     if (data.description) body.description = data.description
@@ -742,6 +883,7 @@ export class CatalogService {
     productId: string,
     data: {
       name?: string
+      retailerId?: string
       description?: string
       imageUrl?: string
       additionalImageUrls?: string[]
@@ -758,6 +900,7 @@ export class CatalogService {
 
     const productData: Record<string, unknown> = {}
     if (data.name) productData.name = data.name
+    if (data.retailerId) productData.retailer_id = data.retailerId
     if (data.description) productData.description = data.description
     if (data.imageUrl) productData.image_url = data.imageUrl
     if (data.additionalImageUrls) {
@@ -882,26 +1025,9 @@ export class CatalogService {
       throw new BadRequestException(`Meta API error: ${error}`)
     }
 
-    const result = (await response.json()) as { id: string }
-
-    // If productIds provided, add products to the collection
-    if (data.productIds?.length) {
-      const addResponse = await fetch(`${this.META_API_BASE}/${result.id}/products`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          access_token: accessToken,
-          product_ids: data.productIds,
-        }),
-      })
-
-      if (!addResponse.ok) {
-        const error = await addResponse.text()
-        this.logger.warn(`Meta add products to collection error: ${error}`)
-      }
-    }
-
-    return result
+    // Product-set membership is defined entirely by the filter above — Meta has
+    // no "add product to set by id" operation — so there's nothing else to do.
+    return (await response.json()) as { id: string }
   }
 
   async updateCollection(catalogId: string, collectionId: string, data: { name?: string }) {

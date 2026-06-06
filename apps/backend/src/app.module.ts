@@ -13,6 +13,7 @@ import { GatewayModule } from './gateway/gateway.module'
 import { MemberModule } from './member/member.module'
 import { InvitationModule } from './invitation/invitation.module'
 import { CatalogModule } from './catalog/catalog.module'
+import { CatalogMigrationModule } from './catalog-migration/catalog-migration.module'
 import { AgentModule } from './agent/agent.module'
 import { TicketModule } from './ticket/ticket.module'
 import { PromotionModule } from './promotion/promotion.module'
@@ -23,6 +24,7 @@ import { NotificationPreferenceModule } from './notification-preference/notifica
 import { WhatsappOptinModule } from './whatsapp-optin/whatsapp-optin.module'
 import { LlmModule } from './common/llm/llm.module'
 import { ContactLanguageModule } from './contact-language/contact-language.module'
+import { BedonesMcpModule } from './mcp/mcp.module'
 
 @Module({
   imports: [
@@ -46,6 +48,7 @@ import { ContactLanguageModule } from './contact-language/contact-language.modul
     MemberModule,
     InvitationModule,
     CatalogModule,
+    CatalogMigrationModule,
     AgentModule,
     TicketModule,
     PromotionModule,
@@ -55,6 +58,7 @@ import { ContactLanguageModule } from './contact-language/contact-language.modul
     NotificationPreferenceModule,
     WhatsappOptinModule,
     ContactLanguageModule,
+    BedonesMcpModule,
   ],
   controllers: [AppController],
 })

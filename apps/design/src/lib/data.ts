@@ -1,0 +1,483 @@
+/* =========================================================
+   Studio images catalogue — données de référence + démo.
+   Formats réseaux sociaux, champs dynamiques, tons de
+   placeholder, et une boutique fictive "Mboa Fashion" servant
+   de repli quand l'API catalogue n'est pas joignable.
+   ========================================================= */
+import type { Collection, DynField, FormatDef, FormatKey, Template, ToneKey } from './types'
+
+// Tons de placeholder produit (monochrome, charte "no stock photo")
+export const TONE: Record<ToneKey, { bg: string; fg: string }> = {
+  light: { bg: '#f5f5f5', fg: '#c9c9c9' },
+  mid: { bg: '#ececec', fg: '#b4b4b4' },
+  ink: { bg: '#e5e5e5', fg: '#a3a3a3' },
+}
+
+// Formats réseaux sociaux
+export const FORMATS: Record<FormatKey, FormatDef> = {
+  '1:1': { label: 'Carré', sub: '1080 × 1080', w: 1080, h: 1080, net: 'Instagram · Facebook' },
+  '4:5': { label: 'Portrait', sub: '1080 × 1350', w: 1080, h: 1350, net: 'Instagram feed' },
+  '9:16': { label: 'Story', sub: '1080 × 1920', w: 1080, h: 1920, net: 'Story · Reel · TikTok' },
+  '16:9': { label: 'Paysage', sub: '1200 × 630', w: 1200, h: 630, net: 'Facebook · lien' },
+}
+
+export const FORMAT_KEYS = Object.keys(FORMATS) as FormatKey[]
+
+// Champs dynamiques disponibles (liés au catalogue)
+export const DYN_FIELDS: DynField[] = [
+  { key: 'name', label: 'Nom du produit' },
+  { key: 'desc', label: 'Description' },
+  { key: 'code', label: 'Code marchand' },
+  { key: 'price', label: 'Prix' },
+]
+
+/** Template vierge (image plein cadre + bandeau prix). */
+export function blankTemplate(accent: string): Template {
+  return {
+    id: 'tpl-' + Date.now(),
+    name: 'Template sans titre',
+    format: '1:1',
+    accent,
+    edited: "à l'instant",
+    uses: 0,
+    elements: [
+      { id: 'b1', type: 'image', x: 0, y: 0, w: 100, h: 100, radius: 0 },
+      { id: 'b2', type: 'rect', x: 6, y: 80, w: 50, h: 11, fill: '#111b21', radius: 10 },
+      {
+        id: 'b3',
+        type: 'text',
+        x: 6,
+        y: 82.5,
+        w: 50,
+        h: 6,
+        bind: 'price',
+        value: '10 000 FCFA',
+        size: 34,
+        weight: 700,
+        color: '#ffffff',
+        align: 'center',
+        font: 'sans',
+      },
+    ],
+  }
+}
+
+// ─── Données de démonstration (repli) ───────────────────────
+export const DEMO_COLLECTIONS: Collection[] = [
+  {
+    id: 'col-foot',
+    name: 'Maillots de foot 24/25',
+    products: [
+      {
+        id: 'p1',
+        name: 'Maillot Manchester United Domicile',
+        code: 'MBF-MU-2425',
+        price: '10 000 FCFA',
+        desc: 'Maillot replica saison 24/25, tailles S à 2XL. Tissu AEROREADY.',
+        glyph: 'jersey',
+        images: [
+          { id: 'p1-a', tone: 'light' },
+          { id: 'p1-b', tone: 'mid' },
+          { id: 'p1-c', tone: 'ink' },
+          { id: 'p1-d', tone: 'light' },
+        ],
+      },
+      {
+        id: 'p2',
+        name: 'Maillot Real Madrid Extérieur',
+        code: 'MBF-RM-2425',
+        price: '12 000 FCFA',
+        desc: 'Édition extérieur, flocage personnalisable.',
+        glyph: 'jersey',
+        images: [
+          { id: 'p2-a', tone: 'mid' },
+          { id: 'p2-b', tone: 'light' },
+          { id: 'p2-c', tone: 'ink' },
+        ],
+      },
+      {
+        id: 'p3',
+        name: 'Maillot Cameroun Lions Indomptables',
+        code: 'MBF-CMR-24',
+        price: '9 500 FCFA',
+        desc: 'Maillot officiel supporter, vert/rouge/jaune.',
+        glyph: 'jersey',
+        images: [
+          { id: 'p3-a', tone: 'light' },
+          { id: 'p3-b', tone: 'mid' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'col-sneakers',
+    name: 'Sneakers & baskets',
+    products: [
+      {
+        id: 'p4',
+        name: 'Air Jordan 1 Retro High',
+        code: 'MBF-AJ1-RH',
+        price: '45 000 FCFA',
+        desc: 'Cuir premium, pointures 39 à 45. Stock limité.',
+        glyph: 'shoe',
+        images: [
+          { id: 'p4-a', tone: 'ink' },
+          { id: 'p4-b', tone: 'light' },
+          { id: 'p4-c', tone: 'mid' },
+          { id: 'p4-d', tone: 'light' },
+        ],
+      },
+      {
+        id: 'p5',
+        name: 'Nike Dunk Low Panda',
+        code: 'MBF-DUNK-PD',
+        price: '38 000 FCFA',
+        desc: 'Coloris noir & blanc intemporel.',
+        glyph: 'shoe',
+        images: [
+          { id: 'p5-a', tone: 'light' },
+          { id: 'p5-b', tone: 'mid' },
+        ],
+      },
+      {
+        id: 'p6',
+        name: 'Adidas Samba OG',
+        code: 'MBF-SAMBA',
+        price: '32 000 FCFA',
+        desc: 'Classique terrain, daim et cuir.',
+        glyph: 'shoe',
+        images: [
+          { id: 'p6-a', tone: 'mid' },
+          { id: 'p6-b', tone: 'ink' },
+          { id: 'p6-c', tone: 'light' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'col-pretaporter',
+    name: 'Prêt-à-porter',
+    products: [
+      {
+        id: 'p7',
+        name: 'Chemise lin oversize',
+        code: 'MBF-CHM-LIN',
+        price: '15 000 FCFA',
+        desc: 'Coupe ample, 100% lin, beige sable.',
+        glyph: 'shirt',
+        images: [
+          { id: 'p7-a', tone: 'light' },
+          { id: 'p7-b', tone: 'mid' },
+          { id: 'p7-c', tone: 'ink' },
+        ],
+      },
+      {
+        id: 'p8',
+        name: 'Robe wax cintrée',
+        code: 'MBF-RB-WAX',
+        price: '22 000 FCFA',
+        desc: 'Tissu pagne wax authentique, sur mesure.',
+        glyph: 'dress',
+        images: [
+          { id: 'p8-a', tone: 'mid' },
+          { id: 'p8-b', tone: 'light' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'col-access',
+    name: 'Accessoires',
+    products: [
+      {
+        id: 'p9',
+        name: 'Casquette brodée Mboa',
+        code: 'MBF-CAP-01',
+        price: '6 000 FCFA',
+        desc: 'Coton, broderie logo, taille unique ajustable.',
+        glyph: 'cap',
+        images: [
+          { id: 'p9-a', tone: 'ink' },
+          { id: 'p9-b', tone: 'light' },
+        ],
+      },
+      {
+        id: 'p10',
+        name: 'Sac banane technique',
+        code: 'MBF-BAG-TX',
+        price: '8 500 FCFA',
+        desc: 'Nylon résistant, bandoulière réglable.',
+        glyph: 'bag',
+        images: [
+          { id: 'p10-a', tone: 'light' },
+          { id: 'p10-b', tone: 'mid' },
+          { id: 'p10-c', tone: 'ink' },
+        ],
+      },
+      {
+        id: 'p11',
+        name: 'Montre minimaliste acier',
+        code: 'MBF-WTC-09',
+        price: '18 000 FCFA',
+        desc: 'Mouvement quartz, bracelet maille milanaise.',
+        glyph: 'watch',
+        images: [
+          { id: 'p11-a', tone: 'mid' },
+          { id: 'p11-b', tone: 'light' },
+        ],
+      },
+    ],
+  },
+]
+
+// ─── Templates de démonstration ─────────────────────────────
+const tplPrixBandeau: Template = {
+  id: 'tpl-prix',
+  name: 'Prix bandeau — Mboa',
+  format: '1:1',
+  accent: '#f5c518',
+  edited: 'il y a 2 jours',
+  uses: 142,
+  elements: [
+    { id: 'e1', type: 'image', x: 4, y: 4, w: 92, h: 92, radius: 6 },
+    {
+      id: 'e2',
+      type: 'rect',
+      x: 2,
+      y: 2,
+      w: 96,
+      h: 96,
+      fill: 'none',
+      stroke: '#f5c518',
+      strokeW: 10,
+      radius: 0,
+    },
+    { id: 'e3', type: 'rect', x: 4, y: 4, w: 50, h: 7, fill: '#111b21', radius: 0 },
+    {
+      id: 'e4',
+      type: 'text',
+      x: 6,
+      y: 5.2,
+      w: 46,
+      h: 4.5,
+      bind: null,
+      value: 'PRIX NON DISCUTABLE SVP',
+      size: 22,
+      weight: 600,
+      color: '#ffffff',
+      align: 'left',
+      font: 'sans',
+    },
+    { id: 'e5', type: 'rect', x: 4, y: 84, w: 92, h: 12, fill: '#f5c518', radius: 0 },
+    {
+      id: 'e6',
+      type: 'text',
+      x: 4,
+      y: 85.5,
+      w: 92,
+      h: 6,
+      bind: 'price',
+      value: '10 000 FCFA',
+      size: 46,
+      weight: 700,
+      color: '#111b21',
+      align: 'center',
+      font: 'sans',
+    },
+    {
+      id: 'e7',
+      type: 'text',
+      x: 4,
+      y: 92,
+      w: 92,
+      h: 3.5,
+      bind: null,
+      value: '© Mboa Fashion',
+      size: 18,
+      weight: 500,
+      color: '#111b21',
+      align: 'center',
+      font: 'sans',
+    },
+  ],
+}
+
+const tplStory: Template = {
+  id: 'tpl-story',
+  name: 'Story promo',
+  format: '9:16',
+  accent: '#111b21',
+  edited: 'il y a 5 jours',
+  uses: 67,
+  elements: [
+    { id: 's1', type: 'image', x: 0, y: 0, w: 100, h: 100, radius: 0 },
+    { id: 's2', type: 'rect', x: 0, y: 0, w: 100, h: 14, fill: '#111b21', radius: 0 },
+    {
+      id: 's3',
+      type: 'text',
+      x: 6,
+      y: 4.5,
+      w: 88,
+      h: 5,
+      bind: null,
+      value: 'NOUVELLE COLLECTION',
+      size: 34,
+      weight: 600,
+      color: '#ffffff',
+      align: 'left',
+      font: 'sans',
+    },
+    { id: 's4', type: 'circle', x: 64, y: 70, w: 32, h: 18, fill: '#f5c518' },
+    {
+      id: 's5',
+      type: 'text',
+      x: 64,
+      y: 75,
+      w: 32,
+      h: 8,
+      bind: 'price',
+      value: '10 000 FCFA',
+      size: 40,
+      weight: 700,
+      color: '#111b21',
+      align: 'center',
+      font: 'sans',
+    },
+    { id: 's6', type: 'rect', x: 0, y: 90, w: 100, h: 10, fill: 'rgba(17,27,33,0.85)', radius: 0 },
+    {
+      id: 's7',
+      type: 'text',
+      x: 6,
+      y: 92.5,
+      w: 88,
+      h: 5,
+      bind: 'name',
+      value: 'Maillot Manchester United',
+      size: 30,
+      weight: 600,
+      color: '#ffffff',
+      align: 'left',
+      font: 'sans',
+    },
+  ],
+}
+
+const tplMinimal: Template = {
+  id: 'tpl-min',
+  name: 'Carré minimaliste',
+  format: '1:1',
+  accent: '#ffffff',
+  edited: 'la semaine dernière',
+  uses: 38,
+  elements: [
+    { id: 'm1', type: 'image', x: 0, y: 0, w: 100, h: 100, radius: 0 },
+    { id: 'm2', type: 'rect', x: 6, y: 78, w: 40, h: 11, fill: '#ffffff', radius: 999 },
+    {
+      id: 'm3',
+      type: 'text',
+      x: 6,
+      y: 80.5,
+      w: 40,
+      h: 6,
+      bind: 'price',
+      value: '10 000 FCFA',
+      size: 34,
+      weight: 700,
+      color: '#111b21',
+      align: 'center',
+      font: 'sans',
+    },
+    { id: 'm4', type: 'logo', x: 84, y: 4, w: 12, h: 12 },
+    {
+      id: 'm5',
+      type: 'text',
+      x: 6,
+      y: 90,
+      w: 60,
+      h: 4,
+      bind: 'name',
+      value: 'Air Jordan 1 Retro',
+      size: 22,
+      weight: 500,
+      color: '#ffffff',
+      align: 'left',
+      font: 'sans',
+    },
+  ],
+}
+
+const tplAnnonce: Template = {
+  id: 'tpl-ann',
+  name: 'Annonce paysage',
+  format: '16:9',
+  accent: '#111b21',
+  edited: 'il y a 1 mois',
+  uses: 21,
+  elements: [
+    { id: 'a1', type: 'rect', x: 0, y: 0, w: 100, h: 100, fill: '#fafafa', radius: 0 },
+    { id: 'a2', type: 'image', x: 0, y: 0, w: 46, h: 100, radius: 0 },
+    {
+      id: 'a3',
+      type: 'text',
+      x: 50,
+      y: 18,
+      w: 46,
+      h: 14,
+      bind: 'name',
+      value: 'Nike Dunk Low Panda',
+      size: 40,
+      weight: 700,
+      color: '#111b21',
+      align: 'left',
+      font: 'sans',
+    },
+    {
+      id: 'a4',
+      type: 'text',
+      x: 50,
+      y: 42,
+      w: 46,
+      h: 18,
+      bind: 'desc',
+      value: 'Coloris noir & blanc intemporel.',
+      size: 22,
+      weight: 400,
+      color: '#494949',
+      align: 'left',
+      font: 'sans',
+    },
+    { id: 'a5', type: 'rect', x: 50, y: 66, w: 30, h: 14, fill: '#111b21', radius: 10 },
+    {
+      id: 'a6',
+      type: 'text',
+      x: 50,
+      y: 70,
+      w: 30,
+      h: 6,
+      bind: 'price',
+      value: '38 000 FCFA',
+      size: 30,
+      weight: 700,
+      color: '#ffffff',
+      align: 'center',
+      font: 'sans',
+    },
+    {
+      id: 'a7',
+      type: 'text',
+      x: 50,
+      y: 86,
+      w: 46,
+      h: 5,
+      bind: 'code',
+      value: 'MBF-DUNK-PD',
+      size: 16,
+      weight: 500,
+      color: '#8c8c8c',
+      align: 'left',
+      font: 'mono',
+    },
+  ],
+}
+
+export const DEMO_TEMPLATES: Template[] = [tplPrixBandeau, tplStory, tplMinimal, tplAnnonce]

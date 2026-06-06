@@ -21,6 +21,10 @@ import gererPicCommandes from './gerer-pic-commandes-promotion.md?raw'
 import chatbotVsAgent from './chatbot-vs-agent-ia-commerce.md?raw'
 import serviceClient24h from './service-client-24h-petite-equipe.md?raw'
 import automatisationMobileMoneyAfrique from './automatisation-vente-mobile-money-afrique.md?raw'
+import gererAvecChatgptClaude from './gerer-commentaires-messages-chatgpt-claude.md?raw'
+import commentFonctionneMcp from './comment-fonctionne-mcp-bedones.md?raw'
+import iaCameroun from './repondre-clients-ia-chatgpt-claude-cameroun.md?raw'
+import iaCoteDivoire from './repondre-clients-ia-chatgpt-claude-cote-divoire.md?raw'
 
 export interface BlogArticle {
   title: string
@@ -120,6 +124,10 @@ export const blogArticles: BlogArticle[] = [
   parseFrontmatter(chatbotVsAgent),
   parseFrontmatter(serviceClient24h),
   parseFrontmatter(automatisationMobileMoneyAfrique),
+  parseFrontmatter(gererAvecChatgptClaude),
+  parseFrontmatter(commentFonctionneMcp),
+  parseFrontmatter(iaCameroun),
+  parseFrontmatter(iaCoteDivoire),
 ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
 export function getArticleBySlug(slug: string): BlogArticle | undefined {

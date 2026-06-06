@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
@@ -8,6 +8,7 @@ import {
   FileText,
   Megaphone,
   MessageCircle,
+  Search,
   Sparkles,
   ShoppingBag,
   Tag,
@@ -17,6 +18,7 @@ import { ConversationList } from './conversation-list'
 import { ChatWindow } from './chat-window'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { HeaderHelper } from '@app/components/shared/header-helper'
+import { ListSearchInput } from '@app/components/shared/list-search-input'
 import {
   WhatsAppIcon,
   InstagramIcon,
@@ -98,6 +100,11 @@ interface ChatLayoutProps {
   onConfigureAgent?: () => void
   /** Callback when user clicks the "configure catalog" button */
   onConfigureCatalog?: () => void
+  /** Whether the current WhatsApp number is an SMB (Coexistence) number with no
+   * catalog yet — show "migrate your catalog" instead of "associate a catalog". */
+  canMigrateCatalog?: boolean
+  /** Callback when user clicks the "migrate catalog" button */
+  onMigrateCatalog?: () => void
   /** Callback when user clicks the Options button */
   onOpenOptions?: () => void
   onOpenTemplates?: () => void
@@ -282,6 +289,8 @@ export function ChatLayout({
   hasCatalogAssociated = true,
   onConfigureAgent,
   onConfigureCatalog,
+  canMigrateCatalog = false,
+  onMigrateCatalog,
   onOpenOptions,
   onOpenTemplates,
   onOpenCampaigns,
@@ -299,6 +308,24 @@ export function ChatLayout({
   const selectedConvId = search.conv
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // Debounce the raw input into the applied query; the gap is the "searching" window.
+  useEffect(() => {
+    if (searchInput === searchQuery) return
+    const id = window.setTimeout(() => setSearchQuery(searchInput), 350)
+    return () => window.clearTimeout(id)
+  }, [searchInput, searchQuery])
+
+  const isSearching = searchInput !== searchQuery
+
+  const closeSearch = () => {
+    setSearchOpen(false)
+    setSearchInput('')
+    setSearchQuery('')
+  }
 
   const labelsQuery = useQuery({
     queryKey: ['labels', socialAccountId],
@@ -334,8 +361,18 @@ export function ChatLayout({
     if (selectedLabelIds.length > 0) {
       result = result.filter((c) => c.labels.some((l) => selectedLabelIds.includes(l.id)))
     }
+    const q = searchQuery.trim().toLowerCase()
+    if (q) {
+      result = result.filter((c) => {
+        const haystacks = [c.contact.name, c.contact.phone, c.contact.username, c.lastMessage]
+        if (haystacks.some((h) => h?.toLowerCase().includes(q))) return true
+        return c.messages.some(
+          (m) => m.text?.toLowerCase().includes(q) || m.imageCaption?.toLowerCase().includes(q),
+        )
+      })
+    }
     return result
-  }, [conversations, filter, selectedLabelIds])
+  }, [conversations, filter, selectedLabelIds, searchQuery])
 
   if (loading) {
     return (
@@ -350,20 +387,33 @@ export function ChatLayout({
     )
   }
 
+  /* ── Catalog setup: "migrate" (SMB number) vs "associate" (Cloud API) ── */
+  const renderCatalogSetup = () =>
+    canMigrateCatalog ? (
+      <SocialSetup
+        icon={<ShoppingBag size={40} strokeWidth={1.5} />}
+        color={providerConfig.color}
+        title={t('chat.migrate_catalog_title')}
+        description={t('chat.migrate_catalog_desc')}
+        buttonLabel={t('chat.migrate_catalog_btn')}
+        onAction={onMigrateCatalog}
+      />
+    ) : (
+      <SocialSetup
+        icon={<ShoppingBag size={40} strokeWidth={1.5} />}
+        color={providerConfig.color}
+        title={t('chat.configure_catalog_title')}
+        description={t('chat.configure_catalog_desc')}
+        buttonLabel={t('chat.configure_catalog_btn')}
+        onAction={onConfigureCatalog}
+      />
+    )
+
   /* ── Desktop SocialSetup (right panel) ── */
   const renderDesktopSetup = () => {
     // Priority: catalog > agent > empty conversations > select conversation
     if (setupState === 'catalog') {
-      return (
-        <SocialSetup
-          icon={<ShoppingBag size={40} strokeWidth={1.5} />}
-          color={providerConfig.color}
-          title={t('chat.configure_catalog_title')}
-          description={t('chat.configure_catalog_desc')}
-          buttonLabel={t('chat.configure_catalog_btn')}
-          onAction={onConfigureCatalog}
-        />
-      )
+      return renderCatalogSetup()
     }
     if (setupState === 'agent') {
       return (
@@ -404,9 +454,16 @@ export function ChatLayout({
       return (
         <HeaderHelper
           icon={<ShoppingBag size={18} strokeWidth={1.5} />}
-          title={t('chat.no_catalog_associated')}
-          subtitle={t('chat.catalog_association_desc')}
-          primaryAction={{ title: t('chat.associate'), onClick: () => onConfigureCatalog?.() }}
+          title={
+            canMigrateCatalog ? t('chat.migrate_catalog_title') : t('chat.no_catalog_associated')
+          }
+          subtitle={
+            canMigrateCatalog ? t('chat.migrate_catalog_desc') : t('chat.catalog_association_desc')
+          }
+          primaryAction={{
+            title: canMigrateCatalog ? t('chat.migrate') : t('chat.associate'),
+            onClick: () => (canMigrateCatalog ? onMigrateCatalog?.() : onConfigureCatalog?.()),
+          }}
         />
       )
     }
@@ -470,20 +527,42 @@ export function ChatLayout({
               {selectedLabelIds.length > 0 ? ` (${selectedLabelIds.length})` : ''}
             </Button>
           </LabelsFilterPopover>
-          {provider === 'whatsapp' && (
-            <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-0.5">
+            <Button
+              type="text"
+              size="small"
+              icon={<Search size={16} />}
+              onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+              aria-label={t('common.search')}
+              title={t('common.search')}
+            />
+            {provider === 'whatsapp' && (
               <WhatsAppToolsPopover
                 onOpenOptions={onOpenOptions}
                 onOpenTemplates={onOpenTemplates}
                 onOpenCampaigns={onOpenCampaigns}
               >
-                <Button type="text" size="small" icon={<Wrench size={16} />}>
-                  {t('chat.tools')}
-                </Button>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<Wrench size={16} />}
+                  aria-label={t('chat.tools')}
+                  title={t('chat.tools')}
+                />
               </WhatsAppToolsPopover>
-            </div>
-          )}
+            )}
+          </div>
         </div>
+
+        {searchOpen && (
+          <ListSearchInput
+            value={searchInput}
+            onChange={setSearchInput}
+            onClose={closeSearch}
+            searching={isSearching}
+            placeholder={t('chat.search')}
+          />
+        )}
 
         <div className="flex-1 overflow-y-auto">
           {/* Mobile: HeaderHelper scrolls with the list (under the filter bar) */}
@@ -493,14 +572,7 @@ export function ChatLayout({
           {!hasConversations && setupState ? (
             <div className="md:hidden">
               {setupState === 'catalog' ? (
-                <SocialSetup
-                  icon={<ShoppingBag size={40} strokeWidth={1.5} />}
-                  color={providerConfig.color}
-                  title={t('chat.configure_catalog_title')}
-                  description={t('chat.configure_catalog_desc')}
-                  buttonLabel={t('chat.configure_catalog_btn')}
-                  onAction={onConfigureCatalog}
-                />
+                renderCatalogSetup()
               ) : (
                 <SocialSetup
                   icon={<Sparkles size={40} strokeWidth={1.5} />}

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Sparkles, Link2 } from 'lucide-react'
+import { Sparkles, Link2, Wand2 } from 'lucide-react'
 
 interface QuickAction {
   key: string
@@ -12,13 +12,23 @@ interface QuickAction {
 interface CatalogQuickActionsProps {
   onOpenContextFlow: () => void
   onOpenLinkPostsFlow: () => void
+  onOpenStudio: () => void
 }
 
 export function CatalogQuickActions({
   onOpenContextFlow,
   onOpenLinkPostsFlow,
+  onOpenStudio,
 }: CatalogQuickActionsProps) {
   const actions: QuickAction[] = [
+    {
+      key: 'design-studio',
+      icon: <Wand2 size={20} strokeWidth={1.75} />,
+      title: 'Personnaliser les images de vos produits',
+      subtitle:
+        'Créez des habillages (prix, promo, logo) et exportez vos visuels aux formats réseaux sociaux dans le Studio images.',
+      onClick: onOpenStudio,
+    },
     {
       key: 'context',
       icon: <Sparkles size={20} strokeWidth={1.75} />,

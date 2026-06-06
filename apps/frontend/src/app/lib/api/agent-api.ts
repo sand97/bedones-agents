@@ -19,6 +19,37 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+/**
+ * Extracts a human-readable message from an error thrown by fetchJson
+ * (format: `API error <status>: <body>`). Unwraps the NestJS error body
+ * `{ message }` and any nested Meta Graph error `{ error: { message } }`.
+ */
+export function getApiErrorMessage(err: unknown, fallback = 'Une erreur est survenue'): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  const jsonStart = raw.indexOf('{')
+  if (jsonStart !== -1) {
+    try {
+      const body = JSON.parse(raw.slice(jsonStart)) as { message?: unknown }
+      const m = body.message
+      const msg = Array.isArray(m) ? m.filter(Boolean).join(', ') : typeof m === 'string' ? m : ''
+      // Unwrap nested "Meta API error: {\"error\":{\"message\":\"...\"}}"
+      const metaStart = msg.indexOf('{')
+      if (metaStart !== -1) {
+        try {
+          const meta = JSON.parse(msg.slice(metaStart)) as { error?: { message?: string } }
+          if (meta.error?.message) return meta.error.message
+        } catch {
+          /* keep the outer message */
+        }
+      }
+      if (msg) return msg
+    } catch {
+      /* fall through to raw */
+    }
+  }
+  return raw || fallback
+}
+
 // ─── Agent ───
 
 export interface AgentSocialAccount {
@@ -172,6 +203,22 @@ export interface Collection {
   product_count?: number
 }
 
+export interface CatalogMigration {
+  id: string
+  catalogId: string
+  sourcePhone: string
+  status: 'QUEUED' | 'EXTRACTING' | 'IMPORTING' | 'COMPLETED' | 'FAILED'
+  totalProducts: number
+  importedProducts: number
+  failedProducts: number
+  error?: string | null
+  /** Number of migrations ahead in the queue (0 = running / next). */
+  position: number
+  /** Estimated minutes before this migration starts (~1 min per sync). */
+  etaMinutes: number
+  createdAt: string
+}
+
 export const catalogApi = {
   list: (orgId: string) => fetchJson<Catalog[]>(`/catalog/org/${orgId}`),
 
@@ -232,6 +279,7 @@ export const catalogApi = {
     catalogId: string,
     data: {
       name: string
+      retailerId: string
       description?: string
       imageUrl?: string
       additionalImageUrls?: string[]
@@ -255,6 +303,7 @@ export const catalogApi = {
     productId: string,
     data: {
       name?: string
+      retailerId?: string
       description?: string
       imageUrl?: string
       additionalImageUrls?: string[]
@@ -293,8 +342,10 @@ export const catalogApi = {
   deleteCollection: (catalogId: string, collectionId: string) =>
     fetchJson<void>(`/catalog/${catalogId}/collections/${collectionId}`, { method: 'DELETE' }),
 
+  // `isSmb` is set when Meta rejects the WABA product_catalogs call with the
+  // (#10) "SMB business type" error — the reliable WhatsApp Business app signal.
   getWhatsappCommerceSettings: (phoneNumberId: string) =>
-    fetchJson<{ data: Array<{ is_catalog_visible: boolean; id?: string }> }>(
+    fetchJson<{ data: Array<{ is_catalog_visible: boolean; id?: string }>; isSmb?: boolean }>(
       `/catalog/whatsapp-commerce/${phoneNumberId}`,
     ),
 
@@ -406,6 +457,24 @@ export const catalogApi = {
     fetchJson<{ success: boolean }>(`/catalog/${catalogId}/collection-post-links/${linkId}`, {
       method: 'DELETE',
     }),
+
+  // ─── Commerce Manager migration (import a WhatsApp number's catalogue) ───
+
+  startMigration: (data: {
+    organisationId: string
+    catalogId: string
+    sourcePhone: string
+    sourceSocialAccountId?: string
+  }) =>
+    fetchJson<CatalogMigration>('/catalog-migration', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getMigration: (id: string) => fetchJson<CatalogMigration>(`/catalog-migration/${id}`),
+
+  getActiveMigration: (orgId: string) =>
+    fetchJson<CatalogMigration | null>(`/catalog-migration/org/${orgId}/active`),
 }
 
 export interface PostLink {

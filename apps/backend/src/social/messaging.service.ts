@@ -180,7 +180,10 @@ export class MessagingService {
 
     return this.prisma.conversation.findMany({
       where: { socialAccountId: accountId },
-      orderBy: { lastMessageAt: 'desc' },
+      // `nulls: 'last'` keeps contact-only entries (synced from the address book
+      // via smb_app_state_sync, no message yet) below active chats instead of
+      // sorting them first (PostgreSQL puts NULLs first on a DESC sort).
+      orderBy: { lastMessageAt: { sort: 'desc', nulls: 'last' } },
     })
   }
 

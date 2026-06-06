@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bedones-design",
+  "compatibility_date": "2025-09-02",
+  // SPA statique (Vite) servie via Workers Static Assets — pas de script worker.
+  // Tout chemin inconnu retombe sur index.html (routing client).
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

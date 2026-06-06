@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Table, Input, Button, Skeleton, Dropdown, Modal } from 'antd'
+import { Table, Input, Button, Skeleton, Dropdown, Modal, App } from 'antd'
 import {
   Search,
   ChevronDown,
@@ -33,7 +33,7 @@ import type { PickerEntity } from '@app/components/catalog/product-collection-pi
 import type { CatalogArticle } from '@app/components/whatsapp/mock-data'
 import { AccountSwitcher } from '@app/components/social/account-switcher'
 import { useLayout } from '@app/contexts/layout-context'
-import { catalogApi } from '@app/lib/api/agent-api'
+import { catalogApi, getApiErrorMessage } from '@app/lib/api/agent-api'
 import { setAuthRedirect, buildFacebookOAuthUrl } from '@app/lib/auth-redirect'
 import type { Product, Collection } from '@app/lib/api/agent-api'
 import { CatalogSocialEmpty } from '@app/components/catalog/catalog-social-empty'
@@ -46,6 +46,7 @@ import {
   updateListItemCache,
 } from '@app/lib/query-cache'
 import { getStoredSelection, setStoredSelection } from '@app/lib/selection-storage'
+import { useDebouncedValue } from '@app/hooks/use-debounced-value'
 
 const CATALOG_SELECTION_SCOPE = 'catalog-current'
 
@@ -69,6 +70,7 @@ const STATUS_FILTER_OPTIONS = [
 
 function CatalogPage() {
   const { t } = useTranslation()
+  const { message } = App.useApp()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
   const search = useSearch({ from: '/app/$orgSlug/catalog' })
   const navigate = useNavigate()
@@ -83,6 +85,15 @@ function CatalogPage() {
   const [cursorStack, setCursorStack] = useState<string[]>([])
   const [afterCursor, setAfterCursor] = useState<string | undefined>(undefined)
   const [pageSize, setPageSize] = useState(DEFAULT_LIMIT)
+
+  // Debounce the search box so typing doesn't fire an API call per keystroke.
+  const debouncedSearch = useDebouncedValue(searchText.trim(), 350)
+  // When the (debounced) term changes, jump back to the first page so the
+  // cursor we send matches the term being queried.
+  useEffect(() => {
+    setCursorStack([])
+    setAfterCursor(undefined)
+  }, [debouncedSearch])
 
   const currentPage = cursorStack.length + 1
 
@@ -158,7 +169,7 @@ function CatalogPage() {
     queryKey: [
       'catalog-products',
       selectedCatalog?.id,
-      searchText,
+      debouncedSearch,
       selectedStatuses,
       selectedCollectionId,
       afterCursor,
@@ -167,7 +178,7 @@ function CatalogPage() {
     queryFn: () =>
       selectedCatalog
         ? catalogApi.getProducts(selectedCatalog.id, {
-            search: searchText || undefined,
+            search: debouncedSearch || undefined,
             status: selectedStatuses.length === 1 ? selectedStatuses[0] : undefined,
             collectionId: selectedCollectionId,
             after: afterCursor,
@@ -218,6 +229,7 @@ function CatalogPage() {
       const optimistic: Product = {
         id: (result as unknown as { id: string }).id,
         name: data.name,
+        retailerId: data.retailerId,
         description: data.description,
         imageUrl: data.imageUrl,
         additionalImageUrls: data.additionalImageUrls,
@@ -239,6 +251,9 @@ function CatalogPage() {
         optimistic,
       )
       setModalProductConfig({ isOpen: false })
+    },
+    onError: (err) => {
+      message.error(getApiErrorMessage(err, t('catalog.product_save_error')))
     },
   })
 
@@ -268,6 +283,9 @@ function CatalogPage() {
         patch,
       )
       setModalProductConfig({ isOpen: false })
+    },
+    onError: (err) => {
+      message.error(getApiErrorMessage(err, t('catalog.product_save_error')))
     },
   })
 
@@ -519,6 +537,13 @@ function CatalogPage() {
           <CatalogQuickActions
             onOpenContextFlow={() => setContextFlowOpen(true)}
             onOpenLinkPostsFlow={() => setPostLinkFlowOpen(true)}
+            onOpenStudio={() => {
+              const base = import.meta.env.VITE_DESIGN_STUDIO_URL || 'https://design.bedones.com'
+              const url = `${base}/?catalogId=${encodeURIComponent(
+                selectedCatalog.id,
+              )}&org=${encodeURIComponent(orgSlug)}`
+              window.open(url, '_blank', 'noopener,noreferrer')
+            }}
           />
         )}
 
@@ -528,10 +553,7 @@ function CatalogPage() {
               placeholder={t('catalog.search_placeholder')}
               prefix={<Search size={16} className="text-text-muted" />}
               value={searchText}
-              onChange={(e) => {
-                setSearchText(e.target.value)
-                resetPagination()
-              }}
+              onChange={(e) => setSearchText(e.target.value)}
               allowClear
               className="tickets-filter-input"
             />
@@ -729,6 +751,7 @@ function CatalogPage() {
           const [firstImage, ...extraImages] = values.imageUrls ?? []
           const apiData = {
             name: values.name,
+            retailerId: values.retailerId,
             description: values.description,
             imageUrl: firstImage,
             additionalImageUrls: extraImages,

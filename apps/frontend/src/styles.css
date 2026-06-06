@@ -503,6 +503,33 @@ a {
   border-radius: 0 !important;
 }
 
+/* Inline list search row (chat conversations + comments posts) */
+.list-search {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Progress overlays the bottom edge so it never shifts the list below it. */
+.list-search__progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  line-height: 0;
+}
+
+.list-search__progress .ant-progress-outer {
+  padding: 0 !important;
+}
+
+.list-search__progress .ant-progress-inner {
+  border-radius: 0 !important;
+}
+
+.list-search__progress .ant-progress-bg {
+  background-color: #111b21 !important;
+}
+
 /* Comments split layout */
 .comments-split {
   display: flex;
@@ -834,6 +861,10 @@ a {
 }
 
 .chat-bubble--video {
+  /* The placeholder/player sizes with width:100%, so the bubble needs a definite
+     width to resolve against — without it the shrink-to-fit bubble collapses to the
+     play button's size, producing a tiny square card. */
+  min-width: 280px;
   max-width: 40%;
 }
 
@@ -2631,8 +2662,43 @@ a {
 .product-modal-img-remove:hover {
   background: rgba(0, 0, 0, 0.8) !important;
 }
+
+/* ─── Product Modal Image Reorder (drag & drop) ─── */
+.product-modal-img-item {
+  cursor: grab;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.product-modal-img-item:active {
+  cursor: grabbing;
+}
+
+.product-modal-img-item.is-dragging {
+  opacity: 0.4;
+}
+
+.product-modal-img-item.is-drop-target img {
+  outline: 2px dashed #111b21;
+  outline-offset: 2px;
+}
+
+.product-modal-img-badge {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
 .ant-btn-icon {
-  @apply flex;
+  @apply flex items-center justify-center;
 }
 /* ─── OTP Input ─── */
 .ant-otp-input {

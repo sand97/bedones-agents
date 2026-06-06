@@ -130,6 +130,24 @@ export async function uploadChatMedia(file: File): Promise<string> {
   return data.url
 }
 
+/** Upload a product image — the backend optimizes (resize + compress) it. */
+export async function uploadProductImage(file: File): Promise<string> {
+  const { data, error } = await apiClient.POST('/upload/product-image', {
+    body: { file } as unknown as { file: string },
+    bodySerializer: () => {
+      const formData = new FormData()
+      formData.append('file', file)
+      return formData
+    },
+  })
+
+  if (error) {
+    throw new Error(getErrorMessage(error, i18n.t('upload.error')))
+  }
+
+  return data.url
+}
+
 // ─── Social / Comments ───
 
 export async function connectFacebook(
