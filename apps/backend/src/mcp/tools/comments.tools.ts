@@ -3,7 +3,13 @@ import { Tool } from '@rekog/mcp-nest'
 import { z } from 'zod'
 import { SocialService } from '../../social/social.service'
 import { mcpContext, requireAdmin } from '../mcp-context'
-import { DESTRUCTIVE_EXTERNAL, READ_ONLY, WRITE_EXTERNAL, WRITE_INTERNAL } from './annotations'
+import {
+  DESTRUCTIVE_EXTERNAL,
+  READ_ONLY,
+  WRITE_EXTERNAL,
+  WRITE_INTERNAL,
+  withTitle,
+} from './annotations'
 import {
   accountIdSchema,
   commentIdSchema,
@@ -19,7 +25,7 @@ export class McpCommentsTools {
 
   @Tool({
     name: 'list_social_accounts',
-    annotations: READ_ONLY,
+    annotations: withTitle('Lister les comptes sociaux', READ_ONLY),
     description:
       "Lister les comptes sociaux connectés de l'organisation (pages Facebook, comptes Instagram, WhatsApp, TikTok) avec leurs IDs.",
     parameters: emptySchema,
@@ -31,7 +37,7 @@ export class McpCommentsTools {
 
   @Tool({
     name: 'get_unread_counts',
-    annotations: READ_ONLY,
+    annotations: withTitle('Compteurs de non-lus', READ_ONLY),
     description: 'Compteurs de commentaires et messages non lus par réseau social.',
     parameters: emptySchema,
   })
@@ -42,7 +48,7 @@ export class McpCommentsTools {
 
   @Tool({
     name: 'list_posts',
-    annotations: READ_ONLY,
+    annotations: withTitle('Lister les publications', READ_ONLY),
     description: "Lister les posts d'un compte social avec leurs commentaires.",
     parameters: accountIdSchema,
   })
@@ -53,7 +59,7 @@ export class McpCommentsTools {
 
   @Tool({
     name: 'comment_on_post',
-    annotations: WRITE_EXTERNAL,
+    annotations: withTitle('Commenter une publication', WRITE_EXTERNAL),
     description: 'Publier un commentaire de premier niveau sur un post.',
     parameters: commentOnPostSchema,
   })
@@ -64,7 +70,7 @@ export class McpCommentsTools {
 
   @Tool({
     name: 'reply_to_comment',
-    annotations: WRITE_EXTERNAL,
+    annotations: withTitle('Répondre à un commentaire', WRITE_EXTERNAL),
     description: 'Répondre à un commentaire (Facebook / Instagram).',
     parameters: replyToCommentSchema,
   })
@@ -75,7 +81,7 @@ export class McpCommentsTools {
 
   @Tool({
     name: 'hide_comment',
-    annotations: WRITE_EXTERNAL,
+    annotations: withTitle('Masquer un commentaire', WRITE_EXTERNAL),
     description: 'Masquer un commentaire.',
     parameters: commentIdSchema,
   })
@@ -86,7 +92,7 @@ export class McpCommentsTools {
 
   @Tool({
     name: 'unhide_comment',
-    annotations: WRITE_EXTERNAL,
+    annotations: withTitle('Ré-afficher un commentaire', WRITE_EXTERNAL),
     description: 'Ré-afficher un commentaire masqué.',
     parameters: commentIdSchema,
   })
@@ -97,7 +103,7 @@ export class McpCommentsTools {
 
   @Tool({
     name: 'delete_comment',
-    annotations: DESTRUCTIVE_EXTERNAL,
+    annotations: withTitle('Supprimer un commentaire', DESTRUCTIVE_EXTERNAL),
     description: 'Supprimer définitivement un commentaire. Réservé aux administrateurs.',
     parameters: commentIdSchema,
   })
@@ -109,7 +115,7 @@ export class McpCommentsTools {
 
   @Tool({
     name: 'mark_comments_read',
-    annotations: WRITE_INTERNAL,
+    annotations: withTitle('Marquer les commentaires comme lus', WRITE_INTERNAL),
     description: "Marquer les commentaires d'un post comme lus.",
     parameters: postIdSchema,
   })

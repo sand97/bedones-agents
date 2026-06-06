@@ -38,3 +38,11 @@ export const DESTRUCTIVE_EXTERNAL: ToolAnnotations = {
   destructiveHint: true,
   openWorldHint: true,
 }
+
+/**
+ * Attach a human-readable title to a behaviour preset. The Claude Connectors
+ * Directory requires every tool to carry a `title` annotation.
+ */
+export function withTitle(title: string, base: ToolAnnotations): ToolAnnotations {
+  return { ...base, title }
+}

@@ -584,6 +584,16 @@ function WhatsAppLoginCard({
           </a>
           .
         </Text>
+
+        <Button
+          type="link"
+          size="small"
+          onClick={() =>
+            navigate({ to: '/auth/login', search: { method: 'email', return_to: returnTo } })
+          }
+        >
+          Se connecter avec un email
+        </Button>
       </div>
     </Card>
   )
