@@ -269,7 +269,10 @@ export function CommentsConfigModal({
         undesiredCommentsAction: values.unwantedAction as 'hide' | 'delete' | 'none',
         spamAction: values.spamAction as 'hide' | 'delete' | 'none',
         customInstructions: values.customInstructions || undefined,
-        faqRules: faqRules.length > 0 ? faqRules : undefined,
+        // Always send the array (even empty) so the backend can clear FAQ rules
+        // when the last one is removed. Sending `undefined` here would be dropped
+        // from the JSON payload and the backend would leave existing rules intact.
+        faqRules,
         catalogId: values.catalogId ?? null,
       })
 
