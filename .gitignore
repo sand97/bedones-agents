@@ -10,3 +10,8 @@
 /apps/frontend/.env
 /apps/frontend/dist/
 /apps/frontend/.wrangler/
+/apps/whatsapp-connector/node_modules/
+/apps/whatsapp-connector/.env
+/apps/whatsapp-connector/.wwebjs_cache/
+/apps/whatsapp-connector/data/
+/apps/whatsapp-connector/dist/
