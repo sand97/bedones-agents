@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core'
 import { NestExpressApplication } from '@nestjs/platform-express'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import type { NextFunction, Request, Response } from 'express'
 import * as cookieParser from 'cookie-parser'
 import { join } from 'path'
 import { mkdirSync, writeFileSync } from 'fs'
@@ -16,6 +17,28 @@ async function bootstrap() {
   app.useBodyParser('urlencoded', { limit: '25mb', extended: true })
 
   app.use(cookieParser())
+
+  // Permissive CORS for the public MCP + OAuth discovery surface so that
+  // Claude / ChatGPT clients can reach them cross-origin. Kept separate from
+  // the credentialed app CORS below (these endpoints use Bearer tokens, not
+  // the session cookie).
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith('/mcp') || req.path.startsWith('/.well-known')) {
+      res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
+      res.setHeader('Vary', 'Origin')
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS')
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Authorization, Content-Type, mcp-session-id, mcp-protocol-version, last-event-id',
+      )
+      res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id, WWW-Authenticate')
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204
+        return res.end()
+      }
+    }
+    next()
+  })
 
   app.enableCors({
     // Liste d'origines autorisées, séparées par des virgules (frontend,

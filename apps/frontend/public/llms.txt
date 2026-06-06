@@ -1,0 +1,28 @@
+# Bedones
+
+> Bedones est un CRM social qui centralise les commentaires et la messagerie
+> (DM) de Facebook, Instagram, TikTok et WhatsApp, et permet d'y répondre et de
+> les modérer — manuellement ou via l'IA. Bedones expose un serveur MCP (Model
+> Context Protocol) qui sert de pont : un assistant IA (Claude, ChatGPT) peut
+> piloter directement la messagerie, les commentaires, le catalogue, les tickets
+> et le contexte business d'une organisation.
+
+## Connecteur IA (MCP)
+
+- [Endpoint MCP](https://api-moderator.bedones.test/mcp): serveur MCP (Streamable HTTP + SSE), authentifié en OAuth 2.1 (PKCE, Dynamic Client Registration). À ajouter comme "custom connector" dans Claude ou ChatGPT.
+- [OAuth — Authorization Server Metadata](https://api-moderator.bedones.test/.well-known/oauth-authorization-server)
+- [OAuth — Protected Resource Metadata](https://api-moderator.bedones.test/.well-known/oauth-protected-resource)
+
+## Outils exposés (tools MCP)
+
+- Organisation: get_active_organisation, list_organisations
+- Messagerie (DM): list_conversations, read_conversation_messages, send_message, send_product_message, send_template_message, send_reaction, mark_conversation_read, sync_conversations
+- Commentaires: list_social_accounts, get_unread_counts, list_posts, comment_on_post, reply_to_comment, hide_comment, unhide_comment, delete_comment, mark_comments_read
+- Catalogue: list_catalog_products
+- Tickets: create_ticket, list_tickets, update_ticket_status
+- Contexte / IA: get_business_context, update_agent_context, get_page_settings, update_page_settings, add_faq_rule
+
+## Cas d'usage
+
+- "Automatiser les réponses aux messages et commentaires via l'IA" sur WhatsApp, Facebook, Instagram et TikTok depuis Claude ou ChatGPT.
+- Trier la boîte de réception, répondre, modérer les commentaires, créer des tickets et définir le contexte business — sans ouvrir le dashboard.
