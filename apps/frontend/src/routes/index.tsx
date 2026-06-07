@@ -7,7 +7,7 @@ import { Features } from '@app/components/marketing/features'
 import { HowItWorks, StatsAndTestimonial, FinalCTA } from '@app/components/marketing/how-stats-cta'
 import { useScrollReveal } from '@app/components/marketing/use-scroll-reveal'
 
-const SITE_URL = 'https://bedones.com'
+const SITE_URL = 'https://moderator.bedones.com'
 const TITLE = "Bedones Moderator — L'IA qui répond à vos clients sur WhatsApp, Instagram, TikTok"
 const DESCRIPTION =
   "L'assistant IA qui répond à vos clients 24h/24 sur WhatsApp, Instagram, TikTok, Facebook et Messenger. Apprend de votre catalogue, comprend Mobile Money, automatise vos ventes."

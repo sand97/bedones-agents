@@ -4,7 +4,7 @@ import { MarketingNav } from '@app/components/marketing/marketing-nav'
 import { MarketingFooter } from '@app/components/marketing/marketing-footer'
 import { blogArticles, getCategoryCounts, type BlogArticle } from '@app/data/blog'
 
-const SITE_URL = 'https://bedones.com'
+const SITE_URL = 'https://moderator.bedones.com'
 const TITLE = "Blog Bedones — Vendre, automatiser et grandir avec l'IA"
 const DESCRIPTION =
   'Guides, études de cas et conseils pour automatiser vos ventes sur WhatsApp, Instagram, TikTok et Facebook. Ressources pratiques pour entrepreneurs en ligne.'
