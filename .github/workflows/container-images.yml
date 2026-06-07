@@ -16,6 +16,7 @@ on:
       - ".dockerignore"
       - ".github/workflows/container-images.yml"
       - "apps/backend/**"
+      - "apps/whatsapp-connector/**"
       - "services/image-cropper/**"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -28,6 +29,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       cropper: ${{ steps.filter.outputs.cropper }}
+      whatsapp: ${{ steps.filter.outputs.whatsapp }}
       shared: ${{ steps.filter.outputs.shared }}
 
     steps:
@@ -47,6 +49,8 @@ jobs:
               - 'pnpm-workspace.yaml'
             backend:
               - 'apps/backend/**'
+            whatsapp:
+              - 'apps/whatsapp-connector/**'
             cropper:
               - 'services/image-cropper/**'
 
@@ -61,6 +65,10 @@ jobs:
             context: .
             dockerfile: apps/backend/Dockerfile
             image: bedones-moderator-backend
+          - id: whatsapp
+            context: .
+            dockerfile: apps/whatsapp-connector/Dockerfile
+            image: bedones-moderator-connector
           - id: cropper
             context: services/image-cropper
             dockerfile: services/image-cropper/Dockerfile
@@ -85,6 +93,7 @@ jobs:
           MATRIX_ID: ${{ matrix.id }}
           SHARED_CHANGED: ${{ needs.changes.outputs.shared }}
           BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
+          WHATSAPP_CHANGED: ${{ needs.changes.outputs.whatsapp }}
           CROPPER_CHANGED: ${{ needs.changes.outputs.cropper }}
         run: |
           should_build=false
@@ -95,6 +104,9 @@ jobs:
             case "${MATRIX_ID}" in
               backend)
                 [[ "${BACKEND_CHANGED}" == "true" ]] && should_build=true
+                ;;
+              whatsapp)
+                [[ "${WHATSAPP_CHANGED}" == "true" ]] && should_build=true
                 ;;
               cropper)
                 [[ "${CROPPER_CHANGED}" == "true" ]] && should_build=true
@@ -173,6 +185,45 @@ jobs:
             
             docker pull ghcr.io/sand97/bedones-moderator-cropper:main 
             docker pull ghcr.io/sand97/bedones-moderator-backend:main
+
+            docker service update \
+              --force \
+              --image ghcr.io/${{ steps.vars.outputs.owner }}/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }} \
+              --with-registry-auth \
+              ${{ steps.vars.outputs.stack }}_${{ steps.vars.outputs.service }}
+
+            echo "Waiting for service update..."
+            sleep 5
+            docker service ps ${{ steps.vars.outputs.stack }}_${{ steps.vars.outputs.service }} --filter "desired-state=running" --format "{{.Name}} {{.Image}} {{.CurrentState}}"
+
+  deploy-connector:
+    needs:
+      - changes
+      - build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.shared == 'true' || needs.changes.outputs.whatsapp == 'true')
+
+    steps:
+      - name: Compute connector deploy variables
+        id: vars
+        shell: bash
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "${GITHUB_OUTPUT}"
+          echo "image=bedones-moderator-connector" >> "${GITHUB_OUTPUT}"
+          echo "tag=git-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "stack=bedones-whatsapp-stack" >> "${GITHUB_OUTPUT}"
+          echo "service=connector" >> "${GITHUB_OUTPUT}"
+
+      - name: Deploy connector to Docker Swarm
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            docker pull ghcr.io/sand97/bedones-moderator-connector:main
 
             docker service update \
               --force \
