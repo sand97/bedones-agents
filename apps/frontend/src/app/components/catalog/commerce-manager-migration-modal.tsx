@@ -844,12 +844,15 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
                 </div>
               </div>
               <div className="mc-ask">
-                <div className="mc-ask-t">{tf('s4_ask_t')}</div>
-                <div className="mc-ask-b">{tf('s4_ask_b', { number: waNumber })}</div>
+                <div className="mc-ask-t">{tf('s4_done_t')}</div>
+                <div className="mc-ask-b">{tf('s4_done_b', { number: waNumber })}</div>
+                <button className="mc-textlink" onClick={connectAccount}>
+                  {tf('s4_connect_native')}
+                </button>
               </div>
             </div>
           ),
-          primary: { label: tf('connect_account'), icon: 'arrowRight', onClick: connectAccount },
+          primary: { label: tf('finish'), icon: 'check', onClick: close },
         }
       }
       if (phase === 'failed') {

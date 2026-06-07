@@ -158,6 +158,25 @@ export class CatalogMigrationService {
     return this.toResponse(migration, position, etaMinutes)
   }
 
+  /**
+   * Last completed sync for a catalogue (which number fed it, and when) — used
+   * by the catalogue page's "Products synced from … at …" banner + re-sync.
+   */
+  async getLastSync(userId: string, catalogId: string) {
+    await this.catalogService.assertCatalogAccess(userId, catalogId)
+    const last = await this.prisma.catalogMigration.findFirst({
+      where: { catalogId, status: 'COMPLETED' },
+      orderBy: { finishedAt: 'desc' },
+    })
+    if (!last) return null
+    return {
+      sourcePhone: last.sourcePhone,
+      sourceSocialAccountId: last.sourceSocialAccountId,
+      finishedAt: last.finishedAt,
+      importedProducts: last.importedProducts,
+    }
+  }
+
   // ─── Worker entry points ───
 
   /**

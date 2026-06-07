@@ -477,6 +477,15 @@ export const catalogApi = {
 
   getActiveMigration: (orgId: string) =>
     fetchJson<CatalogMigration | null>(`/catalog-migration/org/${orgId}/active`),
+
+  /** Last completed sync (which number fed the catalogue, and when) for the banner. */
+  getLastSync: (catalogId: string) =>
+    fetchJson<{
+      sourcePhone: string
+      sourceSocialAccountId: string | null
+      finishedAt: string | null
+      importedProducts: number
+    } | null>(`/catalog-migration/catalog/${catalogId}/last-sync`),
 }
 
 export interface PostLink {
