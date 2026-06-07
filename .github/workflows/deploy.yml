@@ -1,7 +1,7 @@
-name: Container Images
+name: Build & Deploy
 
 concurrency:
-  group: container-images-${{ github.event.pull_request.number || github.ref }}
+  group: build-deploy-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -13,10 +13,12 @@ on:
     branches:
       - main
     paths:
+      - ".github/workflows/deploy.yml"
       - ".dockerignore"
-      - ".github/workflows/container-images.yml"
       - "apps/backend/**"
       - "apps/whatsapp-connector/**"
+      - "apps/frontend/**"
+      - "apps/design/**"
       - "services/image-cropper/**"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -24,13 +26,17 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ── Fan-in: detect what changed once, fan-out to every build/deploy job ──
   changes:
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
+      connector: ${{ steps.filter.outputs.connector }}
       cropper: ${{ steps.filter.outputs.cropper }}
-      whatsapp: ${{ steps.filter.outputs.whatsapp }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      design: ${{ steps.filter.outputs.design }}
       shared: ${{ steps.filter.outputs.shared }}
+      dockerignore: ${{ steps.filter.outputs.dockerignore }}
 
     steps:
       - name: Checkout code
@@ -42,19 +48,25 @@ jobs:
         with:
           filters: |
             shared:
-              - '.dockerignore'
-              - '.github/workflows/container-images.yml'
+              - '.github/workflows/deploy.yml'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
+            dockerignore:
+              - '.dockerignore'
             backend:
               - 'apps/backend/**'
-            whatsapp:
+            connector:
               - 'apps/whatsapp-connector/**'
             cropper:
               - 'services/image-cropper/**'
+            frontend:
+              - 'apps/frontend/**'
+            design:
+              - 'apps/design/**'
 
-  build:
+  # ── Container images (GHCR): backend, connector, cropper — built in parallel ──
+  build-images:
     needs: changes
     runs-on: ubuntu-latest
     strategy:
@@ -65,7 +77,7 @@ jobs:
             context: .
             dockerfile: apps/backend/Dockerfile
             image: bedones-moderator-backend
-          - id: whatsapp
+          - id: connector
             context: .
             dockerfile: apps/whatsapp-connector/Dockerfile
             image: bedones-moderator-connector
@@ -92,21 +104,22 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           MATRIX_ID: ${{ matrix.id }}
           SHARED_CHANGED: ${{ needs.changes.outputs.shared }}
+          DOCKERIGNORE_CHANGED: ${{ needs.changes.outputs.dockerignore }}
           BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
-          WHATSAPP_CHANGED: ${{ needs.changes.outputs.whatsapp }}
+          CONNECTOR_CHANGED: ${{ needs.changes.outputs.connector }}
           CROPPER_CHANGED: ${{ needs.changes.outputs.cropper }}
         run: |
           should_build=false
 
-          if [[ "${EVENT_NAME}" == "workflow_dispatch" || "${SHARED_CHANGED}" == "true" ]]; then
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" || "${SHARED_CHANGED}" == "true" || "${DOCKERIGNORE_CHANGED}" == "true" ]]; then
             should_build=true
           else
             case "${MATRIX_ID}" in
               backend)
                 [[ "${BACKEND_CHANGED}" == "true" ]] && should_build=true
                 ;;
-              whatsapp)
-                [[ "${WHATSAPP_CHANGED}" == "true" ]] && should_build=true
+              connector)
+                [[ "${CONNECTOR_CHANGED}" == "true" ]] && should_build=true
                 ;;
               cropper)
                 [[ "${CROPPER_CHANGED}" == "true" ]] && should_build=true
@@ -156,12 +169,13 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.id }}
           platforms: linux/amd64
 
+  # ── Swarm deploys: depend on the images above ──
   deploy-backend:
     needs:
       - changes
-      - build
+      - build-images
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.shared == 'true' || needs.changes.outputs.backend == 'true')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.shared == 'true' || needs.changes.outputs.dockerignore == 'true' || needs.changes.outputs.backend == 'true')
 
     steps:
       - name: Compute backend deploy variables
@@ -182,8 +196,8 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            
-            docker pull ghcr.io/sand97/bedones-moderator-cropper:main 
+
+            docker pull ghcr.io/sand97/bedones-moderator-cropper:main
             docker pull ghcr.io/sand97/bedones-moderator-backend:main
 
             docker service update \
@@ -199,9 +213,9 @@ jobs:
   deploy-connector:
     needs:
       - changes
-      - build
+      - build-images
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.shared == 'true' || needs.changes.outputs.whatsapp == 'true')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.shared == 'true' || needs.changes.outputs.dockerignore == 'true' || needs.changes.outputs.connector == 'true')
 
     steps:
       - name: Compute connector deploy variables
@@ -211,7 +225,7 @@ jobs:
           echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "${GITHUB_OUTPUT}"
           echo "image=bedones-moderator-connector" >> "${GITHUB_OUTPUT}"
           echo "tag=git-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
-          echo "stack=bedones-whatsapp-stack" >> "${GITHUB_OUTPUT}"
+          echo "stack=bedones-moderator-stack" >> "${GITHUB_OUTPUT}"
           echo "service=connector" >> "${GITHUB_OUTPUT}"
 
       - name: Deploy connector to Docker Swarm
@@ -234,3 +248,102 @@ jobs:
             echo "Waiting for service update..."
             sleep 5
             docker service ps ${{ steps.vars.outputs.stack }}_${{ steps.vars.outputs.service }} --filter "desired-state=running" --format "{{.Name}} {{.Image}} {{.CurrentState}}"
+
+  # ── Cloudflare deploys: independent of the image builds, run in parallel ──
+  deploy-frontend:
+    needs: changes
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.shared == 'true' || needs.changes.outputs.frontend == 'true')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          HUSKY: 0
+
+      - name: Export VITE variables
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
+        run: |
+          echo "${VARS_JSON}" | jq -r '
+            to_entries
+            | sort_by(.key)
+            | .[]
+            | select(.key | startswith("VITE_"))
+            | select(.value != null)
+            | select((.value | tostring | contains("\n")) | not)
+            | "\(.key)=\(.value|tostring)"
+          ' >> "${GITHUB_ENV}"
+
+      - name: Build frontend
+        working-directory: apps/frontend
+        run: pnpm build
+
+      - name: Deploy frontend to Cloudflare Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/frontend
+          command: deploy
+
+  deploy-design:
+    needs: changes
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.shared == 'true' || needs.changes.outputs.design == 'true')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          HUSKY: 0
+
+      - name: Export VITE variables
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
+        run: |
+          echo "${VARS_JSON}" | jq -r '
+            to_entries
+            | sort_by(.key)
+            | .[]
+            | select(.key | startswith("VITE_"))
+            | select(.value != null)
+            | select((.value | tostring | contains("\n")) | not)
+            | "\(.key)=\(.value|tostring)"
+          ' >> "${GITHUB_ENV}"
+
+      - name: Build design studio
+        working-directory: apps/design
+        run: pnpm build
+
+      - name: Deploy design studio to Cloudflare Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/design
+          command: deploy
