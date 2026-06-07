@@ -38,6 +38,7 @@ export interface MigrationDoneEvent {
   failed?: number
   total?: number
   error?: string
+  errorCode?: string
 }
 
 export function getSocket(orgId: string): Socket {

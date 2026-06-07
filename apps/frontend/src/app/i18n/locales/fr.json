@@ -114,6 +114,8 @@
       "s4_failed_title": "L'import a rencontré un problème",
       "s4_failed_msg": "L'import n'a pas abouti.",
       "s4_failed_hint": "Veuillez réessayer. Si le problème persiste, contactez le support.",
+      "s4_failed_vertical": "Le type du catalogue sélectionné ne supporte pas ces produits. Choisissez un autre catalogue (ou créez-en un), puis réessayez.",
+      "s4_choose_another": "Choisir un autre catalogue",
       "s5_linking_title": "Connexion de votre compte WhatsApp",
       "s5_linking_lede": "Nous relions votre numéro {{number}} à votre catalogue Commerce Manager. Cela prend quelques secondes.",
       "s5_linked_title": "Votre compte WhatsApp est lié au catalogue Commerce Manager",
