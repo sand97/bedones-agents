@@ -68,7 +68,7 @@ jobs:
           - id: whatsapp
             context: .
             dockerfile: apps/whatsapp-connector/Dockerfile
-            image: bedones-moderator-whatsapp-connector
+            image: bedones-moderator-connector
           - id: cropper
             context: services/image-cropper
             dockerfile: services/image-cropper/Dockerfile
@@ -185,6 +185,45 @@ jobs:
             
             docker pull ghcr.io/sand97/bedones-moderator-cropper:main 
             docker pull ghcr.io/sand97/bedones-moderator-backend:main
+
+            docker service update \
+              --force \
+              --image ghcr.io/${{ steps.vars.outputs.owner }}/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }} \
+              --with-registry-auth \
+              ${{ steps.vars.outputs.stack }}_${{ steps.vars.outputs.service }}
+
+            echo "Waiting for service update..."
+            sleep 5
+            docker service ps ${{ steps.vars.outputs.stack }}_${{ steps.vars.outputs.service }} --filter "desired-state=running" --format "{{.Name}} {{.Image}} {{.CurrentState}}"
+
+  deploy-connector:
+    needs:
+      - changes
+      - build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.shared == 'true' || needs.changes.outputs.whatsapp == 'true')
+
+    steps:
+      - name: Compute connector deploy variables
+        id: vars
+        shell: bash
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "${GITHUB_OUTPUT}"
+          echo "image=bedones-moderator-connector" >> "${GITHUB_OUTPUT}"
+          echo "tag=git-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "stack=bedones-whatsapp-stack" >> "${GITHUB_OUTPUT}"
+          echo "service=connector" >> "${GITHUB_OUTPUT}"
+
+      - name: Deploy connector to Docker Swarm
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            docker pull ghcr.io/sand97/bedones-moderator-connector:main
 
             docker service update \
               --force \
