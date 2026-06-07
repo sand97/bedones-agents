@@ -853,7 +853,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
               <div className="mc-banner is-warn">
                 <Icon name="alert" size={18} />
                 <div>
-                  <strong>{tf('s4_failed_msg')}</strong> {migration?.error || ''}
+                  <strong>{tf('s4_failed_msg')}</strong> {tf('s4_failed_hint')}
                 </div>
               </div>
             </div>

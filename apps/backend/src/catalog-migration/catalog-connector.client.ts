@@ -60,6 +60,9 @@ const CLIENT_CATALOG_SCRIPT = `(async () => {
   };
 
   try {
+    if (!window.WPP || !window.WPP.whatsapp) {
+      return { success: false, error: 'WhatsApp session not ready: WPP is not injected into the page (no number connected to the connector, or the session is still loading).', productCount: 0 };
+    }
     const userId = CLIENT_USER_ID;
     const wa = window.WPP.whatsapp;
     const productsById = new Map();
@@ -252,9 +255,9 @@ export class CatalogConnectorClient {
     }
     const result = payload?.result
     if (!result?.success) {
-      throw new ServiceUnavailableException(
-        `Catalogue extraction failed: ${result?.error || 'unknown error'}`,
-      )
+      const reason = result?.error || 'unknown error'
+      this.logger.error(`Catalogue extraction failed for ${params.clientUserId}: ${reason}`)
+      throw new ServiceUnavailableException(`Catalogue extraction failed: ${reason}`)
     }
     this.logger.log(
       `Extraction reported ${result.productCount ?? 0} product(s), ${result.collectionCount ?? 0} collection(s)`,

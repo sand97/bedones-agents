@@ -197,6 +197,51 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
     this.logger.log('✅ WPP is ready and available')
   }
 
+  /**
+   * Resilient guard run before any page script: make sure WPP is actually
+   * injected AND ready in the current page, re-injecting and waiting across a
+   * few attempts (the page may have reloaded, leaving a stale flag). Throws a
+   * clear error if the session never becomes ready (e.g. no number connected)
+   * so callers fail explicitly instead of running against an undefined
+   * `window.WPP`.
+   */
+  private async ensureWPPReady(attempts = 3): Promise<void> {
+    const page = this.client?.pupPage
+    if (!page) throw new Error('Puppeteer page is not available')
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      const ready = await page.evaluate(
+        () => typeof window.WPP !== 'undefined' && window.WPP?.isReady === true,
+      )
+      if (ready) {
+        this.wppInjected = true
+        return
+      }
+
+      this.logger.warn(`WPP not ready (attempt ${attempt}/${attempts}); injecting…`)
+      try {
+        // Force a fresh injection (bypass the memoised flag/promise).
+        this.wppInjected = false
+        this.wppInjectionPromise = null
+        await this.injectWPPIntoPageInternal(page)
+        return
+      } catch (error) {
+        this.logger.error(
+          `WPP injection attempt ${attempt}/${attempts} failed: ${
+            error instanceof Error ? error.message : error
+          }`,
+        )
+        if (attempt === attempts) {
+          throw new Error(
+            'WhatsApp session not ready: WPP could not be injected after multiple attempts ' +
+              '(make sure a number is connected to the connector and the session has finished loading).',
+          )
+        }
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1500))
+      }
+    }
+  }
+
   private attachPageDebugListeners(page: any): void {
     if (this.pageDebugListenersAttached) return
     page.on('pageerror', (error: Error) => {
@@ -272,12 +317,9 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
 
     this.attachPageDebugListeners(page)
 
-    const wppAvailable = await page.evaluate(
-      () => typeof window.WPP !== 'undefined' && window.WPP?.isReady,
-    )
-    if (!wppAvailable) {
-      await this.ensureWPPInjected()
-    }
+    // Resilient: inject WPP and wait until it's ready before running the
+    // incoming script (retries across a few attempts; throws if never ready).
+    await this.ensureWPPReady()
 
     return page.evaluate(script)
   }
@@ -303,10 +345,7 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
     const page = this.client.pupPage
     if (!page) throw new Error('Puppeteer page is not available')
 
-    const wppAvailable = await page.evaluate(
-      () => typeof window.WPP !== 'undefined' && window.WPP?.isReady,
-    )
-    if (!wppAvailable) await this.ensureWPPInjected()
+    await this.ensureWPPReady()
 
     const result = await page.evaluate(async (targetWid: string) => {
       const wa = window.WPP.whatsapp as any
