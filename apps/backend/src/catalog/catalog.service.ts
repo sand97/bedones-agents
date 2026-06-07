@@ -11,7 +11,6 @@ import { EventsGateway } from '../gateway/events.gateway'
 import { EncryptionService } from '../auth/encryption.service'
 import { SocialHealthService } from '../social/social-health.service'
 import { ErrorExplanationService, redactSecrets } from '../social/error-explanation.service'
-import { CatalogConnectorClient } from '../catalog-migration/catalog-connector.client'
 import type { SocialFeature, SocialProvider } from 'generated/prisma/enums'
 import { Prisma } from 'generated/prisma/client'
 
@@ -50,7 +49,6 @@ export class CatalogService {
     private encryptionService: EncryptionService,
     private socialHealth: SocialHealthService,
     private errorExplanation: ErrorExplanationService,
-    private readonly connector: CatalogConnectorClient,
   ) {}
 
   // ─── CRUD ───
@@ -1130,63 +1128,20 @@ export class CatalogService {
   /**
    * Persist a catalogue ⇄ WhatsApp-number link for an SMB (WhatsApp Business
    * app) number. Such numbers can't be linked to a Commerce Manager catalogue
-   * through the Meta API (#10) — the user links it manually on their phone and
-   * we record the association in our DB. Best-effort verification: read the
-   * number's public catalogue through the connector and check its products
-   * overlap with the Commerce Manager catalogue's. If we can't verify, we still
-   * record the link (it can be removed from the catalogue controls).
+   * through the Meta API (#10), and WhatsApp Web exposes no reliable catalogue
+   * id to verify against — so the user links it manually on their phone and we
+   * trust them, recording the association in our DB. It can always be removed
+   * from the catalogue controls.
    */
   async linkSmbPhone(catalogId: string, phoneNumberId: string) {
     const { account } = await this.resolveWhatsAppAccount(phoneNumberId)
-    const phoneNumber = (account.username || account.providerAccountId || '').replace(/[^0-9]/g, '')
-
-    let verified = false
-    try {
-      const [{ retailerIds: numberRetailerIds }, catalogRetailerIds] = await Promise.all([
-        this.connector.getNumberCatalog(phoneNumber),
-        this.listCatalogRetailerIds(catalogId),
-      ])
-      verified =
-        numberRetailerIds.length > 0 &&
-        catalogRetailerIds.size > 0 &&
-        numberRetailerIds.some((id) => catalogRetailerIds.has(id))
-      this.logger.log(
-        `[Catalog] SMB link check for ${phoneNumber}: ${numberRetailerIds.length} number ` +
-          `product(s), ${catalogRetailerIds.size} catalogue product(s), verified=${verified}`,
-      )
-    } catch (error) {
-      this.logger.warn(
-        `[Catalog] SMB link verification failed (linking anyway): ${
-          error instanceof Error ? error.message : error
-        }`,
-      )
-    }
-
     await this.prisma.catalogSocialAccount.upsert({
       where: { catalogId_socialAccountId: { catalogId, socialAccountId: account.id } },
       update: {},
       create: { catalogId, socialAccountId: account.id },
     })
-
-    this.logger.log(
-      `[Catalog] SMB-linked catalog ${catalogId} ⇄ account ${account.id} (verified=${verified})`,
-    )
-    return { success: true, verified }
-  }
-
-  /** Retailer ids of a Commerce Manager catalogue (first page) — for SMB link verification. */
-  private async listCatalogRetailerIds(catalogId: string): Promise<Set<string>> {
-    try {
-      const res = (await this.findProducts(catalogId, { limit: 100 })) as {
-        products?: Array<{ retailerId?: string | null; retailer_id?: string | null }>
-      }
-      const ids = (res.products ?? [])
-        .map((p) => p?.retailerId ?? p?.retailer_id)
-        .filter((id): id is string => !!id)
-      return new Set(ids)
-    } catch {
-      return new Set<string>()
-    }
+    this.logger.log(`[Catalog] SMB-linked catalog ${catalogId} ⇄ account ${account.id}`)
+    return { success: true }
   }
 
   async dissociatePhone(catalogId: string, phoneNumberId: string) {

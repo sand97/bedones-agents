@@ -267,47 +267,4 @@ export class CatalogConnectorClient {
       collectionCount: result.collectionCount ?? 0,
     }
   }
-
-  /**
-   * Read a number's public catalogue through the connector and return its
-   * product retailer ids (+ count). Best-effort: never throws — returns an
-   * empty result on any failure. Used to confirm an SMB number has its
-   * catalogue linked to a Commerce Manager catalogue.
-   */
-  async getNumberCatalog(
-    phoneNumber: string,
-  ): Promise<{ productCount: number; retailerIds: string[] }> {
-    const digits = (phoneNumber || '').replace(/[^0-9]/g, '')
-    if (!digits) return { productCount: 0, retailerIds: [] }
-
-    const headers: Record<string, string> = { Accept: 'application/json' }
-    const instanceId = this.config.get<string>('WHATSAPP_CONNECTOR_INSTANCE_ID')
-    if (instanceId) headers['x-bedones-target-instance'] = instanceId
-
-    try {
-      const response = await fetch(`${this.baseUrl}/whatsapp/catalog/${digits}`, {
-        method: 'GET',
-        headers,
-      })
-      if (!response.ok) {
-        this.logger.warn(`Connector catalogue read for ${digits} returned ${response.status}`)
-        return { productCount: 0, retailerIds: [] }
-      }
-      const payload = (await response.json()) as {
-        productCount?: number
-        products?: Array<{ retailerId?: string | null }>
-      }
-      const retailerIds = (payload.products ?? [])
-        .map((p) => p?.retailerId)
-        .filter((id): id is string => !!id)
-      return { productCount: payload.productCount ?? retailerIds.length, retailerIds }
-    } catch (error) {
-      this.logger.warn(
-        `Connector catalogue read for ${digits} failed: ${
-          error instanceof Error ? error.message : error
-        }`,
-      )
-      return { productCount: 0, retailerIds: [] }
-    }
-  }
 }
