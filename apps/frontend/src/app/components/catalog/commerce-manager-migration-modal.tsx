@@ -550,6 +550,16 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
     },
   })
 
+  // SMB (WhatsApp Business app) numbers are linked manually on the phone; this
+  // records the link in our DB once the user confirms they've done it.
+  const smbLinkMutation = useMutation({
+    mutationFn: () => {
+      const phoneNumberId = waAccount?.providerAccountId
+      if (!targetCatalog || !phoneNumberId) throw new Error('Numéro WhatsApp introuvable')
+      return catalogApi.linkSmbPhone(targetCatalog.id, phoneNumberId)
+    },
+  })
+
   // ─── Handlers ───
   const close = () => {
     const inFlight = migration ? IN_FLIGHT.includes(migration.status) : false
@@ -574,7 +584,21 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
   }
 
   const connectAccount = async () => {
+    const phoneNumberId = waAccount?.providerAccountId
     setStep(5)
+    // SMB (WhatsApp Business app) numbers can't be linked through the Meta API,
+    // so we guide the user to link it on their phone and confirm it ourselves.
+    try {
+      if (phoneNumberId) {
+        const settings = await catalogApi.getWhatsappCommerceSettings(phoneNumberId)
+        if (settings?.isSmb) {
+          setPhase('smb_tutorial')
+          return
+        }
+      }
+    } catch {
+      // ignore — fall back to the standard API association below
+    }
     setPhase('linking')
     try {
       await associateMutation.mutateAsync()
@@ -582,6 +606,20 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
     } catch {
       setPhase('manual')
     }
+  }
+
+  const smbDone = async () => {
+    try {
+      await smbLinkMutation.mutateAsync()
+      setPhase('linked')
+    } catch {
+      // stay on the tutorial — the user can retry or report a problem
+    }
+  }
+
+  const reportProblem = () => {
+    const subject = encodeURIComponent('Bedones — problème de liaison du catalogue WhatsApp')
+    window.location.href = `mailto:support@bedones.com?subject=${subject}`
   }
 
   const recheck = async () => {
@@ -947,6 +985,47 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
             <p className="mc-lede mc-center-tx">{tf('s5_linking_lede', { number: waNumber })}</p>
           </div>
         ),
+      }
+    }
+    if (phase === 'smb_tutorial') {
+      const steps: [string, string][] = [
+        [tf('smb_s1_t'), tf('smb_s1_b')],
+        [tf('smb_s2_t'), tf('smb_s2_b')],
+        [tf('smb_s3_t'), tf('smb_s3_b')],
+        [tf('smb_s4_t'), tf('smb_s4_b')],
+      ]
+      return {
+        title: tf('smb_title'),
+        current: 5,
+        back: () => {
+          setStep(4)
+          setPhase('result')
+        },
+        body: (
+          <div className="mc-step pres-compact">
+            <p className="mc-lede">{tf('smb_lede', { catalog: targetCatalog?.name ?? '' })}</p>
+            <ol className="mc-manual">
+              {steps.map(([title, body], i) => (
+                <li key={i} className="mc-manual-item">
+                  <span className="mc-manual-num">{i + 1}</span>
+                  <div className="mc-manual-tx">
+                    <div className="mc-manual-t">{title}</div>
+                    <div className="mc-manual-b">{body}</div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <button className="mc-textlink" onClick={reportProblem}>
+              {tf('smb_problem')}
+            </button>
+          </div>
+        ),
+        primary: {
+          label: tf('smb_done'),
+          icon: 'check',
+          disabled: smbLinkMutation.isPending,
+          onClick: smbDone,
+        },
       }
     }
     // manual fallback

@@ -238,6 +238,18 @@ export class CatalogController {
     return this.catalogService.dissociatePhone(id, phoneNumberId)
   }
 
+  // SMB (WhatsApp Business app) numbers can't be linked via the Meta API, so the
+  // user links the catalogue manually on their phone and we record it in our DB.
+  @Post(':id/link-smb-phone')
+  async linkSmbPhone(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: AssociatePhoneDto,
+  ) {
+    await this.catalogService.assertCatalogAccess(user.id, id)
+    return this.catalogService.linkSmbPhone(id, dto.phoneNumberId)
+  }
+
   // ─── Single catalog (must be last to avoid catching :id/products, :id/collections etc.) ───
 
   @Get(':id')
