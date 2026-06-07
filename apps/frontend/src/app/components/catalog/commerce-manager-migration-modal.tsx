@@ -489,7 +489,8 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
       queryClient.invalidateQueries({ queryKey: ['catalogs', orgSlug] })
     }
     const onFailed = (d: MigrationDoneEvent) => {
-      if (d.migrationId === migrationId) patch({ status: 'FAILED', error: d.error })
+      if (d.migrationId === migrationId)
+        patch({ status: 'FAILED', error: d.error, errorCode: d.errorCode })
     }
 
     socket.on('catalog:migration-queue', onQueue)
@@ -845,6 +846,17 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
         }
       }
       if (phase === 'failed') {
+        // A wrong catalog vertical can't be retried on the same catalog — send
+        // the user back to pick another one (and clear the resume draft so a
+        // reload doesn't drop them back onto this dead-end progress screen).
+        const wrongVertical = migration?.errorCode === 'WRONG_CATALOG_VERTICAL'
+        const chooseAnotherCatalog = () => {
+          clearCatalogMigrationDraft()
+          setMigrationId(undefined)
+          setCollectionsCount(0)
+          setPhase('main')
+          setStep(2)
+        }
         return {
           title: tf('s4_failed_title'),
           current: 4,
@@ -853,17 +865,24 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
               <div className="mc-banner is-warn">
                 <Icon name="alert" size={18} />
                 <div>
-                  <strong>{tf('s4_failed_msg')}</strong> {tf('s4_failed_hint')}
+                  <strong>{tf('s4_failed_msg')}</strong>{' '}
+                  {wrongVertical ? tf('s4_failed_vertical') : tf('s4_failed_hint')}
                 </div>
               </div>
             </div>
           ),
-          primary: {
-            label: tf('retry'),
-            icon: 'refresh',
-            disabled: startMutation.isPending,
-            onClick: () => startMutation.mutate(),
-          },
+          primary: wrongVertical
+            ? {
+                label: tf('s4_choose_another'),
+                icon: 'arrowRight',
+                onClick: chooseAnotherCatalog,
+              }
+            : {
+                label: tf('retry'),
+                icon: 'refresh',
+                disabled: startMutation.isPending,
+                onClick: () => startMutation.mutate(),
+              },
         }
       }
       const tasks = [tf('s4_task1'), tf('s4_task2'), tf('s4_task3')]

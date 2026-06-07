@@ -212,6 +212,8 @@ export interface CatalogMigration {
   importedProducts: number
   failedProducts: number
   error?: string | null
+  /** Stable, actionable code for known failures (e.g. WRONG_CATALOG_VERTICAL). */
+  errorCode?: string | null
   /** Number of migrations ahead in the queue (0 = running / next). */
   position: number
   /** Estimated minutes before this migration starts (~1 min per sync). */

@@ -232,6 +232,10 @@ export class CatalogMigrationService {
           failed++
           const message = error instanceof Error ? error.message : String(error)
           this.logger.warn(`Failed to import "${prepared[i]?.name}" into ${catalogId}: ${message}`)
+          // A wrong catalog vertical rejects every product identically — abort
+          // now with an actionable error instead of hammering Meta for each
+          // product (and then each collection).
+          if (this.isWrongCatalogVertical(message)) throw error
         }
 
         const percentage =
@@ -287,6 +291,7 @@ export class CatalogMigrationService {
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      const errorCode = this.deriveErrorCode(message)
       await this.prisma.catalogMigration.update({
         where: { id: migrationId },
         data: { status: 'FAILED', error: message, finishedAt: new Date() },
@@ -295,6 +300,7 @@ export class CatalogMigrationService {
         migrationId,
         catalogId,
         error: message,
+        errorCode,
       })
       // Re-throw so Bull marks the job failed and the queue moves on.
       throw error
@@ -407,6 +413,17 @@ export class CatalogMigrationService {
     }
   }
 
+  /** True when a Meta error is the "wrong catalog vertical" rejection (subcode 1803298). */
+  private isWrongCatalogVertical(raw: string): boolean {
+    return /1803298|Wrong Catalog Vertical|not support(?:ed)? in this catalog vertical/i.test(raw)
+  }
+
+  /** Map a stored failure message to a stable, frontend-actionable error code. */
+  private deriveErrorCode(error?: string | null): string | undefined {
+    if (error && this.isWrongCatalogVertical(error)) return 'WRONG_CATALOG_VERTICAL'
+    return undefined
+  }
+
   private toResponse(migration: CatalogMigration, position: number, etaMinutes: number) {
     return {
       id: migration.id,
@@ -417,6 +434,7 @@ export class CatalogMigrationService {
       importedProducts: migration.importedProducts,
       failedProducts: migration.failedProducts,
       error: migration.error,
+      errorCode: this.deriveErrorCode(migration.error),
       position,
       etaMinutes,
       createdAt: migration.createdAt,
