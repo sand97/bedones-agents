@@ -49,7 +49,7 @@ export const Route = createFileRoute('/pricing')({
       { property: 'og:description', content: DESCRIPTION },
       { property: 'og:type', content: 'website' },
       { property: 'og:url', content: `${SITE_URL}/pricing` },
-      { property: 'og:image', content: `${SITE_URL}/og-pricing.png` },
+      { property: 'og:image', content: `${SITE_URL}/og-pricing.jpg` },
       { property: 'og:locale', content: 'fr_FR' },
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: TITLE },

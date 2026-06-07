@@ -1,131 +1,111 @@
 /**
- * Génère les images Open Graph / Twitter (`public/og-*.png`) — variante
- * « Logo seul » : marque Bedones centrée sur fond encre + grille signature.
+ * Génère les images Open Graph / Twitter (`public/og-*.jpg`) — variante
+ * « Logo seul » : le hub « B » de Bedones relié aux 5 plateformes
+ * (WhatsApp, Instagram, Facebook, TikTok, Messenger) sur la grille signature.
  *
- * Pourquoi : les liens partagés (Facebook, WhatsApp, X…) référencent
- * `https://bedones.com/og-home.png` (cf. balises og:image dans les routes).
- * Sans fichier PNG réel, le crawler reçoit le HTML du SPA → erreur
- * « Invalid Image Content Type ». Ce script produit de vrais PNG 1200×630.
+ * Pourquoi : les balises og:image des routes référencent /og-home.jpg,
+ * /og-pricing.jpg et /og-blog.jpg. Sans fichier image réel, le crawler
+ * (Facebook, WhatsApp…) reçoit le HTML du SPA → « Invalid Image Content
+ * Type ». Ce script produit de vrais JPG 1200×630 (format og standard).
+ *
+ * 100 % vectoriel (logo + glyphes de marque, aucun texte) → net à toute
+ * taille et reproductible sans dépendance de police.
  *
  * Usage :
+ *   pnpm add -D @resvg/resvg-js sharp
  *   node scripts/generate-og-images.mjs
- *
- * Dépendances :
- *   pnpm add -D @resvg/resvg-js
- *
- * Polices (Geist, OFL) — à placer dans scripts/fonts/ (one-time) :
- *   curl -sL "https://raw.githubusercontent.com/google/fonts/main/ofl/geist/Geist%5Bwght%5D.ttf" -o /tmp/Geist.ttf
- *   pip install fonttools
- *   for w in 400:Regular 500:Medium 600:SemiBold 700:Bold; do \
- *     python3 -m fontTools.varLib.instancer /tmp/Geist.ttf wght=${w%%:*} \
- *       -o scripts/fonts/Geist-${w##*:}.ttf; done
  */
 
 import { Resvg } from '@resvg/resvg-js'
-import { readdirSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
+import sharp from 'sharp'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const W = 1200
 const H = 630
 const INK = '#111b21'
-const SCRIPT_DIR = new URL('.', import.meta.url).pathname
-const FONTS_DIR = join(SCRIPT_DIR, 'fonts')
-const OUT_DIR = join(SCRIPT_DIR, '..', 'public')
+const cx = 600
+const cy = 308
+const hubR = 64
+const R = 196 // distance hub → nœud
+const nodeR = 30
+const OUT_DIR = join(new URL('.', import.meta.url).pathname, '..', 'public')
+const TARGETS = ['og-home.jpg', 'og-pricing.jpg', 'og-blog.jpg']
 
-// Lettre « B » de la marque (favicon.svg, viewBox 0..96).
-// bbox du glyphe ≈ x[32.47..66.84] y[25.91..71], centre ≈ (49.65, 48.45).
+// Lettre « B » de la marque (favicon.svg, viewBox 0..96, centre ≈ 49.65,48.45).
 const B_PATH =
   'M36.5 71V64.75H49.5312C52.4896 64.75 54.7396 64.1562 56.2812 62.9688C57.8438 61.7812 58.625 60.0521 58.625 57.7812V57.7188C58.625 56.1979 58.2604 54.9271 57.5312 53.9062C56.8229 52.8646 55.7604 52.0938 54.3438 51.5938C52.9271 51.0729 51.1667 50.8125 49.0625 50.8125H36.5V44.9688H47.7812C50.6979 44.9688 52.9167 44.3958 54.4375 43.25C55.9583 42.1042 56.7188 40.4583 56.7188 38.3125V38.25C56.7188 36.3125 56.0521 34.8125 54.7188 33.75C53.4062 32.6875 51.5521 32.1562 49.1562 32.1562H36.5V25.9062H51.1875C53.9375 25.9062 56.3125 26.375 58.3125 27.3125C60.3333 28.2292 61.8958 29.5312 63 31.2188C64.125 32.9062 64.6875 34.8958 64.6875 37.1875V37.25C64.6875 38.875 64.3125 40.3958 63.5625 41.8125C62.8333 43.2083 61.8229 44.3854 60.5312 45.3438C59.2396 46.2812 57.7917 46.8646 56.1875 47.0938V47.25C58.2917 47.4375 60.1458 48.0208 61.75 49C63.3542 49.9792 64.6042 51.2604 65.5 52.8438C66.3958 54.4062 66.8438 56.1875 66.8438 58.1875V58.25C66.8438 60.875 66.2188 63.1458 64.9688 65.0625C63.7188 66.9583 61.9375 68.4271 59.625 69.4688C57.3333 70.4896 54.5833 71 51.375 71H36.5ZM32.4688 71V25.9062H40.5312V71H32.4688Z'
 
-const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+// Glyphes de marque (viewBox 0 0 24 24) — mêmes icônes que le site marketing
+// (apps/frontend/src/app/components/marketing/social-icons.tsx). Le détail
+// (téléphone, « f », éclair) est en négatif → bicolore une fois rempli.
+const ICONS = {
+  whatsapp: { color: '#25d366', size: 28, fillRule: 'nonzero', d: 'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z' },
+  instagram: { color: '#e4405f', size: 27, fillRule: 'evenodd', d: 'M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678a6.162 6.162 0 100 12.324 6.162 6.162 0 100-12.324zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405a1.441 1.441 0 11-2.88 0 1.441 1.441 0 012.88 0z' },
+  facebook: { color: '#1877f2', size: 30, fillRule: 'nonzero', d: 'M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z' },
+  tiktok: { color: '#111b21', size: 25, fillRule: 'nonzero', d: 'M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z' },
+  messenger: { color: '#0084ff', size: 29, fillRule: 'nonzero', d: 'M.001 11.639C.001 4.949 5.241 0 12.001 0S24 4.95 24 11.639c0 6.689-5.24 11.638-12 11.638-1.21 0-2.38-.16-3.47-.46a.96.96 0 00-.64.05l-2.39 1.05a.96.96 0 01-1.35-.85l-.07-2.14a.97.97 0 00-.32-.68A11.39 11.389 0 01.002 11.64zm8.32-2.19l-3.52 5.6c-.35.53.32 1.139.82.75l3.79-2.87c.26-.2.6-.2.87 0l2.8 2.1c.84.63 2.04.4 2.6-.48l3.52-5.6c.35-.53-.32-1.13-.82-.75l-3.79 2.87c-.25.2-.6.2-.86 0l-2.8-2.1a1.8 1.8 0 00-2.61.48z' },
+}
 
-function logoMark(cx, cy, r) {
-  const glyphH = 45.1
-  const s = (r * 1.18) / glyphH
-  return `
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="#ffffff"/>
-    <g transform="translate(${cx} ${cy}) scale(${s}) translate(-49.65 -48.45)">
-      <path d="${B_PATH}" fill="${INK}"/>
-    </g>`
+// Pentagone, sens horaire depuis le sommet (haut).
+const NODES = [
+  { key: 'whatsapp', deg: 0 },
+  { key: 'instagram', deg: 72 },
+  { key: 'facebook', deg: 144 },
+  { key: 'tiktok', deg: 216 },
+  { key: 'messenger', deg: 288 },
+]
+
+const pos = (deg) => {
+  const t = (deg * Math.PI) / 180
+  return [cx + R * Math.sin(t), cy - R * Math.cos(t)]
 }
 
 function grid() {
-  let lines = ''
-  for (let x = 40; x < W; x += 40) lines += `<line x1="${x}" y1="0" x2="${x}" y2="${H}"/>`
-  for (let y = 40; y < H; y += 40) lines += `<line x1="0" y1="${y}" x2="${W}" y2="${y}"/>`
-  return `<g stroke="#ffffff" stroke-opacity="0.045" stroke-width="1">${lines}</g>`
+  let l = ''
+  for (let x = 40; x < W; x += 40) l += `<line x1="${x}" y1="0" x2="${x}" y2="${H}"/>`
+  for (let y = 40; y < H; y += 40) l += `<line x1="0" y1="${y}" x2="${W}" y2="${y}"/>`
+  return `<g stroke="#111b21" stroke-opacity="0.05" stroke-width="1">${l}</g>`
 }
 
-function dots(cx, cy) {
-  const colors = ['#25d366', '#e4405f', '#25F4EE', '#1877f2', '#0084ff'] // wa, ig, tt, fb, ms
-  const gap = 34
-  const start = cx - (gap * (colors.length - 1)) / 2
-  return colors
-    .map((c, i) => `<circle cx="${start + i * gap}" cy="${cy}" r="6.5" fill="${c}"/>`)
-    .join('')
+function icon(key, nx, ny) {
+  const ic = ICONS[key]
+  const s = ic.size / 24
+  return `<g transform="translate(${nx - ic.size / 2} ${ny - ic.size / 2}) scale(${s})"><path d="${ic.d}" fill="${ic.color}" fill-rule="${ic.fillRule}"/></g>`
 }
 
-function banner({ l1, l2 }) {
-  const cx = W / 2
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+const lines = NODES.map((n) => {
+  const [nx, ny] = pos(n.deg)
+  return `<line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="#d3d6d9" stroke-width="1.6"/>`
+}).join('')
+
+const nodes = NODES.map((n) => {
+  const [nx, ny] = pos(n.deg)
+  return `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${nodeR}" fill="#ffffff" filter="url(#ns)"/>${icon(n.key, nx, ny)}`
+}).join('')
+
+const bScale = (hubR * 1.18) / 45.1
+const hub = `<circle cx="${cx}" cy="${cy}" r="${hubR}" fill="${INK}" filter="url(#hs)"/><g transform="translate(${cx} ${cy}) scale(${bScale}) translate(-49.65 -48.45)"><path d="${B_PATH}" fill="#ffffff"/></g>`
+
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#15222b"/>
-      <stop offset="1" stop-color="#0d161b"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="50%" cy="26%" r="60%">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.12"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
+    <filter id="ns" x="-60%" y="-60%" width="220%" height="220%"><feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#0b1418" flood-opacity="0.13"/></filter>
+    <filter id="hs" x="-70%" y="-70%" width="240%" height="240%"><feDropShadow dx="0" dy="8" stdDeviation="18" flood-color="#0b1418" flood-opacity="0.20"/></filter>
   </defs>
-  <rect width="${W}" height="${H}" fill="url(#bg)"/>
-  <rect width="${W}" height="${H}" fill="url(#glow)"/>
+  <rect width="${W}" height="${H}" fill="#fafafa"/>
   ${grid()}
-  <rect x="28" y="28" width="${W - 56}" height="${H - 56}" rx="28" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
-  ${logoMark(cx, 168, 70)}
-  <text x="${cx}" y="322" text-anchor="middle" font-family="Geist" font-size="60" letter-spacing="-1">
-    <tspan font-weight="700" fill="#ffffff">Bedones</tspan><tspan font-weight="500" fill="#9aa0a3"> / Moderator</tspan>
-  </text>
-  <text x="${cx}" y="392" text-anchor="middle" font-family="Geist" font-weight="500" font-size="27" fill="#c9ced1" letter-spacing="0.1">${esc(l1)}</text>
-  <text x="${cx}" y="430" text-anchor="middle" font-family="Geist" font-weight="500" font-size="27" fill="#c9ced1" letter-spacing="0.1">${esc(l2)}</text>
-  ${dots(cx, 504)}
-  <text x="${cx}" y="560" text-anchor="middle" font-family="Geist" font-weight="600" font-size="22" fill="#7e878c" letter-spacing="1.5">bedones.com</text>
+  ${lines}
+  ${hub}
+  ${nodes}
 </svg>`
-}
 
-const pages = {
-  'og-home': {
-    l1: 'L’assistant IA qui répond à vos clients 24h/24',
-    l2: 'sur WhatsApp, Instagram, TikTok et Facebook.',
-  },
-  'og-pricing': {
-    l1: 'Tarifs simples et transparents.',
-    l2: 'Démarrez gratuitement, sans engagement.',
-  },
-  'og-blog': {
-    l1: 'Conseils & ressources pour automatiser',
-    l2: 'votre service client sur les réseaux sociaux.',
-  },
-}
+const png = new Resvg(svg, { fitTo: { mode: 'width', value: W } }).render().asPng()
+const jpg = await sharp(png)
+  .flatten({ background: '#fafafa' })
+  .jpeg({ quality: 92, mozjpeg: true, chromaSubsampling: '4:4:4' })
+  .toBuffer()
 
-if (!existsSync(FONTS_DIR)) {
-  console.error(
-    `❌  Polices manquantes : ${FONTS_DIR}\n\nVoir l’en-tête de ce fichier pour récupérer Geist (Regular/Medium/SemiBold/Bold).`,
-  )
-  process.exit(1)
-}
-
-const fontFiles = readdirSync(FONTS_DIR)
-  .filter((f) => f.endsWith('.ttf'))
-  .map((f) => join(FONTS_DIR, f))
-
-mkdirSync(OUT_DIR, { recursive: true })
-for (const [name, copy] of Object.entries(pages)) {
-  const resvg = new Resvg(banner(copy), {
-    fitTo: { mode: 'width', value: W },
-    font: { fontFiles, loadSystemFonts: false, defaultFontFamily: 'Geist' },
-  })
-  const png = resvg.render().asPng()
-  writeFileSync(join(OUT_DIR, `${name}.png`), png)
-  console.log(`✅  ${name}.png  ${(png.length / 1024).toFixed(1)} KB`)
+for (const name of TARGETS) {
+  writeFileSync(join(OUT_DIR, name), jpg)
+  console.log(`✅  ${name}  ${(jpg.length / 1024).toFixed(1)} KB`)
 }
