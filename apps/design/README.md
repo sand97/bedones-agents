@@ -59,8 +59,8 @@ Déployé comme **Worker Cloudflare `bedones-design`** servant le SPA statique
 (`dist/`) via Workers Static Assets (fallback SPA sur `index.html`). Config :
 `wrangler.jsonc`.
 
-- **CI/CD** : `.github/workflows/design-cloudflare.yml` — sur push `main`
-  touchant `apps/design/**` (ou déclenchement manuel). Build pnpm puis
+- **CI/CD** : `.github/workflows/deploy.yml` (job `deploy-design`) — sur push
+  `main` touchant `apps/design/**` (ou déclenchement manuel). Build pnpm puis
   `wrangler deploy` via `cloudflare/wrangler-action`.
 - **Secrets / vars** (déjà configurés pour le frontend, réutilisés) :
   `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, et les `VITE_*` (dont
