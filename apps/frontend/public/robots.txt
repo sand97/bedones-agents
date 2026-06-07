@@ -10,4 +10,4 @@ Disallow: /create-organisation
 Disallow: /organisations
 Disallow: /invitation
 
-Sitemap: https://bedones.com/sitemap.xml
+Sitemap: https://moderator.bedones.com/sitemap.xml

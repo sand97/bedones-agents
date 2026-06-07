@@ -6,7 +6,7 @@ import { getArticleBySlug, blogArticles } from '@app/data/blog'
 import type { BlogArticle } from '@app/data/blog'
 import type { ReactNode } from 'react'
 
-const SITE_URL = 'https://bedones.com'
+const SITE_URL = 'https://moderator.bedones.com'
 
 export const Route = createFileRoute('/blog/$slug')({
   head: ({ params }) => {

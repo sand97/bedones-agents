@@ -16,7 +16,7 @@ import { CreditFactCard } from '@app/components/pricing/CreditFactCard'
 import { PaymentMethodsSection } from '@app/components/pricing/PaymentMethodsSection'
 import { PlanCard } from '@app/components/pricing/PlanCard'
 
-const SITE_URL = 'https://bedones.com'
+const SITE_URL = 'https://moderator.bedones.com'
 const TITLE = 'Tarifs Bedones — Plans et crédits pour automatiser vos ventes'
 const DESCRIPTION =
   'Commencez gratuitement. Plans flexibles à partir de 0 €/mois pour automatiser vos conversations WhatsApp, Instagram, TikTok et Facebook. Paiement par carte ou Mobile Money.'
@@ -49,7 +49,7 @@ export const Route = createFileRoute('/pricing')({
       { property: 'og:description', content: DESCRIPTION },
       { property: 'og:type', content: 'website' },
       { property: 'og:url', content: `${SITE_URL}/pricing` },
-      { property: 'og:image', content: `${SITE_URL}/og-pricing.png` },
+      { property: 'og:image', content: `${SITE_URL}/og-pricing.jpg` },
       { property: 'og:locale', content: 'fr_FR' },
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: TITLE },
