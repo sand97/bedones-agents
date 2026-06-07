@@ -113,6 +113,7 @@
       "s4_ask_b": "Link your number {{number}} to this new Commerce Manager catalog so the AI agent, tickets and promotions rely on it.",
       "s4_failed_title": "The import hit a problem",
       "s4_failed_msg": "The import didn't complete.",
+      "s4_failed_hint": "Please try again. If the problem persists, contact support.",
       "s5_linking_title": "Connecting your WhatsApp account",
       "s5_linking_lede": "We're linking your number {{number}} to your Commerce Manager catalog. It takes a few seconds.",
       "s5_linked_title": "Your WhatsApp account is linked to the Commerce Manager catalog",

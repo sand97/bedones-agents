@@ -113,6 +113,7 @@
       "s4_ask_b": "Reliez votre numéro {{number}} à ce nouveau catalogue Commerce Manager pour que l'agent IA, les tickets et les promotions s'appuient dessus.",
       "s4_failed_title": "L'import a rencontré un problème",
       "s4_failed_msg": "L'import n'a pas abouti.",
+      "s4_failed_hint": "Veuillez réessayer. Si le problème persiste, contactez le support.",
       "s5_linking_title": "Connexion de votre compte WhatsApp",
       "s5_linking_lede": "Nous relions votre numéro {{number}} à votre catalogue Commerce Manager. Cela prend quelques secondes.",
       "s5_linked_title": "Votre compte WhatsApp est lié au catalogue Commerce Manager",
