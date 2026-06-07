@@ -80,6 +80,32 @@ export class WhatsAppController {
     }
   }
 
+  @Get('catalog-id/:phoneNumber')
+  @ApiOperation({
+    summary: "Probe a number's catalog id (diagnostic helper)",
+    description:
+      'Best-effort: probes WhatsApp Web (WPP) for a catalog id of the number and returns the best candidate plus a `debug` dump of what was found across sources. For local testing of the SMB link verification.',
+  })
+  @ApiParam({
+    name: 'phoneNumber',
+    description: 'Target WhatsApp number, digits only with country code, no "+"',
+    example: '237657888690',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Probe result: { phoneNumber, wid, catalogId, candidates, debug }.',
+  })
+  async catalogId(@Param('phoneNumber') phoneNumber: string) {
+    try {
+      return await this.whatsapp.getCatalogId(phoneNumber)
+    } catch (error) {
+      throw new HttpException(
+        { success: false, error: error instanceof Error ? error.message : String(error) },
+        HttpStatus.BAD_REQUEST,
+      )
+    }
+  }
+
   @Get('qr')
   @ApiOperation({ summary: 'Current QR code string (if not yet authenticated)' })
   @ApiResponse({ status: 404, description: 'No QR available (already authenticated).' })
