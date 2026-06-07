@@ -362,6 +362,14 @@ export const catalogApi = {
       method: 'DELETE',
     }),
 
+  // SMB numbers are linked manually on the phone; this records the link in our
+  // DB (best-effort verified server-side via the connector).
+  linkSmbPhone: (catalogId: string, phoneNumberId: string) =>
+    fetchJson<{ success: boolean }>(`/catalog/${catalogId}/link-smb-phone`, {
+      method: 'POST',
+      body: JSON.stringify({ phoneNumberId }),
+    }),
+
   // ─── AI Context ───
 
   listProductContexts: (catalogId: string, providerProductIds?: string[]) => {
