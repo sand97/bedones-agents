@@ -16,6 +16,7 @@ on:
       - ".dockerignore"
       - ".github/workflows/container-images.yml"
       - "apps/backend/**"
+      - "apps/whatsapp-connector/**"
       - "services/image-cropper/**"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -28,6 +29,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       cropper: ${{ steps.filter.outputs.cropper }}
+      whatsapp: ${{ steps.filter.outputs.whatsapp }}
       shared: ${{ steps.filter.outputs.shared }}
 
     steps:
@@ -47,6 +49,8 @@ jobs:
               - 'pnpm-workspace.yaml'
             backend:
               - 'apps/backend/**'
+            whatsapp:
+              - 'apps/whatsapp-connector/**'
             cropper:
               - 'services/image-cropper/**'
 
@@ -61,6 +65,10 @@ jobs:
             context: .
             dockerfile: apps/backend/Dockerfile
             image: bedones-moderator-backend
+          - id: whatsapp
+            context: .
+            dockerfile: apps/whatsapp-connector/Dockerfile
+            image: bedones-moderator-whatsapp-connector
           - id: cropper
             context: services/image-cropper
             dockerfile: services/image-cropper/Dockerfile
@@ -85,6 +93,7 @@ jobs:
           MATRIX_ID: ${{ matrix.id }}
           SHARED_CHANGED: ${{ needs.changes.outputs.shared }}
           BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
+          WHATSAPP_CHANGED: ${{ needs.changes.outputs.whatsapp }}
           CROPPER_CHANGED: ${{ needs.changes.outputs.cropper }}
         run: |
           should_build=false
@@ -95,6 +104,9 @@ jobs:
             case "${MATRIX_ID}" in
               backend)
                 [[ "${BACKEND_CHANGED}" == "true" ]] && should_build=true
+                ;;
+              whatsapp)
+                [[ "${WHATSAPP_CHANGED}" == "true" ]] && should_build=true
                 ;;
               cropper)
                 [[ "${CROPPER_CHANGED}" == "true" ]] && should_build=true
