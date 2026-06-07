@@ -462,6 +462,112 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Diagnostic helper: best-effort attempt to read the *catalog id* of a number
+   * from the WhatsApp Web page (to compare with a Commerce Manager catalog id).
+   * WhatsApp Web exposes no documented, stable catalog-id accessor, so we probe
+   * a few WPP sources and return the best candidate plus a `debug` dump of what
+   * was found — handy to discover locally what's actually available.
+   */
+  async getCatalogId(phoneNumber: string): Promise<{
+    phoneNumber: string
+    wid: string
+    catalogId: string | null
+    candidates: string[]
+    debug: unknown
+  }> {
+    const digits = (phoneNumber || '').replace(/[^0-9]/g, '')
+    if (!digits) throw new Error('Invalid phone number')
+    const wid = `${digits}@c.us`
+
+    if (!this.client) throw new Error('WhatsApp client is not initialized')
+    const page = this.client.pupPage
+    if (!page) throw new Error('Puppeteer page is not available')
+
+    await this.ensureWPPReady()
+
+    const debug = await page.evaluate(async (targetWid: string) => {
+      const out: any = { sources: {}, candidates: [] }
+      const push = (v: any) => {
+        if (v === null || v === undefined) return
+        const s = String(v)
+        if (s && !out.candidates.includes(s)) out.candidates.push(s)
+      }
+      const keysOf = (o: any) => (o && typeof o === 'object' ? Object.keys(o) : null)
+      const W = window as any
+      try {
+        const wa = W.WPP?.whatsapp
+        // 1) queryCatalog response wrapper + first product attributes
+        if (wa?.functions?.queryCatalog) {
+          try {
+            const r = await wa.functions.queryCatalog(targetWid, undefined)
+            const first = Array.isArray(r?.data) ? r.data[0] : null
+            const fa = (first && first.attributes) || first
+            out.sources.queryCatalog = {
+              responseKeys: keysOf(r),
+              respId: r?.id ?? r?.catalogId ?? r?.catalog_id ?? null,
+              productKeys: keysOf(fa),
+              productCatalogId:
+                fa?.catalogWid ?? fa?.catalogId ?? fa?.catalog_id ?? fa?.catalog_wid ?? null,
+            }
+            push(out.sources.queryCatalog.respId)
+            push(out.sources.queryCatalog.productCatalogId)
+          } catch (e: any) {
+            out.sources.queryCatalog = { error: String(e?.message || e) }
+          }
+        }
+        // 2) CatalogStore entries
+        if (wa?.CatalogStore?.findQuery) {
+          try {
+            const res = await wa.CatalogStore.findQuery(targetWid)
+            const first = Array.isArray(res) ? res[0] : res
+            const a = (first && first.attributes) || first
+            out.sources.catalogStore = {
+              entryKeys: keysOf(a),
+              id: a?.id ?? a?.catalogId ?? a?.catalog_id ?? a?.catalogWid ?? null,
+            }
+            push(out.sources.catalogStore.id)
+          } catch (e: any) {
+            out.sources.catalogStore = { error: String(e?.message || e) }
+          }
+        }
+        // 3) a product via WPP.catalog
+        try {
+          const fb = await W.WPP.catalog.getProducts(targetWid, 3)
+          const p = Array.isArray(fb) && fb[0] ? fb[0].attributes || fb[0] : null
+          out.sources.product = {
+            keys: keysOf(p),
+            catalogWid: p?.catalogWid ?? null,
+            catalogId: p?.catalogId ?? p?.catalog_id ?? null,
+          }
+          push(out.sources.product.catalogWid)
+          push(out.sources.product.catalogId)
+        } catch (e: any) {
+          out.sources.product = { error: String(e?.message || e) }
+        }
+        // 4) business profile / commerce info
+        try {
+          const bp =
+            (await W.WPP?.contact?.getBusinessProfile?.(targetWid)) ??
+            (await wa?.functions?.queryBusinessProfile?.(targetWid))
+          out.sources.businessProfile = {
+            keys: keysOf(bp),
+            catalogId: bp?.catalogId ?? bp?.catalog_id ?? bp?.commerceProfile?.catalogId ?? null,
+          }
+          push(out.sources.businessProfile.catalogId)
+        } catch (e: any) {
+          out.sources.businessProfile = { error: String(e?.message || e) }
+        }
+      } catch (e: any) {
+        out.error = String(e?.message || e)
+      }
+      return out
+    }, wid)
+
+    const candidates: string[] = (debug as { candidates?: string[] })?.candidates ?? []
+    return { phoneNumber: digits, wid, catalogId: candidates[0] ?? null, candidates, debug }
+  }
+
   getStatus() {
     return {
       isInitialized: !!this.client,
