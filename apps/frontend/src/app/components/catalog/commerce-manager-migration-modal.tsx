@@ -479,8 +479,15 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
       if (d.migrationId === migrationId) patch({ status: 'EXTRACTING' })
     }
     const onProgress = (d: MigrationProgressEvent) => {
-      if (d.migrationId === migrationId)
-        patch({ status: 'IMPORTING', importedProducts: d.imported, totalProducts: d.total })
+      if (d.migrationId !== migrationId) return
+      // Respect the phase: extraction (connector streaming products) vs import.
+      patch({
+        status: (d.status === 'EXTRACTING'
+          ? 'EXTRACTING'
+          : 'IMPORTING') as CatalogMigration['status'],
+        importedProducts: d.imported,
+        totalProducts: d.total,
+      })
     }
     const onCompleted = (d: MigrationDoneEvent & { collections?: number }) => {
       if (d.migrationId !== migrationId) return
@@ -907,6 +914,15 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
                 )
               })}
             </ul>
+            {(migration?.totalProducts ?? 0) > 0 && (
+              <p className="mc-caption mc-center-tx">
+                {migration?.importedProducts ?? 0}/{migration?.totalProducts} ·{' '}
+                {Math.round(
+                  ((migration?.importedProducts ?? 0) / (migration?.totalProducts || 1)) * 100,
+                )}
+                %
+              </p>
+            )}
             <p className="mc-caption mc-center-tx">{tf('s4_caption')}</p>
           </div>
         ),

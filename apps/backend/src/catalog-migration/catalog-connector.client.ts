@@ -155,6 +155,9 @@ const CLIENT_CATALOG_SCRIPT = `(async () => {
         imageUrl: urls[0] || null,
         additionalImageUrls: urls.slice(1),
       });
+      // Live progress: one ping per product whose images are re-hosted (the
+      // slow part), so the backend can stream a percentage to the browser.
+      try { await post('/catalog-migration/callback/progress', { processed: products.length, total: productsById.size }); } catch (e) {}
     }
 
     // Collections (product sets) — map each collection's products to retailer_ids.

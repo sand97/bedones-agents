@@ -185,6 +185,16 @@ export class CatalogMigrationService {
         catalogId,
       })
       onProgress?.(5)
+      // Live "extraction starting" signal so the UI shows a spinner + 0%
+      // before the connector starts streaming per-product progress.
+      this.gateway.emitToOrg(organisationId, 'catalog:migration-progress', {
+        migrationId,
+        status: 'EXTRACTING',
+        imported: 0,
+        failed: 0,
+        total: 0,
+        percentage: 0,
+      })
 
       // 1) Inject the extraction script into the connector. It downloads the
       //    images (streaming them to our upload-image callback) and posts the
@@ -281,6 +291,23 @@ export class CatalogMigrationService {
           failedProducts: failed,
         },
       })
+
+      // Record the number ⇄ catalogue link in our DB (source of truth for our
+      // app/AI), regardless of any WhatsApp-native linking the user does. This
+      // is why the wizard no longer needs an explicit "I'm done" step.
+      if (migration.sourceSocialAccountId) {
+        await this.prisma.catalogSocialAccount.upsert({
+          where: {
+            catalogId_socialAccountId: {
+              catalogId,
+              socialAccountId: migration.sourceSocialAccountId,
+            },
+          },
+          update: {},
+          create: { catalogId, socialAccountId: migration.sourceSocialAccountId },
+        })
+      }
+
       this.gateway.emitToOrg(organisationId, 'catalog:migration-completed', {
         migrationId,
         catalogId,
@@ -349,6 +376,25 @@ export class CatalogMigrationService {
       migrationId,
       status: 'IMPORTING',
       ...data,
+    })
+  }
+
+  /**
+   * Relay extraction progress (page script → callback → browser). During
+   * extraction the connector pings us once per product whose images are done,
+   * so the user sees a live percentage on the slowest phase.
+   */
+  async reportExtractionProgress(migrationId: string, processed: number, total: number) {
+    const migration = await this.prisma.catalogMigration.findUnique({ where: { id: migrationId } })
+    if (!migration) return
+    const percentage = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0
+    this.gateway.emitToOrg(migration.organisationId, 'catalog:migration-progress', {
+      migrationId,
+      status: 'EXTRACTING',
+      imported: processed,
+      failed: 0,
+      total,
+      percentage,
     })
   }
 
