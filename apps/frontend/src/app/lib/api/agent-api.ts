@@ -167,6 +167,8 @@ export interface Catalog {
   id: string
   name: string
   providerId?: string
+  /** Meta catalog vertical (e.g. "commerce"); only "commerce" can hold WhatsApp products. */
+  vertical?: string
   description?: string
   analysisStatus: 'PENDING' | 'ANALYZING' | 'INDEXING' | 'COMPLETED' | 'FAILED'
   productCount: number

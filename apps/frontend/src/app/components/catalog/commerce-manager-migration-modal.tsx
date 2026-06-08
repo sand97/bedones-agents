@@ -16,9 +16,15 @@ import {
   readCatalogMigrationDraft,
   writeCatalogMigrationDraft,
 } from '@app/lib/catalog-migration-draft'
+import { SupportModal } from '@app/components/support/support-modal'
 import './commerce-manager-migration-modal.css'
 
 const NS = 'catalog_migration.flow.'
+
+/** Only the "commerce" vertical can hold the products migrated from WhatsApp. */
+function isCommerceVertical(vertical?: string | null): boolean {
+  return (vertical ?? '').toLowerCase() === 'commerce'
+}
 
 /* ──────────────────────────── Iconography ──────────────────────────── */
 
@@ -393,6 +399,10 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
   // Step-2 catalogue choice (only relevant when the org already has catalogues).
   const [catalogChoice, setCatalogChoice] = useState<'connected' | 'new'>('connected')
   const [selectedCatalogId, setSelectedCatalogId] = useState<string>()
+  // True after coming back from the Meta connect redirect — used to validate the
+  // freshly-connected catalogue's vertical.
+  const [justConnected, setJustConnected] = useState(false)
+  const [supportOpen, setSupportOpen] = useState(false)
 
   // ─── Data ───
   const catalogsQuery = useQuery({
@@ -435,10 +445,13 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
     if (presetAccountId) setSelectedAccountId(presetAccountId)
   }, [presetAccountId])
 
-  // Default the target catalogue to the most recently connected one.
+  // Default the target catalogue to the most recently connected commerce
+  // catalogue (only "commerce" can hold the imported products), falling back to
+  // the most recent one when none qualifies.
   useEffect(() => {
     if (!selectedCatalogId && connectedCatalogs.length > 0) {
-      setSelectedCatalogId(connectedCatalogs[0].id)
+      const commerce = connectedCatalogs.find((c) => isCommerceVertical(c.vertical))
+      setSelectedCatalogId((commerce ?? connectedCatalogs[0]).id)
     }
   }, [selectedCatalogId, connectedCatalogs])
 
@@ -447,11 +460,24 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
     if (!open) return
     const draft = readCatalogMigrationDraft()
     if (draft.step != null) setStep(draft.step)
+    if (draft.justConnected) setJustConnected(true)
     if (draft.migrationId) {
       setMigrationId(draft.migrationId)
       setStep(4)
     }
   }, [open])
+
+  // After connecting on Meta, make sure at least one connected catalogue is a
+  // "commerce" vertical — WhatsApp products can only be imported into those.
+  // Otherwise we'd hit a "Wrong Catalog Vertical" error mid-import, so we surface
+  // a clear, actionable message before the user starts the import.
+  useEffect(() => {
+    if (!open || !justConnected || step !== 3) return
+    if (catalogsQuery.isLoading || connectedCatalogs.length === 0) return
+    if (!connectedCatalogs.some((c) => isCommerceVertical(c.vertical))) {
+      setPhase('wrong_vertical')
+    }
+  }, [open, justConnected, step, catalogsQuery.isLoading, connectedCatalogs])
 
   // ─── Live migration status (poll + websocket) ───
   const migrationQuery = useQuery({
@@ -570,9 +596,16 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
   // ─── Handlers ───
   const close = () => {
     const inFlight = migration ? IN_FLIGHT.includes(migration.status) : false
-    if (!inFlight) clearCatalogMigrationDraft()
+    if (!inFlight) {
+      clearCatalogMigrationDraft()
+      setJustConnected(false)
+    }
     onClose()
   }
+
+  // Before redirecting to Meta, remind the user that a brand-new catalogue must
+  // use the "commerce" vertical — the only type that can hold WhatsApp products.
+  const showConnectNotice = () => setPhase('connect_notice')
 
   // Always redirect to Meta to connect/create a brand-new catalogue. Reusing an
   // already-connected catalogue is handled by the step-2 radio (skips Meta).
@@ -628,6 +661,14 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
     const subject = encodeURIComponent('Bedones — problème de liaison du catalogue WhatsApp')
     window.location.href = `mailto:support@bedones.com?subject=${subject}`
   }
+
+  // Pre-filled message for the "wrong catalog vertical" support request.
+  const supportMessage = tf('support_vertical_message', {
+    catalog: targetCatalog?.name ?? tf('your_catalog'),
+    vertical: targetCatalog?.vertical || '—',
+    number: waNumber || tf('your_number'),
+  })
+  const openSupport = () => setSupportOpen(true)
 
   const recheck = async () => {
     setPhase('checking')
@@ -701,6 +742,32 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
           ),
         }
       }
+      // Heads-up before leaving for Meta: a new catalogue must use the
+      // "commerce" vertical, otherwise products can't be imported into it.
+      if (phase === 'connect_notice') {
+        return {
+          title: tf('s2_vertical_notice_title'),
+          current: 2,
+          back: () => setPhase('main'),
+          body: (
+            <div className="mc-step">
+              <div className="mc-hero">
+                <div className="mc-redirect-mark mc-tone-blue">
+                  <CommerceGlyph size={30} />
+                </div>
+              </div>
+              <div className="mc-banner is-warn">
+                <Icon name="alert" size={18} />
+                <div>
+                  <Trans i18nKey={NS + 's2_vertical_notice_msg'} components={{ b: <strong /> }} />
+                </div>
+              </div>
+              <p className="mc-lede">{tf('s2_vertical_notice_hint')}</p>
+            </div>
+          ),
+          primary: { label: tf('connect_meta'), icon: 'external', onClick: connectCatalog },
+        }
+      }
       // Org already has Commerce Manager catalogue(s): reuse one or connect/
       // create another. The footer button adapts to the chosen type.
       if (connectedCatalogs.length > 0) {
@@ -755,7 +822,7 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
                   setStep(3)
                 },
               }
-            : { label: tf('connect_meta'), icon: 'external', onClick: connectCatalog },
+            : { label: tf('connect_meta'), icon: 'external', onClick: showConnectNotice },
         }
       }
 
@@ -795,11 +862,41 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
             <Note>{tf('s2_note')}</Note>
           </div>
         ),
-        primary: { label: tf('connect_meta'), icon: 'external', onClick: connectCatalog },
+        primary: { label: tf('connect_meta'), icon: 'external', onClick: showConnectNotice },
       }
     }
 
     if (step === 3) {
+      // The catalogue connected on Meta is not a "commerce" vertical, so the
+      // WhatsApp products can't be imported into it. Explain clearly and offer a
+      // support hand-off (pre-filled) plus a way to connect another catalogue.
+      if (phase === 'wrong_vertical') {
+        const goBackToChoice = () => {
+          setJustConnected(false)
+          clearCatalogMigrationDraft()
+          setPhase('main')
+          setStep(2)
+        }
+        return {
+          title: tf('s3_wrong_vertical_title'),
+          current: 3,
+          back: goBackToChoice,
+          body: (
+            <div className="mc-step">
+              <div className="mc-banner is-warn">
+                <Icon name="alert" size={18} />
+                <div>
+                  <strong>{tf('s3_wrong_vertical_msg')}</strong> {tf('s3_wrong_vertical_hint')}
+                </div>
+              </div>
+              <button className="mc-textlink" onClick={goBackToChoice}>
+                {tf('s3_wrong_vertical_choose_another')}
+              </button>
+            </div>
+          ),
+          primary: { label: tf('contact_support'), icon: 'shield', onClick: openSupport },
+        }
+      }
       const catalogName = targetCatalog?.name ?? tf('your_catalog')
       return {
         title: tf('s3_title'),
@@ -917,6 +1014,11 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
                   {wrongVertical ? tf('s4_failed_vertical') : tf('s4_failed_hint')}
                 </div>
               </div>
+              {wrongVertical && (
+                <button className="mc-textlink" onClick={openSupport}>
+                  {tf('contact_support')}
+                </button>
+              )}
             </div>
           ),
           primary: wrongVertical
@@ -1105,53 +1207,63 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
   const sc = buildScreen()
 
   return (
-    <Modal
-      open={open}
-      onCancel={close}
-      footer={null}
-      closable={false}
-      width={552}
-      centered
-      className="cmm-modal"
-      styles={{ body: { padding: 0 } }}
-    >
-      <div className={'cmm-root' + (sc.title ? '' : ' no-title')} role="dialog" aria-modal="true">
-        <div className="mc-head">
-          <div className="mc-head-tx">{sc.title && <div className="mc-title">{sc.title}</div>}</div>
-          <button className="mc-close" aria-label={tf('close')} onClick={close}>
-            <Icon name="x" size={18} />
-          </button>
-        </div>
-
-        <div className="mc-bodyscroll" key={step + phase}>
-          {sc.body}
-        </div>
-
-        <Stepper current={sc.current} total={total} />
-
-        <div className="mc-foot">
-          <div className="mc-foot-step">
-            {sc.footStep || <span>{tf('step_of', { current: sc.current, total })}</span>}
+    <>
+      <SupportModal
+        open={supportOpen}
+        onClose={() => setSupportOpen(false)}
+        subject={tf('support_vertical_subject')}
+        defaultMessage={supportMessage}
+      />
+      <Modal
+        open={open}
+        onCancel={close}
+        footer={null}
+        closable={false}
+        width={552}
+        centered
+        className="cmm-modal"
+        styles={{ body: { padding: 0 } }}
+      >
+        <div className={'cmm-root' + (sc.title ? '' : ' no-title')} role="dialog" aria-modal="true">
+          <div className="mc-head">
+            <div className="mc-head-tx">
+              {sc.title && <div className="mc-title">{sc.title}</div>}
+            </div>
+            <button className="mc-close" aria-label={tf('close')} onClick={close}>
+              <Icon name="x" size={18} />
+            </button>
           </div>
-          <div className="mc-foot-actions">
-            {sc.back && (
-              <button className="mc-btn mc-btn-back" aria-label={tf('back')} onClick={sc.back}>
-                <Icon name="arrowLeft" size={16} />
-              </button>
-            )}
-            {sc.primary && (
-              <button
-                className="mc-btn mc-btn-primary"
-                disabled={sc.primary.disabled}
-                onClick={sc.primary.onClick}
-              >
-                {sc.primary.label}
-                {sc.primary.icon && <Icon name={sc.primary.icon} size={16} />}
-              </button>
-            )}
+
+          <div className="mc-bodyscroll" key={step + phase}>
+            {sc.body}
+          </div>
+
+          <Stepper current={sc.current} total={total} />
+
+          <div className="mc-foot">
+            <div className="mc-foot-step">
+              {sc.footStep || <span>{tf('step_of', { current: sc.current, total })}</span>}
+            </div>
+            <div className="mc-foot-actions">
+              {sc.back && (
+                <button className="mc-btn mc-btn-back" aria-label={tf('back')} onClick={sc.back}>
+                  <Icon name="arrowLeft" size={16} />
+                </button>
+              )}
+              {sc.primary && (
+                <button
+                  className="mc-btn mc-btn-primary"
+                  disabled={sc.primary.disabled}
+                  onClick={sc.primary.onClick}
+                >
+                  {sc.primary.label}
+                  {sc.primary.icon && <Icon name={sc.primary.icon} size={16} />}
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </Modal>
+      </Modal>
+    </>
   )
 }
