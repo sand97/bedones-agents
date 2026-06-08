@@ -14,6 +14,12 @@ import { PrismaService } from '../prisma/prisma.service'
 import { UploadService } from '../upload/upload.service'
 import { SocialController } from './social.controller'
 import { SocialService } from './social.service'
+import { SocialCommonService } from './social-common.service'
+import { SocialConnectService } from './social-connect.service'
+import { TikTokContentService } from './tiktok-content.service'
+import { SocialAccountService } from './social-account.service'
+import { PostService } from './post.service'
+import { CommentService } from './comment.service'
 import { WebhookController } from './webhook.controller'
 import { WebhookService } from './webhook.service'
 import { MessagingController } from './messaging.controller'
@@ -50,6 +56,12 @@ import { SocialHealthModule } from './social-health.module'
   ],
   providers: [
     SocialService,
+    SocialCommonService,
+    SocialConnectService,
+    TikTokContentService,
+    SocialAccountService,
+    PostService,
+    CommentService,
     WebhookService,
     MessagingService,
     AIService,
