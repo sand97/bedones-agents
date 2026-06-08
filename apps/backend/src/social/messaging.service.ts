@@ -878,15 +878,11 @@ export class MessagingService {
       return { agent: null, override: null, isActive: false }
     }
 
-    const isActive = await this.computeConversationActive({
-      conversationId,
-      participantId: conversation.participantId,
-      participantName: conversation.participantName,
+    const isActive = this.computeConversationActive({
       override,
       agentStatus: agent.status,
-      mode: agentLink.aiActivationMode,
-      activationContacts: agentLink.aiActivationContacts,
-      activationLabels: agentLink.aiActivationLabels,
+      link: agentLink,
+      conversation,
     })
 
     return { agent, override, isActive }
@@ -931,44 +927,61 @@ export class MessagingService {
     return this.getAgentStatusForConversation(userId, conversationId)
   }
 
-  private async computeConversationActive(args: {
-    conversationId: string
-    participantId: string
-    participantName: string
+  /**
+   * Whether the agent would currently process a new message on this conversation.
+   * Combinable scopes (contacts / ads / new conversations) are OR'd; `aiActivateAll`
+   * short-circuits to true. Kept in sync with
+   * AgentMessageProcessorService.isActivatedForConversation.
+   */
+  private computeConversationActive(args: {
     override: 'FORCE_ON' | 'FORCE_OFF' | null
     agentStatus: string
-    mode: string
-    activationContacts: string[]
-    activationLabels: string[]
-  }): Promise<boolean> {
+    link: {
+      aiActivateAll: boolean
+      aiActivateAds: boolean
+      aiActivateNewConversations: boolean
+      aiActivatedAt: Date | null
+      aiActivationContacts: string[]
+    }
+    conversation: {
+      participantId: string
+      participantName: string
+      fromAd: boolean
+      createdAt: Date
+    }
+  }): boolean {
     if (args.override === 'FORCE_OFF') return false
     if (args.override === 'FORCE_ON') {
       return args.agentStatus !== 'DRAFT' && args.agentStatus !== 'CONFIGURING'
     }
 
     if (args.agentStatus !== 'ACTIVE') return false
-    if (args.mode === 'OFF') return false
-    if (args.mode === 'ALL') return true
 
-    if (args.mode === 'CONTACTS') {
-      if (args.activationContacts.length === 0) return false
-      return args.activationContacts.some(
+    const { link, conversation } = args
+    if (link.aiActivateAll) return true
+
+    const contacts = link.aiActivationContacts || []
+    if (
+      contacts.length > 0 &&
+      contacts.some(
         (contact) =>
-          args.participantId.includes(contact) ||
-          contact.includes(args.participantId) ||
-          (args.participantName &&
-            args.participantName.toLowerCase().includes(contact.toLowerCase())),
+          conversation.participantId.includes(contact) ||
+          contact.includes(conversation.participantId) ||
+          (conversation.participantName &&
+            conversation.participantName.toLowerCase().includes(contact.toLowerCase())),
       )
+    ) {
+      return true
     }
 
-    if (args.mode === 'LABELS' || args.mode === 'EXCLUDE_LABELS') {
-      if (args.activationLabels.length === 0) return args.mode === 'EXCLUDE_LABELS'
-      const conversationLabels = await this.prisma.conversationLabel.findMany({
-        where: { conversationId: args.conversationId },
-        select: { labelId: true },
-      })
-      const hasMatch = conversationLabels.some((cl) => args.activationLabels.includes(cl.labelId))
-      return args.mode === 'LABELS' ? hasMatch : !hasMatch
+    if (link.aiActivateAds && conversation.fromAd) return true
+
+    if (
+      link.aiActivateNewConversations &&
+      link.aiActivatedAt &&
+      conversation.createdAt >= link.aiActivatedAt
+    ) {
+      return true
     }
 
     return false

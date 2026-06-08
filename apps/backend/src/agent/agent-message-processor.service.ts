@@ -78,7 +78,13 @@ export class AgentMessageProcessorService {
     // Per-conversation override takes precedence over global agent rules
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: event.conversationId },
-      select: { participantId: true, participantName: true, aiOverride: true },
+      select: {
+        participantId: true,
+        participantName: true,
+        aiOverride: true,
+        fromAd: true,
+        createdAt: true,
+      },
     })
     if (!conversation) return
 
@@ -94,53 +100,60 @@ export class AgentMessageProcessorService {
     // No conversation override → fall back to agent's global activation rules
     if (agentLink.agent.status !== 'ACTIVE') return
 
-    const activationMode = agentLink.aiActivationMode
-    if (activationMode === 'OFF') return
-
-    if (activationMode === 'CONTACTS') {
-      // Only respond to whitelisted contacts
-      const allowedContacts = agentLink.aiActivationContacts || []
-      if (allowedContacts.length > 0) {
-        // Match by participantId (phone for WhatsApp) or participantName (IG/Messenger)
-        const isAllowed = allowedContacts.some(
-          (contact) =>
-            conversation.participantId.includes(contact) ||
-            contact.includes(conversation.participantId) ||
-            (conversation.participantName &&
-              conversation.participantName.toLowerCase().includes(contact.toLowerCase())),
-        )
-        if (!isAllowed) return
-      }
-    }
-
-    if (activationMode === 'LABELS') {
-      const activationLabels = agentLink.aiActivationLabels
-      if (activationLabels.length > 0) {
-        const conversationLabels = await this.prisma.conversationLabel.findMany({
-          where: { conversationId: event.conversationId },
-          select: { labelId: true },
-        })
-        const hasMatchingLabel = conversationLabels.some((cl) =>
-          activationLabels.includes(cl.labelId),
-        )
-        if (!hasMatchingLabel) return
-      }
-    }
-
-    if (activationMode === 'EXCLUDE_LABELS') {
-      const excludeLabels = agentLink.aiActivationLabels
-      if (excludeLabels.length > 0) {
-        const conversationLabels = await this.prisma.conversationLabel.findMany({
-          where: { conversationId: event.conversationId },
-          select: { labelId: true },
-        })
-        const hasExcludedLabel = conversationLabels.some((cl) => excludeLabels.includes(cl.labelId))
-        if (hasExcludedLabel) return
-      }
-    }
+    if (!this.isActivatedForConversation(agentLink, conversation)) return
 
     // Process the message
     await this.processMessage(event, agentLink.agent)
+  }
+
+  /**
+   * Combinable activation scopes (all of them OR'd together), except `aiActivateAll`
+   * which short-circuits to true. Mirrors MessagingService.computeConversationActive
+   * so the chat header and the live processor stay consistent.
+   */
+  private isActivatedForConversation(
+    link: {
+      aiActivateAll: boolean
+      aiActivateAds: boolean
+      aiActivateNewConversations: boolean
+      aiActivatedAt: Date | null
+      aiActivationContacts: string[]
+    },
+    conversation: {
+      participantId: string
+      participantName: string
+      fromAd: boolean
+      createdAt: Date
+    },
+  ): boolean {
+    if (link.aiActivateAll) return true
+
+    // "By contacts" — mainly used to test the agent on a handful of contacts.
+    const contacts = link.aiActivationContacts || []
+    if (
+      contacts.length > 0 &&
+      contacts.some(
+        (contact) =>
+          conversation.participantId.includes(contact) ||
+          contact.includes(conversation.participantId) ||
+          (conversation.participantName &&
+            conversation.participantName.toLowerCase().includes(contact.toLowerCase())),
+      )
+    ) {
+      return true
+    }
+
+    if (link.aiActivateAds && conversation.fromAd) return true
+
+    if (
+      link.aiActivateNewConversations &&
+      link.aiActivatedAt &&
+      conversation.createdAt >= link.aiActivatedAt
+    ) {
+      return true
+    }
+
+    return false
   }
 
   private async processMessage(

@@ -2235,6 +2235,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SseController_sse"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SseController_messages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mcp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StreamableHttpController_handleGetRequest"];
+        put?: never;
+        post: operations["StreamableHttpController_handlePostRequest"];
+        delete: operations["StreamableHttpController_handleDeleteRequest"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/posts/{postId}/agent-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SocialController_getPostAgentStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/posts/{postId}/agent-override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["SocialController_setPostAgentOverride"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2495,6 +2575,8 @@ export interface components {
             totalComments: number;
             unreadComments: number;
             comments: components["schemas"]["CommentResponseDto"][];
+            /** @enum {string|null} */
+            aiOverride?: "FORCE_ON" | "FORCE_OFF" | null;
         };
         SocialAccountLastErrorDto: {
             /** @description Provider/HTTP error code (e.g. 190, OAuthException) */
@@ -2865,11 +2947,13 @@ export interface components {
             content: string;
         };
         ActivateAgentDto: {
-            /** @enum {string} */
-            mode: "CONTACTS" | "LABELS" | "EXCLUDE_LABELS";
-            /** @description Label IDs for LABELS / EXCLUDE_LABELS modes */
-            labelIds?: string[];
-            /** @description Per-social-account contacts for CONTACTS mode */
+            /** @description Respond on every conversation. Exclusive: overrides the other scopes. */
+            activateAll?: boolean;
+            /** @description Respond when the incoming message originates from an ad (Meta CTWA/referral, TikTok). */
+            activateAds?: boolean;
+            /** @description Respond on all new conversations created after activation. */
+            activateNewConversations?: boolean;
+            /** @description Per-social-account test contacts (socialAccountId -> phone numbers or profile names). Mainly used to test the agent on a few contacts. */
             contacts?: Record<string, never>;
         };
         FeedbackTurnDto: {
@@ -3157,6 +3241,24 @@ export interface components {
             enabled: boolean;
         };
         SendTemplateBody: Record<string, never>;
+        PostAgentSummaryDto: {
+            id: string;
+            name?: string;
+            score: number;
+            /** @enum {string} */
+            status: "DRAFT" | "CONFIGURING" | "READY" | "ACTIVE" | "PAUSED";
+        };
+        PostAgentStatusDto: {
+            agent?: components["schemas"]["PostAgentSummaryDto"] | null;
+            /** @enum {string|null} */
+            override?: "FORCE_ON" | "FORCE_OFF" | null;
+            /** @description Whether the agent would currently reply to this post's comments */
+            isActive: boolean;
+        };
+        SetPostAgentOverrideDto: {
+            /** @enum {string} */
+            override: "FORCE_ON" | "FORCE_OFF";
+        };
     };
     responses: never;
     parameters: never;
@@ -6597,6 +6699,137 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    SseController_sse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SseController_messages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StreamableHttpController_handleGetRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StreamableHttpController_handlePostRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StreamableHttpController_handleDeleteRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SocialController_getPostAgentStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                postId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostAgentStatusDto"];
+                };
+            };
+        };
+    };
+    SocialController_setPostAgentOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                postId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPostAgentOverrideDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostAgentStatusDto"];
+                };
             };
         };
     };

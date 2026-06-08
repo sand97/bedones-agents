@@ -2272,6 +2272,72 @@ export class SocialService {
     }))
   }
 
+  // ─── Per-post agent activation (comment replies) ───
+
+  /**
+   * Returns the agent attached to this post's social account, the per-post override,
+   * and whether the agent would currently reply to this post's comments. Used by the
+   * post options menu to toggle agent replies on/off.
+   */
+  async getAgentStatusForPost(userId: string, postId: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      select: {
+        aiOverride: true,
+        socialAccount: {
+          select: {
+            organisationId: true,
+            agentLink: {
+              include: { agent: { select: { id: true, name: true, score: true, status: true } } },
+            },
+          },
+        },
+      },
+    })
+    if (!post) throw new NotFoundException('Post not found')
+    await this.assertMembership(userId, post.socialAccount.organisationId)
+
+    const agent = post.socialAccount.agentLink?.agent ?? null
+    const override = post.aiOverride ?? null
+
+    if (!agent) return { agent: null, override: null, isActive: false }
+
+    const agentReady =
+      agent.score >= 80 && agent.status !== 'DRAFT' && agent.status !== 'CONFIGURING'
+    const isActive = override === 'FORCE_OFF' ? false : agentReady
+
+    return { agent, override, isActive }
+  }
+
+  async setPostAgentOverride(userId: string, postId: string, override: 'FORCE_ON' | 'FORCE_OFF') {
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      select: {
+        socialAccount: {
+          select: {
+            organisationId: true,
+            agentLink: { include: { agent: { select: { score: true } } } },
+          },
+        },
+      },
+    })
+    if (!post) throw new NotFoundException('Post not found')
+    await this.assertMembership(userId, post.socialAccount.organisationId)
+
+    const agent = post.socialAccount.agentLink?.agent
+    if (!agent) {
+      throw new BadRequestException('No agent is attached to this social account')
+    }
+    if (agent.score < 80) {
+      throw new BadRequestException(
+        "L'agent n'a pas encore un score suffisant pour être activé sur une publication.",
+      )
+    }
+
+    await this.prisma.post.update({ where: { id: postId }, data: { aiOverride: override } })
+    return this.getAgentStatusForPost(userId, postId)
+  }
+
   // ─── Fetch fresh page posts straight from Meta ───
   // Local Post rows are only created when comments arrive via webhook, so the
   // table starts empty for inactive pages. This method talks to the Graph API

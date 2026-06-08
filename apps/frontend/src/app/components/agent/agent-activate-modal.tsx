@@ -1,22 +1,20 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Modal, Select, Button, Tag, Alert, Input } from 'antd'
+import { useState, useEffect, useMemo, type ReactNode } from 'react'
+import { Modal, Button, Tag, Input, Checkbox } from 'antd'
 import { Plus, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { CountryPhoneInput } from '@app/components/shared/country-phone-input'
-import type { Agent, LabelItem } from '@app/lib/api/agent-api'
-
-type ActivationMode = 'CONTACTS' | 'LABELS' | 'EXCLUDE_LABELS'
+import type { Agent } from '@app/lib/api/agent-api'
 
 interface AgentActivateModalProps {
   open: boolean
   onClose: () => void
   onSubmit: (data: {
-    mode: ActivationMode
-    labelIds?: string[]
+    activateAll?: boolean
+    activateAds?: boolean
+    activateNewConversations?: boolean
     contacts?: Record<string, string[]>
   }) => void
   agent: Agent
-  labels: LabelItem[]
   loading?: boolean
 }
 
@@ -26,24 +24,45 @@ const PROVIDER_LABELS: Record<string, string> = {
   INSTAGRAM: 'Instagram',
 }
 
+function OptionRow({
+  checked,
+  onChange,
+  title,
+  subtitle,
+  children,
+}: {
+  checked: boolean
+  onChange: (checked: boolean) => void
+  title: string
+  subtitle: string
+  children?: ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border-subtle p-3">
+      <Checkbox checked={checked} onChange={(e) => onChange(e.target.checked)}>
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-text-primary">{title}</span>
+          <span className="text-xs text-text-muted">{subtitle}</span>
+        </div>
+      </Checkbox>
+      {checked && children ? <div className="pl-6">{children}</div> : null}
+    </div>
+  )
+}
+
 export function AgentActivateModal({
   open,
   onClose,
   onSubmit,
   agent,
-  labels,
   loading,
 }: AgentActivateModalProps) {
   const { t } = useTranslation()
-  const [mode, setMode] = useState<ActivationMode | null>(null)
-  const [selectedLabels, setSelectedLabels] = useState<string[]>([])
+  const [activateAll, setActivateAll] = useState(false)
+  const [activateAds, setActivateAds] = useState(false)
+  const [activateNew, setActivateNew] = useState(false)
+  const [contactsEnabled, setContactsEnabled] = useState(false)
   const [contacts, setContacts] = useState<Record<string, string[]>>({})
-
-  const modeOptions = [
-    { value: 'CONTACTS', label: t('agent.activate_mode_contacts') },
-    { value: 'LABELS', label: t('agent.activate_mode_labels') },
-    { value: 'EXCLUDE_LABELS', label: t('agent.activate_mode_exclude_labels') },
-  ]
 
   // Group social accounts by provider type
   const providerGroups = useMemo(() => {
@@ -59,11 +78,38 @@ export function AgentActivateModal({
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
-      setMode(null)
-      setSelectedLabels([])
+      setActivateAll(false)
+      setActivateAds(false)
+      setActivateNew(false)
+      setContactsEnabled(false)
       setContacts({})
     }
   }, [open])
+
+  // "All conversations" is exclusive — selecting it clears the more specific scopes.
+  const handleToggleAll = (checked: boolean) => {
+    setActivateAll(checked)
+    if (checked) {
+      setActivateAds(false)
+      setActivateNew(false)
+      setContactsEnabled(false)
+    }
+  }
+
+  const handleToggleAds = (checked: boolean) => {
+    setActivateAds(checked)
+    if (checked) setActivateAll(false)
+  }
+
+  const handleToggleNew = (checked: boolean) => {
+    setActivateNew(checked)
+    if (checked) setActivateAll(false)
+  }
+
+  const handleToggleContacts = (checked: boolean) => {
+    setContactsEnabled(checked)
+    if (checked) setActivateAll(false)
+  }
 
   const handleAddContact = (socialAccountId: string) => {
     setContacts((prev) => ({
@@ -86,35 +132,25 @@ export function AgentActivateModal({
     }))
   }
 
+  const hasAnyContact = Object.values(contacts).some((arr) => arr.some((c) => c.trim().length > 0))
+
   const canSubmit = () => {
-    if (!mode) return false
-    if (mode === 'CONTACTS') {
-      const hasAnyContact = Object.values(contacts).some((arr) =>
-        arr.some((c) => c.trim().length > 0),
-      )
-      return hasAnyContact
-    }
-    if (mode === 'LABELS' || mode === 'EXCLUDE_LABELS') {
-      return selectedLabels.length > 0
-    }
+    if (activateAll) return true
+    if (activateAds || activateNew) return true
+    if (contactsEnabled && hasAnyContact) return true
     return false
   }
 
   const handleSubmit = () => {
-    if (!mode) return
     onSubmit({
-      mode,
-      labelIds: mode === 'LABELS' || mode === 'EXCLUDE_LABELS' ? selectedLabels : undefined,
-      contacts: mode === 'CONTACTS' ? contacts : undefined,
+      activateAll,
+      activateAds: activateAll ? false : activateAds,
+      activateNewConversations: activateAll ? false : activateNew,
+      contacts: !activateAll && contactsEnabled ? contacts : undefined,
     })
   }
 
   const getProviderLabel = (provider: string) => PROVIDER_LABELS[provider] || provider
-
-  const labelOptions = labels.map((l) => ({
-    value: l.id,
-    label: l.name,
-  }))
 
   return (
     <Modal
@@ -137,26 +173,36 @@ export function AgentActivateModal({
       ]}
       width={520}
     >
-      <div className="flex flex-col gap-4 py-2">
-        {/* Mode selection */}
-        <div className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-text-primary">
-            {t('agent.activate_how_question')}
-          </span>
-          <Select
-            placeholder={t('agent.activate_mode_placeholder')}
-            options={modeOptions}
-            value={mode}
-            onChange={(v) => {
-              setMode(v)
-              setSelectedLabels([])
-              setContacts({})
-            }}
-          />
-        </div>
+      <div className="flex flex-col gap-3 py-2">
+        <span className="text-sm text-text-secondary">{t('agent.activate_how_question')}</span>
 
-        {/* CONTACTS mode: per-provider contact inputs */}
-        {mode === 'CONTACTS' && (
+        <OptionRow
+          checked={activateAll}
+          onChange={handleToggleAll}
+          title={t('agent.activate_opt_all_title')}
+          subtitle={t('agent.activate_opt_all_desc')}
+        />
+
+        <OptionRow
+          checked={activateAds}
+          onChange={handleToggleAds}
+          title={t('agent.activate_opt_ads_title')}
+          subtitle={t('agent.activate_opt_ads_desc')}
+        />
+
+        <OptionRow
+          checked={activateNew}
+          onChange={handleToggleNew}
+          title={t('agent.activate_opt_new_title')}
+          subtitle={t('agent.activate_opt_new_desc')}
+        />
+
+        <OptionRow
+          checked={contactsEnabled}
+          onChange={handleToggleContacts}
+          title={t('agent.activate_opt_contacts_title')}
+          subtitle={t('agent.activate_opt_contacts_desc')}
+        >
           <div className="flex flex-col gap-4">
             {Object.entries(providerGroups).map(([provider, accounts]) => (
               <div key={provider} className="flex flex-col gap-2">
@@ -228,47 +274,7 @@ export function AgentActivateModal({
               </div>
             ))}
           </div>
-        )}
-
-        {/* LABELS mode */}
-        {mode === 'LABELS' && (
-          <div className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-text-primary">
-              {t('agent.labels_trigger_title')}
-            </span>
-            <span className="text-xs text-text-muted">{t('agent.labels_trigger_desc')}</span>
-            <Select
-              mode="multiple"
-              placeholder={t('agent.select_labels_placeholder')}
-              options={labelOptions}
-              value={selectedLabels}
-              onChange={setSelectedLabels}
-            />
-            {labels.length === 0 && (
-              <Alert type="info" showIcon message={t('agent.no_labels_found')} />
-            )}
-          </div>
-        )}
-
-        {/* EXCLUDE_LABELS mode */}
-        {mode === 'EXCLUDE_LABELS' && (
-          <div className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-text-primary">
-              {t('agent.exclude_labels_title')}
-            </span>
-            <span className="text-xs text-text-muted">{t('agent.exclude_labels_desc')}</span>
-            <Select
-              mode="multiple"
-              placeholder={t('agent.select_exclude_labels_placeholder')}
-              options={labelOptions}
-              value={selectedLabels}
-              onChange={setSelectedLabels}
-            />
-            {labels.length === 0 && (
-              <Alert type="info" showIcon message={t('agent.no_labels_found')} />
-            )}
-          </div>
-        )}
+        </OptionRow>
       </div>
     </Modal>
   )

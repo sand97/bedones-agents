@@ -129,8 +129,9 @@ export const agentApi = {
   activate: (
     id: string,
     data: {
-      mode: 'CONTACTS' | 'LABELS' | 'EXCLUDE_LABELS'
-      labelIds?: string[]
+      activateAll?: boolean
+      activateAds?: boolean
+      activateNewConversations?: boolean
       contacts?: Record<string, string[]>
     },
   ) =>

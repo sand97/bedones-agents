@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common'
 import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import { AuthGuard } from '../auth/auth.guard'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -19,6 +19,8 @@ import {
   CommentActionDto,
   TikTokBusinessCheckDto,
   SocialAccountHealthDto,
+  PostAgentStatusDto,
+  SetPostAgentOverrideDto,
 } from './dto/social.dto'
 
 @ApiTags('Social')
@@ -97,6 +99,25 @@ export class SocialController {
   @ApiOkResponse({ type: [PostResponseDto] })
   async getPosts(@CurrentUser() user: { id: string }, @Param('accountId') accountId: string) {
     return this.socialService.getPostsForAccount(user.id, accountId)
+  }
+
+  // ─── Per-post agent activation (comment replies) ───
+
+  @Get('posts/:postId/agent-status')
+  @ApiOkResponse({ type: PostAgentStatusDto })
+  async getPostAgentStatus(@CurrentUser() user: { id: string }, @Param('postId') postId: string) {
+    return this.socialService.getAgentStatusForPost(user.id, postId)
+  }
+
+  @Put('posts/:postId/agent-override')
+  @ApiBody({ type: SetPostAgentOverrideDto })
+  @ApiOkResponse({ type: PostAgentStatusDto })
+  async setPostAgentOverride(
+    @CurrentUser() user: { id: string },
+    @Param('postId') postId: string,
+    @Body() body: SetPostAgentOverrideDto,
+  ) {
+    return this.socialService.setPostAgentOverride(user.id, postId, body.override)
   }
 
   // ─── Account health / last error (for the reconnect prompt) ───

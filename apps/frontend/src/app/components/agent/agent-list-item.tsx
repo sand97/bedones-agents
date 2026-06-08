@@ -10,6 +10,7 @@ interface AgentListItemProps {
   isActive: boolean
   onClick: () => void
   onEditResources: () => void
+  onActivationSettings: () => void
   onDeactivate: () => void
   onDelete: () => void
 }
@@ -19,6 +20,7 @@ export function AgentListItem({
   isActive,
   onClick,
   onEditResources,
+  onActivationSettings,
   onDeactivate,
   onDelete,
 }: AgentListItemProps) {
@@ -52,6 +54,7 @@ export function AgentListItem({
           <AgentActionsPopover
             agent={agent}
             onEditResources={onEditResources}
+            onActivationSettings={onActivationSettings}
             onDeactivate={onDeactivate}
             onDelete={onDelete}
           >

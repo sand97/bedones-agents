@@ -256,11 +256,13 @@ async function main() {
 
       await prisma.agentSocialAccount.upsert({
         where: { socialAccountId: whatsappAccount.id },
-        update: { aiActivationMode: 'ALL' },
+        update: { aiActivationMode: 'ALL', aiActivateAll: true, aiActivatedAt: new Date() },
         create: {
           agentId: agent.id,
           socialAccountId: whatsappAccount.id,
           aiActivationMode: 'ALL',
+          aiActivateAll: true,
+          aiActivatedAt: new Date(),
         },
       })
       console.log(`✓ Agent linked to WhatsApp account (mode ALL)`)

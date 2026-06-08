@@ -549,6 +549,75 @@ export class WebhookService {
     })
   }
 
+  // ─── Ad / referral detection ───
+  // When an incoming message originates from an ad, we flag the conversation so the
+  // agent's "activate on ad messages" scope can pick it up. Detection is best-effort
+  // and platform-specific.
+
+  /** Persist ad provenance on the conversation. No-op when `referral` is null. */
+  private async markConversationFromAd(
+    conversationId: string,
+    referral: Prisma.InputJsonValue | null,
+  ): Promise<void> {
+    if (!referral) return
+    try {
+      await this.prisma.conversation.update({
+        where: { id: conversationId },
+        data: { fromAd: true, adReferral: referral },
+      })
+    } catch (error) {
+      this.logger.warn(`Failed to flag conversation ${conversationId} as ad-sourced`, error)
+    }
+  }
+
+  /** Meta (Messenger / Instagram) ad referral — from message, top-level, or postback. */
+  private extractMetaAdReferral(messaging: MessagingEvent): Prisma.InputJsonValue | null {
+    const ref = messaging.message?.referral ?? messaging.referral ?? messaging.postback?.referral
+    if (!ref) return null
+    const isAd = ref.source === 'ADS' || ref.type === 'AD' || !!ref.ad_id
+    if (!isAd) return null
+    return {
+      platform: 'META',
+      source: ref.source ?? null,
+      type: ref.type ?? null,
+      adId: ref.ad_id ?? null,
+      ref: ref.ref ?? null,
+      adsContextData: (ref.ads_context_data as Prisma.InputJsonValue) ?? null,
+    }
+  }
+
+  /** WhatsApp Click-to-WhatsApp ad referral. */
+  private extractWhatsAppAdReferral(msg: WhatsAppMessage): Prisma.InputJsonValue | null {
+    const ref = msg.referral
+    if (!ref) return null
+    // WhatsApp only attaches `referral` on CTWA ad messages, but guard the source type anyway.
+    if (ref.source_type && ref.source_type !== 'ad') return null
+    return {
+      platform: 'WHATSAPP',
+      sourceType: ref.source_type ?? 'ad',
+      sourceId: ref.source_id ?? null,
+      sourceUrl: ref.source_url ?? null,
+      ctwaClid: ref.ctwa_clid ?? null,
+      headline: ref.headline ?? null,
+      body: ref.body ?? null,
+    }
+  }
+
+  /** TikTok DM ad provenance — best effort via message_tag (TikTok has no CTWA equivalent). */
+  private extractTikTokAdReferral(
+    content: TikTokDirectMessageContent,
+  ): Prisma.InputJsonValue | null {
+    const tag = content.message_tag as Record<string, unknown> | undefined
+    const adId = (tag?.ad_id ?? tag?.adId ?? tag?.advertiser_id) as string | undefined
+    if (!adId) return null
+    return {
+      platform: 'TIKTOK',
+      adId,
+      sceneType: content.scene_type ?? null,
+      messageTag: (tag as Prisma.InputJsonValue) ?? null,
+    }
+  }
+
   // ─── Messenger message handling ───
 
   private async handleMessengerMessage(
@@ -689,6 +758,8 @@ export class WebhookService {
       message.reply_to?.mid || null,
     )
     if (!conversation) return
+
+    await this.markConversationFromAd(conversation.id, this.extractMetaAdReferral(messaging))
 
     this.logger.log(
       `[Messenger] New message from ${senderName} (${senderId}): "${message.text?.substring(0, 50) || '[media]'}"`,
@@ -847,6 +918,8 @@ export class WebhookService {
       message.reply_to?.mid || null,
     )
     if (!conversation) return
+
+    await this.markConversationFromAd(conversation.id, this.extractMetaAdReferral(messaging))
 
     this.logger.log(
       `[Instagram DM] New message from ${senderName} (${senderId}): "${message.text?.substring(0, 50) || '[media]'}"`,
@@ -1252,6 +1325,8 @@ export class WebhookService {
       metadata,
     )
     if (!conversation) return
+
+    await this.markConversationFromAd(conversation.id, this.extractWhatsAppAdReferral(msg))
 
     await this.markOutboundMessagesAsRead(conversation.id, orgId, timestamp)
 
@@ -2270,6 +2345,8 @@ export class WebhookService {
     )
     if (!conversation) return
 
+    await this.markConversationFromAd(conversation.id, this.extractTikTokAdReferral(content))
+
     this.logger.log(
       `[TikTok DM] New message from ${senderName} (${participantId}): "${
         mapped.message?.substring(0, 50) || mapped.mediaType || '[message]'
@@ -2798,6 +2875,24 @@ export class WebhookService {
       if (!settings.isConfigured) {
         this.logger.log(`[AI] AI not configured for account ${socialAccountId}, skipping`)
         return
+      }
+
+      // Per-post agent override: a post toggled OFF disables agent replies to its comments.
+      const dbComment = await this.prisma.comment.findUnique({
+        where: { id: commentId },
+        select: { postId: true },
+      })
+      if (dbComment) {
+        const dbPost = await this.prisma.post.findUnique({
+          where: { id: dbComment.postId },
+          select: { aiOverride: true },
+        })
+        if (dbPost?.aiOverride === 'FORCE_OFF') {
+          this.logger.log(
+            `[AI] Agent disabled for post ${dbComment.postId}; skipping comment ${commentId}`,
+          )
+          return
+        }
       }
 
       // Resolve access token once — used for the thread fetch and (later) for the action.
@@ -3614,6 +3709,21 @@ interface InstagramChangeValue {
 
 // ─── Messaging event types (Messenger + Instagram DM) ───
 
+// Meta (Messenger/Instagram) ad referral — present when a conversation starts from
+// a Click-to-Messenger / Click-to-Instagram ad, an m.me ad link, or an icebreaker.
+interface MetaReferral {
+  ref?: string
+  source?: string // e.g. 'ADS', 'SHORTLINK', 'CUSTOMER_CHAT_PLUGIN'
+  type?: string // e.g. 'OPEN_THREAD', 'AD'
+  ad_id?: string
+  ads_context_data?: {
+    ad_title?: string
+    photo_url?: string
+    video_url?: string
+    post_id?: string
+  }
+}
+
 interface MessagingEvent {
   sender?: { id: string }
   recipient?: { id: string }
@@ -3633,7 +3743,10 @@ interface MessagingEvent {
     reply_to?: {
       mid?: string
     }
+    referral?: MetaReferral
   }
+  referral?: MetaReferral
+  postback?: { referral?: MetaReferral }
   reaction?: {
     mid: string
     action: 'react' | 'unreact'
@@ -3717,6 +3830,15 @@ interface WhatsAppMessage {
   button?: { payload?: string; text?: string }
   reaction?: { message_id: string; emoji: string }
   context?: { id?: string; from?: string }
+  // Present only on Click-to-WhatsApp (CTWA) ad messages.
+  referral?: {
+    source_type?: string // e.g. 'ad', 'post'
+    source_id?: string // ad / post id
+    source_url?: string
+    ctwa_clid?: string // Click-to-WhatsApp click id
+    headline?: string
+    body?: string
+  }
 }
 
 interface WhatsAppMessageEcho extends WhatsAppMessage {

@@ -1,8 +1,18 @@
 import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Avatar, Button, Input, Popover, Spin, Tooltip, App } from 'antd'
-import { MessageSquare, Send, Eye, EyeOff, Trash2, ExternalLink } from 'lucide-react'
+import {
+  MessageSquare,
+  Send,
+  Eye,
+  EyeOff,
+  Trash2,
+  ExternalLink,
+  Sparkles,
+  BotOff,
+} from 'lucide-react'
 import dayjs from 'dayjs'
+import { useQueryClient } from '@tanstack/react-query'
 import { ImagePlaceholderIcon, OptionsIcon } from '@app/components/icons/social-icons'
 import { $api } from '@app/lib/api/$api'
 import { getAvatarColor } from '@app/lib/avatar-color'
@@ -207,28 +217,76 @@ function groupThreadsByDate(
 
 /* ── Options popover for post header ── */
 
-function PostOptionsMenu({ permalinkUrl }: { permalinkUrl?: string }) {
+function PostOptionsMenu({ post }: { post: Post }) {
   const [open, setOpen] = useState(false)
   const { t } = useTranslation()
+  const { message: antdMessage } = App.useApp()
+  const queryClient = useQueryClient()
 
-  if (!permalinkUrl) return null
+  // Agent activation status for this post's comments (lazy — only when the menu opens).
+  const agentStatusQuery = $api.useQuery(
+    'get',
+    '/social/posts/{postId}/agent-status',
+    { params: { path: { postId: post.id } } },
+    { enabled: open },
+  )
+  const setOverrideMutation = $api.useMutation('put', '/social/posts/{postId}/agent-override')
+
+  const agentStatus = agentStatusQuery.data
+  const agent = agentStatus?.agent ?? null
+  const isAgentReady =
+    !!agent && agent.score >= 80 && agent.status !== 'DRAFT' && agent.status !== 'CONFIGURING'
+  const isActive = agentStatus?.isActive === true
+
+  const handleToggleAgent = async () => {
+    const next: 'FORCE_ON' | 'FORCE_OFF' = isActive ? 'FORCE_OFF' : 'FORCE_ON'
+    try {
+      const result = await setOverrideMutation.mutateAsync({
+        params: { path: { postId: post.id } },
+        body: { override: next },
+      })
+      queryClient.setQueryData(
+        ['get', '/social/posts/{postId}/agent-status', { params: { path: { postId: post.id } } }],
+        result,
+      )
+      antdMessage.success(
+        next === 'FORCE_ON' ? t('comments.agent_activated') : t('comments.agent_deactivated'),
+      )
+    } catch {
+      antdMessage.error(t('comments.agent_toggle_error'))
+    }
+  }
 
   return (
     <Popover
       content={
-        <div className="w-52">
-          <Button
-            type="text"
-            block
-            onClick={() => {
-              window.open(permalinkUrl, '_blank')
-              setOpen(false)
-            }}
-            icon={<ExternalLink size={14} />}
-            className="py-2.5! whitespace-nowrap"
-          >
-            {t('comments.view_original_post')}
-          </Button>
+        <div className="w-56">
+          {post.permalinkUrl && (
+            <Button
+              type="text"
+              block
+              onClick={() => {
+                window.open(post.permalinkUrl, '_blank')
+                setOpen(false)
+              }}
+              icon={<ExternalLink size={14} />}
+              className="py-2.5! whitespace-nowrap"
+            >
+              {t('comments.view_original_post')}
+            </Button>
+          )}
+          {isAgentReady && (
+            <Button
+              type="text"
+              block
+              onClick={handleToggleAgent}
+              loading={setOverrideMutation.isPending}
+              icon={isActive ? <BotOff size={14} /> : <Sparkles size={14} />}
+              className="py-2.5! whitespace-nowrap"
+            >
+              {isActive ? t('comments.deactivate_agent') : t('comments.activate_agent')}
+            </Button>
+          )}
         </div>
       }
       trigger="click"
@@ -550,7 +608,7 @@ function PostPreviewHeader({ post }: { post: Post }) {
       >
         {displayText}
       </p>
-      <PostOptionsMenu permalinkUrl={post.permalinkUrl} />
+      <PostOptionsMenu post={post} />
     </div>
   )
 }
