@@ -533,7 +533,7 @@ function CatalogPage() {
 
       <CatalogIndexingBanner catalogs={catalogs} />
 
-      <div className="flex-1 p-4 pb-16 lg:p-6 lg:pb-16">
+      <div className="flex-1 p-4 pb-28 lg:p-6 lg:pb-28">
         {selectedCatalog && (
           <CatalogQuickActions
             onOpenContextFlow={() => setContextFlowOpen(true)}

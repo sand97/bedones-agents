@@ -759,7 +759,9 @@
     "status_draft": "Draft",
     "status_archived": "Archived",
     "error_title": "Unable to load your catalog",
-    "error_description": "We couldn't load your products. Please reconnect your catalog."
+    "error_description": "We couldn't load your products. Please reconnect your catalog.",
+    "synced_from": "Products synced from {{number}} at {{date}}",
+    "sync_now": "Sync"
   },
   "promotions": {
     "title": "Promotions",
@@ -780,8 +782,6 @@
     "not_stackable": "Not stackable",
     "period": "Period",
     "products": "Products",
-    "synced_from": "Products synced from {{number}} at {{date}}",
-    "sync_now": "Sync",
     "products_count_one": "{{count}} product",
     "products_count_other": "{{count}} products",
     "product_count_one": "{{count}} product",

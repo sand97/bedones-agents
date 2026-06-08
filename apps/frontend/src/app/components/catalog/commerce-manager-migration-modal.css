@@ -1062,6 +1062,15 @@
   .cmm-root .mc-head {
     padding: 14px 16px 12px;
   }
+  .cmm-root .mc-title {
+    font-size: 16px;
+  }
+  .cmm-root .mc-bigtitle {
+    font-size: 17px;
+  }
+  .cmm-root .mc-lede {
+    font-size: 13.5px;
+  }
   .cmm-root .mc-bodyscroll {
     padding: 18px 16px 4px;
   }
@@ -1070,5 +1079,10 @@
   }
   .cmm-root .mc-foot {
     padding: 12px 16px 14px;
+  }
+  .cmm-root .mc-btn {
+    height: 38px;
+    font-size: 13px;
+    padding: 0 14px;
   }
 }

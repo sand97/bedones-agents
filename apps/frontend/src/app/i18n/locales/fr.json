@@ -759,7 +759,9 @@
     "status_draft": "Brouillon",
     "status_archived": "Archivé",
     "error_title": "Impossible de récupérer votre catalogue",
-    "error_description": "Nous n'avons pas pu charger vos produits. Veuillez reconnecter votre catalogue."
+    "error_description": "Nous n'avons pas pu charger vos produits. Veuillez reconnecter votre catalogue.",
+    "synced_from": "Produits synchronisés depuis {{number}} le {{date}}",
+    "sync_now": "Synchroniser"
   },
   "promotions": {
     "title": "Promotions",
@@ -780,8 +782,6 @@
     "not_stackable": "Non cumulable",
     "period": "Période",
     "products": "Produits",
-    "synced_from": "Produits synchronisés depuis {{number}} le {{date}}",
-    "sync_now": "Synchroniser",
     "products_count_one": "{{count}} produit",
     "products_count_other": "{{count}} produits",
     "product_count_one": "{{count}} produit",

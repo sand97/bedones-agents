@@ -372,6 +372,9 @@ interface Props {
   /** When opened from a specific WhatsApp number (e.g. the chat page), lock the
    * migration to that number and skip the number picker. */
   presetAccountId?: string
+  /** When opened from the catalog resync banner, hide the "connect to number"
+   * prompt on the success screen since the user is already on the catalog page. */
+  isResync?: boolean
 }
 
 /**
@@ -380,7 +383,7 @@ interface Props {
  * (Meta OAuth), import the products (queue + websocket progress), then link the
  * WhatsApp Business account to the new catalogue.
  */
-export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAccountId }: Props) {
+export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAccountId, isResync }: Props) {
   const { t } = useTranslation()
   const tf = (key: string, opts?: Record<string, unknown>) => t(NS + key, opts)
   const queryClient = useQueryClient()
@@ -881,13 +884,15 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
                   </div>
                 </div>
               </div>
-              <div className="mc-ask">
-                <div className="mc-ask-t">{tf('s4_done_t')}</div>
-                <div className="mc-ask-b">{tf('s4_done_b', { number: waNumber })}</div>
-                <button className="mc-textlink" onClick={connectAccount}>
-                  {tf('s4_connect_native')}
-                </button>
-              </div>
+              {!isResync && (
+                <div className="mc-ask">
+                  <div className="mc-ask-t">{tf('s4_done_t')}</div>
+                  <div className="mc-ask-b">{tf('s4_done_b', { number: waNumber })}</div>
+                  <button className="mc-textlink" onClick={connectAccount}>
+                    {tf('s4_connect_native')}
+                  </button>
+                </div>
+              )}
             </div>
           ),
           primary: { label: tf('finish'), icon: 'check', onClick: close },
