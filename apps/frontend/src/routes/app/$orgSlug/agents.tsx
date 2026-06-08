@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, Spin } from 'antd'
+import { Button, Spin, Tooltip } from 'antd'
 import { SetupSuccessModal } from '@app/components/dashboard/setup-success-modal'
-import { Plus, Sparkles, Bot, Zap, MoreHorizontal, Loader2 } from 'lucide-react'
+import { Plus, Sparkles, Bot, Zap, MoreHorizontal, Loader2, ArrowLeft } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
@@ -366,7 +366,7 @@ function AgentsPage() {
 
   if (!agentsQuery.isLoading && agents.length === 0 && !selectedAgentId) {
     return (
-      <div className="flex h-screen flex-col">
+      <div className="flex h-[100dvh] flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
         <DashboardHeader title={t('agent.page_title')} />
         <SocialSetup
           icon={<Bot size={48} strokeWidth={1.5} />}
@@ -518,27 +518,43 @@ function AgentsPage() {
 
   // ─── Main layout (list + chat) ───
 
+  // On mobile, viewing a single agent's detail (chat) hides the list.
+  const isMobileAgentDetail = !isDesktop && !showList && !!selectedAgent
+
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-[100dvh] flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
       <DashboardHeader
         title={t('agent.page_title')}
         action={
           <div className="flex items-center gap-2">
             {selectedAgent && <AgentScoreBadge score={selectedAgent.score} />}
-            <Button onClick={() => setCreateOpen(true)} icon={<Plus size={16} strokeWidth={1.5} />}>
-              {t('agent.new_agent')}
-            </Button>
+            {/* "New agent" is already on the list view — hide it on the mobile detail
+                view so it doesn't crowd the agent name. */}
+            {!isMobileAgentDetail && (
+              <Button
+                onClick={() => setCreateOpen(true)}
+                icon={<Plus size={16} strokeWidth={1.5} />}
+              >
+                {t('agent.new_agent')}
+              </Button>
+            )}
           </div>
         }
         mobileLeft={
-          !showList && selectedAgent ? (
-            <div className="flex items-center gap-2">
-              <Button type="text" onClick={() => setShowList(true)} size="small">
-                {t('common.back')}
-              </Button>
-              <span className="truncate text-sm font-medium text-text-primary">
-                {selectedAgent.name}
-              </span>
+          isMobileAgentDetail ? (
+            <div className="flex min-w-0 items-center gap-2">
+              <Button
+                type="text"
+                onClick={() => setShowList(true)}
+                size="small"
+                aria-label={t('common.back')}
+                icon={<ArrowLeft size={20} strokeWidth={1.5} />}
+              />
+              <Tooltip title={selectedAgent.name}>
+                <span className="truncate text-sm font-medium text-text-primary">
+                  {selectedAgent.name}
+                </span>
+              </Tooltip>
             </div>
           ) : undefined
         }

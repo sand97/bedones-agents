@@ -23,7 +23,7 @@ export function DashboardHeader({ title, mobileTitle, action, mobileLeft }: Dash
     <header className="sticky top-0 z-100 flex h-14 items-center gap-3 border-b border-border-subtle bg-bg-surface px-4">
       {/* Mobile: show custom left content if provided */}
       {!isDesktop && mobileLeft ? (
-        <div className="flex flex-1 items-center gap-3">{mobileLeft}</div>
+        <div className="flex min-w-0 flex-1 items-center gap-3">{mobileLeft}</div>
       ) : (
         <>
           <Button
