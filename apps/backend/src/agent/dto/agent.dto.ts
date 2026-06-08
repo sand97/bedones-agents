@@ -22,19 +22,27 @@ export class UpdateAgentSocialAccountsDto {
 }
 
 export class ActivateAgentDto {
-  @ApiProperty({ enum: ['CONTACTS', 'LABELS', 'EXCLUDE_LABELS'] })
-  mode: 'CONTACTS' | 'LABELS' | 'EXCLUDE_LABELS'
+  @ApiPropertyOptional({
+    description: 'Respond on every conversation. Exclusive: overrides the other scopes.',
+  })
+  activateAll?: boolean
 
   @ApiPropertyOptional({
-    type: [String],
-    description: 'Label IDs for LABELS / EXCLUDE_LABELS modes',
+    description:
+      'Respond when the incoming message originates from an ad (Meta CTWA/referral, TikTok).',
   })
-  labelIds?: string[]
+  activateAds?: boolean
 
   @ApiPropertyOptional({
-    description: 'Per-social-account contacts for CONTACTS mode',
+    description: 'Respond on all new conversations created after activation.',
   })
-  contacts?: Record<string, string[]> // socialAccountId → phone numbers or profile names
+  activateNewConversations?: boolean
+
+  @ApiPropertyOptional({
+    description:
+      'Per-social-account test contacts (socialAccountId → phone numbers or profile names). Mainly used to test the agent on a few contacts.',
+  })
+  contacts?: Record<string, string[]>
 }
 
 export class AgentResponseDto {

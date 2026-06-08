@@ -492,30 +492,36 @@ export class AgentService {
   async activate(
     agentId: string,
     dto: {
-      mode: 'CONTACTS' | 'LABELS' | 'EXCLUDE_LABELS'
-      labelIds?: string[]
+      activateAll?: boolean
+      activateAds?: boolean
+      activateNewConversations?: boolean
       contacts?: Record<string, string[]>
     },
   ) {
     const agent = await this.findById(agentId)
+    const activatedAt = new Date()
+
+    // "All conversations" is exclusive — it overrides the more specific scopes.
+    const activateAll = !!dto.activateAll
+    const activateAds = activateAll ? false : !!dto.activateAds
+    const activateNewConversations = activateAll ? false : !!dto.activateNewConversations
 
     // Update all social accounts of the agent
     for (const sa of agent.socialAccounts) {
-      const updateData: Record<string, unknown> = {
-        aiActivationMode: dto.mode,
-      }
-
-      if (dto.mode === 'CONTACTS') {
-        updateData.aiActivationContacts = dto.contacts?.[sa.socialAccount.id] || []
-        updateData.aiActivationLabels = []
-      } else if (dto.mode === 'LABELS' || dto.mode === 'EXCLUDE_LABELS') {
-        updateData.aiActivationLabels = dto.labelIds || []
-        updateData.aiActivationContacts = []
-      }
+      const contacts = activateAll ? [] : dto.contacts?.[sa.socialAccount.id] || []
 
       await this.prisma.agentSocialAccount.update({
         where: { id: sa.id },
-        data: updateData,
+        data: {
+          aiActivateAll: activateAll,
+          aiActivateAds: activateAds,
+          aiActivateNewConversations: activateNewConversations,
+          aiActivationContacts: contacts,
+          aiActivatedAt: activatedAt,
+          // Keep the legacy enum column roughly in sync for any legacy reads.
+          aiActivationMode: activateAll ? 'ALL' : contacts.length > 0 ? 'CONTACTS' : 'OFF',
+          aiActivationLabels: [],
+        },
       })
     }
 
@@ -530,10 +536,15 @@ export class AgentService {
   }
 
   async deactivate(agentId: string) {
-    // Set all social accounts to OFF
+    // Clear every activation scope on all social accounts
     await this.prisma.agentSocialAccount.updateMany({
       where: { agentId },
-      data: { aiActivationMode: 'OFF' },
+      data: {
+        aiActivationMode: 'OFF',
+        aiActivateAll: false,
+        aiActivateAds: false,
+        aiActivateNewConversations: false,
+      },
     })
 
     return this.prisma.agent.update({

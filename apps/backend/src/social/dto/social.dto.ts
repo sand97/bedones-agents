@@ -137,6 +137,9 @@ export class PostResponseDto {
   @ApiPropertyOptional()
   permalinkUrl?: string
 
+  @ApiPropertyOptional({ enum: ['FORCE_ON', 'FORCE_OFF'], nullable: true })
+  aiOverride?: 'FORCE_ON' | 'FORCE_OFF' | null
+
   @ApiProperty()
   totalComments: number
 
@@ -145,6 +148,38 @@ export class PostResponseDto {
 
   @ApiProperty({ type: [CommentResponseDto] })
   comments: CommentResponseDto[]
+}
+
+export class PostAgentSummaryDto {
+  @ApiProperty()
+  id: string
+
+  @ApiPropertyOptional()
+  name?: string
+
+  @ApiProperty()
+  score: number
+
+  @ApiProperty({ enum: ['DRAFT', 'CONFIGURING', 'READY', 'ACTIVE', 'PAUSED'] })
+  status: string
+}
+
+export class PostAgentStatusDto {
+  @ApiPropertyOptional({ type: PostAgentSummaryDto, nullable: true })
+  agent: PostAgentSummaryDto | null
+
+  @ApiPropertyOptional({ enum: ['FORCE_ON', 'FORCE_OFF'], nullable: true })
+  override: 'FORCE_ON' | 'FORCE_OFF' | null
+
+  @ApiProperty({
+    description: "Whether the agent would currently reply to this post's comments",
+  })
+  isActive: boolean
+}
+
+export class SetPostAgentOverrideDto {
+  @ApiProperty({ enum: ['FORCE_ON', 'FORCE_OFF'] })
+  override: 'FORCE_ON' | 'FORCE_OFF'
 }
 
 export class SocialAccountResponseDto {

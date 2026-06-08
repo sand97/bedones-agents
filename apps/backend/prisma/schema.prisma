@@ -519,8 +519,13 @@ model AgentSocialAccount {
   socialAccountId      String           @unique // A social account can only be in ONE agent
   socialAccount        SocialAccount    @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
   aiActivationMode     AiActivationMode @default(OFF)
-  aiActivationLabels   String[] // Label IDs for LABELS / EXCLUDE_LABELS modes
-  aiActivationContacts String[] // Phone numbers (WhatsApp) or profile names (IG/Messenger)
+  aiActivationLabels   String[] // Label IDs for LABELS / EXCLUDE_LABELS modes (legacy)
+  aiActivationContacts String[] // Phone numbers (WhatsApp) or profile names (IG/Messenger) — "by contacts" scope, mainly for testing
+  // ─── Activation scopes (combinable, except aiActivateAll which is exclusive) ───
+  aiActivateAll              Boolean  @default(false) // Respond on every conversation
+  aiActivateAds              Boolean  @default(false) // Respond when the message originates from an ad (Meta referral / CTWA, TikTok)
+  aiActivateNewConversations Boolean  @default(false) // Respond on conversations created after activation
+  aiActivatedAt              DateTime? // Cutoff used by aiActivateNewConversations
   createdAt            DateTime         @default(now())
 
   @@unique([agentId, socialAccountId])
@@ -675,6 +680,7 @@ model Post {
   message         String?
   imageUrl        String?
   permalinkUrl    String?
+  aiOverride      AiConversationOverride? // Per-post override: FORCE_OFF disables agent replies to this post's comments
   comments        Comment[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -731,6 +737,8 @@ model Conversation {
   unreadCount              Int                              @default(0)
   historySyncedAt          DateTime? // last time the 14-day message backfill ran for this thread
   aiOverride               AiConversationOverride? // Per-conversation override of agent activation rules
+  fromAd                   Boolean                          @default(false) // Conversation started from an ad (Meta CTWA / referral, TikTok)
+  adReferral               Json? // Raw ad/referral metadata captured from the webhook (source, ad id, ctwa_clid, ...)
   messages                 DirectMessage[]
   conversationLabels       ConversationLabel[]
   campaignContacts         LoyaltyCampaignContact[]

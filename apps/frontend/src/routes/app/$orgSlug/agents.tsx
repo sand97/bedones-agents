@@ -1,9 +1,9 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, Spin } from 'antd'
+import { Button, Spin, Tooltip, Modal } from 'antd'
 import { SetupSuccessModal } from '@app/components/dashboard/setup-success-modal'
-import { Plus, Sparkles, Bot, Zap, MoreHorizontal, Loader2 } from 'lucide-react'
+import { Plus, Sparkles, Bot, Zap, MoreHorizontal, Loader2, ArrowLeft } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
@@ -22,7 +22,6 @@ import {
   catalogApi,
   socialApi,
   type AgentMessage as ApiAgentMessage,
-  type LabelItem,
 } from '@app/lib/api/agent-api'
 import type { AgentMessage, AgentChoiceOption } from '@app/components/agent/mock-data'
 
@@ -96,13 +95,6 @@ function AgentsPage() {
     () => agentsQuery.data?.find((a) => a.id === selectedAgentId) ?? null,
     [agentsQuery.data, selectedAgentId],
   )
-
-  const labelsQuery = useQuery({
-    queryKey: ['agent-labels', selectedAgentId],
-    queryFn: () => agentApi.getLabels(selectedAgentId!),
-    enabled: !!selectedAgentId,
-    staleTime: 30_000,
-  })
 
   // ─── Load messages when agent selected ───
 
@@ -215,6 +207,33 @@ function AgentsPage() {
     }
   }, [orgSlug, selectedAgentId, queryClient])
 
+  // ─── Prompt to activate when the score crosses the 80 threshold ───
+  // We track the previous score per agent. When it goes from < 80 to >= 80 during the
+  // session (and the agent isn't already active), we ask the user if they want to
+  // activate — answering "yes" opens the activation modal.
+  const prevScoresRef = useRef<Record<string, number>>({})
+
+  useEffect(() => {
+    if (!selectedAgent) return
+    const prev = prevScoresRef.current[selectedAgent.id]
+    prevScoresRef.current[selectedAgent.id] = selectedAgent.score
+
+    if (
+      prev !== undefined &&
+      prev < 80 &&
+      selectedAgent.score >= 80 &&
+      selectedAgent.status !== 'ACTIVE'
+    ) {
+      Modal.confirm({
+        title: t('agent.score_reached_title'),
+        content: t('agent.score_reached_desc'),
+        okText: t('agent.score_reached_confirm'),
+        cancelText: t('common.later'),
+        onOk: () => setActivateOpen(true),
+      })
+    }
+  }, [selectedAgent, t])
+
   // ─── Mutations ───
 
   const createMutation = useMutation({
@@ -229,8 +248,9 @@ function AgentsPage() {
 
   const activateMutation = useMutation({
     mutationFn: (data: {
-      mode: 'CONTACTS' | 'LABELS' | 'EXCLUDE_LABELS'
-      labelIds?: string[]
+      activateAll?: boolean
+      activateAds?: boolean
+      activateNewConversations?: boolean
       contacts?: Record<string, string[]>
     }) => agentApi.activate(selectedAgentId!, data),
     onSuccess: async (activated) => {
@@ -366,7 +386,7 @@ function AgentsPage() {
 
   if (!agentsQuery.isLoading && agents.length === 0 && !selectedAgentId) {
     return (
-      <div className="flex h-screen flex-col">
+      <div className="flex h-[100dvh] flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
         <DashboardHeader title={t('agent.page_title')} />
         <SocialSetup
           icon={<Bot size={48} strokeWidth={1.5} />}
@@ -471,6 +491,7 @@ function AgentsPage() {
             <AgentActionsPopover
               agent={selectedAgent}
               onEditResources={() => handleEditResources(selectedAgent)}
+              onActivationSettings={() => setActivateOpen(true)}
               onDeactivate={() => handleDeactivate(selectedAgent.id)}
               onDelete={() => handleDelete(selectedAgent.id)}
             >
@@ -489,17 +510,18 @@ function AgentsPage() {
     // CONFIGURING / READY / ACTIVE: show chat
     return (
       <div className="flex flex-1 flex-col overflow-hidden">
-        {selectedAgent.score >= 80 && selectedAgent.status === 'READY' && (
-          <HeaderHelper
-            icon={<Zap size={20} />}
-            title={t('agent.activate_banner_title')}
-            subtitle={t('agent.activate_banner_desc')}
-            primaryAction={{
-              title: t('agent.activate_banner_btn'),
-              onClick: () => setActivateOpen(true),
-            }}
-          />
-        )}
+        {selectedAgent.score >= 80 &&
+          (selectedAgent.status === 'READY' || selectedAgent.status === 'PAUSED') && (
+            <HeaderHelper
+              icon={<Zap size={20} />}
+              title={t('agent.activate_banner_title')}
+              subtitle={t('agent.activate_banner_desc')}
+              primaryAction={{
+                title: t('agent.activate_banner_btn'),
+                onClick: () => setActivateOpen(true),
+              }}
+            />
+          )}
         <AgentChat
           messages={messages}
           onSendMessage={handleSendMessage}
@@ -518,27 +540,43 @@ function AgentsPage() {
 
   // ─── Main layout (list + chat) ───
 
+  // On mobile, viewing a single agent's detail (chat) hides the list.
+  const isMobileAgentDetail = !isDesktop && !showList && !!selectedAgent
+
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-[100dvh] flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
       <DashboardHeader
         title={t('agent.page_title')}
         action={
           <div className="flex items-center gap-2">
             {selectedAgent && <AgentScoreBadge score={selectedAgent.score} />}
-            <Button onClick={() => setCreateOpen(true)} icon={<Plus size={16} strokeWidth={1.5} />}>
-              {t('agent.new_agent')}
-            </Button>
+            {/* "New agent" is already on the list view — hide it on the mobile detail
+                view so it doesn't crowd the agent name. */}
+            {!isMobileAgentDetail && (
+              <Button
+                onClick={() => setCreateOpen(true)}
+                icon={<Plus size={16} strokeWidth={1.5} />}
+              >
+                {t('agent.new_agent')}
+              </Button>
+            )}
           </div>
         }
         mobileLeft={
-          !showList && selectedAgent ? (
-            <div className="flex items-center gap-2">
-              <Button type="text" onClick={() => setShowList(true)} size="small">
-                {t('common.back')}
-              </Button>
-              <span className="truncate text-sm font-medium text-text-primary">
-                {selectedAgent.name}
-              </span>
+          isMobileAgentDetail ? (
+            <div className="flex min-w-0 items-center gap-2">
+              <Button
+                type="text"
+                onClick={() => setShowList(true)}
+                size="small"
+                aria-label={t('common.back')}
+                icon={<ArrowLeft size={20} strokeWidth={1.5} />}
+              />
+              <Tooltip title={selectedAgent.name}>
+                <span className="truncate text-sm font-medium text-text-primary">
+                  {selectedAgent.name}
+                </span>
+              </Tooltip>
             </div>
           ) : undefined
         }
@@ -563,6 +601,10 @@ function AgentsPage() {
                     isActive={agent.id === selectedAgentId}
                     onClick={() => handleSelectAgent(agent.id)}
                     onEditResources={() => handleEditResources(agent)}
+                    onActivationSettings={() => {
+                      setSelectedAgentId(agent.id)
+                      setActivateOpen(true)
+                    }}
                     onDeactivate={() => handleDeactivate(agent.id)}
                     onDelete={() => handleDelete(agent.id)}
                   />
@@ -609,7 +651,6 @@ function AgentsPage() {
           onClose={() => setActivateOpen(false)}
           onSubmit={(data) => activateMutation.mutate(data)}
           agent={selectedAgent}
-          labels={(labelsQuery.data as LabelItem[]) || []}
           loading={activateMutation.isPending}
         />
       )}

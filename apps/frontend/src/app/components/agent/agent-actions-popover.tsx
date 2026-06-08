@@ -1,12 +1,13 @@
 import { useState, type ReactNode } from 'react'
 import { Button, Popover, Modal } from 'antd'
-import { Link, Pause, Trash2 } from 'lucide-react'
+import { Link, Pause, Trash2, SlidersHorizontal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Agent } from '@app/lib/api/agent-api'
 
 interface AgentActionsPopoverProps {
   agent: Agent
   onEditResources: () => void
+  onActivationSettings: () => void
   onDeactivate: () => void
   onDelete: () => void
   children: ReactNode
@@ -15,6 +16,7 @@ interface AgentActionsPopoverProps {
 export function AgentActionsPopover({
   agent,
   onEditResources,
+  onActivationSettings,
   onDeactivate,
   onDelete,
   children,
@@ -45,6 +47,20 @@ export function AgentActionsPopover({
         onEditResources()
       },
     },
+    ...(agent.score >= 80
+      ? [
+          {
+            label: t('agent.activation_settings'),
+            icon: <SlidersHorizontal size={18} />,
+            color: 'text-purple-500',
+            bgColor: 'bg-purple-50',
+            onClick: () => {
+              setOpen(false)
+              onActivationSettings()
+            },
+          },
+        ]
+      : []),
     ...(agent.status === 'ACTIVE'
       ? [
           {

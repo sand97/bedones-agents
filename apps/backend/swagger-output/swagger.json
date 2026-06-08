@@ -4907,6 +4907,76 @@
           "StreamableHttp"
         ]
       }
+    },
+    "/social/posts/{postId}/agent-status": {
+      "get": {
+        "operationId": "SocialController_getPostAgentStatus",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostAgentStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/posts/{postId}/agent-override": {
+      "put": {
+        "operationId": "SocialController_setPostAgentOverride",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPostAgentOverrideDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostAgentStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
     }
   },
   "info": {
@@ -5826,6 +5896,14 @@
             "items": {
               "$ref": "#/components/schemas/CommentResponseDto"
             }
+          },
+          "aiOverride": {
+            "type": "string",
+            "enum": [
+              "FORCE_ON",
+              "FORCE_OFF"
+            ],
+            "nullable": true
           }
         },
         "required": [
@@ -7031,29 +7109,23 @@
       "ActivateAgentDto": {
         "type": "object",
         "properties": {
-          "mode": {
-            "type": "string",
-            "enum": [
-              "CONTACTS",
-              "LABELS",
-              "EXCLUDE_LABELS"
-            ]
+          "activateAll": {
+            "type": "boolean",
+            "description": "Respond on every conversation. Exclusive: overrides the other scopes."
           },
-          "labelIds": {
-            "description": "Label IDs for LABELS / EXCLUDE_LABELS modes",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "activateAds": {
+            "type": "boolean",
+            "description": "Respond when the incoming message originates from an ad (Meta CTWA/referral, TikTok)."
+          },
+          "activateNewConversations": {
+            "type": "boolean",
+            "description": "Respond on all new conversations created after activation."
           },
           "contacts": {
             "type": "object",
-            "description": "Per-social-account contacts for CONTACTS mode"
+            "description": "Per-social-account test contacts (socialAccountId -> phone numbers or profile names). Mainly used to test the agent on a few contacts."
           }
-        },
-        "required": [
-          "mode"
-        ]
+        }
       },
       "FeedbackTurnDto": {
         "type": "object",
@@ -8022,6 +8094,78 @@
       "SendTemplateBody": {
         "type": "object",
         "properties": {}
+      },
+      "PostAgentSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "CONFIGURING",
+              "READY",
+              "ACTIVE",
+              "PAUSED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "score",
+          "status"
+        ]
+      },
+      "PostAgentStatusDto": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PostAgentSummaryDto"
+              }
+            ]
+          },
+          "override": {
+            "type": "string",
+            "enum": [
+              "FORCE_ON",
+              "FORCE_OFF"
+            ],
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the agent would currently reply to this post's comments"
+          }
+        },
+        "required": [
+          "isActive"
+        ]
+      },
+      "SetPostAgentOverrideDto": {
+        "type": "object",
+        "properties": {
+          "override": {
+            "type": "string",
+            "enum": [
+              "FORCE_ON",
+              "FORCE_OFF"
+            ]
+          }
+        },
+        "required": [
+          "override"
+        ]
       }
     }
   }
