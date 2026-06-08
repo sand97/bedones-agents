@@ -42,13 +42,21 @@ export interface MigrationDoneEvent {
 }
 
 export function getSocket(orgId: string): Socket {
-  if (socket?.connected && socket.io.opts.query?.orgId === orgId) {
+  // Reuse the existing socket as long as it targets the same org — even while it
+  // is still establishing the connection. Requiring `connected` here was a bug:
+  // effects run child-first, so a page (e.g. the agents chat) would create the
+  // socket and attach its handlers, then the parent SocketProvider would call
+  // getSocket() before the socket finished connecting, tear it down and recreate
+  // a new one — orphaning the page's handlers on the dead socket. The result was
+  // that real-time agent events were lost until a manual refresh.
+  if (socket && socket.io.opts.query?.orgId === orgId) {
     return socket
   }
 
   // Disconnect previous socket if org changed
   if (socket) {
     socket.disconnect()
+    socket = null
   }
 
   const backendUrl = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
