@@ -125,7 +125,10 @@ export function WhatsappConfigModal({
 
   // ─── Catalog association ───
   const linkedMeta = commerceData?.data?.[0]
-  const localCatalog = linkedMeta ? catalogs.find((c) => c.providerId === linkedMeta.id) : undefined
+  const localCatalog =
+    (linkedMeta ? catalogs.find((c) => c.providerId === linkedMeta.id) : undefined) ??
+    // DB link (CatalogSocialAccount) — covers SMB numbers linked only in our DB.
+    catalogs.find((c) => c.socialAccounts?.some((sa) => sa.socialAccount.id === socialAccountId))
 
   const dissociateMutation = useMutation({
     mutationFn: (catalogId: string) => catalogApi.dissociatePhone(catalogId, phoneNumberId),

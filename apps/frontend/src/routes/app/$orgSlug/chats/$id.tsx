@@ -438,23 +438,34 @@ function ChatsPage() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const hasCatalogAssociated = useMemo(() => {
-    const data = commerceQuery.data?.data
-    if (!data || data.length === 0) return false
-    return data.some((entry) => !!entry.id)
-  }, [commerceQuery.data])
-
-  // Only an SMB number owns an in-app WhatsApp Business catalogue worth
-  // migrating — offer "migrate your catalog" only for those, with none yet.
-  const canMigrateCatalog = !hasCatalogAssociated && commerceQuery.data?.isSmb === true
-
-  // ─── Catalogs query (for config modal) ───
+  // ─── Catalogs query (for config modal + DB-link detection) ───
   const catalogsQuery = useQuery({
     queryKey: ['catalogs', orgSlug],
     queryFn: () => catalogApi.list(orgSlug),
     enabled: id === 'whatsapp' && !!currentAccountId,
     staleTime: 30_000,
   })
+
+  // A number is "linked" to a catalogue if Meta has a commerce catalog for it OR
+  // if we recorded the link in our DB (CatalogSocialAccount) — the latter covers
+  // SMB numbers, which can't be linked through the Meta API.
+  const dbLinkedCatalog = useMemo(
+    () =>
+      (catalogsQuery.data || []).find((c) =>
+        c.socialAccounts?.some((sa) => sa.socialAccount.id === currentAccount?.id),
+      ),
+    [catalogsQuery.data, currentAccount],
+  )
+
+  const hasCatalogAssociated = useMemo(() => {
+    const data = commerceQuery.data?.data
+    if (data && data.some((entry) => !!entry.id)) return true
+    return !!dbLinkedCatalog
+  }, [commerceQuery.data, dbLinkedCatalog])
+
+  // Only an SMB number owns an in-app WhatsApp Business catalogue worth
+  // migrating — offer "migrate your catalog" only for those, with none yet.
+  const canMigrateCatalog = !hasCatalogAssociated && commerceQuery.data?.isSmb === true
 
   // Find the catalog linked to the current WhatsApp number (for product sending)
   const linkedCatalog = useMemo(() => {
@@ -466,9 +477,11 @@ function ChatsPage() {
       const match = catalogs.find((c) => c.providerId === String(commerceId))
       if (match) return match
     }
+    // DB link (CatalogSocialAccount) — source of truth for SMB numbers.
+    if (dbLinkedCatalog) return dbLinkedCatalog
     // Fallback: first catalog with a providerId
     return catalogs.find((c) => !!c.providerId)
-  }, [id, currentAccount, catalogsQuery.data, commerceQuery.data])
+  }, [id, currentAccount, catalogsQuery.data, commerceQuery.data, dbLinkedCatalog])
 
   // Auto-select first account
   const setAccountInUrl = useCallback(

@@ -104,6 +104,7 @@
       "s4_task2": "Extraction des produits et des collections",
       "s4_task3": "Stockage dans le catalogue Commerce Manager",
       "s4_caption": "Inutile d'attendre ici — nous vous préviendrons une fois l'import terminé.",
+      "s4_task_count": "{{done}} produits sur {{total}}",
       "s4_result_title": "Vos produits sont dans Commerce Manager",
       "stat_collections_one": "collection",
       "stat_collections_other": "collections",

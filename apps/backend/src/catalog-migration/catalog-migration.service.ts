@@ -258,13 +258,21 @@ export class CatalogMigrationService {
           await this.catalogService.createProduct(catalogId, prepared[i])
           imported++
         } catch (error) {
-          failed++
           const message = error instanceof Error ? error.message : String(error)
-          this.logger.warn(`Failed to import "${prepared[i]?.name}" into ${catalogId}: ${message}`)
-          // A wrong catalog vertical rejects every product identically — abort
-          // now with an actionable error instead of hammering Meta for each
-          // product (and then each collection).
-          if (this.isWrongCatalogVertical(message)) throw error
+          // Re-sync: a product already present in the catalogue (same
+          // retailer_id) is a no-op on Meta's side — count it, don't fail it.
+          if (this.isAlreadyExists(message)) {
+            imported++
+          } else {
+            failed++
+            this.logger.warn(
+              `Failed to import "${prepared[i]?.name}" into ${catalogId}: ${message}`,
+            )
+            // A wrong catalog vertical rejects every product identically — abort
+            // now with an actionable error instead of hammering Meta for each
+            // product (and then each collection).
+            if (this.isWrongCatalogVertical(message)) throw error
+          }
         }
 
         const percentage =
@@ -297,7 +305,12 @@ export class CatalogMigrationService {
           collectionsCreated++
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
-          this.logger.warn(`Failed to create collection "${collection.name}": ${message}`)
+          // A collection (product set) that already exists is also counted.
+          if (this.isAlreadyExists(message)) {
+            collectionsCreated++
+          } else {
+            this.logger.warn(`Failed to create collection "${collection.name}": ${message}`)
+          }
         }
       }
 
@@ -481,6 +494,15 @@ export class CatalogMigrationService {
   /** True when a Meta error is the "wrong catalog vertical" rejection (subcode 1803298). */
   private isWrongCatalogVertical(raw: string): boolean {
     return /1803298|Wrong Catalog Vertical|not support(?:ed)? in this catalog vertical/i.test(raw)
+  }
+
+  /**
+   * True when Meta rejects an item because it already exists in the catalogue
+   * (duplicate retailer_id / product set). On a re-sync that's a no-op we count
+   * as success rather than a failure.
+   */
+  private isAlreadyExists(raw: string): boolean {
+    return /already exists|2310021|duplicate/i.test(raw)
   }
 
   /** Map a stored failure message to a stable, frontend-actionable error code. */
