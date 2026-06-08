@@ -855,6 +855,23 @@ a {
   overflow: visible;
 }
 
+/* Wrap long, unbreakable tokens (URLs, IDs) so they stay within the bubble's
+   max-width instead of stretching it. */
+.chat-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.chat-text-link {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.chat-text-link:hover {
+  color: #1d4ed8;
+}
+
 /* Media messages need equal padding all around for coherent border radius */
 .chat-bubble--media {
   padding: 6px;
