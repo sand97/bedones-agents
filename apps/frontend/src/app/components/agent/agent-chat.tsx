@@ -1,5 +1,7 @@
 import { useMemo, useRef, useEffect } from 'react'
 import dayjs from 'dayjs'
+import { Spin } from 'antd'
+import { useTranslation } from 'react-i18next'
 import type { AgentMessage } from './mock-data'
 import { AgentChatInput } from './agent-chat-input'
 
@@ -87,6 +89,8 @@ interface AgentChatProps {
   /** The last pending MCQ/SCQ question (not yet answered) */
   pendingQuestion: AgentMessage | null
   onDismissQuestion: () => void
+  /** Whether the agent is currently thinking (shows an indicator above the input) */
+  isThinking?: boolean
 }
 
 export function AgentChat({
@@ -94,7 +98,9 @@ export function AgentChat({
   onSendMessage,
   pendingQuestion,
   onDismissQuestion,
+  isThinking,
 }: AgentChatProps) {
+  const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Only show text messages in the chat (MCQ/SCQ questions show as text bubbles,
@@ -110,7 +116,7 @@ export function AgentChat({
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [messages.length])
+  }, [messages.length, isThinking])
 
   const pendingOptions = pendingQuestion
     ? {
@@ -149,6 +155,13 @@ export function AgentChat({
           ))}
         </div>
       </div>
+
+      {isThinking && (
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 py-2 text-xs text-text-muted">
+          <Spin size="small" />
+          <span>{t('agent.thinking')}</span>
+        </div>
+      )}
 
       <AgentChatInput
         onSend={onSendMessage}

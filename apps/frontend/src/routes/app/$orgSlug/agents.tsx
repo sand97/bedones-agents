@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, Spin, Tooltip, Modal } from 'antd'
 import { SetupSuccessModal } from '@app/components/dashboard/setup-success-modal'
@@ -27,6 +27,9 @@ import type { AgentMessage, AgentChoiceOption } from '@app/components/agent/mock
 
 export const Route = createFileRoute('/app/$orgSlug/agents')({
   component: AgentsPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    agentId: (search.agentId as string) || undefined,
+  }),
 })
 
 function mapApiMessage(m: ApiAgentMessage): AgentMessage {
@@ -47,11 +50,31 @@ function mapApiMessage(m: ApiAgentMessage): AgentMessage {
 function AgentsPage() {
   const { t } = useTranslation()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
+  const search = useSearch({ from: '/app/$orgSlug/agents' })
   const navigate = useNavigate()
   const { isDesktop } = useLayout()
   const queryClient = useQueryClient()
 
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
+  // The selected agent is mirrored in the URL (?agentId=…) so a refresh restores
+  // the same conversation.
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(
+    search.agentId ?? null,
+  )
+
+  // Keep the selected agent in the URL — single entry point so every selection
+  // (list click, creation, activation shortcut, deletion) stays shareable and
+  // survives a refresh.
+  const selectAgent = useCallback(
+    (agentId: string | null) => {
+      setSelectedAgentId(agentId)
+      navigate({
+        search: (prev: Record<string, unknown>) =>
+          ({ ...prev, agentId: agentId ?? undefined }) as never,
+        replace: true,
+      })
+    },
+    [navigate],
+  )
   const [createOpen, setCreateOpen] = useState(false)
   const [activateOpen, setActivateOpen] = useState(false)
   const [activationSuccess, setActivationSuccess] = useState<{
@@ -62,7 +85,9 @@ function AgentsPage() {
   const [messages, setMessages] = useState<AgentMessage[]>([])
   const [pendingQuestion, setPendingQuestion] = useState<AgentMessage | null>(null)
   const [isThinking, setIsThinking] = useState(false)
-  const [showList, setShowList] = useState(true)
+  // When an agent is restored from the URL we open straight into its chat (on
+  // mobile the list is otherwise shown first).
+  const [showList, setShowList] = useState(!search.agentId)
   const [setupPhase, setSetupPhase] = useState<
     'analyzing-catalogs' | 'initializing' | 'error' | null
   >(null)
@@ -241,7 +266,7 @@ function AgentsPage() {
       agentApi.create({ organisationId: orgSlug, socialAccountIds, name }),
     onSuccess: (newAgent) => {
       queryClient.invalidateQueries({ queryKey: ['agents', orgSlug] })
-      setSelectedAgentId(newAgent.id)
+      selectAgent(newAgent.id)
       setCreateOpen(false)
     },
   })
@@ -291,7 +316,7 @@ function AgentsPage() {
     mutationFn: (agentId: string) => agentApi.remove(agentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents', orgSlug] })
-      if (selectedAgentId) setSelectedAgentId(null)
+      if (selectedAgentId) selectAgent(null)
     },
   })
 
@@ -354,7 +379,7 @@ function AgentsPage() {
   }, [selectedAgentId, orgSlug])
 
   const handleSelectAgent = (agentId: string) => {
-    setSelectedAgentId(agentId)
+    selectAgent(agentId)
     if (!isDesktop) setShowList(false)
   }
 
@@ -527,13 +552,8 @@ function AgentsPage() {
           onSendMessage={handleSendMessage}
           pendingQuestion={pendingQuestion}
           onDismissQuestion={handleDismissQuestion}
+          isThinking={isThinking}
         />
-        {isThinking && (
-          <div className="flex items-center justify-center gap-2 py-2 text-xs text-text-muted">
-            <Spin size="small" />
-            <span>{t('agent.thinking')}</span>
-          </div>
-        )}
       </div>
     )
   }
@@ -602,7 +622,7 @@ function AgentsPage() {
                     onClick={() => handleSelectAgent(agent.id)}
                     onEditResources={() => handleEditResources(agent)}
                     onActivationSettings={() => {
-                      setSelectedAgentId(agent.id)
+                      selectAgent(agent.id)
                       setActivateOpen(true)
                     }}
                     onDeactivate={() => handleDeactivate(agent.id)}
