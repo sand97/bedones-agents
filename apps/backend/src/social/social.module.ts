@@ -22,6 +22,12 @@ import { PostService } from './post.service'
 import { CommentService } from './comment.service'
 import { WebhookController } from './webhook.controller'
 import { WebhookService } from './webhook.service'
+import { WebhookSignatureService } from './webhook-signature.service'
+import { WebhookCommonService } from './webhook-common.service'
+import { MetaWebhookService } from './meta-webhook.service'
+import { WhatsAppWebhookService } from './whatsapp-webhook.service'
+import { TikTokWebhookService } from './tiktok-webhook.service'
+import { CommentModerationService } from './comment-moderation.service'
 import { MessagingController } from './messaging.controller'
 import { TikTokWebhookController } from './tiktok-webhook.controller'
 import { MessagingService } from './messaging.service'
@@ -69,6 +75,12 @@ import { SocialHealthModule } from './social-health.module'
     PostService,
     CommentService,
     WebhookService,
+    WebhookSignatureService,
+    WebhookCommonService,
+    MetaWebhookService,
+    WhatsAppWebhookService,
+    TikTokWebhookService,
+    CommentModerationService,
     MessagingService,
     MessagingCommonService,
     ConversationService,
