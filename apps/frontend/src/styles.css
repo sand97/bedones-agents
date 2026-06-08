@@ -1583,6 +1583,25 @@ a {
   left: var(--sidebar-collapsed-width);
 }
 
+/* Sync banner: fixed just above the pagination bar */
+.catalog-sync-banner {
+  position: fixed;
+  bottom: 59px;
+  left: var(--sidebar-width);
+  right: 0;
+  z-index: 10;
+}
+
+.page-content--collapsed .catalog-sync-banner {
+  left: var(--sidebar-collapsed-width);
+}
+
+@media (max-width: 1023px) {
+  .catalog-sync-banner {
+    left: 0;
+  }
+}
+
 .table-pagination__size-select .ant-select {
   height: 34px !important;
 }
