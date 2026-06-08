@@ -315,6 +315,7 @@ model Catalog {
   organisation   Organisation          @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   name           String
   providerId     String? // External catalog ID (e.g. Facebook catalog ID)
+  vertical       String? // Meta catalog vertical (e.g. "commerce"); only "commerce" supports WhatsApp products
   description    String? // AI-generated description of catalog contents
   analysisStatus CatalogAnalysisStatus @default(PENDING)
   productCount   Int                   @default(0)

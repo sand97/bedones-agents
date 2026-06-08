@@ -434,6 +434,7 @@ export class SocialService {
           data: {
             name: metaCatalog.name,
             productCount: metaCatalog.product_count ?? 0,
+            vertical: metaCatalog.vertical ?? null,
           },
         })
       } else {
@@ -443,6 +444,7 @@ export class SocialService {
             name: metaCatalog.name,
             providerId: metaCatalog.id,
             productCount: metaCatalog.product_count ?? 0,
+            vertical: metaCatalog.vertical ?? null,
           },
         })
       }

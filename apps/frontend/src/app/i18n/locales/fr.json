@@ -149,7 +149,17 @@
       "s5_m4_b": "Cliquez ensuite sur « Revérifier la liaison » ci-dessous.",
       "s5_checking": "Vérification de la liaison…",
       "s5_stillfailed_t": "Toujours pas liée.",
-      "s5_stillfailed_b": "Reprenez les étapes ci-dessus, ou contactez le support."
+      "s5_stillfailed_b": "Reprenez les étapes ci-dessus, ou contactez le support.",
+      "s2_vertical_notice_title": "Créez un catalogue « commerce »",
+      "s2_vertical_notice_msg": "Sur Meta, veillez à créer un catalogue de type <b>« commerce » (E-commerce)</b>. C'est le seul type capable de contenir vos produits WhatsApp.",
+      "s2_vertical_notice_hint": "Si vous choisissez un autre type (voyage, véhicules, etc.), l'import échouera. Vous reviendrez ici juste après la connexion.",
+      "s3_wrong_vertical_title": "Ce catalogue n'est pas un catalogue « commerce »",
+      "s3_wrong_vertical_msg": "Le catalogue que vous avez connecté n'est pas de type « commerce ».",
+      "s3_wrong_vertical_hint": "Vos produits WhatsApp ne peuvent être importés que dans un catalogue « commerce » (E-commerce). Connectez ou créez-en un de ce type, ou contactez le support pour le convertir.",
+      "s3_wrong_vertical_choose_another": "Connecter ou créer un autre catalogue",
+      "contact_support": "Contacter le support",
+      "support_vertical_subject": "Bedones — Catalogue non « commerce »",
+      "support_vertical_message": "Bonjour,\n\nLors de la migration de mon catalogue WhatsApp, le catalogue connecté « {{catalog}} » n'est pas de la vertical « commerce » (type actuel : {{vertical}}), mes produits ne peuvent donc pas être importés.\n\nPourriez-vous m'aider à le convertir en catalogue « commerce » ou à créer le bon ?\n\nNuméro WhatsApp : {{number}}\n\nMerci."
     }
   },
   "common": {
@@ -1350,5 +1360,13 @@
     "alt_step3_desc": "Dans le Business Center, allez dans Compte → Comptes TikTok et ajoutez votre compte. On vous demandera alors de le convertir en Business",
     "alt_step4_title": "Reconnecter le compte",
     "alt_step4_desc": "Une fois la conversion effectuée, cliquez sur « Reconnecter » ci-dessous"
+  },
+  "support": {
+    "title": "Contacter le support",
+    "lede": "Décrivez votre problème ci-dessous. Nous ouvrirons votre application e-mail pour l'envoyer à {{email}}.",
+    "placeholder": "Décrivez votre problème…",
+    "cancel": "Annuler",
+    "send": "Envoyer au support",
+    "default_subject": "Bedones — Demande de support"
   }
 }
