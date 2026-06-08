@@ -4,11 +4,12 @@ import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/re
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { usePersistedQuery } from '@app/lib/use-persisted-query'
-import { Button } from 'antd'
+import { App, Button } from 'antd'
 import { ArrowLeft } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { SocialSetup } from '@app/components/social/social-setup'
-import { WhatsappConfigModal } from '@app/components/whatsapp/whatsapp-config-modal'
+import { ChatConfigModal } from '@app/components/whatsapp/chat-config-modal'
+import { ConfirmDisconnectModal } from '@app/components/shared/confirm-disconnect-modal'
 import { CatalogLinkModal } from '@app/components/whatsapp/catalog-link-modal'
 import { CommerceManagerMigrationModal } from '@app/components/catalog/commerce-manager-migration-modal'
 import {
@@ -35,7 +36,7 @@ import {
 } from '@app/components/icons/social-icons'
 import { useLayout } from '@app/contexts/layout-context'
 import { $api } from '@app/lib/api/$api'
-import { agentApi, catalogApi, type Agent } from '@app/lib/api/agent-api'
+import { agentApi, catalogApi, socialApi, type Agent } from '@app/lib/api/agent-api'
 import {
   setAuthRedirect,
   buildFacebookOAuthUrl,
@@ -349,8 +350,10 @@ function ChatsPage() {
 
   const hasSelectedConv = !!search.conv
 
+  const { message } = App.useApp()
   const [connecting, setConnecting] = useState(false)
-  const [whatsappConfigOpen, setWhatsappConfigOpen] = useState(false)
+  const [chatConfigOpen, setChatConfigOpen] = useState(false)
+  const [disconnectOpen, setDisconnectOpen] = useState(false)
   const [catalogLinkOpen, setCatalogLinkOpen] = useState(false)
   const [productSendOpen, setProductSendOpen] = useState(false)
   const [catalogSendOpen, setCatalogSendOpen] = useState(false)
@@ -438,11 +441,13 @@ function ChatsPage() {
     staleTime: 5 * 60 * 1000,
   })
 
-  // ─── Catalogs query (for config modal + DB-link detection) ───
+  // ─── Catalogs query (for the shared config modal + DB-link detection) ───
+  // Enabled for every channel so the catalog/labels modal can associate a
+  // catalog via our DB link (Instagram DM / Messenger / TikTok), not just WA.
   const catalogsQuery = useQuery({
     queryKey: ['catalogs', orgSlug],
     queryFn: () => catalogApi.list(orgSlug),
-    enabled: id === 'whatsapp' && !!currentAccountId,
+    enabled: !!currentAccountId,
     staleTime: 30_000,
   })
 
@@ -914,6 +919,20 @@ function ChatsPage() {
     navigate({ to: '/app/$orgSlug/agents' as string, params: { orgSlug } })
   }, [navigate, orgSlug])
 
+  const handleDisconnect = async () => {
+    if (!currentAccount) return
+    await socialApi.disconnect(currentAccount.id)
+    message.success(t('chat.disconnect_success'))
+    // The account is now hidden from the list — drop it from the URL and refetch
+    // so the page falls back to another account (or the setup screen).
+    queryClient.invalidateQueries({ queryKey: ['get', '/social/accounts/{organisationId}'] })
+    navigate({
+      search: (prev: Record<string, unknown>) =>
+        ({ ...prev, account: undefined, conv: undefined }) as never,
+      replace: true,
+    })
+  }
+
   const handleSelectConv = (convId: string) => {
     navigate({
       search: (prev: Record<string, unknown>) => ({ ...prev, conv: convId }) as never,
@@ -1088,7 +1107,8 @@ function ChatsPage() {
         onConfigureCatalog={() => setCatalogLinkOpen(true)}
         canMigrateCatalog={canMigrateCatalog}
         onMigrateCatalog={() => setMigrationOpen(true)}
-        onOpenOptions={() => setWhatsappConfigOpen(true)}
+        onOpenOptions={() => setChatConfigOpen(true)}
+        onDisconnect={() => setDisconnectOpen(true)}
         onOpenTemplates={() => setTemplatesOpen(true)}
         onOpenCampaigns={() => {
           if (!currentAccount?.id) return
@@ -1104,25 +1124,44 @@ function ChatsPage() {
         onTemplateClick={() => setTemplateMessageOpen(true)}
         onTikTokMessageClick={() => setTikTokMessageOpen(true)}
       />
-      {id === 'whatsapp' && currentAccount && (
+      {currentAccount && (
         <>
-          <WhatsappConfigModal
-            open={whatsappConfigOpen}
-            onClose={() => setWhatsappConfigOpen(false)}
-            phoneNumberId={currentAccount.providerAccountId}
-            accountName={
+          <ChatConfigModal
+            open={chatConfigOpen}
+            onClose={() => setChatConfigOpen(false)}
+            provider={id as 'whatsapp' | 'instagram-dm' | 'messenger' | 'tiktok'}
+            socialAccountId={currentAccount.id}
+            organisationId={orgSlug}
+            catalogs={catalogsQuery.data || []}
+            phoneNumberId={id === 'whatsapp' ? currentAccount.providerAccountId : undefined}
+            commerceData={
+              id === 'whatsapp'
+                ? (commerceQuery.data as { data: { id: string; name: string }[] } | undefined)
+                : undefined
+            }
+            onOpenCatalogLink={
+              id === 'whatsapp'
+                ? () => {
+                    setChatConfigOpen(false)
+                    setCatalogLinkOpen(true)
+                  }
+                : undefined
+            }
+          />
+          <ConfirmDisconnectModal
+            open={disconnectOpen}
+            onClose={() => setDisconnectOpen(false)}
+            onConfirm={handleDisconnect}
+            resourceLabel={
               currentAccount.pageName || currentAccount.username || currentAccount.providerAccountId
             }
-            socialAccountId={currentAccount.id}
-            catalogs={catalogsQuery.data || []}
-            commerceData={
-              commerceQuery.data as { data: { id: string; name: string }[] } | undefined
-            }
-            onOpenCatalogLink={() => {
-              setWhatsappConfigOpen(false)
-              setCatalogLinkOpen(true)
-            }}
+            title={t('chat.disconnect_title')}
+            description={t('chat.disconnect_confirm')}
           />
+        </>
+      )}
+      {id === 'whatsapp' && currentAccount && (
+        <>
           <CatalogLinkModal
             open={catalogLinkOpen}
             onClose={() => setCatalogLinkOpen(false)}

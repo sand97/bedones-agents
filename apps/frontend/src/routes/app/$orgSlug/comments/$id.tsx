@@ -213,8 +213,12 @@ function CommentsPage() {
     [navigate],
   )
 
-  // Auto-select on first load
-  if (accounts.length > 0 && !currentAccountId) {
+  // Auto-select on first load, or re-select when the current account vanished
+  // (e.g. it was just disconnected).
+  if (
+    accounts.length > 0 &&
+    (!currentAccountId || !accounts.some((a) => a.id === currentAccountId))
+  ) {
     setAccountInUrl(accounts[0].id)
   }
 

@@ -159,6 +159,17 @@ export class SocialController {
     return this.socialService.updatePageSettings(user.id, accountId, body)
   }
 
+  // ─── Disconnect an account (soft: hide + stop sync, keep history) ───
+
+  @Post('accounts/:accountId/disconnect')
+  @ApiOkResponse({ description: 'Account disconnected' })
+  async disconnectAccount(
+    @CurrentUser() user: { id: string },
+    @Param('accountId') accountId: string,
+  ) {
+    return this.socialService.disconnectAccount(user.id, accountId)
+  }
+
   // ─── User stats ───
 
   @Get('accounts/:accountId/user-stats/:fromId')

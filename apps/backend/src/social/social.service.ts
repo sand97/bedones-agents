@@ -1105,19 +1105,17 @@ export class SocialService {
     }
 
     // 4. Get phone number display info
-    let displayName = phoneId
-    let displayPhone: string | null = null
     if (!phoneInfo?.display_phone_number || !phoneInfo?.verified_name) {
       const fetchedPhoneInfo = await graphGet<WhatsAppPhoneInfo>(phoneId, {
         fields: 'display_phone_number,verified_name',
       })
       phoneInfo = { ...(phoneInfo ?? { id: phoneId }), ...(fetchedPhoneInfo ?? {}), id: phoneId }
     }
-    displayName = phoneInfo?.verified_name || wabaName || phoneInfo?.display_phone_number || phoneId
-    displayPhone = phoneInfo?.display_phone_number || null
+    const displayName =
+      phoneInfo?.verified_name || wabaName || phoneInfo?.display_phone_number || phoneId
+    const displayPhone = phoneInfo?.display_phone_number || null
 
     // 5. Fetch WhatsApp Business profile metadata
-    let profilePictureUrl: string | null = null
     const profileData = await graphGet<{ data?: WhatsAppBusinessProfile[] }>(
       `${phoneId}/whatsapp_business_profile`,
       {
@@ -1126,7 +1124,7 @@ export class SocialService {
       },
     )
     const businessProfile = profileData?.data?.[0] || null
-    profilePictureUrl = businessProfile?.profile_picture_url || null
+    const profilePictureUrl = businessProfile?.profile_picture_url || null
     if (!profileData) {
       this.logger.warn(`[WhatsApp] Could not fetch business profile for ${phoneId}`)
     }
@@ -2138,6 +2136,8 @@ export class SocialService {
         return false
       }
 
+      // Omit the immutable unique key (providerAccountId) from the update payload.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { providerAccountId: _providerAccountId, ...existingAccountData } = data
       await this.prisma.socialAccount.update({
         where: { id: existingPhoneAccount.id },
@@ -2164,7 +2164,8 @@ export class SocialService {
     await this.assertMembership(userId, organisationId)
 
     const accounts = await this.prisma.socialAccount.findMany({
-      where: { organisationId },
+      // Hide accounts the user has soft-disconnected (kept in DB for reconnect).
+      where: { organisationId, disconnectedAt: null },
       include: {
         settings: { include: { faqRules: true } },
         _count: { select: { posts: true } },
@@ -2185,13 +2186,46 @@ export class SocialService {
     if (!hasUpdates) return accounts
 
     return this.prisma.socialAccount.findMany({
-      where: { organisationId },
+      // Hide accounts the user has soft-disconnected (kept in DB for reconnect).
+      where: { organisationId, disconnectedAt: null },
       include: {
         settings: { include: { faqRules: true } },
         _count: { select: { posts: true } },
       },
       orderBy: { createdAt: 'asc' },
     })
+  }
+
+  // ─── User-initiated soft disconnect ───
+
+  /**
+   * Soft-disconnects a social account: it is hidden from active lists and all
+   * outbound calls are stopped, while the row and its history are kept so the
+   * user can reconnect later. A successful (re)connect revives it via
+   * clearHealth (which clears `disconnectedAt`).
+   */
+  async disconnectAccount(userId: string, accountId: string) {
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: accountId },
+      select: { organisationId: true },
+    })
+    if (!account) throw new NotFoundException('Social account not found')
+    await this.assertMembership(userId, account.organisationId)
+
+    await this.prisma.socialAccount.update({
+      where: { id: accountId },
+      data: {
+        disconnectedAt: new Date(),
+        disabled: true,
+        disabledReason: 'USER_DISCONNECTED',
+        disabledAt: new Date(),
+        // Revoke stored credentials so no further outbound calls succeed.
+        accessToken: '',
+        refreshToken: null,
+      },
+    })
+
+    return { success: true }
   }
 
   // ─── Account health (for the "reconnect" error state) ───
@@ -3040,7 +3074,7 @@ export class SocialService {
     await this.assertMembership(userId, organisationId)
 
     const accounts = await this.prisma.socialAccount.findMany({
-      where: { organisationId },
+      where: { organisationId, disconnectedAt: null },
       select: {
         provider: true,
         scopes: true,

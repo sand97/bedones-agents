@@ -13,6 +13,7 @@ import {
   ShoppingBag,
   Sparkles,
   Link2,
+  Wrench,
 } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { CatalogIndexingBanner } from '@app/components/catalog/catalog-indexing-banner'
@@ -24,7 +25,7 @@ import { ProductModal } from '@app/components/catalog/product-modal'
 import { CollectionFilterSelect } from '@app/components/catalog/collection-filter-select'
 import { ArticleDescriptionCard } from '@app/components/catalog/article-description-card'
 import { useCatalogColumns } from '@app/components/catalog/catalog-columns'
-import { CatalogQuickActions } from '@app/components/catalog/catalog-quick-actions'
+import { CatalogToolsModal } from '@app/components/catalog/catalog-tools-modal'
 import { ProductContextFlowModal } from '@app/components/catalog/product-context-flow-modal'
 import { PostLinkFlowModal } from '@app/components/catalog/post-link-flow-modal'
 import { ProductContextDetailModal } from '@app/components/catalog/product-context-detail-modal'
@@ -36,7 +37,7 @@ import { AccountSwitcher } from '@app/components/social/account-switcher'
 import { useLayout } from '@app/contexts/layout-context'
 import { catalogApi, getApiErrorMessage } from '@app/lib/api/agent-api'
 import { setAuthRedirect, buildFacebookOAuthUrl } from '@app/lib/auth-redirect'
-import type { Product, Collection } from '@app/lib/api/agent-api'
+import type { Product, Collection, Catalog } from '@app/lib/api/agent-api'
 import { CatalogSocialEmpty } from '@app/components/catalog/catalog-social-empty'
 import {
   prependDirectListCache,
@@ -104,6 +105,8 @@ function CatalogPage() {
     initialProduct?: Product
   }>({ isOpen: false })
 
+  // Tools modal (hosts the quick-action flows + catalog disconnect)
+  const [toolsModalOpen, setToolsModalOpen] = useState(false)
   // Quick action wizards
   const [contextFlowOpen, setContextFlowOpen] = useState(false)
   const [contextFlowEdit, setContextFlowEdit] = useState<{
@@ -366,6 +369,28 @@ function CatalogPage() {
     },
   })
 
+  // Catalog disconnect = full delete (products, collections, links cascade).
+  const deleteCatalogMutation = useMutation({
+    mutationFn: (catalogId: string) => catalogApi.remove(catalogId),
+    onSuccess: (_res, catalogId) => {
+      queryClient.setQueryData<Catalog[]>(['catalogs', orgSlug], (old) =>
+        (old || []).filter((c) => c.id !== catalogId),
+      )
+      setCursorStack([])
+      setAfterCursor(undefined)
+      updateSearch({
+        catalogId: undefined,
+        collection: undefined,
+        status: undefined,
+        page: undefined,
+      })
+      message.success('Catalogue déconnecté')
+    },
+    onError: (err) => {
+      message.error(getApiErrorMessage(err, 'Échec de la déconnexion du catalogue'))
+    },
+  })
+
   // ─── Handlers ───
 
   const resetPagination = () => {
@@ -534,20 +559,6 @@ function CatalogPage() {
       <CatalogIndexingBanner catalogs={catalogs} />
 
       <div className="flex-1 p-4 pb-28 lg:p-6 lg:pb-28">
-        {selectedCatalog && (
-          <CatalogQuickActions
-            onOpenContextFlow={() => setContextFlowOpen(true)}
-            onOpenLinkPostsFlow={() => setPostLinkFlowOpen(true)}
-            onOpenStudio={() => {
-              const base = import.meta.env.VITE_DESIGN_STUDIO_URL || 'https://design.bedones.com'
-              const url = `${base}/?catalogId=${encodeURIComponent(
-                selectedCatalog.id,
-              )}&org=${encodeURIComponent(orgSlug)}`
-              window.open(url, '_blank', 'noopener,noreferrer')
-            }}
-          />
-        )}
-
         <div className="tickets-filters catalog-filters">
           <div className="flex flex-1 items-center gap-3 lg:contents">
             <Input
@@ -591,11 +602,16 @@ function CatalogPage() {
                 mutating={createCollectionMutation.isPending || updateCollectionMutation.isPending}
               />
             </div>
-            <div className="flex-1 lg:ml-auto lg:flex-none">
+            <div className="flex flex-1 items-center gap-3 lg:ml-auto lg:flex-none">
+              {selectedCatalog && (
+                <Button onClick={() => setToolsModalOpen(true)} icon={<Wrench size={14} />}>
+                  {t('catalog.tools')}
+                </Button>
+              )}
               <Button
                 onClick={() => setModalProductConfig({ isOpen: true })}
                 icon={<Plus size={14} />}
-                block={!isDesktop}
+                className="flex-1 lg:flex-none"
               >
                 {t('catalog.add_article')}
               </Button>
@@ -780,6 +796,21 @@ function CatalogPage() {
 
       {selectedCatalog && (
         <>
+          <CatalogToolsModal
+            open={toolsModalOpen}
+            onClose={() => setToolsModalOpen(false)}
+            onOpenContextFlow={() => setContextFlowOpen(true)}
+            onOpenLinkPostsFlow={() => setPostLinkFlowOpen(true)}
+            onOpenStudio={() => {
+              const base = import.meta.env.VITE_DESIGN_STUDIO_URL || 'https://design.bedones.com'
+              const url = `${base}/?catalogId=${encodeURIComponent(
+                selectedCatalog.id,
+              )}&org=${encodeURIComponent(orgSlug)}`
+              window.open(url, '_blank', 'noopener,noreferrer')
+            }}
+            catalogName={selectedCatalog.name}
+            onDisconnect={() => deleteCatalogMutation.mutateAsync(selectedCatalog.id)}
+          />
           <ProductContextFlowModal
             open={contextFlowOpen || !!contextFlowEdit}
             catalog={selectedCatalog}

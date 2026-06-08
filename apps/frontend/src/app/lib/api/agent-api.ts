@@ -740,6 +740,12 @@ export interface SocialAccount {
 
 export const socialApi = {
   listAccounts: (orgId: string) => fetchJson<SocialAccount[]>(`/social/accounts/${orgId}`),
+
+  // Soft disconnect: hides the account & stops sync but keeps history for reconnect.
+  disconnect: (accountId: string) =>
+    fetchJson<{ success: boolean }>(`/social/accounts/${accountId}/disconnect`, {
+      method: 'POST',
+    }),
 }
 
 // ─── Conversations ───

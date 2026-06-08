@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { App, Button, Card, Form, Input, Modal, Select } from 'antd'
-import { ShieldAlert, ShieldBan, Plus, Trash2, ShoppingBag } from 'lucide-react'
+import { App, Button, Card, Form, Input, Modal, Select, Typography } from 'antd'
+import { ShieldAlert, ShieldBan, Plus, Trash2, ShoppingBag, Unlink } from 'lucide-react'
 import { updatePageSettings } from '@app/lib/api'
 import type { PageSettingsResponse } from '@app/lib/api'
 import { $api } from '@app/lib/api/$api'
+import { socialApi } from '@app/lib/api/agent-api'
+import { ConfirmDisconnectModal } from '@app/components/shared/confirm-disconnect-modal'
 
 interface CommentsConfigModalProps {
   pageName: string
@@ -215,8 +217,16 @@ export function CommentsConfigModal({
 }: CommentsConfigModalProps) {
   const [form] = Form.useForm<FormValues>()
   const [saving, setSaving] = useState(false)
+  const [disconnectOpen, setDisconnectOpen] = useState(false)
   const { message: messageApi } = App.useApp()
   const { t } = useTranslation()
+
+  const handleDisconnect = async () => {
+    await socialApi.disconnect(accountId)
+    messageApi.success(t('comments_config.disconnect_success'))
+    onSaved?.()
+    onClose()
+  }
 
   const catalogsQuery = $api.useQuery(
     'get',
@@ -309,6 +319,40 @@ export function CommentsConfigModal({
         form={form}
         catalogOptions={catalogOptions}
         catalogLoading={catalogsQuery.isLoading}
+      />
+
+      {/* Danger zone — disconnect this page */}
+      <Card size="small" className="danger-card mt-5">
+        <div className="flex items-start gap-3">
+          <span
+            className="mt-0.5 flex-shrink-0 text-[color:var(--color-danger)]"
+            aria-hidden="true"
+          >
+            <Unlink size={16} />
+          </span>
+          <div className="flex flex-1 flex-col">
+            <Typography.Text type="danger" strong className="text-sm">
+              {t('comments_config.disconnect_title')}
+            </Typography.Text>
+            <span className="mt-0.5 text-xs text-text-muted">
+              {t('comments_config.disconnect_description')}
+            </span>
+            <div className="mt-3">
+              <Button danger onClick={() => setDisconnectOpen(true)}>
+                {t('comments_config.disconnect_button')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <ConfirmDisconnectModal
+        open={disconnectOpen}
+        onClose={() => setDisconnectOpen(false)}
+        onConfirm={handleDisconnect}
+        resourceLabel={pageName}
+        title={t('comments_config.disconnect_title')}
+        description={t('comments_config.disconnect_confirm', { pageName })}
       />
     </Modal>
   )
