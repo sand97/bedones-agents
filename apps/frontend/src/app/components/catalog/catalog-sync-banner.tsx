@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Button } from 'antd'
+import { Button, Tooltip } from 'antd'
 import { RefreshCw } from 'lucide-react'
 import dayjs from 'dayjs'
 import { catalogApi } from '@app/lib/api/agent-api'
@@ -54,9 +54,14 @@ export function CatalogSyncBanner({ orgSlug, catalogId }: CatalogSyncBannerProps
   return (
     <>
       <div className="catalog-sync-banner flex items-center gap-2 border-t border-border-subtle bg-bg-subtle px-4 py-2 text-[13px]">
-        <span className="min-w-0 flex-1 truncate text-text-muted">
-          {t('catalog.synced_from', { number: lastSync.sourcePhone, date })}
-        </span>
+        <Tooltip
+          title={t('catalog.synced_from', { number: lastSync.sourcePhone, date })}
+          trigger={['hover', 'click']}
+        >
+          <span className="min-w-0 flex-1 cursor-default truncate text-text-muted">
+            {t('catalog.synced_from', { number: lastSync.sourcePhone, date })}
+          </span>
+        </Tooltip>
         <Button
           size="small"
           icon={<RefreshCw size={14} />}

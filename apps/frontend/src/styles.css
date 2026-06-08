@@ -1588,6 +1588,7 @@ a {
   right: 0;
   left: var(--sidebar-width);
   z-index: 10;
+  height: 59px;
   display: flex;
   align-items: center;
   justify-content: space-between;
