@@ -149,7 +149,17 @@
       "s5_m4_b": "Then click “Re-check the link” below.",
       "s5_checking": "Checking the link…",
       "s5_stillfailed_t": "Still not linked.",
-      "s5_stillfailed_b": "Go through the steps above again, or contact support."
+      "s5_stillfailed_b": "Go through the steps above again, or contact support.",
+      "s2_vertical_notice_title": "Create a “commerce” catalog",
+      "s2_vertical_notice_msg": "On Meta, make sure to create a catalog of type <b>“commerce” (E-commerce)</b>. It's the only type that can hold your WhatsApp products.",
+      "s2_vertical_notice_hint": "If you pick another type (travel, vehicles, etc.), the import will fail. You'll come straight back here after connecting.",
+      "s3_wrong_vertical_title": "This catalog isn't a “commerce” catalog",
+      "s3_wrong_vertical_msg": "The catalog you connected isn't of type “commerce”.",
+      "s3_wrong_vertical_hint": "Your WhatsApp products can only be imported into a “commerce” (E-commerce) catalog. Connect or create one of that type, or contact support to convert it.",
+      "s3_wrong_vertical_choose_another": "Connect or create another catalog",
+      "contact_support": "Contact support",
+      "support_vertical_subject": "Bedones — Catalog is not a “commerce” vertical",
+      "support_vertical_message": "Hello,\n\nWhile migrating my WhatsApp catalog, the connected catalog \"{{catalog}}\" is not of the \"commerce\" vertical (current type: {{vertical}}), so my products can't be imported.\n\nCould you help me convert it to a \"commerce\" catalog or create the right one?\n\nWhatsApp number: {{number}}\n\nThank you."
     }
   },
   "common": {
@@ -376,7 +386,12 @@
     "custom_instructions_tone_placeholder": "You can e.g. describe the tone of replies: serious, funny, friendly… to customize the reply style",
     "catalog_title": "Linked catalog",
     "catalog_description": "Link a catalog to this page so the agent can detect product references in comments and respond.",
-    "catalog_placeholder": "No catalog linked"
+    "catalog_placeholder": "No catalog linked",
+    "disconnect_title": "Disconnect page",
+    "disconnect_description": "The page will be disconnected from Bedones and syncing will stop. You can reconnect it at any time.",
+    "disconnect_button": "Disconnect",
+    "disconnect_success": "Page disconnected",
+    "disconnect_confirm": "The page \"{{pageName}}\" will be disconnected and comment syncing will stop. You can reconnect it later."
   },
   "chat": {
     "no_conversations": "No conversations",
@@ -505,6 +520,10 @@
     "tools_labels": "Labels",
     "tools_templates": "Templates",
     "tools_campaigns": "Campaigns",
+    "tools_disconnect": "Disconnect",
+    "disconnect_title": "Disconnect this account",
+    "disconnect_confirm": "This account will be disconnected and syncing will stop. History is kept and you can reconnect it at any time.",
+    "disconnect_success": "Account disconnected",
     "template": "Template",
     "window_closed_placeholder_whatsapp": "No customer message in last 24h. Use template or mobile app",
     "window_closed_placeholder_tiktok": "No customer message in last 48h, you can't send new message",
@@ -573,6 +592,16 @@
     "dissociate_confirm": "Are you sure you want to dissociate this catalog?",
     "associate_catalog": "Associate catalog",
     "label_placeholder": "Label name"
+  },
+  "chat_config": {
+    "title": "Configuration",
+    "select_catalog": "Select a catalog",
+    "associate": "Associate",
+    "no_catalog_org": "No catalog in this organisation."
+  },
+  "confirm_disconnect": {
+    "confirm": "Disconnect",
+    "prompt": "To confirm, type:"
   },
   "members": {
     "title": "Members",
@@ -706,6 +735,7 @@
     "sync": "Sync",
     "configuration": "Configuration",
     "add_article": "Add article",
+    "tools": "Tools",
     "edit_article": "Edit article",
     "delete_article": "Delete article",
     "delete_article_confirm": "Are you sure you want to delete this article? This action cannot be undone.",
@@ -759,7 +789,9 @@
     "status_draft": "Draft",
     "status_archived": "Archived",
     "error_title": "Unable to load your catalog",
-    "error_description": "We couldn't load your products. Please reconnect your catalog."
+    "error_description": "We couldn't load your products. Please reconnect your catalog.",
+    "synced_from": "Products synced from {{number}} at {{date}}",
+    "sync_now": "Sync"
   },
   "promotions": {
     "title": "Promotions",
@@ -780,8 +812,6 @@
     "not_stackable": "Not stackable",
     "period": "Period",
     "products": "Products",
-    "synced_from": "Products synced from {{number}} at {{date}}",
-    "sync_now": "Sync",
     "products_count_one": "{{count}} product",
     "products_count_other": "{{count}} products",
     "product_count_one": "{{count}} product",
@@ -1334,5 +1364,13 @@
     "alt_step3_desc": "In the Business Center, go to Account → TikTok accounts and add your account. You will be asked to convert it to Business",
     "alt_step4_title": "Reconnect your account",
     "alt_step4_desc": "Once the conversion is done, click 'Reconnect' below"
+  },
+  "support": {
+    "title": "Contact support",
+    "lede": "Describe your problem below. We'll open your email app to send it to {{email}}.",
+    "placeholder": "Describe your problem…",
+    "cancel": "Cancel",
+    "send": "Send to support",
+    "default_subject": "Bedones — Support request"
   }
 }

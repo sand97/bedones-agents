@@ -855,6 +855,23 @@ a {
   overflow: visible;
 }
 
+/* Wrap long, unbreakable tokens (URLs, IDs) so they stay within the bubble's
+   max-width instead of stretching it. */
+.chat-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.chat-text-link {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.chat-text-link:hover {
+  color: #1d4ed8;
+}
+
 /* Media messages need equal padding all around for coherent border radius */
 .chat-bubble--media {
   padding: 6px;
@@ -1583,6 +1600,25 @@ a {
   left: var(--sidebar-collapsed-width);
 }
 
+/* Sync banner: fixed just above the pagination bar */
+.catalog-sync-banner {
+  position: fixed;
+  bottom: 59px;
+  left: var(--sidebar-width);
+  right: 0;
+  z-index: 10;
+}
+
+.page-content--collapsed .catalog-sync-banner {
+  left: var(--sidebar-collapsed-width);
+}
+
+@media (max-width: 1023px) {
+  .catalog-sync-banner {
+    left: 0;
+  }
+}
+
 .table-pagination__size-select .ant-select {
   height: 34px !important;
 }
@@ -1714,7 +1750,9 @@ a {
   background: var(--color-bg-surface);
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
   scroll-snap-align: start;
 }
 
@@ -3046,6 +3084,12 @@ a {
   background: var(--color-danger-bg);
   border-color: var(--color-danger);
   color: var(--color-danger-hover);
+}
+
+/* Reusable "danger zone" card — disconnect / delete actions */
+.danger-card {
+  background: var(--color-danger-bg) !important;
+  border-color: var(--color-danger-border) !important;
 }
 
 .notif-modal__stack-mini {

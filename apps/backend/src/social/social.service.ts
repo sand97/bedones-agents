@@ -124,6 +124,10 @@ export class SocialService {
     return this.account.getAccountHealth(userId, accountId)
   }
 
+  disconnectAccount(userId: string, accountId: string) {
+    return this.account.disconnectAccount(userId, accountId)
+  }
+
   getUnreadCounts(userId: string, organisationId: string) {
     return this.account.getUnreadCounts(userId, organisationId)
   }

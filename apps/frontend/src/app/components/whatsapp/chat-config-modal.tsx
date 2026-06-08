@@ -27,29 +27,46 @@ const LABEL_COLORS = [
   { value: '#08979c', label: 'Teal' },
 ]
 
-interface WhatsappConfigModalProps {
+type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger' | 'tiktok'
+
+interface ChatConfigModalProps {
   open: boolean
   onClose: () => void
-  phoneNumberId: string
-  accountName: string
+  provider: ChatProvider
   socialAccountId: string
+  organisationId: string
   catalogs: Catalog[]
+  /** WhatsApp-only: phone number id used for Meta Commerce (dis)association. */
+  phoneNumberId?: string
+  /** WhatsApp-only: Meta Commerce Manager linked catalog(s). */
   commerceData?: { data: Array<{ id: string; name: string }> }
-  onOpenCatalogLink: () => void
+  /** WhatsApp-only: open the Meta catalog link wizard. */
+  onOpenCatalogLink?: () => void
 }
 
-export function WhatsappConfigModal({
+/**
+ * Shared catalog + labels configuration modal for every chat channel.
+ *
+ * - WhatsApp: catalog association goes through Meta Commerce Manager (phone
+ *   number). We also surface a catalog that is only linked in our DB
+ *   (CatalogSocialAccount) — e.g. SMB numbers that cannot be linked via Meta.
+ * - Instagram DM / Messenger / TikTok: there is no Meta Commerce link, so the
+ *   catalog is associated through our DB link (linkSocialAccounts).
+ */
+export function ChatConfigModal({
   open,
   onClose,
-  phoneNumberId,
-  accountName: _accountName,
+  provider,
   socialAccountId,
+  organisationId,
   catalogs,
+  phoneNumberId,
   commerceData,
   onOpenCatalogLink,
-}: WhatsappConfigModalProps) {
+}: ChatConfigModalProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const isWhatsApp = provider === 'whatsapp'
 
   // ─── Labels from API ───
   const labelsQuery = useQuery({
@@ -64,6 +81,7 @@ export function WhatsappConfigModal({
   const [newLabelColor, setNewLabelColor] = useState('#1677ff')
 
   const labelsKey = ['labels', socialAccountId]
+  const catalogsKey = ['catalogs', organisationId]
 
   const createLabelMutation = useMutation({
     mutationFn: (data: { socialAccountId: string; name: string; color?: string }) =>
@@ -115,25 +133,42 @@ export function WhatsappConfigModal({
     updateLabelMutation.mutate({ id: label.id, data: { color } })
   }
 
-  // Reset state when modal closes
+  const [catalogToLink, setCatalogToLink] = useState<string | undefined>(undefined)
+
+  // Reset transient state when modal closes
   useEffect(() => {
     if (!open) {
       setNewLabelName('')
       setNewLabelColor('#1677ff')
+      setCatalogToLink(undefined)
     }
   }, [open])
 
   // ─── Catalog association ───
   const linkedMeta = commerceData?.data?.[0]
+  // Catalog linked in our DB (CatalogSocialAccount) — the source of truth for
+  // SMB WhatsApp numbers and for non-WhatsApp channels.
+  const dbLinkedCatalog = catalogs.find((c) =>
+    c.socialAccounts?.some((sa) => sa.socialAccount.id === socialAccountId),
+  )
   const localCatalog =
     (linkedMeta ? catalogs.find((c) => c.providerId === linkedMeta.id) : undefined) ??
-    // DB link (CatalogSocialAccount) — covers SMB numbers linked only in our DB.
-    catalogs.find((c) => c.socialAccounts?.some((sa) => sa.socialAccount.id === socialAccountId))
+    dbLinkedCatalog
 
+  // What to display in the catalog row: prefer the Meta link, fall back to the
+  // DB link so a catalog linked only in our DB still shows up.
+  const displayCatalog = linkedMeta
+    ? { name: linkedMeta.name, subtitle: linkedMeta.id }
+    : localCatalog
+      ? { name: localCatalog.name, subtitle: localCatalog.providerId ?? '' }
+      : undefined
+
+  // WhatsApp dissociation (Meta + DB link via phone number)
   const dissociateMutation = useMutation({
-    mutationFn: (catalogId: string) => catalogApi.dissociatePhone(catalogId, phoneNumberId),
+    mutationFn: (catalogId: string) => catalogApi.dissociatePhone(catalogId, phoneNumberId || ''),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-commerce', phoneNumberId] })
+      queryClient.invalidateQueries({ queryKey: catalogsKey })
     },
   })
 
@@ -147,6 +182,22 @@ export function WhatsappConfigModal({
     })
   }
 
+  // Non-WhatsApp DB-link (dis)association
+  const linkDbMutation = useMutation({
+    mutationFn: async (vars: { catalogId: string; attach: boolean }) => {
+      const cat = catalogs.find((c) => c.id === vars.catalogId)
+      const currentIds = (cat?.socialAccounts || []).map((sa) => sa.socialAccount.id)
+      const next = vars.attach
+        ? Array.from(new Set([...currentIds, socialAccountId]))
+        : currentIds.filter((id) => id !== socialAccountId)
+      return catalogApi.linkSocialAccounts(vars.catalogId, next)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: catalogsKey })
+      setCatalogToLink(undefined)
+    },
+  })
+
   const colorSelectOptions = LABEL_COLORS.map((c) => ({
     value: c.value,
     label: (
@@ -157,52 +208,104 @@ export function WhatsappConfigModal({
     ),
   }))
 
+  const renderCatalogSection = () => {
+    // WhatsApp → Meta Commerce flow (with DB-link fallback display)
+    if (isWhatsApp) {
+      return displayCatalog ? (
+        <div className="flex items-center justify-between rounded-lg border border-border-subtle px-4 py-3">
+          <div className="flex items-center gap-3">
+            <ShoppingBag size={18} className="text-text-muted" />
+            <div className="flex flex-col">
+              <Text strong>{displayCatalog.name}</Text>
+              {displayCatalog.subtitle && (
+                <Text className="text-text-muted">{displayCatalog.subtitle}</Text>
+              )}
+            </div>
+          </div>
+          {localCatalog && (
+            <Button
+              danger
+              size="small"
+              icon={<Unlink size={14} />}
+              loading={dissociateMutation.isPending}
+              onClick={handleDissociate}
+            >
+              {t('whatsapp_config.dissociate')}
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="create-ticket-empty-section">
+          <ShoppingBag size={32} strokeWidth={1.5} className="text-text-muted opacity-50" />
+          <div className="text-sm font-medium text-text-primary">
+            {t('whatsapp_config.no_catalog')}
+          </div>
+          <div className="text-xs text-text-muted">{t('whatsapp_config.no_catalog_desc')}</div>
+          <Button onClick={onOpenCatalogLink} className="mt-2">
+            {t('whatsapp_config.connect_catalog')}
+          </Button>
+        </div>
+      )
+    }
+
+    // Instagram DM / Messenger / TikTok → DB-link association
+    if (dbLinkedCatalog) {
+      return (
+        <div className="flex items-center justify-between rounded-lg border border-border-subtle px-4 py-3">
+          <div className="flex items-center gap-3">
+            <ShoppingBag size={18} className="text-text-muted" />
+            <Text strong>{dbLinkedCatalog.name}</Text>
+          </div>
+          <Button
+            danger
+            size="small"
+            icon={<Unlink size={14} />}
+            loading={linkDbMutation.isPending}
+            onClick={() => linkDbMutation.mutate({ catalogId: dbLinkedCatalog.id, attach: false })}
+          >
+            {t('whatsapp_config.dissociate')}
+          </Button>
+        </div>
+      )
+    }
+
+    return catalogs.length > 0 ? (
+      <div className="flex flex-col gap-2">
+        <Select
+          className="w-full"
+          placeholder={t('chat_config.select_catalog')}
+          value={catalogToLink}
+          onChange={setCatalogToLink}
+          options={catalogs.map((c) => ({ value: c.id, label: c.name }))}
+        />
+        <Button
+          type="primary"
+          disabled={!catalogToLink}
+          loading={linkDbMutation.isPending}
+          onClick={() =>
+            catalogToLink && linkDbMutation.mutate({ catalogId: catalogToLink, attach: true })
+          }
+        >
+          {t('chat_config.associate')}
+        </Button>
+      </div>
+    ) : (
+      <div className="create-ticket-empty-section">
+        <ShoppingBag size={32} strokeWidth={1.5} className="text-text-muted opacity-50" />
+        <div className="text-sm font-medium text-text-primary">
+          {t('whatsapp_config.no_catalog')}
+        </div>
+        <div className="text-xs text-text-muted">{t('chat_config.no_catalog_org')}</div>
+      </div>
+    )
+  }
+
   return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      title={t('whatsapp_config.title')}
-      footer={null}
-      width={520}
-    >
+    <Modal open={open} onCancel={onClose} title={t('chat_config.title')} footer={null} width={520}>
       {/* ── Section 1: Catalog ── */}
       <div className="mb-4">
         <Text strong>{t('whatsapp_config.catalog_section')}</Text>
-        <div className="mt-2">
-          {linkedMeta ? (
-            <div className="flex items-center justify-between rounded-lg border border-border-subtle px-4 py-3">
-              <div className="flex items-center gap-3">
-                <ShoppingBag size={18} className="text-text-muted" />
-                <div className="flex flex-col">
-                  <Text strong>{linkedMeta.name}</Text>
-                  <Text className="text-text-muted">{linkedMeta.id}</Text>
-                </div>
-              </div>
-              {localCatalog && (
-                <Button
-                  danger
-                  size="small"
-                  icon={<Unlink size={14} />}
-                  loading={dissociateMutation.isPending}
-                  onClick={handleDissociate}
-                >
-                  {t('whatsapp_config.dissociate')}
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="create-ticket-empty-section">
-              <ShoppingBag size={32} strokeWidth={1.5} className="text-text-muted opacity-50" />
-              <div className="text-sm font-medium text-text-primary">
-                {t('whatsapp_config.no_catalog')}
-              </div>
-              <div className="text-xs text-text-muted">{t('whatsapp_config.no_catalog_desc')}</div>
-              <Button onClick={onOpenCatalogLink} className="mt-2">
-                {t('whatsapp_config.connect_catalog')}
-              </Button>
-            </div>
-          )}
-        </div>
+        <div className="mt-2">{renderCatalogSection()}</div>
       </div>
 
       <Divider className="my-3" />

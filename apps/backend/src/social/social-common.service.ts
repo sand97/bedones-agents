@@ -340,6 +340,8 @@ export class SocialCommonService {
         return false
       }
 
+      // Omit the immutable unique key (providerAccountId) from the update payload.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { providerAccountId: _providerAccountId, ...existingAccountData } = data
       await this.prisma.socialAccount.update({
         where: { id: existingPhoneAccount.id },

@@ -321,6 +321,7 @@ export class SocialConnectService {
           data: {
             name: metaCatalog.name,
             productCount: metaCatalog.product_count ?? 0,
+            vertical: metaCatalog.vertical ?? null,
           },
         })
       } else {
@@ -330,6 +331,7 @@ export class SocialConnectService {
             name: metaCatalog.name,
             providerId: metaCatalog.id,
             productCount: metaCatalog.product_count ?? 0,
+            vertical: metaCatalog.vertical ?? null,
           },
         })
       }
@@ -978,19 +980,17 @@ export class SocialConnectService {
     }
 
     // 4. Get phone number display info
-    let displayName = phoneId
-    let displayPhone: string | null = null
     if (!phoneInfo?.display_phone_number || !phoneInfo?.verified_name) {
       const fetchedPhoneInfo = await graphGet<WhatsAppPhoneInfo>(phoneId, {
         fields: 'display_phone_number,verified_name',
       })
       phoneInfo = { ...(phoneInfo ?? { id: phoneId }), ...(fetchedPhoneInfo ?? {}), id: phoneId }
     }
-    displayName = phoneInfo?.verified_name || wabaName || phoneInfo?.display_phone_number || phoneId
-    displayPhone = phoneInfo?.display_phone_number || null
+    const displayName =
+      phoneInfo?.verified_name || wabaName || phoneInfo?.display_phone_number || phoneId
+    const displayPhone = phoneInfo?.display_phone_number || null
 
     // 5. Fetch WhatsApp Business profile metadata
-    let profilePictureUrl: string | null = null
     const profileData = await graphGet<{ data?: WhatsAppBusinessProfile[] }>(
       `${phoneId}/whatsapp_business_profile`,
       {
@@ -999,7 +999,7 @@ export class SocialConnectService {
       },
     )
     const businessProfile = profileData?.data?.[0] || null
-    profilePictureUrl = businessProfile?.profile_picture_url || null
+    const profilePictureUrl = businessProfile?.profile_picture_url || null
     if (!profileData) {
       this.logger.warn(`[WhatsApp] Could not fetch business profile for ${phoneId}`)
     }

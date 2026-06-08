@@ -249,6 +249,13 @@ model SocialAccount {
   // longer a business account) without disabling the whole account.
   featureDisabled   SocialFeature[]
 
+  // ─── User-initiated soft disconnect ───
+  // Set when the user explicitly disconnects the page/number from the app. The
+  // row (and its history) is kept so it can be reconnected later, but the
+  // account is hidden from active lists and outbound calls are stopped. Cleared
+  // on a successful (re)connect through the OAuth/embedded-signup callback.
+  disconnectedAt    DateTime?
+
   // ─── Message history sync (14-day backfill on connect) ───
   // Tracks the initial backfill of the last 14 days of conversations/messages
   // that runs once when an account is connected. WhatsApp delivers its history
@@ -315,6 +322,7 @@ model Catalog {
   organisation   Organisation          @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   name           String
   providerId     String? // External catalog ID (e.g. Facebook catalog ID)
+  vertical       String? // Meta catalog vertical (e.g. "commerce"); only "commerce" supports WhatsApp products
   description    String? // AI-generated description of catalog contents
   analysisStatus CatalogAnalysisStatus @default(PENDING)
   productCount   Int                   @default(0)

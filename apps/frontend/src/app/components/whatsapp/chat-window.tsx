@@ -55,6 +55,44 @@ function formatTime(timestamp: string): string {
   return dayjs(timestamp).format('HH:mm')
 }
 
+/* ── Linkified text ──
+   Detects URLs in plain message text and renders them as clickable links.
+   Long URLs (and any unbreakable token) wrap via the `chat-text` class so
+   they don't widen the bubble beyond its max-width. */
+
+const URL_SPLIT_REGEX = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi
+const URL_MATCH_REGEX = /^(https?:\/\/|www\.)/i
+
+function LinkifiedText({ text, className }: { text: string; className?: string }) {
+  // split() with a capturing group keeps the matched URLs in the result array,
+  // alternating with the surrounding plain text.
+  const parts = text.split(URL_SPLIT_REGEX)
+
+  return (
+    <p className={`chat-text m-0 text-sm text-text-primary ${className ?? ''}`}>
+      {parts.map((part, i) => {
+        if (!part) return null
+        if (URL_MATCH_REGEX.test(part)) {
+          const href = part.startsWith('http') ? part : `https://${part}`
+          return (
+            <a
+              key={i}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="chat-text-link"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {part}
+            </a>
+          )
+        }
+        return <span key={i}>{part}</span>
+      })}
+    </p>
+  )
+}
+
 function formatDateLabel(timestamp: string, t: (key: string) => string): string {
   const date = dayjs(timestamp)
   const now = dayjs()
@@ -524,9 +562,7 @@ function MessageBubble({
                 onLoad={onMediaLoad}
               />
             </div>
-            {message.imageCaption && (
-              <p className="m-0 mt-2 text-sm text-text-primary">{message.imageCaption}</p>
-            )}
+            {message.imageCaption && <LinkifiedText text={message.imageCaption} className="mt-2" />}
           </div>
         )
 
@@ -534,7 +570,7 @@ function MessageBubble({
         return (
           <div>
             <LazyVideo src={message.videoUrl || message.videoThumbnail} onPlay={onMediaLoad} />
-            {message.text && <p className="m-0 mt-2 text-sm text-text-primary">{message.text}</p>}
+            {message.text && <LinkifiedText text={message.text} className="mt-2" />}
           </div>
         )
 
@@ -688,7 +724,7 @@ function MessageBubble({
         )
 
       default:
-        return message.text ? <p className="m-0 text-sm text-text-primary">{message.text}</p> : null
+        return message.text ? <LinkifiedText text={message.text} /> : null
     }
   }
 

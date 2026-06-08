@@ -149,7 +149,17 @@
       "s5_m4_b": "Cliquez ensuite sur « Revérifier la liaison » ci-dessous.",
       "s5_checking": "Vérification de la liaison…",
       "s5_stillfailed_t": "Toujours pas liée.",
-      "s5_stillfailed_b": "Reprenez les étapes ci-dessus, ou contactez le support."
+      "s5_stillfailed_b": "Reprenez les étapes ci-dessus, ou contactez le support.",
+      "s2_vertical_notice_title": "Créez un catalogue « commerce »",
+      "s2_vertical_notice_msg": "Sur Meta, veillez à créer un catalogue de type <b>« commerce » (E-commerce)</b>. C'est le seul type capable de contenir vos produits WhatsApp.",
+      "s2_vertical_notice_hint": "Si vous choisissez un autre type (voyage, véhicules, etc.), l'import échouera. Vous reviendrez ici juste après la connexion.",
+      "s3_wrong_vertical_title": "Ce catalogue n'est pas un catalogue « commerce »",
+      "s3_wrong_vertical_msg": "Le catalogue que vous avez connecté n'est pas de type « commerce ».",
+      "s3_wrong_vertical_hint": "Vos produits WhatsApp ne peuvent être importés que dans un catalogue « commerce » (E-commerce). Connectez ou créez-en un de ce type, ou contactez le support pour le convertir.",
+      "s3_wrong_vertical_choose_another": "Connecter ou créer un autre catalogue",
+      "contact_support": "Contacter le support",
+      "support_vertical_subject": "Bedones — Catalogue non « commerce »",
+      "support_vertical_message": "Bonjour,\n\nLors de la migration de mon catalogue WhatsApp, le catalogue connecté « {{catalog}} » n'est pas de la vertical « commerce » (type actuel : {{vertical}}), mes produits ne peuvent donc pas être importés.\n\nPourriez-vous m'aider à le convertir en catalogue « commerce » ou à créer le bon ?\n\nNuméro WhatsApp : {{number}}\n\nMerci."
     }
   },
   "common": {
@@ -376,7 +386,12 @@
     "custom_instructions_tone_placeholder": "Vous pouvez par ex décrire le ton des réponses : sérieux, drôle, jovial… pour personnaliser le style des réponses",
     "catalog_title": "Catalogue associé",
     "catalog_description": "Associez un catalogue à cette page pour que l'agent puisse détecter les références produits dans les commentaires et y répondre.",
-    "catalog_placeholder": "Aucun catalogue associé"
+    "catalog_placeholder": "Aucun catalogue associé",
+    "disconnect_title": "Déconnecter la page",
+    "disconnect_description": "La page sera déconnectée de Bedones et la synchronisation s'arrêtera. Vous pourrez la reconnecter à tout moment.",
+    "disconnect_button": "Déconnecter",
+    "disconnect_success": "Page déconnectée",
+    "disconnect_confirm": "La page « {{pageName}} » sera déconnectée et la synchronisation des commentaires s'arrêtera. Vous pourrez la reconnecter plus tard."
   },
   "chat": {
     "no_conversations": "Aucune conversation",
@@ -505,6 +520,10 @@
     "tools_labels": "Labels",
     "tools_templates": "Templates",
     "tools_campaigns": "Campagnes",
+    "tools_disconnect": "Déconnecter",
+    "disconnect_title": "Déconnecter ce compte",
+    "disconnect_confirm": "Ce compte sera déconnecté et la synchronisation s'arrêtera. L'historique est conservé et vous pourrez le reconnecter à tout moment.",
+    "disconnect_success": "Compte déconnecté",
     "template": "Template",
     "window_closed_placeholder_whatsapp": "Aucun message client depuis 24h. Utilisez un template ou l'app mobile",
     "window_closed_placeholder_tiktok": "Aucun message client depuis 48h, vous ne pouvez plus envoyer de message",
@@ -573,6 +592,16 @@
     "dissociate_confirm": "Êtes-vous sûr de vouloir dissocier ce catalogue ?",
     "associate_catalog": "Associer un catalogue",
     "label_placeholder": "Nom de l'étiquette"
+  },
+  "chat_config": {
+    "title": "Configuration",
+    "select_catalog": "Choisir un catalogue",
+    "associate": "Associer",
+    "no_catalog_org": "Aucun catalogue dans cette organisation."
+  },
+  "confirm_disconnect": {
+    "confirm": "Déconnecter",
+    "prompt": "Pour confirmer, saisissez :"
   },
   "members": {
     "title": "Membres",
@@ -706,6 +735,7 @@
     "sync": "Synchroniser",
     "configuration": "Configuration",
     "add_article": "Ajouter un article",
+    "tools": "Outils",
     "edit_article": "Modifier l'article",
     "delete_article": "Supprimer l'article",
     "delete_article_confirm": "Êtes-vous sûr de vouloir supprimer cet article ? Cette action est irréversible.",
@@ -759,7 +789,9 @@
     "status_draft": "Brouillon",
     "status_archived": "Archivé",
     "error_title": "Impossible de récupérer votre catalogue",
-    "error_description": "Nous n'avons pas pu charger vos produits. Veuillez reconnecter votre catalogue."
+    "error_description": "Nous n'avons pas pu charger vos produits. Veuillez reconnecter votre catalogue.",
+    "synced_from": "Produits synchronisés depuis {{number}} le {{date}}",
+    "sync_now": "Synchroniser"
   },
   "promotions": {
     "title": "Promotions",
@@ -780,8 +812,6 @@
     "not_stackable": "Non cumulable",
     "period": "Période",
     "products": "Produits",
-    "synced_from": "Produits synchronisés depuis {{number}} le {{date}}",
-    "sync_now": "Synchroniser",
     "products_count_one": "{{count}} produit",
     "products_count_other": "{{count}} produits",
     "product_count_one": "{{count}} produit",
@@ -1350,5 +1380,13 @@
     "alt_step3_desc": "Dans le Business Center, allez dans Compte → Comptes TikTok et ajoutez votre compte. On vous demandera alors de le convertir en Business",
     "alt_step4_title": "Reconnecter le compte",
     "alt_step4_desc": "Une fois la conversion effectuée, cliquez sur « Reconnecter » ci-dessous"
+  },
+  "support": {
+    "title": "Contacter le support",
+    "lede": "Décrivez votre problème ci-dessous. Nous ouvrirons votre application e-mail pour l'envoyer à {{email}}.",
+    "placeholder": "Décrivez votre problème…",
+    "cancel": "Annuler",
+    "send": "Envoyer au support",
+    "default_subject": "Bedones — Demande de support"
   }
 }

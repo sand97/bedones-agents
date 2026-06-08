@@ -53,7 +53,7 @@ export function CatalogSyncBanner({ orgSlug, catalogId }: CatalogSyncBannerProps
 
   return (
     <>
-      <div className="flex items-center gap-2 border-t border-border-subtle bg-bg-subtle px-4 py-2 text-[13px]">
+      <div className="catalog-sync-banner flex items-center gap-2 border-t border-border-subtle bg-bg-subtle px-4 py-2 text-[13px]">
         <span className="min-w-0 flex-1 truncate text-text-muted">
           {t('catalog.synced_from', { number: lastSync.sourcePhone, date })}
         </span>
@@ -69,6 +69,7 @@ export function CatalogSyncBanner({ orgSlug, catalogId }: CatalogSyncBannerProps
       <CommerceManagerMigrationModal
         open={modalOpen}
         orgSlug={orgSlug}
+        isResync
         onClose={() => {
           setModalOpen(false)
           void lastSyncQuery.refetch()

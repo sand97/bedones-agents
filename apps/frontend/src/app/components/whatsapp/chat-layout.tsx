@@ -12,6 +12,7 @@ import {
   Sparkles,
   ShoppingBag,
   Tag,
+  Unlink,
   Wrench,
 } from 'lucide-react'
 import { ConversationList } from './conversation-list'
@@ -109,6 +110,8 @@ interface ChatLayoutProps {
   onOpenOptions?: () => void
   onOpenTemplates?: () => void
   onOpenCampaigns?: () => void
+  /** Called when user clicks the "Disconnect" tool */
+  onDisconnect?: () => void
   /** Social account ID used to fetch labels from the database */
   socialAccountId?: string
   /** Whether the current WhatsApp number has a linked catalog for product sending */
@@ -194,15 +197,19 @@ function useSetupState(
   return null
 }
 
-function WhatsAppToolsPopover({
+function ChatToolsPopover({
+  provider,
   onOpenOptions,
   onOpenTemplates,
   onOpenCampaigns,
+  onDisconnect,
   children,
 }: {
+  provider: ChatProvider
   onOpenOptions?: () => void
   onOpenTemplates?: () => void
   onOpenCampaigns?: () => void
+  onDisconnect?: () => void
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
@@ -222,19 +229,31 @@ function WhatsAppToolsPopover({
       bgColor: 'bg-purple-50',
       onClick: onOpenOptions,
     },
+    // Templates & campaigns are WhatsApp-only features.
+    ...(provider === 'whatsapp'
+      ? [
+          {
+            label: t('chat.tools_templates'),
+            icon: <FileText size={18} />,
+            color: 'text-blue-500',
+            bgColor: 'bg-blue-50',
+            onClick: onOpenTemplates,
+          },
+          {
+            label: t('chat.tools_campaigns'),
+            icon: <Megaphone size={18} />,
+            color: 'text-orange-500',
+            bgColor: 'bg-orange-50',
+            onClick: onOpenCampaigns,
+          },
+        ]
+      : []),
     {
-      label: t('chat.tools_templates'),
-      icon: <FileText size={18} />,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-50',
-      onClick: onOpenTemplates,
-    },
-    {
-      label: t('chat.tools_campaigns'),
-      icon: <Megaphone size={18} />,
-      color: 'text-orange-500',
-      bgColor: 'bg-orange-50',
-      onClick: onOpenCampaigns,
+      label: t('chat.tools_disconnect'),
+      icon: <Unlink size={18} />,
+      color: 'text-red-500',
+      bgColor: 'bg-red-50',
+      onClick: onDisconnect,
     },
   ]
 
@@ -294,6 +313,7 @@ export function ChatLayout({
   onOpenOptions,
   onOpenTemplates,
   onOpenCampaigns,
+  onDisconnect,
   socialAccountId,
   hasCatalogForProducts,
   onProductClick,
@@ -536,21 +556,21 @@ export function ChatLayout({
               aria-label={t('common.search')}
               title={t('common.search')}
             />
-            {provider === 'whatsapp' && (
-              <WhatsAppToolsPopover
-                onOpenOptions={onOpenOptions}
-                onOpenTemplates={onOpenTemplates}
-                onOpenCampaigns={onOpenCampaigns}
-              >
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<Wrench size={16} />}
-                  aria-label={t('chat.tools')}
-                  title={t('chat.tools')}
-                />
-              </WhatsAppToolsPopover>
-            )}
+            <ChatToolsPopover
+              provider={provider}
+              onOpenOptions={onOpenOptions}
+              onOpenTemplates={onOpenTemplates}
+              onOpenCampaigns={onOpenCampaigns}
+              onDisconnect={onDisconnect}
+            >
+              <Button
+                type="text"
+                size="small"
+                icon={<Wrench size={16} />}
+                aria-label={t('chat.tools')}
+                title={t('chat.tools')}
+              />
+            </ChatToolsPopover>
           </div>
         </div>
 
