@@ -25,6 +25,12 @@ import { WebhookService } from './webhook.service'
 import { MessagingController } from './messaging.controller'
 import { TikTokWebhookController } from './tiktok-webhook.controller'
 import { MessagingService } from './messaging.service'
+import { MessagingCommonService } from './messaging-common.service'
+import { ConversationService } from './conversation.service'
+import { MessageSenderService } from './message-sender.service'
+import { ConversationSyncService } from './conversation-sync.service'
+import { ConversationHistoryService } from './conversation-history.service'
+import { ProductMessagingService } from './product-messaging.service'
 import { AIService } from './ai.service'
 import { LabelController } from './label.controller'
 import { LabelService } from './label.service'
@@ -64,6 +70,12 @@ import { SocialHealthModule } from './social-health.module'
     CommentService,
     WebhookService,
     MessagingService,
+    MessagingCommonService,
+    ConversationService,
+    MessageSenderService,
+    ConversationSyncService,
+    ConversationHistoryService,
+    ProductMessagingService,
     AIService,
     LabelService,
     AvatarSyncService,
