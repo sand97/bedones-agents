@@ -299,8 +299,9 @@ export class SocialHealthService {
 
   /**
    * Clears all health state on a successful (re)connect: re-enables the account
-   * and every feature, resets the error counter. Scope checks run afterwards may
-   * disable individual features again.
+   * and every feature, resets the error counter, and revives a user-initiated
+   * soft disconnect. Scope checks run afterwards may disable individual features
+   * again.
    */
   async clearHealth(socialAccountId: string): Promise<void> {
     await this.prisma.socialAccount.update({
@@ -311,6 +312,7 @@ export class SocialHealthService {
         disabledAt: null,
         consecutiveErrors: 0,
         featureDisabled: { set: [] },
+        disconnectedAt: null,
       },
     })
   }

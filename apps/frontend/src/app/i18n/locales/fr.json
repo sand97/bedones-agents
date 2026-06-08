@@ -386,7 +386,12 @@
     "custom_instructions_tone_placeholder": "Vous pouvez par ex décrire le ton des réponses : sérieux, drôle, jovial… pour personnaliser le style des réponses",
     "catalog_title": "Catalogue associé",
     "catalog_description": "Associez un catalogue à cette page pour que l'agent puisse détecter les références produits dans les commentaires et y répondre.",
-    "catalog_placeholder": "Aucun catalogue associé"
+    "catalog_placeholder": "Aucun catalogue associé",
+    "disconnect_title": "Déconnecter la page",
+    "disconnect_description": "La page sera déconnectée de Bedones et la synchronisation s'arrêtera. Vous pourrez la reconnecter à tout moment.",
+    "disconnect_button": "Déconnecter",
+    "disconnect_success": "Page déconnectée",
+    "disconnect_confirm": "La page « {{pageName}} » sera déconnectée et la synchronisation des commentaires s'arrêtera. Vous pourrez la reconnecter plus tard."
   },
   "chat": {
     "no_conversations": "Aucune conversation",
@@ -515,6 +520,10 @@
     "tools_labels": "Labels",
     "tools_templates": "Templates",
     "tools_campaigns": "Campagnes",
+    "tools_disconnect": "Déconnecter",
+    "disconnect_title": "Déconnecter ce compte",
+    "disconnect_confirm": "Ce compte sera déconnecté et la synchronisation s'arrêtera. L'historique est conservé et vous pourrez le reconnecter à tout moment.",
+    "disconnect_success": "Compte déconnecté",
     "template": "Template",
     "window_closed_placeholder_whatsapp": "Aucun message client depuis 24h. Utilisez un template ou l'app mobile",
     "window_closed_placeholder_tiktok": "Aucun message client depuis 48h, vous ne pouvez plus envoyer de message",
@@ -583,6 +592,16 @@
     "dissociate_confirm": "Êtes-vous sûr de vouloir dissocier ce catalogue ?",
     "associate_catalog": "Associer un catalogue",
     "label_placeholder": "Nom de l'étiquette"
+  },
+  "chat_config": {
+    "title": "Configuration",
+    "select_catalog": "Choisir un catalogue",
+    "associate": "Associer",
+    "no_catalog_org": "Aucun catalogue dans cette organisation."
+  },
+  "confirm_disconnect": {
+    "confirm": "Déconnecter",
+    "prompt": "Pour confirmer, saisissez :"
   },
   "members": {
     "title": "Membres",
@@ -716,6 +735,7 @@
     "sync": "Synchroniser",
     "configuration": "Configuration",
     "add_article": "Ajouter un article",
+    "tools": "Outils",
     "edit_article": "Modifier l'article",
     "delete_article": "Supprimer l'article",
     "delete_article_confirm": "Êtes-vous sûr de vouloir supprimer cet article ? Cette action est irréversible.",

@@ -1750,7 +1750,9 @@ a {
   background: var(--color-bg-surface);
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
   scroll-snap-align: start;
 }
 
@@ -3082,6 +3084,12 @@ a {
   background: var(--color-danger-bg);
   border-color: var(--color-danger);
   color: var(--color-danger-hover);
+}
+
+/* Reusable "danger zone" card — disconnect / delete actions */
+.danger-card {
+  background: var(--color-danger-bg) !important;
+  border-color: var(--color-danger-border) !important;
 }
 
 .notif-modal__stack-mini {

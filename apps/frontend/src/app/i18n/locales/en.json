@@ -386,7 +386,12 @@
     "custom_instructions_tone_placeholder": "You can e.g. describe the tone of replies: serious, funny, friendly… to customize the reply style",
     "catalog_title": "Linked catalog",
     "catalog_description": "Link a catalog to this page so the agent can detect product references in comments and respond.",
-    "catalog_placeholder": "No catalog linked"
+    "catalog_placeholder": "No catalog linked",
+    "disconnect_title": "Disconnect page",
+    "disconnect_description": "The page will be disconnected from Bedones and syncing will stop. You can reconnect it at any time.",
+    "disconnect_button": "Disconnect",
+    "disconnect_success": "Page disconnected",
+    "disconnect_confirm": "The page \"{{pageName}}\" will be disconnected and comment syncing will stop. You can reconnect it later."
   },
   "chat": {
     "no_conversations": "No conversations",
@@ -515,6 +520,10 @@
     "tools_labels": "Labels",
     "tools_templates": "Templates",
     "tools_campaigns": "Campaigns",
+    "tools_disconnect": "Disconnect",
+    "disconnect_title": "Disconnect this account",
+    "disconnect_confirm": "This account will be disconnected and syncing will stop. History is kept and you can reconnect it at any time.",
+    "disconnect_success": "Account disconnected",
     "template": "Template",
     "window_closed_placeholder_whatsapp": "No customer message in last 24h. Use template or mobile app",
     "window_closed_placeholder_tiktok": "No customer message in last 48h, you can't send new message",
@@ -583,6 +592,16 @@
     "dissociate_confirm": "Are you sure you want to dissociate this catalog?",
     "associate_catalog": "Associate catalog",
     "label_placeholder": "Label name"
+  },
+  "chat_config": {
+    "title": "Configuration",
+    "select_catalog": "Select a catalog",
+    "associate": "Associate",
+    "no_catalog_org": "No catalog in this organisation."
+  },
+  "confirm_disconnect": {
+    "confirm": "Disconnect",
+    "prompt": "To confirm, type:"
   },
   "members": {
     "title": "Members",
@@ -716,6 +735,7 @@
     "sync": "Sync",
     "configuration": "Configuration",
     "add_article": "Add article",
+    "tools": "Tools",
     "edit_article": "Edit article",
     "delete_article": "Delete article",
     "delete_article_confirm": "Are you sure you want to delete this article? This action cannot be undone.",

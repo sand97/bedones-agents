@@ -2164,7 +2164,8 @@ export class SocialService {
     await this.assertMembership(userId, organisationId)
 
     const accounts = await this.prisma.socialAccount.findMany({
-      where: { organisationId },
+      // Hide accounts the user has soft-disconnected (kept in DB for reconnect).
+      where: { organisationId, disconnectedAt: null },
       include: {
         settings: { include: { faqRules: true } },
         _count: { select: { posts: true } },
@@ -2185,13 +2186,46 @@ export class SocialService {
     if (!hasUpdates) return accounts
 
     return this.prisma.socialAccount.findMany({
-      where: { organisationId },
+      // Hide accounts the user has soft-disconnected (kept in DB for reconnect).
+      where: { organisationId, disconnectedAt: null },
       include: {
         settings: { include: { faqRules: true } },
         _count: { select: { posts: true } },
       },
       orderBy: { createdAt: 'asc' },
     })
+  }
+
+  // ─── User-initiated soft disconnect ───
+
+  /**
+   * Soft-disconnects a social account: it is hidden from active lists and all
+   * outbound calls are stopped, while the row and its history are kept so the
+   * user can reconnect later. A successful (re)connect revives it via
+   * clearHealth (which clears `disconnectedAt`).
+   */
+  async disconnectAccount(userId: string, accountId: string) {
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: accountId },
+      select: { organisationId: true },
+    })
+    if (!account) throw new NotFoundException('Social account not found')
+    await this.assertMembership(userId, account.organisationId)
+
+    await this.prisma.socialAccount.update({
+      where: { id: accountId },
+      data: {
+        disconnectedAt: new Date(),
+        disabled: true,
+        disabledReason: 'USER_DISCONNECTED',
+        disabledAt: new Date(),
+        // Revoke stored credentials so no further outbound calls succeed.
+        accessToken: '',
+        refreshToken: null,
+      },
+    })
+
+    return { success: true }
   }
 
   // ─── Account health (for the "reconnect" error state) ───
@@ -3040,7 +3074,7 @@ export class SocialService {
     await this.assertMembership(userId, organisationId)
 
     const accounts = await this.prisma.socialAccount.findMany({
-      where: { organisationId },
+      where: { organisationId, disconnectedAt: null },
       select: {
         provider: true,
         scopes: true,
