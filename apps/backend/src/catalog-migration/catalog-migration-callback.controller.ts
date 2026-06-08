@@ -6,7 +6,8 @@ import {
   CallbackMigrationId,
   CatalogMigrationCallbackGuard,
 } from './catalog-migration-callback.guard'
-import { SaveCatalogDto, UploadImageDto } from './dto/callback.dto'
+import { CatalogMigrationService } from './catalog-migration.service'
+import { ExtractionProgressDto, SaveCatalogDto, UploadImageDto } from './dto/callback.dto'
 
 /** Public storage key of the temporary catalogue JSON for a migration. */
 export function catalogJsonKey(migrationId: string): string {
@@ -22,7 +23,17 @@ export function catalogJsonKey(migrationId: string): string {
 @Controller('catalog-migration/callback')
 @UseGuards(CatalogMigrationCallbackGuard)
 export class CatalogMigrationCallbackController {
-  constructor(private readonly upload: UploadService) {}
+  constructor(
+    private readonly upload: UploadService,
+    private readonly migration: CatalogMigrationService,
+  ) {}
+
+  @Post('progress')
+  @ApiOperation({ summary: 'Report extraction progress (called by the page script per product)' })
+  async progress(@CallbackMigrationId() migrationId: string, @Body() dto: ExtractionProgressDto) {
+    await this.migration.reportExtractionProgress(migrationId, dto.processed ?? 0, dto.total ?? 0)
+    return { success: true }
+  }
 
   @Post('upload-image')
   @ApiOperation({ summary: 'Re-host a product image on our storage (called by the page script)' })

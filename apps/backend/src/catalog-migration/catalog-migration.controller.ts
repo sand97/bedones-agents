@@ -27,6 +27,12 @@ export class CatalogMigrationController {
     return this.service.getActiveForOrg(user.id, organisationId)
   }
 
+  @Get('catalog/:catalogId/last-sync')
+  @ApiOperation({ summary: 'Last completed sync (number + date) for a catalogue, for the banner' })
+  async lastSync(@CurrentUser() user: { id: string }, @Param('catalogId') catalogId: string) {
+    return this.service.getLastSync(user.id, catalogId)
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Status + live queue position of a migration' })
   async getOne(@CurrentUser() user: { id: string }, @Param('id') id: string) {

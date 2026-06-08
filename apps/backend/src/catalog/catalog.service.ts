@@ -1125,12 +1125,35 @@ export class CatalogService {
     return { success: true }
   }
 
+  /**
+   * Persist a catalogue ⇄ WhatsApp-number link for an SMB (WhatsApp Business
+   * app) number. Such numbers can't be linked to a Commerce Manager catalogue
+   * through the Meta API (#10), and WhatsApp Web exposes no reliable catalogue
+   * id to verify against — so the user links it manually on their phone and we
+   * trust them, recording the association in our DB. It can always be removed
+   * from the catalogue controls.
+   */
+  async linkSmbPhone(catalogId: string, phoneNumberId: string) {
+    const { account } = await this.resolveWhatsAppAccount(phoneNumberId)
+    await this.prisma.catalogSocialAccount.upsert({
+      where: { catalogId_socialAccountId: { catalogId, socialAccountId: account.id } },
+      update: {},
+      create: { catalogId, socialAccountId: account.id },
+    })
+    this.logger.log(`[Catalog] SMB-linked catalog ${catalogId} ⇄ account ${account.id}`)
+    return { success: true }
+  }
+
   async dissociatePhone(catalogId: string, phoneNumberId: string) {
     const [providerId, catalogToken] = await Promise.all([
       this.getCatalogProviderId(catalogId),
       this.resolveAccessToken(catalogId),
     ])
-    const { accessToken: whatsappToken, wabaId } = await this.resolveWhatsAppAccount(phoneNumberId)
+    const {
+      account,
+      accessToken: whatsappToken,
+      wabaId,
+    } = await this.resolveWhatsAppAccount(phoneNumberId)
 
     // 1. Deactivate commerce settings on phone number
     const phoneRes = await fetch(
@@ -1160,6 +1183,11 @@ export class CatalogService {
       const error = await wabaRes.text()
       this.logger.warn(`Meta remove catalog from WABA (may already be removed): ${error}`)
     }
+
+    // Remove our DB link too — this is the only association SMB numbers ever had.
+    await this.prisma.catalogSocialAccount.deleteMany({
+      where: { catalogId, socialAccountId: account.id },
+    })
 
     this.logger.log(
       `[Catalog] Dissociated catalog ${providerId} from phone ${phoneNumberId} via WABA ${wabaId}`,

@@ -362,6 +362,14 @@ export const catalogApi = {
       method: 'DELETE',
     }),
 
+  // SMB numbers are linked manually on the phone; this records the link in our
+  // DB (best-effort verified server-side via the connector).
+  linkSmbPhone: (catalogId: string, phoneNumberId: string) =>
+    fetchJson<{ success: boolean }>(`/catalog/${catalogId}/link-smb-phone`, {
+      method: 'POST',
+      body: JSON.stringify({ phoneNumberId }),
+    }),
+
   // ─── AI Context ───
 
   listProductContexts: (catalogId: string, providerProductIds?: string[]) => {
@@ -477,6 +485,15 @@ export const catalogApi = {
 
   getActiveMigration: (orgId: string) =>
     fetchJson<CatalogMigration | null>(`/catalog-migration/org/${orgId}/active`),
+
+  /** Last completed sync (which number fed the catalogue, and when) for the banner. */
+  getLastSync: (catalogId: string) =>
+    fetchJson<{
+      sourcePhone: string
+      sourceSocialAccountId: string | null
+      finishedAt: string | null
+      importedProducts: number
+    } | null>(`/catalog-migration/catalog/${catalogId}/last-sync`),
 }
 
 export interface PostLink {

@@ -58,3 +58,12 @@ export class SaveCatalogDto {
   @ApiPropertyOptional({ type: [SaveCatalogCollectionDto] })
   collections?: SaveCatalogCollectionDto[]
 }
+
+/** Extraction progress ping from the page script (products whose images are done). */
+export class ExtractionProgressDto {
+  @ApiPropertyOptional()
+  processed?: number
+
+  @ApiPropertyOptional()
+  total?: number
+}
