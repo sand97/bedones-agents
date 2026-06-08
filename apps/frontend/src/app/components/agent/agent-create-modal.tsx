@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Modal, Avatar, Checkbox, Alert, Tag, Tooltip, Input } from 'antd'
+import { Modal, Avatar, Checkbox, Alert, Tag, Tooltip, Input, Button } from 'antd'
 import { Link } from '@tanstack/react-router'
 import { AlertTriangle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -43,6 +43,11 @@ export function AgentCreateModal({
   const { t } = useTranslation()
   const [name, setName] = useState('')
   const [selected, setSelected] = useState<string[]>([])
+  // Creation is a 2-step wizard: 1) pick accounts, 2) name the agent.
+  const [step, setStep] = useState<1 | 2>(1)
+  // Whether the user manually edited the name — until then we keep it in sync
+  // with the first selected account so the suggestion follows their choice.
+  const [nameTouched, setNameTouched] = useState(false)
 
   const isEditMode = !!editAgent
 
@@ -55,11 +60,25 @@ export function AgentCreateModal({
         setSelected([])
         setName('')
       }
+      setStep(1)
+      setNameTouched(false)
     }
   }, [open, editAgent])
 
   // Show all messaging-capable accounts (WhatsApp, Instagram DM, Messenger)
   const availableAccounts = socialAccounts.filter((a) => SUPPORTED_PROVIDERS.includes(a.provider))
+
+  // The name suggested from the first chosen account — the page names can be
+  // long, so we default to a single account instead of joining them all.
+  const suggestedName = useMemo(() => {
+    const first = socialAccounts.find((a) => a.id === selected[0])
+    return first ? first.pageName || first.username || first.providerAccountId : ''
+  }, [socialAccounts, selected])
+
+  const goToNameStep = () => {
+    if (!nameTouched) setName(suggestedName)
+    setStep(2)
+  }
 
   // Build a map of socialAccountId -> agentId (exclude the agent being edited)
   const accountToAgent = useMemo(() => {
@@ -94,120 +113,179 @@ export function AgentCreateModal({
     setSelected((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]))
   }
 
+  // Create mode is a 2-step wizard; edit mode is a single screen (accounts only).
+  const showAccounts = isEditMode || step === 1
+  const showName = !isEditMode && step === 2
+
+  const title = isEditMode
+    ? t('agent.edit_resources_modal_title')
+    : step === 1
+      ? t('agent.create_step_accounts_title')
+      : t('agent.create_step_name_title')
+
+  const footer = isEditMode
+    ? [
+        <Button key="cancel" onClick={onClose}>
+          {t('agent.create_modal_cancel')}
+        </Button>,
+        <Button
+          key="save"
+          type="primary"
+          loading={loading}
+          disabled={selected.length === 0}
+          onClick={() => onSubmit(name.trim(), selected)}
+        >
+          {t('agent.edit_resources_modal_ok')}
+        </Button>,
+      ]
+    : step === 1
+      ? [
+          <Button key="cancel" onClick={onClose}>
+            {t('agent.create_modal_cancel')}
+          </Button>,
+          <Button
+            key="next"
+            type="primary"
+            disabled={selected.length === 0}
+            onClick={goToNameStep}
+          >
+            {t('agent.create_modal_next')}
+          </Button>,
+        ]
+      : [
+          <Button key="back" onClick={() => setStep(1)}>
+            {t('agent.create_modal_back')}
+          </Button>,
+          <Button
+            key="create"
+            type="primary"
+            loading={loading}
+            disabled={!name.trim()}
+            onClick={() => onSubmit(name.trim(), selected)}
+          >
+            {t('agent.create_modal_ok')}
+          </Button>,
+        ]
+
   return (
-    <Modal
-      title={isEditMode ? t('agent.edit_resources_modal_title') : t('agent.create_modal_title')}
-      open={open}
-      onCancel={onClose}
-      onOk={() => onSubmit(name.trim(), selected)}
-      okText={isEditMode ? t('agent.edit_resources_modal_ok') : t('agent.create_modal_ok')}
-      cancelText={t('agent.create_modal_cancel')}
-      okButtonProps={{ disabled: selected.length === 0, loading }}
-    >
-      {!isEditMode && (
-        <div className="mb-4">
+    <Modal title={title} open={open} onCancel={onClose} footer={footer}>
+      {showName && (
+        <div className="mb-2">
           <label className="mb-1.5 block text-sm font-medium text-text-primary">
             {t('agent.name_label')}
           </label>
           <Input
             placeholder={t('agent.name_placeholder')}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value)
+              setNameTouched(true)
+            }}
+            autoFocus
           />
           <Alert type="info" showIcon className="mt-2!" message={t('agent.name_info')} />
         </div>
       )}
 
-      <label className="mb-1.5 block text-sm font-medium text-text-primary">
-        {t('agent.accounts_label')}
-      </label>
+      {showAccounts && (
+        <>
+          <label className="mb-1.5 block text-sm font-medium text-text-primary">
+            {t('agent.accounts_label')}
+          </label>
 
-      <div className="flex flex-col gap-2">
-        {availableAccounts.map((account) => {
-          const linkedAgent = accountToAgent.get(account.id)
-          const isDisabled = !!linkedAgent
-          const network = (
-            account.provider === 'FACEBOOK' ? 'messenger' : account.provider.toLowerCase()
-          ) as SocialNetwork
-          const isWhatsappWithoutCatalog =
-            account.provider === 'WHATSAPP' && !whatsappAccountsWithCatalog.has(account.id)
+          <div className="flex flex-col gap-2">
+            {availableAccounts.map((account) => {
+              const linkedAgent = accountToAgent.get(account.id)
+              const isDisabled = !!linkedAgent
+              const network = (
+                account.provider === 'FACEBOOK' ? 'messenger' : account.provider.toLowerCase()
+              ) as SocialNetwork
+              const isWhatsappWithoutCatalog =
+                account.provider === 'WHATSAPP' && !whatsappAccountsWithCatalog.has(account.id)
 
-          return (
-            <div
-              key={account.id}
-              className={`flex items-center gap-3 rounded-lg border p-3 ${
-                isDisabled
-                  ? 'cursor-not-allowed border-border-subtle bg-bg-subtle opacity-60'
-                  : selected.includes(account.id)
-                    ? 'border-text-primary bg-bg-surface'
-                    : 'cursor-pointer border-border-default bg-bg-surface hover:bg-bg-subtle'
-              }`}
-              onClick={() => !isDisabled && handleToggle(account.id)}
-            >
-              <Checkbox
-                checked={selected.includes(account.id)}
-                disabled={isDisabled}
-                style={{ pointerEvents: 'none' }}
-              />
-              <div className="relative flex-shrink-0">
-                <Avatar src={account.profilePictureUrl} size={36}>
-                  {(account.pageName || account.username || '?')[0]}
-                </Avatar>
-                <span className="absolute -right-1 -bottom-1">
-                  <SocialBadge network={network} size={18} bg="white" />
-                </span>
-              </div>
-              <div className="flex flex-1 flex-col">
-                <span className="text-sm font-medium text-text-primary">
-                  {account.pageName || account.username || account.providerAccountId}
-                </span>
-                <span className="text-xs text-text-muted">
-                  {PROVIDER_LABELS[account.provider] || account.provider}
-                  {account.provider === 'WHATSAPP' && account.username && (
-                    <span> • {account.username}</span>
-                  )}
-                  {account.provider !== 'WHATSAPP' && account.username && account.pageName && (
-                    <span> • @{account.username}</span>
-                  )}
-                </span>
-              </div>
-              {isDisabled && linkedAgent && (
-                <Tooltip
-                  title={t('agent.linked_to_agent', { name: linkedAgent.name || linkedAgent.id })}
+              return (
+                <div
+                  key={account.id}
+                  className={`flex items-center gap-3 rounded-lg border p-3 ${
+                    isDisabled
+                      ? 'cursor-not-allowed border-border-subtle bg-bg-subtle opacity-60'
+                      : selected.includes(account.id)
+                        ? 'border-text-primary bg-bg-surface'
+                        : 'cursor-pointer border-border-default bg-bg-surface hover:bg-bg-subtle'
+                  }`}
+                  onClick={() => !isDisabled && handleToggle(account.id)}
                 >
-                  <Link
-                    to="/app/$orgSlug/agents"
-                    params={{ orgSlug }}
-                    className="text-xs text-text-muted underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {t('agent.already_linked')}
-                  </Link>
-                </Tooltip>
-              )}
-              {!isDisabled && isWhatsappWithoutCatalog && (
-                <Tag
-                  icon={<AlertTriangle size={12} />}
-                  style={{
-                    color: 'var(--color-text-primary)',
-                    background: 'var(--color-bg-surface)',
-                    borderColor: 'var(--color-border-default)',
-                  }}
-                >
-                  {t('agent.no_catalog')}
-                </Tag>
-              )}
-            </div>
-          )
-        })}
-      </div>
+                  <Checkbox
+                    checked={selected.includes(account.id)}
+                    disabled={isDisabled}
+                    style={{ pointerEvents: 'none' }}
+                  />
+                  <div className="relative flex-shrink-0">
+                    <Avatar src={account.profilePictureUrl} size={36}>
+                      {(account.pageName || account.username || '?')[0]}
+                    </Avatar>
+                    <span className="absolute -right-1 -bottom-1">
+                      <SocialBadge network={network} size={18} bg="white" />
+                    </span>
+                  </div>
+                  <div className="flex flex-1 flex-col">
+                    <span className="text-sm font-medium text-text-primary">
+                      {account.pageName || account.username || account.providerAccountId}
+                    </span>
+                    <span className="text-xs text-text-muted">
+                      {PROVIDER_LABELS[account.provider] || account.provider}
+                      {account.provider === 'WHATSAPP' && account.username && (
+                        <span> • {account.username}</span>
+                      )}
+                      {account.provider !== 'WHATSAPP' && account.username && account.pageName && (
+                        <span> • @{account.username}</span>
+                      )}
+                    </span>
+                  </div>
+                  {isDisabled && linkedAgent && (
+                    <Tooltip
+                      title={t('agent.linked_to_agent', { name: linkedAgent.name || linkedAgent.id })}
+                    >
+                      <Link
+                        to="/app/$orgSlug/agents"
+                        params={{ orgSlug }}
+                        className="text-xs text-text-muted underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {t('agent.already_linked')}
+                      </Link>
+                    </Tooltip>
+                  )}
+                  {!isDisabled && isWhatsappWithoutCatalog && (
+                    <Tag
+                      icon={<AlertTriangle size={12} />}
+                      style={{
+                        color: 'var(--color-text-primary)',
+                        background: 'var(--color-bg-surface)',
+                        borderColor: 'var(--color-border-default)',
+                      }}
+                    >
+                      {t('agent.no_catalog')}
+                    </Tag>
+                  )}
+                </div>
+              )
+            })}
+          </div>
 
-      {hasNoCatalogWarning && selected.length > 0 && (
-        <Alert type="warning" showIcon className="mt-3" message={t('agent.no_catalog_warning')} />
-      )}
+          {hasNoCatalogWarning && selected.length > 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              className="mt-3"
+              message={t('agent.no_catalog_warning')}
+            />
+          )}
 
-      {availableAccounts.length === 0 && (
-        <Alert type="info" showIcon message={t('agent.no_social_accounts')} />
+          {availableAccounts.length === 0 && (
+            <Alert type="info" showIcon message={t('agent.no_social_accounts')} />
+          )}
+        </>
       )}
     </Modal>
   )
