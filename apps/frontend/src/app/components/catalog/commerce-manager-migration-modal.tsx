@@ -950,20 +950,21 @@ export function CommerceManagerMigrationModal({ open, orgSlug, onClose, presetAc
                       {st === 'done' && <Icon name="check" size={13} />}
                       {st === 'doing' && <span className="mc-spin sm" />}
                     </span>
-                    {task}
+                    <span className="mc-task-tx">
+                      {task}
+                      {st === 'doing' && (migration?.totalProducts ?? 0) > 0 && (
+                        <span className="mc-task-sub">
+                          {tf('s4_task_count', {
+                            done: migration?.importedProducts ?? 0,
+                            total: migration?.totalProducts,
+                          })}
+                        </span>
+                      )}
+                    </span>
                   </li>
                 )
               })}
             </ul>
-            {(migration?.totalProducts ?? 0) > 0 && (
-              <p className="mc-caption mc-center-tx">
-                {migration?.importedProducts ?? 0}/{migration?.totalProducts} ·{' '}
-                {Math.round(
-                  ((migration?.importedProducts ?? 0) / (migration?.totalProducts || 1)) * 100,
-                )}
-                %
-              </p>
-            )}
             <p className="mc-caption mc-center-tx">{tf('s4_caption')}</p>
           </div>
         ),

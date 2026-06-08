@@ -20,13 +20,15 @@
   --danger-bg: #fef2f2;
   --danger-border: #fecaca;
   --radius-2xl: 20px;
-  --font-sans: 'Geist', -apple-system, 'SF Pro Display', 'SF Pro Text', ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    'Geist', -apple-system, 'SF Pro Display', 'SF Pro Text', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   font-family: var(--font-sans);
   color: var(--fg-1);
   background: var(--bg-surface);
@@ -492,6 +494,18 @@
 .cmm-root .mc-task.is-doing .mc-task-dot {
   border-color: var(--fg-1);
 }
+.cmm-root .mc-task-tx {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+}
+.cmm-root .mc-task-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fg-3);
+}
 
 /* Link visual (steps 4/5) */
 .cmm-root .mc-linkviz {
@@ -538,9 +552,18 @@
   background: var(--danger-border);
 }
 @keyframes cmm-spine {
-  0% { width: 0; left: 0; }
-  50% { width: 100%; left: 0; }
-  100% { width: 0; left: 100%; }
+  0% {
+    width: 0;
+    left: 0;
+  }
+  50% {
+    width: 100%;
+    left: 0;
+  }
+  100% {
+    width: 0;
+    left: 100%;
+  }
 }
 .cmm-root .mc-linkviz-badge {
   position: absolute;
@@ -669,7 +692,9 @@
   border-width: 3px;
 }
 @keyframes cmm-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* No-title centered "moment" screens */
@@ -787,10 +812,20 @@
   animation-delay: 0.8s;
 }
 @keyframes cmm-travel {
-  0% { left: 6px; opacity: 0; }
-  20% { opacity: 1; }
-  80% { opacity: 1; }
-  100% { left: 46px; opacity: 0; }
+  0% {
+    left: 6px;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    left: 46px;
+    opacity: 0;
+  }
 }
 
 /* Confirmation line (step 3) */
@@ -941,7 +976,10 @@
   border: 0;
   background: transparent;
   cursor: pointer;
-  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+  transition:
+    opacity 0.15s,
+    background 0.15s,
+    border-color 0.15s;
 }
 .cmm-root .mc-btn-primary {
   background: var(--fg-1);
@@ -1013,4 +1051,24 @@
   border-radius: var(--radius-2xl, 20px);
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+}
+
+/* Mobile: pin header + footer, scroll only the body. Use the dynamic viewport
+   height so the browser address bar can't push the footer off-screen. */
+@media (max-width: 640px) {
+  .cmm-root {
+    max-height: calc(100dvh - 16px);
+  }
+  .cmm-root .mc-head {
+    padding: 14px 16px 12px;
+  }
+  .cmm-root .mc-bodyscroll {
+    padding: 18px 16px 4px;
+  }
+  .cmm-root .mc-stepper {
+    padding: 10px 16px;
+  }
+  .cmm-root .mc-foot {
+    padding: 12px 16px 14px;
+  }
 }
