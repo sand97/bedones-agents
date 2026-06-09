@@ -68,7 +68,21 @@ export function createTicketTools(deps: {
         if (title) updateData.title = title
         if (description) updateData.description = description
         if (priority) updateData.priority = priority
-        if (statusId) updateData.statusId = statusId
+        if (statusId) {
+          // The model sometimes invents a statusId (e.g. it reuses the ticket id).
+          // Apply it only when it is a real status of this org — otherwise ignore
+          // it, so the DB never throws a foreign-key error that the model would
+          // retry until it exhausts its tool-call budget (recursion-limit crash).
+          const validStatus = await deps.prisma.ticketStatus.findFirst({
+            where: { id: statusId, organisationId: deps.organisationId },
+            select: { id: true },
+          })
+          if (validStatus) updateData.statusId = statusId
+        }
+
+        if (Object.keys(updateData).length === 0) {
+          return 'Aucune modification valide a appliquer (statut inconnu ?). Utilise get_ticket_statuses pour un statut valide.'
+        }
 
         const ticket = await deps.prisma.ticket.update({
           where: { id: ticketId },

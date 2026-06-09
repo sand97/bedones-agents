@@ -13,9 +13,20 @@ export function createProductMessagingTools(deps: {
     async ({ productIds, catalogId, format, headerText, bodyText }) => {
       if (deps.replyGuard?.sent) return REPLY_ALREADY_SENT_NOTICE
 
-      const metaCatalogId = deps.catalogProviderMap[catalogId]
+      // The model frequently confuses catalogId with a product/retailer id. When
+      // the agent has a single catalog, resolve it automatically; otherwise keep
+      // the id it provided. This avoids a failed call + retry that eats the turn
+      // budget (and can lead to a recursion-limit crash).
+      const catalogKeys = Object.keys(deps.catalogProviderMap)
+      let resolvedCatalogId = catalogId
+      if (!resolvedCatalogId || !deps.catalogProviderMap[resolvedCatalogId]) {
+        if (catalogKeys.length === 1) resolvedCatalogId = catalogKeys[0]
+      }
+      const metaCatalogId = resolvedCatalogId
+        ? deps.catalogProviderMap[resolvedCatalogId]
+        : undefined
       if (!metaCatalogId) {
-        return `Failed: catalog "${catalogId}" has no Meta provider ID. Available catalogs: ${Object.keys(deps.catalogProviderMap).join(', ')}`
+        return `Failed: unknown catalogId "${catalogId ?? ''}" (this is NOT a product/retailer id). Use one of: ${catalogKeys.join(', ')}.`
       }
 
       try {
@@ -43,7 +54,12 @@ export function createProductMessagingTools(deps: {
           .min(1)
           .max(30)
           .describe('Array of product retailer IDs to send (max 30)'),
-        catalogId: z.string().describe('Internal catalog ID (from search_products context)'),
+        catalogId: z
+          .string()
+          .optional()
+          .describe(
+            'Internal catalog ID. Omit it when the agent has a single catalog (it is inferred automatically). This is NOT a product/retailer id.',
+          ),
         format: z
           .enum(['product', 'product_list', 'carousel', 'catalog_message'])
           .describe(
