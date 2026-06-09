@@ -136,6 +136,62 @@ export class QdrantService implements OnModuleInit {
     return indexed
   }
 
+  // ─── Debug read helpers (full payload, no vectors) ───
+
+  /** Scroll a catalog's indexed points with their full payload. */
+  async scrollProducts(
+    catalogId: string,
+    limit = 50,
+  ): Promise<{ id: string | number; payload: Record<string, unknown> }[]> {
+    if (!this.isConfigured() || !this.client) return []
+    const name = this.collectionName(catalogId)
+    const out: { id: string | number; payload: Record<string, unknown> }[] = []
+    let offset: string | number | undefined
+
+    try {
+      do {
+        const page = await this.client.scroll(name, {
+          limit: Math.min(256, limit - out.length),
+          offset,
+          with_payload: true,
+          with_vector: false,
+        })
+        for (const point of page.points || []) {
+          out.push({ id: point.id, payload: (point.payload || {}) as Record<string, unknown> })
+          if (out.length >= limit) break
+        }
+        offset = page.next_page_offset as string | number | undefined
+      } while (offset !== undefined && offset !== null && out.length < limit)
+    } catch (error) {
+      if (this.isCollectionNotFoundError(error)) return []
+      throw error
+    }
+
+    return out
+  }
+
+  /** Retrieve a single product point's full payload. */
+  async getProductPoint(
+    catalogId: string,
+    productId: string,
+  ): Promise<{ id: string | number; payload: Record<string, unknown> } | null> {
+    if (!this.isConfigured() || !this.client) return null
+    const name = this.collectionName(catalogId)
+    try {
+      const res = await this.client.retrieve(name, {
+        ids: [this.toPointId(productId)],
+        with_payload: true,
+        with_vector: false,
+      })
+      const point = res?.[0]
+      if (!point) return null
+      return { id: point.id, payload: (point.payload || {}) as Record<string, unknown> }
+    } catch (error) {
+      if (this.isCollectionNotFoundError(error)) return null
+      throw error
+    }
+  }
+
   // ─── Indexing (upsert a full product point) ───
 
   async upsertProduct(

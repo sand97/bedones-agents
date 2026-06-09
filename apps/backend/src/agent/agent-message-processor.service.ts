@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
 import { ConfigService } from '@nestjs/config'
-import { HumanMessage, SystemMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
+import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
 import { LlmFactoryService } from '../common/llm/llm-factory.service'
-import { createRequire } from 'module'
-const _require = createRequire(__filename)
-const { createReactAgent } = _require('@langchain/langgraph/prebuilt')
 
 import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
@@ -17,15 +14,7 @@ import type { IncomingMessageEvent } from '../social/webhook.service'
 import { CreditService } from '../stats/credit.service'
 import type { CreditMediaType } from '../../generated/prisma/client'
 
-import { createCommunicationTools } from './tools/live/communication.tools'
-import { createCatalogTools } from './tools/live/catalog.tools'
-import { createLabelTools } from './tools/live/label.tools'
-import { createMessageTools } from './tools/live/message.tools'
-import { createTicketTools } from './tools/live/ticket.tools'
-import { createPromotionTools } from './tools/live/promotion.tools'
-import { createProductMessagingTools } from './tools/live/product-messaging.tools'
-import { createContactNoteTools } from './tools/live/contact-note.tools'
-import { createButtonMessagingTools } from './tools/live/button-messaging.tools'
+import { runLiveAgent } from './run-live-agent'
 import { contactMatchesConversation } from '../social/contact-match.util'
 
 @Injectable()
@@ -293,63 +282,8 @@ export class AgentMessageProcessorService {
         return new HumanMessage(content)
       })
 
-    // Create tools
-    const tools = [
-      ...createCommunicationTools({
-        messagingService: this.messagingService,
-        conversationId: event.conversationId,
-      }),
-      ...createCatalogTools({
-        catalogSearchService: this.catalogSearchService,
-        catalogIds,
-      }),
-      ...createLabelTools({
-        prisma: this.prisma,
-        socialAccountId: event.socialAccountId,
-      }),
-      ...createMessageTools({
-        prisma: this.prisma,
-        conversationId: event.conversationId,
-      }),
-      ...createTicketTools({
-        prisma: this.prisma,
-        gateway: this.gateway,
-        agentId: agent.id,
-        organisationId: agent.organisationId,
-        conversationId: event.conversationId,
-      }),
-      ...createPromotionTools({
-        prisma: this.prisma,
-        organisationId: agent.organisationId,
-      }),
-      ...createContactNoteTools({
-        prisma: this.prisma,
-        conversationId: event.conversationId,
-        agentId: agent.id,
-      }),
-      ...(canSendButtons
-        ? createButtonMessagingTools({
-            messagingService: this.messagingService,
-            conversationId: event.conversationId,
-          })
-        : []),
-      ...(event.provider === 'WHATSAPP' && Object.keys(catalogProviderMap).length > 0
-        ? createProductMessagingTools({
-            messagingService: this.messagingService,
-            conversationId: event.conversationId,
-            catalogProviderMap,
-          })
-        : []),
-    ]
-
-    // Create LLM with fallback
+    // Create LLM with fallback (flash tier: Gemini primary, OpenAI fallback)
     const model = this.createModel()
-
-    // Create and run the agent
-    const agentExecutor = createReactAgent({
-      llm: model,
-      tools,
-    })
 
     const callLimit = this.config.get<number>('AGENT_MODEL_CALL_LIMIT') || 6
 
@@ -361,23 +295,34 @@ export class AgentMessageProcessorService {
     void this.messagingService.sendTypingIndicator(event.conversationId)
 
     try {
-      await agentExecutor.invoke(
-        {
-          messages: [
-            new SystemMessage(systemPrompt),
-            ...historyMessages,
-            new HumanMessage(userMessageContent || '[Message vide]'),
-          ],
+      // Shared core (also used by the debug MCP and the e2e harness) so the tool
+      // wiring under test never drifts from production.
+      await runLiveAgent({
+        systemPrompt,
+        history: historyMessages,
+        userMessageContent,
+        model,
+        recursionLimit: callLimit * 2 + 1,
+        // Trace at invoke time so the model passed to createReactAgent keeps
+        // its `bindTools` method (a wrapped/traced Runnable would hide it).
+        callbacks: this.llmFactory.buildTraceCallbacks({
+          properties: { feature: 'agent-live-response' },
+        }),
+        toolContext: {
+          prisma: this.prisma,
+          messagingService: this.messagingService,
+          catalogSearchService: this.catalogSearchService,
+          gateway: this.gateway,
+          conversationId: event.conversationId,
+          socialAccountId: event.socialAccountId,
+          agentId: agent.id,
+          organisationId: agent.organisationId,
+          catalogIds,
+          catalogProviderMap,
+          canSendButtons,
+          canSendProducts,
         },
-        {
-          recursionLimit: callLimit * 2 + 1,
-          // Trace at invoke time so the model passed to createReactAgent keeps
-          // its `bindTools` method (a wrapped/traced Runnable would hide it).
-          callbacks: this.llmFactory.buildTraceCallbacks({
-            properties: { feature: 'agent-live-response' },
-          }),
-        },
-      )
+      })
 
       this.logger.log(`Agent ${agent.id} processed message successfully`)
     } catch (error: unknown) {
