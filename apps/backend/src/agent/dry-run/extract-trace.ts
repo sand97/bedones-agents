@@ -10,6 +10,29 @@ export interface RecordedToolCall {
   result?: string
 }
 
+export interface TokenUsage {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  /** Number of LLM round-trips the agent made for this turn. */
+  llmCalls: number
+}
+
+export interface AgentRunSignals {
+  toolCalls: number
+  /** Total customer-facing sends (reply + buttons + product messages). */
+  customerFacingSends: number
+  /** Number of reply_to_message sends specifically. */
+  replyMessages: number
+  /**
+   * TRUE when the agent sent more than one message to the customer in a single
+   * turn — this must NEVER happen in production (see system prompt rules).
+   */
+  multipleSends: boolean
+  /** Total characters across the reply messages (brevity signal). */
+  replyChars: number
+}
+
 export interface AgentRunTrace {
   toolCalls: RecordedToolCall[]
   capturedSends: CapturedSend[]
@@ -18,6 +41,10 @@ export interface AgentRunTrace {
   finalReplyText: string
   /** Raw text content of the last assistant message (fallback / debugging). */
   lastAssistantText: string
+  /** Aggregated token usage across all LLM calls in the turn. */
+  tokenUsage: TokenUsage
+  /** Quality signals to drive system-prompt / model iteration. */
+  signals: AgentRunSignals
 }
 
 type LooseMessage = {
@@ -26,6 +53,11 @@ type LooseMessage = {
   tool_calls?: { id?: string; name: string; args: unknown }[]
   tool_call_id?: string
   content?: unknown
+  usage_metadata?: { input_tokens?: number; output_tokens?: number; total_tokens?: number }
+  response_metadata?: {
+    tokenUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number }
+    usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number }
+  }
 }
 
 function messageType(m: LooseMessage): string {
@@ -108,16 +140,57 @@ export function reconstructReply(sends: CapturedSend[]): string {
   return parts.join('\n')
 }
 
+/** Sum token usage across every assistant (LLM) message in the turn. */
+export function aggregateTokenUsage(messages: BaseMessage[]): TokenUsage {
+  let inputTokens = 0
+  let outputTokens = 0
+  let totalTokens = 0
+  let llmCalls = 0
+
+  for (const raw of messages as unknown as LooseMessage[]) {
+    if (messageType(raw) !== 'ai') continue
+    const um = raw.usage_metadata
+    const rm = raw.response_metadata
+    const input = um?.input_tokens ?? rm?.usage?.input_tokens ?? rm?.tokenUsage?.promptTokens
+    const output = um?.output_tokens ?? rm?.usage?.output_tokens ?? rm?.tokenUsage?.completionTokens
+    const total = um?.total_tokens ?? rm?.usage?.total_tokens ?? rm?.tokenUsage?.totalTokens
+
+    if (input === undefined && output === undefined && total === undefined) continue
+    inputTokens += input ?? 0
+    outputTokens += output ?? 0
+    totalTokens += total ?? (input ?? 0) + (output ?? 0)
+    llmCalls += 1
+  }
+
+  return { inputTokens, outputTokens, totalTokens, llmCalls }
+}
+
+function computeSignals(toolCalls: RecordedToolCall[], sends: CapturedSend[]): AgentRunSignals {
+  const replies = sends.filter(
+    (s): s is Extract<CapturedSend, { kind: 'reply' }> => s.kind === 'reply',
+  )
+  return {
+    toolCalls: toolCalls.length,
+    customerFacingSends: sends.length,
+    replyMessages: replies.length,
+    multipleSends: sends.length > 1,
+    replyChars: replies.reduce((n, s) => n + s.message.length, 0),
+  }
+}
+
 export function buildAgentRunTrace(
   messages: BaseMessage[],
   sends: CapturedSend[],
   writes: CapturedWrite[],
 ): AgentRunTrace {
+  const toolCalls = extractToolCalls(messages)
   return {
-    toolCalls: extractToolCalls(messages),
+    toolCalls,
     capturedSends: sends,
     simulatedDbWrites: writes,
     finalReplyText: reconstructReply(sends),
     lastAssistantText: extractLastAssistantText(messages),
+    tokenUsage: aggregateTokenUsage(messages),
+    signals: computeSignals(toolCalls, sends),
   }
 }

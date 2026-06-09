@@ -7,6 +7,7 @@ import { DebugMcpAuthGuard } from './auth/debug-mcp-auth.guard'
 import { DebugAgentTools } from './tools/agent-sim.tools'
 import { DebugDbTools } from './tools/db-read.tools'
 import { DebugQdrantTools } from './tools/qdrant-inspect.tools'
+import { DebugCatalogTools } from './tools/catalog-write.tools'
 
 const DEBUG_SERVER_INSTRUCTIONS = `Serveur MCP de DEBUG (interne), totalement distinct du MCP de prod.
 Il est verrouillé sur UNE seule organisation (DEBUG_MCP_ORG_ID) — impossible de lire les données d'une autre.
@@ -42,6 +43,7 @@ Outils:
     DebugAgentTools,
     DebugDbTools,
     DebugQdrantTools,
+    DebugCatalogTools,
   ],
   exports: [DebugMcpAuthGuard],
 })

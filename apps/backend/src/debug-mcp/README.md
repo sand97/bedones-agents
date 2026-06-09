@@ -12,8 +12,14 @@ re-doing any DevOps.
   real LLM, real catalog search and real DB **reads**, but **nothing is sent**
   to WhatsApp and **no write is committed**. Returns the full trace: ordered
   tool calls (name + args + result), the customer-facing reply that *would* have
-  been sent, and the DB writes that *would* have happened. This is how you
-  reproduce hallucinations end-to-end.
+  been sent, and the DB writes that *would* have happened.
+  - Pick the model per call with `model` / `provider` (falls back to the env
+    flash model). Lets you A/B models for performance/quality.
+  - The response also carries **`tokenUsage`** (input/output/total + number of
+    LLM calls), **`durationMs`** and **`signals`** — notably
+    **`multipleSends`** (the agent sent >1 message in one turn — must NEVER
+    happen) and **`replyChars`** (brevity). Use these to iterate on the system
+    prompt toward short, human-like replies.
 - **`list_tables` / `read_table` / `list_products`** — read-only DB access,
   restricted to an allow-list of tables, always AND-ed with the org scope.
   Sensitive columns (`passwordHash`, `accessToken`, `refreshToken`) are masked
@@ -22,6 +28,10 @@ re-doing any DevOps.
 - **`qdrant_list_indexed` / `qdrant_get_point`** — inspect what is actually
   indexed in Qdrant (payload per point), e.g. to spot a missing `currency`
   field.
+- **`add_products` / `index_products`** — bulk-create products in a catalog
+  (explicit list and/or N synthetic ones) and index them into Qdrant (text
+  embeddings; payload **includes `currency`**, the field the prod pipeline
+  omits). Fill catalogs to load-test search + agent behaviour at scale.
 
 ## Safety model
 

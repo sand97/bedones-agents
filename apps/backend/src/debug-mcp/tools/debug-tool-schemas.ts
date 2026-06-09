@@ -21,6 +21,68 @@ export const chatWithAgentSchema = z.object({
     .string()
     .optional()
     .describe('Optional agent id to test. Defaults to the first agent of the organisation.'),
+  provider: z
+    .enum(['gemini', 'openai'])
+    .optional()
+    .describe('Force the LLM provider. Default: env (Gemini primary, OpenAI fallback).'),
+  model: z
+    .string()
+    .optional()
+    .describe(
+      'Override the model id (e.g. "gemini-3-flash-preview", "gpt-5-mini"). Provider is inferred from the name when not given. Default: the env flash model.',
+    ),
+  temperature: z
+    .number()
+    .min(0)
+    .max(2)
+    .optional()
+    .describe('Sampling temperature. Default 0 for reproducible debug runs.'),
+})
+
+export const addProductsSchema = z.object({
+  catalogId: z
+    .string()
+    .optional()
+    .describe("Target catalog (this org). Defaults to the org's first catalog."),
+  products: z
+    .array(
+      z.object({
+        name: z.string(),
+        price: z.number().optional(),
+        currency: z.string().optional().describe('Default "XAF".'),
+        description: z.string().optional(),
+        category: z.string().optional(),
+      }),
+    )
+    .optional()
+    .describe('Explicit products to create.'),
+  count: z
+    .number()
+    .int()
+    .positive()
+    .max(1000)
+    .optional()
+    .describe(
+      'Generate this many synthetic products (load testing), in addition to any explicit ones.',
+    ),
+  namePrefix: z
+    .string()
+    .optional()
+    .describe('Name prefix for synthetic products (default "Article").'),
+})
+
+export const indexProductsSchema = z.object({
+  catalogId: z
+    .string()
+    .optional()
+    .describe("Catalog to (re)index into Qdrant (this org). Defaults to the org's first catalog."),
+  limit: z
+    .number()
+    .int()
+    .positive()
+    .max(1000)
+    .optional()
+    .describe('Max products to index this call (default 200).'),
 })
 
 export const readTableSchema = z.object({

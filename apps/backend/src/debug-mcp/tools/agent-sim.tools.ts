@@ -137,12 +137,13 @@ export class DebugAgentTools {
       contactNotes,
     })
 
-    const model = this.llmFactory.createToolCallingModel('flash', { temperature: 0 })
+    const model = this.llmFactory.createToolCallingModel('flash', resolveModelOptions(args))
     const callLimit = Number(this.config.get('AGENT_MODEL_CALL_LIMIT')) || 6
 
     // Dry-run seams: capture sends, intercept writes, no PostHog tracing.
     const messaging = new CapturingMessagingDouble()
     const { prisma: dryRunPrisma, writes } = createDryRunPrisma(this.prisma)
+    const startedAt = Date.now()
 
     try {
       const result = await runLiveAgent({
@@ -167,20 +168,24 @@ export class DebugAgentTools {
           canSendProducts,
         },
       })
+      const durationMs = Date.now() - startedAt
 
       const trace = buildAgentRunTrace(result.messages, messaging.sends, writes)
       return {
         agent: { id: agent.id, status: agent.status },
-        socialAccountId,
-        provider,
+        channelProvider: provider,
         conversationId: args.conversationId ?? null,
+        socialAccountId,
         catalogIds,
         model: describeModel(model),
+        durationMs,
         ...trace,
       }
     } catch (error: unknown) {
       return {
         error: `Agent run failed: ${error instanceof Error ? error.message : String(error)}`,
+        model: describeModel(model),
+        durationMs: Date.now() - startedAt,
         capturedSends: messaging.sends,
         simulatedDbWrites: writes,
       }
@@ -189,8 +194,31 @@ export class DebugAgentTools {
 }
 
 function describeModel(model: object): { provider: string; model?: string } {
-  return {
-    provider: model.constructor?.name ?? 'unknown',
-    model: (model as { model?: string }).model,
+  const ctor = model.constructor?.name ?? ''
+  const provider =
+    ctor.includes('Google') || ctor.includes('Gemini')
+      ? 'gemini'
+      : ctor.includes('OpenAI')
+        ? 'openai'
+        : ctor || 'unknown'
+  return { provider, model: (model as { model?: string }).model }
+}
+
+/**
+ * Resolve the model choice for a debug run: an explicit provider/model wins,
+ * otherwise the provider is inferred from the model name, otherwise we fall back
+ * to the env-configured flash model. Temperature defaults to 0 (reproducible).
+ */
+function resolveModelOptions(args: {
+  provider?: 'gemini' | 'openai'
+  model?: string
+  temperature?: number
+}): { provider?: 'gemini' | 'openai'; model?: string; temperature: number } {
+  let provider = args.provider
+  if (!provider && args.model) {
+    const m = args.model.toLowerCase().replace(/^models\//, '')
+    if (m.startsWith('gemini')) provider = 'gemini'
+    else if (m.startsWith('gpt') || /^o[1-9]/.test(m)) provider = 'openai'
   }
+  return { provider, model: args.model, temperature: args.temperature ?? 0 }
 }

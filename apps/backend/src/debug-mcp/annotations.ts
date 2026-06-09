@@ -18,6 +18,20 @@ export const DRY_RUN_AGENT: ToolAnnotations = {
   openWorldHint: true,
 }
 
+/** Writes to Bedones' own database only (debug seeding). */
+export const WRITE: ToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  openWorldHint: false,
+}
+
+/** Write that also reaches an external system (embeddings + Qdrant). */
+export const WRITE_EXTERNAL: ToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  openWorldHint: true,
+}
+
 export function withTitle(title: string, base: ToolAnnotations): ToolAnnotations {
   return { ...base, title }
 }
