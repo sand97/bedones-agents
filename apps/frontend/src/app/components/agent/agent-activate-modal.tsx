@@ -45,7 +45,9 @@ function OptionRow({
           <span className="text-xs text-text-muted">{subtitle}</span>
         </div>
       </Checkbox>
-      {checked && children ? <div className="pl-6">{children}</div> : null}
+      {/* Children align with the checkbox column (full card width) rather than
+          indenting under the label, to gain horizontal space. */}
+      {checked && children ? <div className="pt-1">{children}</div> : null}
     </div>
   )
 }
@@ -208,20 +210,22 @@ export function AgentActivateModal({
               <div key={provider} className="flex flex-col gap-2">
                 {accounts.map((sa) => (
                   <div key={sa.id} className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      {/* Tag sits BELOW the page name so a long name keeps its
+                          own line instead of wrapping awkwardly. */}
+                      <div className="flex min-w-0 flex-col items-start gap-1">
                         <span className="text-sm font-medium text-text-primary">
                           {sa.socialAccount.pageName ||
                             sa.socialAccount.username ||
                             getProviderLabel(provider)}
                         </span>
-                        <Tag>{getProviderLabel(provider)}</Tag>
+                        <Tag className="m-0">{getProviderLabel(provider)}</Tag>
                       </div>
                       <Button
-                        type="text"
                         size="small"
                         icon={<Plus size={14} />}
                         onClick={() => handleAddContact(sa.socialAccount.id)}
+                        className="flex-shrink-0"
                       >
                         {provider === 'WHATSAPP'
                           ? t('agent.add_phone_number')
@@ -234,6 +238,7 @@ export function AgentActivateModal({
                         {provider === 'WHATSAPP' ? (
                           <CountryPhoneInput
                             value={contact}
+                            dialCodeOnly
                             onChange={(v) => handleUpdateContact(sa.socialAccount.id, idx, v)}
                             addonAfter={
                               <Button
