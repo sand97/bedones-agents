@@ -341,6 +341,11 @@ export class AgentMessageProcessorService {
         },
         {
           recursionLimit: callLimit * 2 + 1,
+          // Trace at invoke time so the model passed to createReactAgent keeps
+          // its `bindTools` method (a wrapped/traced Runnable would hide it).
+          callbacks: this.llmFactory.buildTraceCallbacks({
+            properties: { feature: 'agent-live-response' },
+          }),
         },
       )
 
@@ -358,9 +363,10 @@ export class AgentMessageProcessorService {
    * Gemini primary, OpenAI fallback.
    */
   private createModel() {
-    return this.llmFactory.createChatModel('flash', {
-      trace: { properties: { feature: 'agent-live-response' } },
-    })
+    // createReactAgent needs a model that exposes `bindTools`, so we use a single
+    // tool-callable model here (not the fallback/traced Runnable from
+    // createChatModel). PostHog tracing is attached at invoke time via callbacks.
+    return this.llmFactory.createToolCallingModel('flash')
   }
 
   private async downloadMedia(url: string): Promise<Buffer> {
