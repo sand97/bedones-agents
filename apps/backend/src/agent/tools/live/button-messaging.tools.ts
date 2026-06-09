@@ -2,19 +2,23 @@ import { tool } from '@langchain/core/tools'
 import { z } from 'zod'
 import type { MessagingService } from '../../../social/messaging.service'
 import { MAX_BUTTONS } from '../../../social/button-format.util'
+import { type SingleReplyGuard, REPLY_ALREADY_SENT_NOTICE } from './turn-guard'
 
 export function createButtonMessagingTools(deps: {
   messagingService: MessagingService
   conversationId: string
+  replyGuard?: SingleReplyGuard
 }) {
   const sendButtons = tool(
     async ({ body, buttons }) => {
+      if (deps.replyGuard?.sent) return REPLY_ALREADY_SENT_NOTICE
       try {
         await deps.messagingService.sendInteractiveButtonsAsAgent(
           deps.conversationId,
           body,
           buttons,
         )
+        if (deps.replyGuard) deps.replyGuard.sent = true
         return `Proposal sent with ${buttons.length} button(s): ${buttons.map((b) => b.label).join(', ')}`
       } catch (error: unknown) {
         return `Failed to send buttons: ${error instanceof Error ? error.message : 'Unknown error'}`

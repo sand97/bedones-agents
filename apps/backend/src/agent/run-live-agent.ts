@@ -18,6 +18,7 @@ import { createPromotionTools } from './tools/live/promotion.tools'
 import { createProductMessagingTools } from './tools/live/product-messaging.tools'
 import { createContactNoteTools } from './tools/live/contact-note.tools'
 import { createButtonMessagingTools } from './tools/live/button-messaging.tools'
+import { createSingleReplyGuard } from './tools/live/turn-guard'
 
 const _require = createRequire(__filename)
 const { createReactAgent } = _require('@langchain/langgraph/prebuilt')
@@ -50,10 +51,15 @@ export interface LiveAgentToolContext {
  * all build the identical wiring (no logic drift).
  */
 export function buildLiveAgentTools(ctx: LiveAgentToolContext) {
+  // One guard per turn, shared by the customer-facing tools, to GUARANTEE that
+  // at most one message is delivered to the customer (no double replies).
+  const replyGuard = createSingleReplyGuard()
+
   return [
     ...createCommunicationTools({
       messagingService: ctx.messagingService,
       conversationId: ctx.conversationId,
+      replyGuard,
     }),
     ...createCatalogTools({
       catalogSearchService: ctx.catalogSearchService,
@@ -87,6 +93,7 @@ export function buildLiveAgentTools(ctx: LiveAgentToolContext) {
       ? createButtonMessagingTools({
           messagingService: ctx.messagingService,
           conversationId: ctx.conversationId,
+          replyGuard,
         })
       : []),
     ...(ctx.canSendProducts
@@ -94,6 +101,7 @@ export function buildLiveAgentTools(ctx: LiveAgentToolContext) {
           messagingService: ctx.messagingService,
           conversationId: ctx.conversationId,
           catalogProviderMap: ctx.catalogProviderMap,
+          replyGuard,
         })
       : []),
   ]

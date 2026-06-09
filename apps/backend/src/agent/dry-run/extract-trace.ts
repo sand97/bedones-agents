@@ -20,15 +20,24 @@ export interface TokenUsage {
 
 export interface AgentRunSignals {
   toolCalls: number
-  /** Total customer-facing sends (reply + buttons + product messages). */
+  /** Customer-facing messages actually DELIVERED (after the single-reply guard). */
   customerFacingSends: number
   /** Number of reply_to_message sends specifically. */
   replyMessages: number
   /**
-   * TRUE when the agent sent more than one message to the customer in a single
-   * turn — this must NEVER happen in production (see system prompt rules).
+   * TRUE when more than one customer-facing message was delivered in a single
+   * turn. The single-reply guard makes this impossible in production — keep it
+   * as a hard invariant the e2e harness can assert on.
    */
   multipleSends: boolean
+  /** Customer-facing tool CALLS the model made (delivered or suppressed). */
+  customerFacingToolCalls: number
+  /**
+   * TRUE when the model TRIED to send more than one customer-facing message,
+   * even if the guard suppressed the extras. A prompt/model smell worth fixing
+   * even though the customer only ever receives one message.
+   */
+  attemptedMultipleSends: boolean
   /** Total characters across the reply messages (brevity signal). */
   replyChars: number
 }
@@ -165,15 +174,20 @@ export function aggregateTokenUsage(messages: BaseMessage[]): TokenUsage {
   return { inputTokens, outputTokens, totalTokens, llmCalls }
 }
 
+const CUSTOMER_FACING_TOOLS = new Set(['reply_to_message', 'send_buttons', 'send_products'])
+
 function computeSignals(toolCalls: RecordedToolCall[], sends: CapturedSend[]): AgentRunSignals {
   const replies = sends.filter(
     (s): s is Extract<CapturedSend, { kind: 'reply' }> => s.kind === 'reply',
   )
+  const customerFacingToolCalls = toolCalls.filter((t) => CUSTOMER_FACING_TOOLS.has(t.name)).length
   return {
     toolCalls: toolCalls.length,
     customerFacingSends: sends.length,
     replyMessages: replies.length,
     multipleSends: sends.length > 1,
+    customerFacingToolCalls,
+    attemptedMultipleSends: customerFacingToolCalls > 1,
     replyChars: replies.reduce((n, s) => n + s.message.length, 0),
   }
 }
