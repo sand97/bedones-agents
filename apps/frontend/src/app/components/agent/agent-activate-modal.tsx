@@ -77,16 +77,27 @@ export function AgentActivateModal({
     return groups
   }, [agent.socialAccounts])
 
-  // Reset state when modal opens
+  // Pre-fill from the agent's saved activation each time the modal opens, so the
+  // user sees (and can edit) what was previously configured — phone numbers
+  // included — instead of a blank form.
   useEffect(() => {
-    if (open) {
-      setActivateAll(false)
-      setActivateAds(false)
-      setActivateNew(false)
-      setContactsEnabled(false)
-      setContacts({})
+    if (!open) return
+
+    const links = agent.socialAccounts
+    const savedContacts: Record<string, string[]> = {}
+    for (const sa of links) {
+      const list = (sa.aiActivationContacts ?? []).filter((c) => c.trim().length > 0)
+      if (list.length > 0) savedContacts[sa.socialAccount.id] = list
     }
-  }, [open])
+    const hasContacts = Object.keys(savedContacts).length > 0
+    const allOn = links.some((sa) => sa.aiActivateAll)
+
+    setActivateAll(allOn)
+    setActivateAds(!allOn && links.some((sa) => sa.aiActivateAds))
+    setActivateNew(!allOn && links.some((sa) => sa.aiActivateNewConversations))
+    setContactsEnabled(!allOn && hasContacts)
+    setContacts(savedContacts)
+  }, [open, agent.socialAccounts])
 
   // "All conversations" is exclusive — selecting it clears the more specific scopes.
   const handleToggleAll = (checked: boolean) => {
