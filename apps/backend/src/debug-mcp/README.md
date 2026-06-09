@@ -39,21 +39,32 @@ re-doing any DevOps.
   this env var, **never** from a token or argument → cross-org access is
   structurally impossible.
 - **OFF by default**: the module is only mounted when `DEBUG_MCP_ENABLED=true`.
-- **Read-only / dry-run**: the only "write-ish" tool runs the agent in dry-run
-  (captured sends + intercepted writes). Everything else is read-only.
-- **Static bearer auth** (`DEBUG_MCP_TOKEN`), decoupled from the production
-  OAuth stack. A leaked token can at most read one org's masked data and dry-run
-  the agent.
+- **Read-only / dry-run by default**: `chat_with_agent` runs the agent in
+  dry-run (captured sends + intercepted writes); reads are read-only. The only
+  real writes are `add_products` / `index_products`, intentional load-test
+  seeding scoped to the pinned org.
+- **OAuth, locked to one org**: auth reuses the production Bedones OAuth (so
+  Claude connectors work), but a token issued for any org other than
+  `DEBUG_MCP_ORG_ID` is **rejected** — only members of the pinned org can
+  connect. An optional `DEBUG_MCP_TOKEN` static bearer is accepted for non-OAuth
+  clients (CLI / Codex).
 
 ## Configure & connect
 
 ```bash
 DEBUG_MCP_ENABLED=true
 DEBUG_MCP_ORG_ID=<organisation id>
+# optional, for CLI / Codex only (leave empty for OAuth-only):
 DEBUG_MCP_TOKEN=<a strong random secret>
 ```
 
-Then point an MCP client at `POST <APP_URL>/debug-mcp` (Streamable HTTP) with
+**From Claude (custom connector):** add a connector with URL
+`<APP_URL>/debug-mcp`, leave the OAuth Client ID/Secret **empty**, click Add —
+Claude runs the login + consent flow (same as the prod `/mcp`). **Pick the
+`DEBUG_MCP_ORG_ID` organisation** on the consent screen, or the connection is
+refused.
+
+**From a CLI / Codex client:** `POST <APP_URL>/debug-mcp` (Streamable HTTP) with
 header `Authorization: Bearer <DEBUG_MCP_TOKEN>`.
 
 ## Extending

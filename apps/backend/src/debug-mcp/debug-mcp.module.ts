@@ -8,6 +8,7 @@ import { DebugAgentTools } from './tools/agent-sim.tools'
 import { DebugDbTools } from './tools/db-read.tools'
 import { DebugQdrantTools } from './tools/qdrant-inspect.tools'
 import { DebugCatalogTools } from './tools/catalog-write.tools'
+import { DebugWellKnownController } from './debug-well-known.controller'
 
 const DEBUG_SERVER_INSTRUCTIONS = `Serveur MCP de DEBUG (interne), totalement distinct du MCP de prod.
 Il est verrouillé sur UNE seule organisation (DEBUG_MCP_ORG_ID) — impossible de lire les données d'une autre.
@@ -19,10 +20,12 @@ Outils:
 /**
  * A SECOND, isolated MCP server mounted at /debug-mcp, with its OWN tool
  * registry (mcp-nest scopes tool discovery to the providers of the module that
- * imports forRoot), its OWN static-token guard and a single env-pinned org.
- * Shares NOTHING with the production /mcp surface. Only mounted when
- * DEBUG_MCP_ENABLED=true (see AppModule). Declared @Global so the auto-generated
- * mcp-nest transport controller can resolve {@link DebugMcpAuthGuard}.
+ * imports forRoot) and its OWN guard. Auth reuses the production Bedones OAuth
+ * (so Claude / ChatGPT connectors can drive it) but is LOCKED to a single
+ * env-pinned org (DEBUG_MCP_ORG_ID). Shares NO tools with the production /mcp
+ * surface. Only mounted when DEBUG_MCP_ENABLED=true (see AppModule). Declared
+ * @Global so the auto-generated mcp-nest transport controller can resolve
+ * {@link DebugMcpAuthGuard}.
  */
 @Global()
 @Module({
@@ -37,6 +40,7 @@ Outils:
       guards: [DebugMcpAuthGuard],
     }),
   ],
+  controllers: [DebugWellKnownController],
   providers: [
     DebugMcpAuthGuard,
     AgentPromptsService,
