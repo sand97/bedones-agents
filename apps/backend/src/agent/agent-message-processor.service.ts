@@ -26,6 +26,7 @@ import { createPromotionTools } from './tools/live/promotion.tools'
 import { createProductMessagingTools } from './tools/live/product-messaging.tools'
 import { createContactNoteTools } from './tools/live/contact-note.tools'
 import { createButtonMessagingTools } from './tools/live/button-messaging.tools'
+import { contactMatchesConversation } from '../social/contact-match.util'
 
 @Injectable()
 export class AgentMessageProcessorService {
@@ -134,13 +135,7 @@ export class AgentMessageProcessorService {
     const contacts = link.aiActivationContacts || []
     if (
       contacts.length > 0 &&
-      contacts.some(
-        (contact) =>
-          conversation.participantId.includes(contact) ||
-          contact.includes(conversation.participantId) ||
-          (conversation.participantName &&
-            conversation.participantName.toLowerCase().includes(contact.toLowerCase())),
-      )
+      contacts.some((contact) => contactMatchesConversation(contact, conversation))
     ) {
       return true
     }

@@ -54,6 +54,12 @@ export function getApiErrorMessage(err: unknown, fallback = 'Une erreur est surv
 
 export interface AgentSocialAccount {
   id: string
+  // Activation scope persisted on the agent↔account link. Returned by the
+  // agent list/detail endpoints so the activation modal can pre-fill.
+  aiActivateAll?: boolean
+  aiActivateAds?: boolean
+  aiActivateNewConversations?: boolean
+  aiActivationContacts?: string[]
   socialAccount: {
     id: string
     provider: string

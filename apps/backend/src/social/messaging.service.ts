@@ -11,6 +11,7 @@ import { EventsGateway } from '../gateway/events.gateway'
 import { ProductImageSyncService } from './product-image-sync.service'
 import { SocialHealthService } from './social-health.service'
 import { normalizeButtons, formatButtonBody, type AgentButton } from './button-format.util'
+import { contactMatchesConversation } from './contact-match.util'
 
 /**
  * Rolling window (in days) for the connect-time message history backfill.
@@ -1125,13 +1126,7 @@ export class MessagingService {
     const contacts = link.aiActivationContacts || []
     if (
       contacts.length > 0 &&
-      contacts.some(
-        (contact) =>
-          conversation.participantId.includes(contact) ||
-          contact.includes(conversation.participantId) ||
-          (conversation.participantName &&
-            conversation.participantName.toLowerCase().includes(contact.toLowerCase())),
-      )
+      contacts.some((contact) => contactMatchesConversation(contact, conversation))
     ) {
       return true
     }

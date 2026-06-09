@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, Spin, Tooltip } from 'antd'
 import { SetupSuccessModal } from '@app/components/dashboard/setup-success-modal'
 import { AgentReadyModal } from '@app/components/agent/agent-ready-modal'
-import { Plus, Sparkles, Bot, Zap, MoreHorizontal, Loader2, ArrowLeft } from 'lucide-react'
+import { Plus, Sparkles, Bot, Zap, MoreHorizontal, Loader2, ArrowLeft, Settings } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
@@ -28,9 +28,6 @@ import type { AgentMessage, AgentChoiceOption } from '@app/components/agent/mock
 
 export const Route = createFileRoute('/app/$orgSlug/agents')({
   component: AgentsPage,
-  validateSearch: (search: Record<string, unknown>) => ({
-    agentId: (search.agentId as string) || undefined,
-  }),
 })
 
 function mapApiMessage(m: ApiAgentMessage): AgentMessage {
@@ -51,31 +48,19 @@ function mapApiMessage(m: ApiAgentMessage): AgentMessage {
 function AgentsPage() {
   const { t } = useTranslation()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
-  const search = useSearch({ from: '/app/$orgSlug/agents' })
   const navigate = useNavigate()
   const { isDesktop } = useLayout()
   const queryClient = useQueryClient()
 
-  // The selected agent is mirrored in the URL (?agentId=…) so a refresh restores
-  // the same conversation.
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(
-    search.agentId ?? null,
-  )
+  // Unlike chats/comments, the agents page intentionally does NOT restore the
+  // last-opened agent on refresh — the user prefers to land back on the agent
+  // list rather than be sent straight into a conversation. Selection is kept in
+  // local state only (not mirrored in the URL).
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
 
-  // Keep the selected agent in the URL — single entry point so every selection
-  // (list click, creation, activation shortcut, deletion) stays shareable and
-  // survives a refresh.
-  const selectAgent = useCallback(
-    (agentId: string | null) => {
-      setSelectedAgentId(agentId)
-      navigate({
-        search: (prev: Record<string, unknown>) =>
-          ({ ...prev, agentId: agentId ?? undefined }) as never,
-        replace: true,
-      })
-    },
-    [navigate],
-  )
+  const selectAgent = useCallback((agentId: string | null) => {
+    setSelectedAgentId(agentId)
+  }, [])
   const [createOpen, setCreateOpen] = useState(false)
   const [activateOpen, setActivateOpen] = useState(false)
   const [scorePromptOpen, setScorePromptOpen] = useState(false)
@@ -87,9 +72,8 @@ function AgentsPage() {
   const [messages, setMessages] = useState<AgentMessage[]>([])
   const [pendingQuestion, setPendingQuestion] = useState<AgentMessage | null>(null)
   const [isThinking, setIsThinking] = useState(false)
-  // When an agent is restored from the URL we open straight into its chat (on
-  // mobile the list is otherwise shown first).
-  const [showList, setShowList] = useState(!search.agentId)
+  // On mobile the list is shown first; opening an agent hides it.
+  const [showList, setShowList] = useState(true)
   const [setupPhase, setSetupPhase] = useState<
     'analyzing-catalogs' | 'initializing' | 'error' | null
   >(null)
@@ -566,6 +550,22 @@ function AgentsPage() {
         action={
           <div className="flex items-center gap-2">
             {selectedAgent && <AgentScoreBadge score={selectedAgent.score} />}
+            {/* Settings/actions for the open agent — also available from the list
+                rows, but expected here in the detail header. */}
+            {selectedAgent && (
+              <AgentActionsPopover
+                agent={selectedAgent}
+                onEditResources={() => handleEditResources(selectedAgent)}
+                onActivationSettings={() => setActivateOpen(true)}
+                onDeactivate={() => handleDeactivate(selectedAgent.id)}
+                onDelete={() => handleDelete(selectedAgent.id)}
+              >
+                <Button
+                  icon={<Settings size={16} strokeWidth={1.5} />}
+                  aria-label={t('agent.activation_settings')}
+                />
+              </AgentActionsPopover>
+            )}
             {/* "New agent" is already on the list view — hide it on the mobile detail
                 view so it doesn't crowd the agent name. */}
             {!isMobileAgentDetail && (
