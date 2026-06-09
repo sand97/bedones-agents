@@ -7,15 +7,43 @@ export function createProductMessagingTools(deps: {
   messagingService: MessagingService
   conversationId: string
   catalogProviderMap: Record<string, string> // internalId → Meta providerId
+  /** Shared product→catalog index populated by search_products. */
+  productCatalogIndex?: Map<string, string>
   replyGuard?: SingleReplyGuard
 }) {
   const sendProducts = tool(
     async ({ productIds, catalogId, format, headerText, bodyText }) => {
       if (deps.replyGuard?.sent) return REPLY_ALREADY_SENT_NOTICE
 
-      const metaCatalogId = deps.catalogProviderMap[catalogId]
+      const catalogKeys = Object.keys(deps.catalogProviderMap)
+
+      // Resolve the catalog FROM the products (search_products recorded which
+      // catalog each one belongs to). The model must not guess it: if a product
+      // maps to a catalog we cannot send under, we fail instead of forcing it
+      // onto the wrong catalog.
+      const productCatalogs = new Set<string>()
+      for (const id of productIds) {
+        const c = deps.productCatalogIndex?.get(id)
+        if (c) productCatalogs.add(c)
+      }
+
+      if (productCatalogs.size > 1) {
+        return `Failed: these products span multiple catalogs (${[...productCatalogs].join(', ')}). Send products from a single catalog per message.`
+      }
+
+      const resolvedCatalogId =
+        [...productCatalogs][0] ??
+        (catalogId && deps.catalogProviderMap[catalogId]
+          ? catalogId
+          : catalogKeys.length === 1
+            ? catalogKeys[0]
+            : undefined)
+
+      const metaCatalogId = resolvedCatalogId
+        ? deps.catalogProviderMap[resolvedCatalogId]
+        : undefined
       if (!metaCatalogId) {
-        return `Failed: catalog "${catalogId}" has no Meta provider ID. Available catalogs: ${Object.keys(deps.catalogProviderMap).join(', ')}`
+        return `Failed: could not resolve a sendable catalog for these products. Run search_products first, or pass a valid catalogId (one of: ${catalogKeys.join(', ')}). Do not force a different catalog.`
       }
 
       try {
@@ -36,14 +64,19 @@ export function createProductMessagingTools(deps: {
     {
       name: 'send_products',
       description:
-        'Send product(s) from the catalog to the customer via WhatsApp. Default format by count (unless admin rules override): 1-3 → "product", 4-10 → "carousel", >10 → "product_list". If you request "carousel" with more than 10 products, the service will automatically fall back to "product_list". Product IDs must be retailer IDs from the search_products tool results.',
+        'Send catalog product(s) to the customer (formatting and per-count rules are in the system prompt). Product IDs come from search_products results.',
       schema: z.object({
         productIds: z
           .array(z.string())
           .min(1)
           .max(30)
           .describe('Array of product retailer IDs to send (max 30)'),
-        catalogId: z.string().describe('Internal catalog ID (from search_products context)'),
+        catalogId: z
+          .string()
+          .optional()
+          .describe(
+            'Internal catalog ID. Omit it when the agent has a single catalog (it is inferred automatically). This is NOT a product/retailer id.',
+          ),
         format: z
           .enum(['product', 'product_list', 'carousel', 'catalog_message'])
           .describe(

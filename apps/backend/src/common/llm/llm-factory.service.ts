@@ -29,7 +29,7 @@ export interface LlmTraceContext {
 export interface LlmFactoryOptions {
   temperature?: number
   maxOutputTokens?: number
-  /** Force a specific provider. Default: Gemini if configured, else OpenAI. */
+  /** Force a specific provider. Default: LLM_DEFAULT_PROVIDER (Gemini unless set to "openai"). */
   provider?: 'gemini' | 'openai'
   /** Override the model id. Default: the tier's env default. */
   model?: string
@@ -41,7 +41,9 @@ export type ChatModel = Runnable<BaseLanguageModelInput, AIMessageChunk>
 export type StructuredChatModel<T> = Runnable<BaseLanguageModelInput, T>
 
 /**
- * Builds a chat model with Gemini as primary and OpenAI as fallback.
+ * Builds a chat model with one provider as primary and the other as fallback.
+ * Gemini is primary by default; set LLM_DEFAULT_PROVIDER=openai to make ChatGPT
+ * primary instead.
  *
  * Two tiers are supported:
  * - `thinking`: most capable reasoning models with extended thinking enabled.
@@ -51,6 +53,7 @@ export type StructuredChatModel<T> = Runnable<BaseLanguageModelInput, T>
  *   comment auto-replies, moderation).
  *
  * Env vars (with stable defaults):
+ *   LLM_DEFAULT_PROVIDER    (default: gemini; set to "openai" to make ChatGPT primary)
  *   GEMINI_API_KEY, OPENAI_API_KEY (legacy: OPENIA_API_KEY)
  *   GEMINI_MODEL_THINKING   (default: gemini-3.1-pro-preview)
  *   GEMINI_MODEL_FLASH      (default: gemini-3-flash-preview)
@@ -72,10 +75,13 @@ export class LlmFactoryService {
     const gemini = this.buildGemini(tier, options)
     const openai = this.buildOpenAI(tier, options)
 
+    const openaiFirst = this.defaultProvider() === 'openai'
+    const primary = openaiFirst ? openai : gemini
+    const fallback = openaiFirst ? gemini : openai
+
     let model: ChatModel | null = null
-    if (gemini && openai) model = gemini.withFallbacks([openai])
-    else if (gemini) model = gemini
-    else if (openai) model = openai
+    if (primary && fallback) model = primary.withFallbacks([fallback])
+    else model = primary ?? fallback
 
     if (!model) {
       throw new Error(
@@ -106,11 +112,14 @@ export class LlmFactoryService {
       ? (openai.withStructuredOutput(schema) as StructuredChatModel<T>)
       : null
 
+    const openaiFirst = this.defaultProvider() === 'openai'
+    const primary = openaiFirst ? openaiStructured : geminiStructured
+    const fallback = openaiFirst ? geminiStructured : openaiStructured
+
     let model: StructuredChatModel<T> | null = null
-    if (geminiStructured && openaiStructured) {
-      model = geminiStructured.withFallbacks([openaiStructured]) as StructuredChatModel<T>
-    } else if (geminiStructured) model = geminiStructured
-    else if (openaiStructured) model = openaiStructured
+    if (primary && fallback) {
+      model = primary.withFallbacks([fallback]) as StructuredChatModel<T>
+    } else model = primary ?? fallback
 
     if (!model) {
       throw new Error(
@@ -135,6 +144,8 @@ export class LlmFactoryService {
     let model: ChatGoogleGenerativeAI | ChatOpenAI | null
     if (options.provider === 'openai') model = this.buildOpenAI(tier, options)
     else if (options.provider === 'gemini') model = this.buildGemini(tier, options)
+    else if (this.defaultProvider() === 'openai')
+      model = this.buildOpenAI(tier, options) ?? this.buildGemini(tier, options)
     else model = this.buildGemini(tier, options) ?? this.buildOpenAI(tier, options)
 
     if (!model) {
@@ -187,6 +198,18 @@ export class LlmFactoryService {
     return model.withConfig({ callbacks: [handler as BaseCallbackHandler] }) as Runnable<I, O>
   }
 
+  /**
+   * Default provider used when the caller doesn't force one. Switchable via env
+   * `LLM_DEFAULT_PROVIDER` (`gemini` | `openai`); defaults to Gemini. Lets ops
+   * flip the whole platform (the live agent included) from Gemini to ChatGPT
+   * without a code change.
+   */
+  private defaultProvider(): 'gemini' | 'openai' {
+    return this.config.get<string>('LLM_DEFAULT_PROVIDER')?.trim().toLowerCase() === 'openai'
+      ? 'openai'
+      : 'gemini'
+  }
+
   private buildGemini(tier: LlmTier, options: LlmFactoryOptions): ChatGoogleGenerativeAI | null {
     const apiKey = this.config.get<string>('GEMINI_API_KEY')
     if (!apiKey) return null
@@ -233,10 +256,16 @@ export class LlmFactoryService {
         | 'high'
         | undefined) || 'medium'
 
+    // GPT-5 and o-series reasoning models reject any non-default temperature
+    // (only the default of 1 is allowed) and 400 otherwise. Omit it for them —
+    // without this, making OpenAI the default provider would break the live
+    // agent, which has no fallback in the tool-calling path.
+    const supportsTemperature = !/^(gpt-5|o\d)/i.test(model)
+
     return new ChatOpenAI({
       apiKey,
       model,
-      temperature: options.temperature ?? 0.3,
+      temperature: supportsTemperature ? (options.temperature ?? 0.3) : undefined,
       maxTokens: options.maxOutputTokens,
       reasoning: tier === 'thinking' ? { effort: reasoningEffort } : undefined,
     })

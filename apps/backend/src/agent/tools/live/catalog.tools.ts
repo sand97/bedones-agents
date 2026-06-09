@@ -5,6 +5,8 @@ import type { CatalogSearchService } from '../../../image-processing/catalog-sea
 export function createCatalogTools(deps: {
   catalogSearchService: CatalogSearchService
   catalogIds: string[]
+  /** Shared product→catalog index; filled here so send_products can resolve the catalog. */
+  productCatalogIndex?: Map<string, string>
 }) {
   const searchProducts = tool(
     async ({ query, queryEn }) => {
@@ -23,11 +25,19 @@ export function createCatalogTools(deps: {
         return `No products found for query "${query}". ${result.error || ''}`
       }
 
+      // Remember which catalog each product belongs to, so send_products can
+      // resolve it from the product id instead of the model guessing.
+      if (deps.productCatalogIndex) {
+        for (const p of result.products) {
+          if (p.catalogId) deps.productCatalogIndex.set(p.id, p.catalogId)
+        }
+      }
+
       const lines = result.products.map(
         (p) =>
-          `${p.id},${(p.rankingScore ?? p.similarity ?? 0).toFixed(3)},${p.name},${p.price || 'N/A'}`,
+          `${p.id},${(p.rankingScore ?? p.similarity ?? 0).toFixed(3)},${p.name},${p.price || 'N/A'},${p.currency || 'N/A'}`,
       )
-      return `productID,score,name,price\n${lines.join('\n')}`
+      return `productID,score,name,price,currency\n${lines.join('\n')}`
     },
     {
       name: 'search_products',

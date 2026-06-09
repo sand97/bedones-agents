@@ -68,7 +68,21 @@ export function createTicketTools(deps: {
         if (title) updateData.title = title
         if (description) updateData.description = description
         if (priority) updateData.priority = priority
-        if (statusId) updateData.statusId = statusId
+        if (statusId) {
+          // The model sometimes invents a statusId (e.g. it reuses the ticket id).
+          // Apply it only when it is a real status of this org — otherwise ignore
+          // it, so the DB never throws a foreign-key error that the model would
+          // retry until it exhausts its tool-call budget (recursion-limit crash).
+          const validStatus = await deps.prisma.ticketStatus.findFirst({
+            where: { id: statusId, organisationId: deps.organisationId },
+            select: { id: true },
+          })
+          if (validStatus) updateData.statusId = statusId
+        }
+
+        if (Object.keys(updateData).length === 0) {
+          return 'Aucune modification valide a appliquer.'
+        }
 
         const ticket = await deps.prisma.ticket.update({
           where: { id: ticketId },
@@ -146,27 +160,5 @@ export function createTicketTools(deps: {
     },
   )
 
-  const getTicketStatuses = tool(
-    async () => {
-      try {
-        const statuses = await deps.prisma.ticketStatus.findMany({
-          where: { organisationId: deps.organisationId },
-          orderBy: { order: 'asc' },
-        })
-        if (statuses.length === 0) return 'Aucun statut de ticket configure.'
-        return statuses
-          .map((s) => `ID: ${s.id} | ${s.name} ${s.isDefault ? '(par defaut)' : ''}`)
-          .join('\n')
-      } catch (error: unknown) {
-        return `Erreur: ${error instanceof Error ? error.message : 'Unknown error'}`
-      }
-    },
-    {
-      name: 'get_ticket_statuses',
-      description: 'Get the list of available ticket statuses for this agent.',
-      schema: z.object({}),
-    },
-  )
-
-  return [createTicket, updateTicket, listTickets, getTicketStatuses]
+  return [createTicket, updateTicket, listTickets]
 }
