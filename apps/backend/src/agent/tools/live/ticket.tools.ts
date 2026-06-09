@@ -81,7 +81,7 @@ export function createTicketTools(deps: {
         }
 
         if (Object.keys(updateData).length === 0) {
-          return 'Aucune modification valide a appliquer (statut inconnu ?). Utilise get_ticket_statuses pour un statut valide.'
+          return 'Aucune modification valide a appliquer.'
         }
 
         const ticket = await deps.prisma.ticket.update({
@@ -160,27 +160,5 @@ export function createTicketTools(deps: {
     },
   )
 
-  const getTicketStatuses = tool(
-    async () => {
-      try {
-        const statuses = await deps.prisma.ticketStatus.findMany({
-          where: { organisationId: deps.organisationId },
-          orderBy: { order: 'asc' },
-        })
-        if (statuses.length === 0) return 'Aucun statut de ticket configure.'
-        return statuses
-          .map((s) => `ID: ${s.id} | ${s.name} ${s.isDefault ? '(par defaut)' : ''}`)
-          .join('\n')
-      } catch (error: unknown) {
-        return `Erreur: ${error instanceof Error ? error.message : 'Unknown error'}`
-      }
-    },
-    {
-      name: 'get_ticket_statuses',
-      description: 'Get the list of available ticket statuses for this agent.',
-      schema: z.object({}),
-    },
-  )
-
-  return [createTicket, updateTicket, listTickets, getTicketStatuses]
+  return [createTicket, updateTicket, listTickets]
 }

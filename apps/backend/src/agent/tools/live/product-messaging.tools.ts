@@ -64,7 +64,7 @@ export function createProductMessagingTools(deps: {
     {
       name: 'send_products',
       description:
-        'Send product(s) from the catalog to the customer via WhatsApp. Default format by count (unless admin rules override): 1-3 → "product", 4-10 → "carousel", >10 → "product_list". If you request "carousel" with more than 10 products, the service will automatically fall back to "product_list". Product IDs must be retailer IDs from the search_products tool results.',
+        'Send catalog product(s) to the customer (formatting and per-count rules are in the system prompt). Product IDs come from search_products results.',
       schema: z.object({
         productIds: z
           .array(z.string())

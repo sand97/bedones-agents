@@ -11,7 +11,6 @@ import type { CatalogSearchService } from '../image-processing/catalog-search.se
 
 import { createCommunicationTools } from './tools/live/communication.tools'
 import { createCatalogTools } from './tools/live/catalog.tools'
-import { createLabelTools } from './tools/live/label.tools'
 import { createMessageTools } from './tools/live/message.tools'
 import { createTicketTools } from './tools/live/ticket.tools'
 import { createPromotionTools } from './tools/live/promotion.tools'
@@ -50,7 +49,7 @@ export interface LiveAgentToolContext {
  * AgentMessageProcessorService so production, the debug MCP and the e2e harness
  * all build the identical wiring (no logic drift).
  */
-export function buildLiveAgentTools(ctx: LiveAgentToolContext) {
+export async function buildLiveAgentTools(ctx: LiveAgentToolContext) {
   // One guard per turn, shared by the customer-facing tools, to GUARANTEE that
   // at most one message is delivered to the customer (no double replies).
   const replyGuard = createSingleReplyGuard()
@@ -59,21 +58,30 @@ export function buildLiveAgentTools(ctx: LiveAgentToolContext) {
   // it so the catalog is resolved from the product (never guessed by the model).
   const productCatalogIndex = new Map<string, string>()
 
+  // Only expose tools the agent can actually use, so every config carries the
+  // smallest tool set (fewer tokens per call + fewer chances to misuse a tool):
+  //  - catalog search only when at least one catalog is linked;
+  //  - promotion tools only when the org has promotions.
+  // (send_buttons / send_products are already gated by the canSend* flags, and
+  // labels / contact notes are injected into the system prompt rather than read
+  // through a tool.)
+  const hasCatalog = ctx.catalogIds.length > 0
+  const hasPromotions =
+    (await ctx.prisma.promotion.count({ where: { organisationId: ctx.organisationId } })) > 0
+
   return [
     ...createCommunicationTools({
       messagingService: ctx.messagingService,
       conversationId: ctx.conversationId,
       replyGuard,
     }),
-    ...createCatalogTools({
-      catalogSearchService: ctx.catalogSearchService,
-      catalogIds: ctx.catalogIds,
-      productCatalogIndex,
-    }),
-    ...createLabelTools({
-      prisma: ctx.prisma,
-      socialAccountId: ctx.socialAccountId,
-    }),
+    ...(hasCatalog
+      ? createCatalogTools({
+          catalogSearchService: ctx.catalogSearchService,
+          catalogIds: ctx.catalogIds,
+          productCatalogIndex,
+        })
+      : []),
     ...createMessageTools({
       prisma: ctx.prisma,
       conversationId: ctx.conversationId,
@@ -85,10 +93,12 @@ export function buildLiveAgentTools(ctx: LiveAgentToolContext) {
       organisationId: ctx.organisationId,
       conversationId: ctx.conversationId,
     }),
-    ...createPromotionTools({
-      prisma: ctx.prisma,
-      organisationId: ctx.organisationId,
-    }),
+    ...(hasPromotions
+      ? createPromotionTools({
+          prisma: ctx.prisma,
+          organisationId: ctx.organisationId,
+        })
+      : []),
     ...createContactNoteTools({
       prisma: ctx.prisma,
       conversationId: ctx.conversationId,
@@ -130,7 +140,7 @@ export interface RunLiveAgentInput {
  * the captured tool sends and the tool-call trace from these messages.
  */
 export async function runLiveAgent(input: RunLiveAgentInput): Promise<{ messages: BaseMessage[] }> {
-  const tools = buildLiveAgentTools(input.toolContext)
+  const tools = await buildLiveAgentTools(input.toolContext)
 
   const agentExecutor = createReactAgent({
     llm: input.model,

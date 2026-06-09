@@ -27,7 +27,7 @@ export function createButtonMessagingTools(deps: {
     {
       name: 'send_buttons',
       description:
-        'Send the customer a short message with up to 3 tappable reply buttons, to offer clear choices (e.g. payment method, delivery option, sizes). Prefer this over a plain text question when the answer is a small closed set. Labels are short; long labels are truncated automatically. Do NOT also call reply_to_message for the same turn.',
+        'Send a short message with up to 3 tappable reply buttons for a small closed-set choice (payment, delivery, sizes). Do NOT also call reply_to_message this turn.',
       schema: z.object({
         body: z
           .string()
