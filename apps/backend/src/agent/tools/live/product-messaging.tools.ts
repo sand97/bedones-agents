@@ -7,26 +7,43 @@ export function createProductMessagingTools(deps: {
   messagingService: MessagingService
   conversationId: string
   catalogProviderMap: Record<string, string> // internalId → Meta providerId
+  /** Shared product→catalog index populated by search_products. */
+  productCatalogIndex?: Map<string, string>
   replyGuard?: SingleReplyGuard
 }) {
   const sendProducts = tool(
     async ({ productIds, catalogId, format, headerText, bodyText }) => {
       if (deps.replyGuard?.sent) return REPLY_ALREADY_SENT_NOTICE
 
-      // The model frequently confuses catalogId with a product/retailer id. When
-      // the agent has a single catalog, resolve it automatically; otherwise keep
-      // the id it provided. This avoids a failed call + retry that eats the turn
-      // budget (and can lead to a recursion-limit crash).
       const catalogKeys = Object.keys(deps.catalogProviderMap)
-      let resolvedCatalogId = catalogId
-      if (!resolvedCatalogId || !deps.catalogProviderMap[resolvedCatalogId]) {
-        if (catalogKeys.length === 1) resolvedCatalogId = catalogKeys[0]
+
+      // Resolve the catalog FROM the products (search_products recorded which
+      // catalog each one belongs to). The model must not guess it: if a product
+      // maps to a catalog we cannot send under, we fail instead of forcing it
+      // onto the wrong catalog.
+      const productCatalogs = new Set<string>()
+      for (const id of productIds) {
+        const c = deps.productCatalogIndex?.get(id)
+        if (c) productCatalogs.add(c)
       }
+
+      if (productCatalogs.size > 1) {
+        return `Failed: these products span multiple catalogs (${[...productCatalogs].join(', ')}). Send products from a single catalog per message.`
+      }
+
+      const resolvedCatalogId =
+        [...productCatalogs][0] ??
+        (catalogId && deps.catalogProviderMap[catalogId]
+          ? catalogId
+          : catalogKeys.length === 1
+            ? catalogKeys[0]
+            : undefined)
+
       const metaCatalogId = resolvedCatalogId
         ? deps.catalogProviderMap[resolvedCatalogId]
         : undefined
       if (!metaCatalogId) {
-        return `Failed: unknown catalogId "${catalogId ?? ''}" (this is NOT a product/retailer id). Use one of: ${catalogKeys.join(', ')}.`
+        return `Failed: could not resolve a sendable catalog for these products. Run search_products first, or pass a valid catalogId (one of: ${catalogKeys.join(', ')}). Do not force a different catalog.`
       }
 
       try {

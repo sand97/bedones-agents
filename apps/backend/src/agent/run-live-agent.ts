@@ -55,6 +55,10 @@ export function buildLiveAgentTools(ctx: LiveAgentToolContext) {
   // at most one message is delivered to the customer (no double replies).
   const replyGuard = createSingleReplyGuard()
 
+  // Shared product→catalog index: search_products fills it, send_products reads
+  // it so the catalog is resolved from the product (never guessed by the model).
+  const productCatalogIndex = new Map<string, string>()
+
   return [
     ...createCommunicationTools({
       messagingService: ctx.messagingService,
@@ -64,6 +68,7 @@ export function buildLiveAgentTools(ctx: LiveAgentToolContext) {
     ...createCatalogTools({
       catalogSearchService: ctx.catalogSearchService,
       catalogIds: ctx.catalogIds,
+      productCatalogIndex,
     }),
     ...createLabelTools({
       prisma: ctx.prisma,
@@ -101,6 +106,7 @@ export function buildLiveAgentTools(ctx: LiveAgentToolContext) {
           messagingService: ctx.messagingService,
           conversationId: ctx.conversationId,
           catalogProviderMap: ctx.catalogProviderMap,
+          productCatalogIndex,
           replyGuard,
         })
       : []),

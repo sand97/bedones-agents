@@ -20,6 +20,8 @@ const GENERIC_COVER_EN_TOKENS = new Set([
 
 export interface ProductSearchResult {
   id: string
+  /** Internal catalog id this product was found in (each catalog = one Qdrant collection). */
+  catalogId?: string
   name: string
   description?: string
   price?: number
@@ -31,6 +33,7 @@ export interface ProductSearchResult {
 }
 
 type CatalogSearchHit = SearchHit & {
+  catalogId?: string
   primaryScore?: number
   englishScore?: number
   __rankingScore?: number
@@ -95,6 +98,7 @@ export class CatalogSearchService {
 
     const products: ProductSearchResult[] = filteredResults.map((hit) => ({
       id: hit.productId,
+      catalogId: hit.catalogId,
       name: (hit.metadata.product_name as string) || (hit.metadata.name as string) || '',
       description: (hit.metadata.description as string) || undefined,
       price: (hit.metadata.price as number) || undefined,
@@ -117,10 +121,10 @@ export class CatalogSearchService {
     catalogIds: string[],
     queryText: string,
     limit: number,
-  ): Promise<SearchHit[]> {
+  ): Promise<CatalogSearchHit[]> {
     const embedding = await this.embeddings.embedText(queryText)
 
-    const allHits: SearchHit[] = []
+    const allHits: CatalogSearchHit[] = []
     for (const catalogId of catalogIds) {
       let hits = await this.qdrantService.searchSimilarText(
         catalogId,
@@ -138,7 +142,9 @@ export class CatalogSearchService {
         )
       }
 
-      allHits.push(...hits)
+      // Tag each hit with the catalog it came from (each catalog is its own
+      // Qdrant collection) so callers can resolve a product's catalog later.
+      allHits.push(...hits.map((hit) => ({ ...hit, catalogId })))
     }
 
     return allHits
@@ -264,7 +270,7 @@ export class CatalogSearchService {
       .slice(0, limit)
   }
 
-  private mergeHits(primaryHits: SearchHit[], englishHits: SearchHit[]): CatalogSearchHit[] {
+  private mergeHits(primaryHits: CatalogSearchHit[], englishHits: CatalogSearchHit[]): CatalogSearchHit[] {
     const merged = new Map<string, CatalogSearchHit>()
 
     for (const hit of primaryHits) {
