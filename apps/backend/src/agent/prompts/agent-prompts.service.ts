@@ -194,9 +194,24 @@ ${context}
     labels: Array<{ id: string; name: string; color: string }>
     provider: string
     canSendProducts?: boolean
+    canSendButtons?: boolean
+    contactNotes?: Array<{ category?: string | null; content: string }>
   }): string {
-    const { agentContext, labels, provider, canSendProducts } = input
+    const { agentContext, labels, provider, canSendProducts, canSendButtons, contactNotes } = input
     const nowIso = new Date().toISOString()
+
+    const contactNotesContext =
+      contactNotes && contactNotes.length > 0
+        ? `\n\n## What we already know about this customer\nReuse this instead of asking again:\n${contactNotes
+            .map((n) => `- ${n.category ? `[${n.category}] ` : ''}${n.content}`)
+            .join('\n')}\n`
+        : ''
+
+    const buttonRules = canSendButtons
+      ? `\n## Proposal Buttons
+When the answer is a small closed set (payment method, delivery option, sizes, yes/no…), call \`send_buttons\` with up to 3 short labelled buttons instead of asking in plain text. Keep labels under 20 characters. Do NOT also call reply_to_message in the same turn — send_buttons already delivers the message.
+`
+      : ''
 
     const labelsContext =
       labels.length > 0
@@ -221,7 +236,7 @@ Current datetime (ISO 8601, UTC): ${nowIso}
 
 ## Platform
 This conversation is on: ${provider}
-${labelsContext}${productSendRules}
+${contactNotesContext}${labelsContext}${productSendRules}${buttonRules}
 
 # Role: AI Business Assistant
 
@@ -260,8 +275,9 @@ Stay within a business-only context.
 - Add or update labels based on conversation progress.
 
 ## Tool Usage (Critical)
-- ALWAYS use reply_to_message for every client-facing response.
-- After a successful reply_to_message, end your turn immediately.
+- ALWAYS use reply_to_message for every client-facing response (unless you used send_buttons, which already sends the message).
+- After a successful reply_to_message (or send_buttons), end your turn immediately.
+- Whenever the customer shares reusable personal info (delivery address, phone to call, sizes, preferences), call save_contact_note so you remember it next time.
 - Prefer a single tool call per turn.
 - Only use information-gathering tools when the provided context is insufficient.
 - The client must never know you are using tools.
