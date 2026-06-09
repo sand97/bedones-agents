@@ -481,6 +481,10 @@ export class ProductImageIndexingService {
     if (!priceStr) return null
     const cleaned = priceStr.replace(/[^0-9.]/g, '')
     const parsed = parseFloat(cleaned)
-    return Number.isFinite(parsed) ? parsed / 100 : null
+    // Meta returns the price already in major units (e.g. "60000" = 60 000 XAF),
+    // exactly like CatalogService.parseMetaPrice reads it for the products API.
+    // Do NOT divide by 100 — there is no minor-unit ("cents") convention to undo,
+    // and XAF/XOF are zero-decimal currencies anyway.
+    return Number.isFinite(parsed) ? parsed : null
   }
 }
