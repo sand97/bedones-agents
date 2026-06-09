@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, Spin, Tooltip, Modal } from 'antd'
+import { Button, Spin, Tooltip } from 'antd'
 import { SetupSuccessModal } from '@app/components/dashboard/setup-success-modal'
+import { AgentReadyModal } from '@app/components/agent/agent-ready-modal'
 import { Plus, Sparkles, Bot, Zap, MoreHorizontal, Loader2, ArrowLeft } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
@@ -77,6 +78,7 @@ function AgentsPage() {
   )
   const [createOpen, setCreateOpen] = useState(false)
   const [activateOpen, setActivateOpen] = useState(false)
+  const [scorePromptOpen, setScorePromptOpen] = useState(false)
   const [activationSuccess, setActivationSuccess] = useState<{
     agentName: string
     remaining: number
@@ -249,15 +251,9 @@ function AgentsPage() {
       selectedAgent.score >= 80 &&
       selectedAgent.status !== 'ACTIVE'
     ) {
-      Modal.confirm({
-        title: t('agent.score_reached_title'),
-        content: t('agent.score_reached_desc'),
-        okText: t('agent.score_reached_confirm'),
-        cancelText: t('common.later'),
-        onOk: () => setActivateOpen(true),
-      })
+      setScorePromptOpen(true)
     }
-  }, [selectedAgent, t])
+  }, [selectedAgent])
 
   // ─── Mutations ───
 
@@ -674,6 +670,15 @@ function AgentsPage() {
           loading={activateMutation.isPending}
         />
       )}
+
+      <AgentReadyModal
+        open={scorePromptOpen}
+        onActivate={() => {
+          setScorePromptOpen(false)
+          setActivateOpen(true)
+        }}
+        onLater={() => setScorePromptOpen(false)}
+      />
 
       <SetupSuccessModal
         open={Boolean(activationSuccess)}

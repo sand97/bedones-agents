@@ -10,6 +10,7 @@ import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.con
 import { EventsGateway } from '../gateway/events.gateway'
 import { ProductImageSyncService } from './product-image-sync.service'
 import { SocialHealthService } from './social-health.service'
+import { normalizeButtons, formatButtonBody, type AgentButton } from './button-format.util'
 
 /**
  * Rolling window (in days) for the connect-time message history backfill.
@@ -713,6 +714,167 @@ export class MessagingService {
     return { id: savedMessage.id, message: savedMessage.message }
   }
 
+  // ─── Send interactive proposal buttons as the AI agent ───
+
+  /**
+   * Send up to 3 reply buttons (a "proposal") to the customer as the AI agent.
+   *
+   * - WhatsApp → interactive reply buttons (`type: "button"`).
+   * - Messenger / Instagram → quick replies (tappable chips).
+   * - TikTok → no per-message buttons via API, so we fall back to a numbered
+   *   text list (until the native mechanism is wired).
+   *
+   * Labels and body are truncated to each platform's limits (with an ellipsis)
+   * before sending. The customer's tap comes back as a normal inbound message
+   * (handled in the webhook), which re-triggers the agent.
+   */
+  async sendInteractiveButtonsAsAgent(
+    conversationId: string,
+    body: string,
+    buttons: AgentButton[],
+  ): Promise<{ id: string; message: string }> {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        socialAccount: {
+          select: {
+            id: true,
+            provider: true,
+            providerAccountId: true,
+            organisationId: true,
+            disabled: true,
+            featureDisabled: true,
+          },
+        },
+      },
+    })
+    if (!conversation) throw new NotFoundException('Conversation not found')
+    this.socialHealth.ensureOutboundAllowed(conversation.socialAccount, 'MESSAGE')
+
+    const provider = conversation.socialAccount.provider
+    const normalized = normalizeButtons(buttons, provider)
+    if (normalized.length === 0) {
+      throw new BadRequestException('At least one button with a label is required')
+    }
+    const bodyText = formatButtonBody(body, provider)
+
+    const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
+    let platformMsgId: string | null = null
+
+    try {
+      if (provider === 'WHATSAPP') {
+        const interactive: Record<string, unknown> = {
+          type: 'button',
+          body: { text: bodyText || '…' },
+          action: {
+            buttons: normalized.map((b) => ({
+              type: 'reply',
+              reply: { id: b.id, title: b.label },
+            })),
+          },
+        }
+        platformMsgId = await this.sendWhatsAppInteractivePayload(
+          conversation.socialAccount.providerAccountId,
+          conversation.participantId,
+          accessToken,
+          interactive,
+          `buttons (${normalized.length})`,
+        )
+      } else if (provider === 'FACEBOOK') {
+        platformMsgId = await this.sendFacebookMessage(
+          conversation.socialAccount.providerAccountId,
+          conversation.participantId,
+          accessToken,
+          bodyText,
+          undefined,
+          undefined,
+          null,
+          normalized.map((b) => ({ title: b.label, payload: b.id })),
+        )
+      } else if (provider === 'INSTAGRAM') {
+        platformMsgId = await this.sendInstagramMessage(
+          conversation.participantId,
+          accessToken,
+          bodyText,
+          undefined,
+          undefined,
+          normalized.map((b) => ({ title: b.label, payload: b.id })),
+        )
+      } else if (provider === 'TIKTOK') {
+        // TikTok QA_BUTTON_CARD: card title ≤ 40, up to 3 REPLY buttons
+        // (title ≤ 20, id ≤ 40). The customer's tap returns as an inbound message.
+        const result = await this.sendTikTokMessage({
+          conversationId,
+          businessId: conversation.socialAccount.providerAccountId,
+          conversationPlatformId: conversation.platformThreadId || conversation.participantId,
+          accessToken,
+          messageType: 'TEMPLATE',
+          template: {
+            type: 'QA_BUTTON_CARD',
+            title: bodyText || normalized.map((b) => b.label).join(' / ').slice(0, 40),
+            buttons: normalized.map((b) => ({
+              type: 'REPLY',
+              title: b.label,
+              id: b.id.slice(0, 40),
+            })),
+          },
+        })
+        platformMsgId = result.platformMsgId
+      } else {
+        // Any other provider — no interactive buttons available. Fall back to a
+        // numbered text list so the proposal still lands.
+        const fallback = [bodyText, ...normalized.map((b, i) => `${i + 1}. ${b.label}`)]
+          .filter(Boolean)
+          .join('\n')
+        return this.sendMessageAsAgent(conversationId, fallback)
+      }
+    } catch (error) {
+      await this.socialHealth.recordError({
+        socialAccountId: conversation.socialAccount.id,
+        provider,
+        operation: 'sendInteractiveButtonsAsAgent',
+        feature: 'MESSAGE',
+        resource: provider === 'TIKTOK' ? 'tiktok' : 'page',
+        error,
+        forceDisableFeature: await this.detectTikTokBusinessLoss(
+          provider,
+          conversation.socialAccount.providerAccountId,
+          accessToken,
+        ),
+      })
+      throw error
+    }
+    await this.socialHealth.recordSuccess(conversation.socialAccount.id)
+
+    const displayText = bodyText || normalized.map((b) => b.label).join(' / ')
+    const savedMessage = await this.prisma.directMessage.create({
+      data: {
+        conversationId,
+        platformMsgId,
+        message: displayText,
+        senderId: conversation.socialAccount.providerAccountId,
+        senderName: 'AI Agent',
+        isFromPage: true,
+        isRead: true,
+        mediaType: 'button',
+        deliveryStatus: provider === 'WHATSAPP' ? 'sent' : null,
+        metadata: {
+          kind: 'buttons',
+          body: bodyText,
+          buttons: normalized,
+        },
+        createdTime: new Date(),
+      },
+    })
+
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { lastMessageText: displayText, lastMessageAt: new Date() },
+    })
+
+    return { id: savedMessage.id, message: savedMessage.message }
+  }
+
   // ─── Typing indicator (best-effort, never throws) ───
 
   async sendTypingIndicator(conversationId: string, userId?: string): Promise<void> {
@@ -1089,6 +1251,7 @@ export class MessagingService {
     mediaUrl?: string,
     mediaType?: string,
     replyToMid?: string | null,
+    quickReplies?: Array<{ title: string; payload: string }>,
   ): Promise<string | null> {
     const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${pageId}/messages?access_token=${accessToken}`
 
@@ -1110,6 +1273,16 @@ export class MessagingService {
       }
     } else {
       messagePayload = { text: message || '' }
+    }
+
+    // Quick replies ride along with any text/media message (Messenger renders
+    // them as tappable chips under the message).
+    if (quickReplies?.length) {
+      messagePayload.quick_replies = quickReplies.map((q) => ({
+        content_type: 'text',
+        title: q.title,
+        payload: q.payload,
+      }))
     }
 
     const body: Record<string, unknown> = {
@@ -1260,6 +1433,7 @@ export class MessagingService {
     message?: string,
     mediaUrl?: string,
     mediaType?: string,
+    quickReplies?: Array<{ title: string; payload: string }>,
   ): Promise<string | null> {
     const url = `https://graph.instagram.com/${FACEBOOK_GRAPH_API_VERSION}/me/messages`
 
@@ -1281,6 +1455,15 @@ export class MessagingService {
       }
     } else {
       messagePayload = { text: message || '' }
+    }
+
+    // Instagram supports text-only quick replies (rendered as tappable chips).
+    if (quickReplies?.length) {
+      messagePayload.quick_replies = quickReplies.map((q) => ({
+        content_type: 'text',
+        title: q.title,
+        payload: q.payload,
+      }))
     }
 
     const body: Record<string, unknown> = {

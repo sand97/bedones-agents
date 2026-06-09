@@ -24,6 +24,8 @@ import { createMessageTools } from './tools/live/message.tools'
 import { createTicketTools } from './tools/live/ticket.tools'
 import { createPromotionTools } from './tools/live/promotion.tools'
 import { createProductMessagingTools } from './tools/live/product-messaging.tools'
+import { createContactNoteTools } from './tools/live/contact-note.tools'
+import { createButtonMessagingTools } from './tools/live/button-messaging.tools'
 
 @Injectable()
 export class AgentMessageProcessorService {
@@ -255,11 +257,25 @@ export class AgentMessageProcessorService {
     const canSendProducts =
       event.provider === 'WHATSAPP' && Object.keys(catalogProviderMap).length > 0
 
+    // Interactive reply buttons: WhatsApp/Messenger/Instagram (reply buttons /
+    // quick replies) and TikTok (QA_BUTTON_CARD), all capped at 3 buttons.
+    const canSendButtons = ['WHATSAPP', 'FACEBOOK', 'INSTAGRAM', 'TIKTOK'].includes(event.provider)
+
+    // Per-customer memory saved on previous turns — injected so the agent reuses
+    // it (delivery address, phone, sizes…) instead of asking again.
+    const contactNotes = await this.prisma.contactNote.findMany({
+      where: { conversationId: event.conversationId },
+      orderBy: { createdAt: 'asc' },
+      select: { category: true, content: true },
+    })
+
     const systemPrompt = this.prompts.buildLiveAgentSystemPrompt({
       agentContext: agent.context || '',
       labels,
       provider: event.provider,
       canSendProducts,
+      canSendButtons,
+      contactNotes,
     })
 
     // Build conversation history for context
@@ -303,6 +319,17 @@ export class AgentMessageProcessorService {
         prisma: this.prisma,
         organisationId: agent.organisationId,
       }),
+      ...createContactNoteTools({
+        prisma: this.prisma,
+        conversationId: event.conversationId,
+        agentId: agent.id,
+      }),
+      ...(canSendButtons
+        ? createButtonMessagingTools({
+            messagingService: this.messagingService,
+            conversationId: event.conversationId,
+          })
+        : []),
       ...(event.provider === 'WHATSAPP' && Object.keys(catalogProviderMap).length > 0
         ? createProductMessagingTools({
             messagingService: this.messagingService,

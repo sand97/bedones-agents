@@ -752,6 +752,7 @@ model Conversation {
   campaignContacts         LoyaltyCampaignContact[]
   communicationPreferences ContactCommunicationPreference[]
   consentEvents            ContactConsentEvent[]
+  contactNotes             ContactNote[]
   createdAt                DateTime                         @default(now())
   updatedAt                DateTime                         @updatedAt
 
@@ -787,6 +788,26 @@ model DirectMessage {
 
   @@index([conversationId])
   @@index([createdTime])
+}
+
+// ─── Contact Notes (per-conversation customer memory) ───
+
+/// Free-form notes the AI agent (or an operator) saves about the customer of a
+/// conversation — delivery address, phone to call, clothing sizes, preferences…
+/// Scoped to the conversation; the agent reads them back when re-engaging.
+model ContactNote {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  /// The agent that recorded the note (informational; no FK so deletes are loose).
+  agentId        String?
+  /// Optional bucket, e.g. "delivery_address", "phone", "size", "preference".
+  category       String?
+  content        String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([conversationId])
 }
 
 // ─── Credit Operations ───

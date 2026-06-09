@@ -46,6 +46,12 @@ interface CountryPhoneInputProps {
   disableGeoDetect?: boolean
   placeholder?: string
   disabled?: boolean
+  /**
+   * Show only the dial code (e.g. "+237") in the closed selector instead of the
+   * ISO + dial code ("CM +237"). The dropdown still lists the full labels. Saves
+   * horizontal space in cramped layouts.
+   */
+  dialCodeOnly?: boolean
 }
 
 export function CountryPhoneInput({
@@ -57,6 +63,7 @@ export function CountryPhoneInput({
   disableGeoDetect,
   placeholder,
   disabled,
+  dialCodeOnly,
 }: CountryPhoneInputProps) {
   const [defaultCode, setDefaultCode] = useState(DEFAULT_DIAL_CODE)
   const [initialized, setInitialized] = useState(disableGeoDetect ?? false)
@@ -108,9 +115,12 @@ export function CountryPhoneInput({
       value={parsed.countryCode}
       onChange={handleCountryChange}
       popupMatchSelectWidth={false}
-      style={{ width: 100 }}
+      style={{ width: dialCodeOnly ? 76 : 100 }}
       showSearch
       optionFilterProp="label"
+      // When compact, the closed selector shows the option `value` (dial code)
+      // while the dropdown keeps the full "ISO +code" labels.
+      optionLabelProp={dialCodeOnly ? 'value' : undefined}
       options={UNIQUE_OPTIONS}
       disabled={disabled}
     />
