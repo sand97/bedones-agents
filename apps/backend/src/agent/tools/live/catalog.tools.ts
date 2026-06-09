@@ -21,22 +21,22 @@ export function createCatalogTools(deps: {
         queryEn || undefined,
       )
 
-      if (!result.success || result.products.length === 0) {
-        return `No products found for query "${query}". ${result.error || ''}`
+      if (!result.success) {
+        return `Catalog search is temporarily unavailable (${result.error || 'unknown error'}). Tell the customer you will send this shortly — do NOT claim you already sent it or invent product details.`
+      }
+      if (result.products.length === 0) {
+        return `No products found for query "${query}".`
       }
 
-      // Remember which catalog each product belongs to, so send_products can
-      // resolve it from the product id instead of the model guessing.
-      if (deps.productCatalogIndex) {
-        for (const p of result.products) {
-          if (p.catalogId) deps.productCatalogIndex.set(p.id, p.catalogId)
-        }
-      }
-
-      const lines = result.products.map(
-        (p) =>
-          `${p.id},${(p.rankingScore ?? p.similarity ?? 0).toFixed(3)},${p.name},${p.price || 'N/A'},${p.currency || 'N/A'}`,
-      )
+      // The agent must reference products by their RETAILER id — that is what the
+      // WhatsApp product message API (and send_products) needs. The Qdrant
+      // product_id is internal and Meta rejects it ("product not found for
+      // product_retailer_id …"). Index each product's catalog under that same id.
+      const lines = result.products.map((p) => {
+        const sendId = p.retailerId || p.id
+        if (p.catalogId) deps.productCatalogIndex?.set(sendId, p.catalogId)
+        return `${sendId},${(p.rankingScore ?? p.similarity ?? 0).toFixed(3)},${p.name},${p.price || 'N/A'},${p.currency || 'N/A'}`
+      })
       return `productID,score,name,price,currency\n${lines.join('\n')}`
     },
     {

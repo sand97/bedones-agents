@@ -22,6 +22,8 @@ export interface ProductSearchResult {
   id: string
   /** Internal catalog id this product was found in (each catalog = one Qdrant collection). */
   catalogId?: string
+  /** Merchant retailer id — the id the WhatsApp product message API expects (NOT product_id). */
+  retailerId?: string
   name: string
   description?: string
   price?: number
@@ -99,6 +101,7 @@ export class CatalogSearchService {
     const products: ProductSearchResult[] = filteredResults.map((hit) => ({
       id: hit.productId,
       catalogId: hit.catalogId,
+      retailerId: (hit.metadata.retailer_id as string) || undefined,
       name: (hit.metadata.product_name as string) || (hit.metadata.name as string) || '',
       description: (hit.metadata.description as string) || undefined,
       price: (hit.metadata.price as number) || undefined,
