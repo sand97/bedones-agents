@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
 import { ConfigService } from '@nestjs/config'
-import { HumanMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
+import { HumanMessage, SystemMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
 import { LlmFactoryService } from '../common/llm/llm-factory.service'
 import { createRequire } from 'module'
 const _require = createRequire(__filename)
@@ -174,6 +174,11 @@ export class AgentMessageProcessorService {
       `Processing message for agent ${agent.id} on ${event.provider} (conversation: ${event.conversationId})`,
     )
 
+    // We've decided to reply → surface the typing indicator immediately, before the
+    // (potentially slow) history backfill / image processing below. A periodic
+    // refresh keeps it alive while the agent reflects (see typingInterval).
+    void this.messagingService.sendTypingIndicator(event.conversationId)
+
     await this.creditService.logOperation({
       organisationId: agent.organisationId,
       agentId: agent.id,
@@ -268,8 +273,11 @@ export class AgentMessageProcessorService {
       .slice(0, -1) // Exclude the last message (current)
       .map((m) => {
         const content = m.message || (m.mediaType ? `[${m.mediaType}]` : '')
+        // Previous page/agent replies must be AI messages, not system messages:
+        // the model (Gemini) requires the single system message to be first, and
+        // interleaved system messages trigger "System message should be the first one".
         if (m.isFromPage) {
-          return new SystemMessage(`[Previous AI response]: ${content}`)
+          return new AIMessage(content)
         }
         return new HumanMessage(content)
       })
