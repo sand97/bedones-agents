@@ -25,9 +25,9 @@ export function createCatalogTools(deps: {
 
       const lines = result.products.map(
         (p) =>
-          `${p.id},${(p.rankingScore ?? p.similarity ?? 0).toFixed(3)},${p.name},${p.price || 'N/A'}`,
+          `${p.id},${(p.rankingScore ?? p.similarity ?? 0).toFixed(3)},${p.name},${p.price || 'N/A'},${p.currency || 'N/A'}`,
       )
-      return `productID,score,name,price\n${lines.join('\n')}`
+      return `productID,score,name,price,currency\n${lines.join('\n')}`
     },
     {
       name: 'search_products',

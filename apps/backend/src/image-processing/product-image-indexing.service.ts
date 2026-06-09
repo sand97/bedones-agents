@@ -337,6 +337,7 @@ export class ProductImageIndexingService {
       retailer_id: product.retailer_id || null,
       category: product.category || product.product_type || null,
       price,
+      currency: product.currency || null,
       image_url: imageUrl || null,
       image_id: imageId,
       cover_image_description: coverDescription || null,
