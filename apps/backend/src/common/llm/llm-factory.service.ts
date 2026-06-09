@@ -256,10 +256,16 @@ export class LlmFactoryService {
         | 'high'
         | undefined) || 'medium'
 
+    // GPT-5 and o-series reasoning models reject any non-default temperature
+    // (only the default of 1 is allowed) and 400 otherwise. Omit it for them —
+    // without this, making OpenAI the default provider would break the live
+    // agent, which has no fallback in the tool-calling path.
+    const supportsTemperature = !/^(gpt-5|o\d)/i.test(model)
+
     return new ChatOpenAI({
       apiKey,
       model,
-      temperature: options.temperature ?? 0.3,
+      temperature: supportsTemperature ? (options.temperature ?? 0.3) : undefined,
       maxTokens: options.maxOutputTokens,
       reasoning: tier === 'thinking' ? { effort: reasoningEffort } : undefined,
     })
