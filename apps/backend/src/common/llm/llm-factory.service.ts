@@ -118,6 +118,47 @@ export class LlmFactoryService {
   }
 
   /**
+   * Returns a single tool-callable chat model (one that exposes `bindTools`) for
+   * use with LangGraph's `createReactAgent`, which cannot bind tools to a
+   * fallback/traced Runnable. Gemini is preferred; OpenAI is used only when no
+   * Gemini key is configured. PostHog tracing is NOT wrapped here (it would hide
+   * `bindTools`); attach it at invoke time via `buildTraceCallbacks()`.
+   */
+  createToolCallingModel(
+    tier: LlmTier,
+    options: LlmFactoryOptions = {},
+  ): ChatGoogleGenerativeAI | ChatOpenAI {
+    const model = this.buildGemini(tier, options) ?? this.buildOpenAI(tier, options)
+    if (!model) {
+      throw new Error(
+        'No LLM API key configured. Set GEMINI_API_KEY and/or OPENAI_API_KEY in your env.',
+      )
+    }
+    return model
+  }
+
+  /**
+   * Builds the PostHog LangChain callback handler(s) for invoke-time tracing.
+   * Returns an empty array when PostHog is disabled. Use this with models that
+   * must keep `bindTools` available (e.g. createReactAgent): pass the result as
+   * `{ callbacks }` on `.invoke()` instead of wrapping the model.
+   */
+  buildTraceCallbacks(trace?: LlmTraceContext): BaseCallbackHandler[] {
+    const client = this.posthog.getClient()
+    if (!client) return []
+    return [
+      new LangChainCallbackHandler({
+        client,
+        distinctId: trace?.distinctId ?? 'backend-agent',
+        traceId: trace?.traceId,
+        properties: { service: 'backend', ...trace?.properties },
+        groups: trace?.groups,
+        privacyMode: false,
+      }) as BaseCallbackHandler,
+    ]
+  }
+
+  /**
    * Attaches the PostHog LangChain callback handler so the call shows up in
    * PostHog's LLM analytics. No-op when PostHog is disabled — the model is
    * returned unchanged.
