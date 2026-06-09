@@ -1,14 +1,18 @@
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod'
 import type { MessagingService } from '../../../social/messaging.service'
+import { type SingleReplyGuard, REPLY_ALREADY_SENT_NOTICE } from './turn-guard'
 
 export function createProductMessagingTools(deps: {
   messagingService: MessagingService
   conversationId: string
   catalogProviderMap: Record<string, string> // internalId → Meta providerId
+  replyGuard?: SingleReplyGuard
 }) {
   const sendProducts = tool(
     async ({ productIds, catalogId, format, headerText, bodyText }) => {
+      if (deps.replyGuard?.sent) return REPLY_ALREADY_SENT_NOTICE
+
       const metaCatalogId = deps.catalogProviderMap[catalogId]
       if (!metaCatalogId) {
         return `Failed: catalog "${catalogId}" has no Meta provider ID. Available catalogs: ${Object.keys(deps.catalogProviderMap).join(', ')}`
@@ -23,6 +27,7 @@ export function createProductMessagingTools(deps: {
           headerText,
           bodyText,
         )
+        if (deps.replyGuard) deps.replyGuard.sent = true
         return `Successfully sent ${productIds.length} product(s) as ${format} message.`
       } catch (error: unknown) {
         return `Failed to send products: ${error instanceof Error ? error.message : 'Unknown error'}`

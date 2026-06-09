@@ -29,6 +29,10 @@ export interface LlmTraceContext {
 export interface LlmFactoryOptions {
   temperature?: number
   maxOutputTokens?: number
+  /** Force a specific provider. Default: Gemini if configured, else OpenAI. */
+  provider?: 'gemini' | 'openai'
+  /** Override the model id. Default: the tier's env default. */
+  model?: string
   /** Enable PostHog LLM observability for calls made with the returned model. */
   trace?: LlmTraceContext
 }
@@ -128,10 +132,14 @@ export class LlmFactoryService {
     tier: LlmTier,
     options: LlmFactoryOptions = {},
   ): ChatGoogleGenerativeAI | ChatOpenAI {
-    const model = this.buildGemini(tier, options) ?? this.buildOpenAI(tier, options)
+    let model: ChatGoogleGenerativeAI | ChatOpenAI | null
+    if (options.provider === 'openai') model = this.buildOpenAI(tier, options)
+    else if (options.provider === 'gemini') model = this.buildGemini(tier, options)
+    else model = this.buildGemini(tier, options) ?? this.buildOpenAI(tier, options)
+
     if (!model) {
       throw new Error(
-        'No LLM API key configured. Set GEMINI_API_KEY and/or OPENAI_API_KEY in your env.',
+        'No LLM API key configured for the requested provider. Set GEMINI_API_KEY and/or OPENAI_API_KEY in your env.',
       )
     }
     return model
@@ -184,9 +192,10 @@ export class LlmFactoryService {
     if (!apiKey) return null
 
     const model =
-      tier === 'thinking'
+      options.model ??
+      (tier === 'thinking'
         ? this.config.get<string>('GEMINI_MODEL_THINKING') || 'gemini-3.1-pro-preview'
-        : this.config.get<string>('GEMINI_MODEL_FLASH') || 'gemini-3-flash-preview'
+        : this.config.get<string>('GEMINI_MODEL_FLASH') || 'gemini-3-flash-preview')
 
     const thinkingBudgetRaw = this.config.get<string>('GEMINI_THINKING_BUDGET')
     const thinkingBudget =
@@ -211,9 +220,10 @@ export class LlmFactoryService {
     if (!apiKey) return null
 
     const model =
-      tier === 'thinking'
+      options.model ??
+      (tier === 'thinking'
         ? this.config.get<string>('OPENAI_MODEL_THINKING') || 'gpt-5'
-        : this.config.get<string>('OPENAI_MODEL_FLASH') || 'gpt-5-mini'
+        : this.config.get<string>('OPENAI_MODEL_FLASH') || 'gpt-5-mini')
 
     const reasoningEffort =
       (this.config.get<string>('OPENAI_REASONING_EFFORT') as

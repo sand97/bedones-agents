@@ -25,6 +25,7 @@ import { WhatsappOptinModule } from './whatsapp-optin/whatsapp-optin.module'
 import { LlmModule } from './common/llm/llm.module'
 import { ContactLanguageModule } from './contact-language/contact-language.module'
 import { BedonesMcpModule } from './mcp/mcp.module'
+import { DebugMcpModule } from './debug-mcp/debug-mcp.module'
 import { PostHogModule } from './posthog/posthog.module'
 
 @Module({
@@ -61,6 +62,8 @@ import { PostHogModule } from './posthog/posthog.module'
     WhatsappOptinModule,
     ContactLanguageModule,
     BedonesMcpModule,
+    // Internal debug MCP — mounted only when explicitly enabled at deploy time.
+    ...(process.env.DEBUG_MCP_ENABLED === 'true' ? [DebugMcpModule] : []),
   ],
   controllers: [AppController],
 })

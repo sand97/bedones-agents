@@ -42,6 +42,7 @@ async function bootstrap() {
   // through the credentialed app CORS below instead.
   const isPublicMcpSurface = (path: string) =>
     path === '/mcp' ||
+    path === '/debug-mcp' ||
     path === '/sse' ||
     path === '/messages' ||
     path.startsWith('/.well-known/oauth')
