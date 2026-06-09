@@ -103,10 +103,11 @@ export function AgentChat({
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Only show text messages in the chat (MCQ/SCQ questions show as text bubbles,
-  // their options appear in the input area)
+  // Show every message that carries text as a bubble — including the agent's
+  // MCQ/SCQ questions (their text IS the question). Only the selectable options
+  // are rendered separately, in the input area.
   const textMessages = useMemo(
-    () => messages.filter((m) => m.type === 'text' || m.from === 'user'),
+    () => messages.filter((m) => (m.text ?? '').trim().length > 0),
     [messages],
   )
 
