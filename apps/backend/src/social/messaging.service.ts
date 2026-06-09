@@ -800,13 +800,30 @@ export class MessagingService {
           undefined,
           normalized.map((b) => ({ title: b.label, payload: b.id })),
         )
+      } else if (provider === 'TIKTOK') {
+        // TikTok QA_BUTTON_CARD: card title ≤ 40, up to 3 REPLY buttons
+        // (title ≤ 20, id ≤ 40). The customer's tap returns as an inbound message.
+        const result = await this.sendTikTokMessage({
+          conversationId,
+          businessId: conversation.socialAccount.providerAccountId,
+          conversationPlatformId: conversation.platformThreadId || conversation.participantId,
+          accessToken,
+          messageType: 'TEMPLATE',
+          template: {
+            type: 'QA_BUTTON_CARD',
+            title: bodyText || normalized.map((b) => b.label).join(' / ').slice(0, 40),
+            buttons: normalized.map((b) => ({
+              type: 'REPLY',
+              title: b.label,
+              id: b.id.slice(0, 40),
+            })),
+          },
+        })
+        platformMsgId = result.platformMsgId
       } else {
-        // TikTok (and any other provider) — no interactive buttons available via
-        // API yet. Fall back to a numbered text list so the proposal still lands.
-        const fallback = [
-          bodyText,
-          ...normalized.map((b, i) => `${i + 1}. ${b.label}`),
-        ]
+        // Any other provider — no interactive buttons available. Fall back to a
+        // numbered text list so the proposal still lands.
+        const fallback = [bodyText, ...normalized.map((b, i) => `${i + 1}. ${b.label}`)]
           .filter(Boolean)
           .join('\n')
         return this.sendMessageAsAgent(conversationId, fallback)
@@ -817,8 +834,13 @@ export class MessagingService {
         provider,
         operation: 'sendInteractiveButtonsAsAgent',
         feature: 'MESSAGE',
-        resource: 'page',
+        resource: provider === 'TIKTOK' ? 'tiktok' : 'page',
         error,
+        forceDisableFeature: await this.detectTikTokBusinessLoss(
+          provider,
+          conversation.socialAccount.providerAccountId,
+          accessToken,
+        ),
       })
       throw error
     }

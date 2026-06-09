@@ -257,9 +257,9 @@ export class AgentMessageProcessorService {
     const canSendProducts =
       event.provider === 'WHATSAPP' && Object.keys(catalogProviderMap).length > 0
 
-    // Interactive reply buttons exist on the Meta channels; TikTok has no
-    // per-message buttons via API (handled as a text fallback for now).
-    const canSendButtons = ['WHATSAPP', 'FACEBOOK', 'INSTAGRAM'].includes(event.provider)
+    // Interactive reply buttons: WhatsApp/Messenger/Instagram (reply buttons /
+    // quick replies) and TikTok (QA_BUTTON_CARD), all capped at 3 buttons.
+    const canSendButtons = ['WHATSAPP', 'FACEBOOK', 'INSTAGRAM', 'TIKTOK'].includes(event.provider)
 
     // Per-customer memory saved on previous turns — injected so the agent reuses
     // it (delivery address, phone, sizes…) instead of asking again.

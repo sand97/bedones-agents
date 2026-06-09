@@ -38,7 +38,8 @@ const BODY_MAX: Record<string, number> = {
   WHATSAPP: 1024,
   FACEBOOK: 640,
   INSTAGRAM: 1000,
-  TIKTOK: 1000,
+  // TikTok renders the body as the QA_BUTTON_CARD `title`, capped at 40 chars.
+  TIKTOK: 40,
 }
 
 /** Truncate to `max` chars, appending an ellipsis (which counts toward `max`). */
