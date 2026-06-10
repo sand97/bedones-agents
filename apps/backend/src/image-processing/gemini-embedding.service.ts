@@ -3,6 +3,11 @@ import { ConfigService } from '@nestjs/config'
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
+// The embedding model rate-limits easily (429); a dropped query embedding
+// silently kills catalog search for the whole turn, so retry transient errors.
+const EMBED_MAX_RETRIES = 3
+const EMBED_BASE_DELAY_MS = 500
+
 export interface EmbeddingResult {
   values: number[]
 }
@@ -104,7 +109,10 @@ export class GeminiEmbeddingService {
 
   // ─── Private ───
 
-  private async callEmbedApi(body: Record<string, unknown>): Promise<EmbeddingResult> {
+  private async callEmbedApi(
+    body: Record<string, unknown>,
+    attempt = 0,
+  ): Promise<EmbeddingResult> {
     const url = `${GEMINI_API_BASE}/models/${this.model}:embedContent?key=${this.apiKey}`
 
     const response = await fetch(url, {
@@ -115,6 +123,18 @@ export class GeminiEmbeddingService {
 
     if (!response.ok) {
       const errorText = await response.text()
+      // 429 (rate limit) and 5xx are transient — back off and retry. The Gemini
+      // embedding model rate-limits easily, and a dropped query embedding kills
+      // catalog search for the whole turn (the agent then can't find products,
+      // loops, and improvises that it "sent" photos it never sent).
+      if ((response.status === 429 || response.status >= 500) && attempt < EMBED_MAX_RETRIES) {
+        const delay = EMBED_BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 250)
+        this.logger.warn(
+          `Gemini embedding ${response.status}; retrying ${attempt + 1}/${EMBED_MAX_RETRIES} in ${delay}ms`,
+        )
+        await new Promise((resolve) => setTimeout(resolve, delay))
+        return this.callEmbedApi(body, attempt + 1)
+      }
       this.logger.error(
         `Gemini embedding API error (${response.status}): ${errorText.slice(0, 500)}`,
       )

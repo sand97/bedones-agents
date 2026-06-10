@@ -184,7 +184,7 @@ jobs:
         run: |
           echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "${GITHUB_OUTPUT}"
           echo "image=bedones-moderator-backend" >> "${GITHUB_OUTPUT}"
-          echo "tag=git-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "tag=main" >> "${GITHUB_OUTPUT}"
           echo "stack=bedones-moderator-stack" >> "${GITHUB_OUTPUT}"
           echo "service=backend" >> "${GITHUB_OUTPUT}"
 
@@ -224,7 +224,7 @@ jobs:
         run: |
           echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "${GITHUB_OUTPUT}"
           echo "image=bedones-moderator-connector" >> "${GITHUB_OUTPUT}"
-          echo "tag=git-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "tag=main" >> "${GITHUB_OUTPUT}"
           echo "stack=bedones-moderator-stack" >> "${GITHUB_OUTPUT}"
           echo "service=connector" >> "${GITHUB_OUTPUT}"
 
