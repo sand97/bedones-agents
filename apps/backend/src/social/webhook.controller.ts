@@ -77,6 +77,7 @@ export class WebhookController {
 
     // Process asynchronously
     try {
+      this.logger.log(`[Facebook Webhook] Payload: ${JSON.stringify(req.body, null, 2)}`)
       await this.webhookService.processFacebookWebhook(req.body)
     } catch (error) {
       this.logger.error('[Facebook Webhook] Processing error:', error)
@@ -129,6 +130,7 @@ export class WebhookController {
 
     // Process asynchronously
     try {
+      this.logger.log(`[Instagram Webhook] Payload: ${JSON.stringify(req.body, null, 2)}`)
       await this.webhookService.processInstagramWebhook(req.body)
     } catch (error) {
       this.logger.error('[Instagram Webhook] Processing error:', error)
@@ -181,6 +183,7 @@ export class WebhookController {
 
     // Process asynchronously
     try {
+      this.logger.log(`[WhatsApp Webhook] Payload: ${JSON.stringify(req.body, null, 2)}`)
       await this.webhookService.processWhatsAppWebhook(req.body)
     } catch (error) {
       this.logger.error('[WhatsApp Webhook] Processing error:', error)
@@ -213,6 +216,7 @@ export class WebhookController {
 
     // Process asynchronously
     try {
+      this.logger.log(`[TikTok Webhook] Payload: ${JSON.stringify(req.body, null, 2)}`)
       await this.webhookService.processTikTokWebhook(req.body)
     } catch (error) {
       this.logger.error('[TikTok Webhook] Processing error:', error)
