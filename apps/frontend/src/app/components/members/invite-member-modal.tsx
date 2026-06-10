@@ -1,4 +1,5 @@
 import { Button, Form, Modal, Select, Input } from 'antd'
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ALL_ROLES, MEMBER_ROLE_CONFIG, type MemberRole } from './mock-data'
 import { CountryPhoneInput } from '@app/components/shared/country-phone-input'
@@ -12,22 +13,32 @@ interface InviteMemberModalProps {
     phone: string
     role: MemberRole
   }) => void
+  submitLoading?: boolean
 }
 
-export function InviteMemberModal({ open, onClose, onSubmit }: InviteMemberModalProps) {
+export function InviteMemberModal({
+  open,
+  onClose,
+  onSubmit,
+  submitLoading,
+}: InviteMemberModalProps) {
   const { t } = useTranslation()
   const [form] = Form.useForm()
 
+  // Réinitialise le formulaire une fois la modale fermée (fermeture pilotée par le parent
+  // après succès de la création).
+  useEffect(() => {
+    if (!open) form.resetFields()
+  }, [open, form])
+
   const handleCancel = () => {
-    form.resetFields()
+    if (submitLoading) return
     onClose()
   }
 
   const handleOk = () => {
     form.validateFields().then((values) => {
       onSubmit?.(values)
-      form.resetFields()
-      onClose()
     })
   }
 
@@ -36,11 +47,13 @@ export function InviteMemberModal({ open, onClose, onSubmit }: InviteMemberModal
       title={t('members.invite')}
       open={open}
       onCancel={handleCancel}
+      maskClosable={!submitLoading}
+      closable={!submitLoading}
       footer={[
-        <Button key="cancel" onClick={handleCancel}>
+        <Button key="cancel" onClick={handleCancel} disabled={submitLoading}>
           {t('common.cancel')}
         </Button>,
-        <Button key="submit" type="primary" onClick={handleOk}>
+        <Button key="submit" type="primary" loading={submitLoading} onClick={handleOk}>
           {t('members.create_invitation')}
         </Button>,
       ]}

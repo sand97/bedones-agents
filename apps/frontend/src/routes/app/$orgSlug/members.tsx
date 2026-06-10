@@ -91,6 +91,7 @@ function MembersPage() {
       })
 
       invalidateMembers()
+      setInviteOpen(false)
 
       // Show the invite link modal
       const inviteToken = (result as unknown as { inviteToken?: string }).inviteToken
@@ -279,6 +280,7 @@ function MembersPage() {
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
         onSubmit={handleInvite}
+        submitLoading={inviteMutation.isPending}
       />
 
       <NotificationPreferencesModal
