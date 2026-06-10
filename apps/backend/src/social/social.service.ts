@@ -393,37 +393,56 @@ export class SocialService {
       throw new BadRequestException('No product catalogs found for this account')
     }
 
-    // Save a SocialAccount with the user token (needed for product listing proxy)
+    // Persist one SocialAccount PER catalog, each holding the token from THIS
+    // OAuth session. Previously a single `catalog_${organisationId}` account was
+    // shared by every catalog and its token was overwritten on each connect — so
+    // connecting a second business account invalidated the first one's catalogs
+    // (Graph "#100 subcode 33: missing permissions"). A per-catalog token keeps
+    // every catalog backed by a token actually authorised to read it.
     const encryptedToken = await this.encryptionService.encrypt(userAccessToken)
-    const socialAccount = await this.prisma.socialAccount.upsert({
+
+    // Legacy per-org account to migrate catalogs away from. Catalogs reconnected
+    // in this session are re-pointed to their own account; the legacy account is
+    // deleted once it has no catalogs left.
+    const legacySharedAccount = await this.prisma.socialAccount.findUnique({
       where: {
         provider_providerAccountId: {
           provider: 'FACEBOOK_CATALOG',
           providerAccountId: `catalog_${organisationId}`,
         },
       },
-      create: {
-        organisationId,
-        provider: 'FACEBOOK_CATALOG',
-        providerAccountId: `catalog_${organisationId}`,
-        pageName: 'Catalog',
-        accessToken: encryptedToken,
-        scopes: scopes ?? ['catalog_management'],
-      },
-      update: {
-        accessToken: encryptedToken,
-        pageName: 'Catalog',
-        scopes: scopes ?? ['catalog_management'],
-      },
+      select: { id: true },
     })
-
-    // A successful (re)connect must clear any prior disabled / error state so
-    // the catalog can be listed again.
-    await this.socialHealth.clearHealth(socialAccount.id)
 
     // Save each catalog in our DB
     const savedCatalogs = []
     for (const metaCatalog of metaCatalogs) {
+      const socialAccount = await this.prisma.socialAccount.upsert({
+        where: {
+          provider_providerAccountId: {
+            provider: 'FACEBOOK_CATALOG',
+            providerAccountId: `catalog_${organisationId}_${metaCatalog.id}`,
+          },
+        },
+        create: {
+          organisationId,
+          provider: 'FACEBOOK_CATALOG',
+          providerAccountId: `catalog_${organisationId}_${metaCatalog.id}`,
+          pageName: metaCatalog.name || 'Catalog',
+          accessToken: encryptedToken,
+          scopes: scopes ?? ['catalog_management'],
+        },
+        update: {
+          accessToken: encryptedToken,
+          pageName: metaCatalog.name || 'Catalog',
+          scopes: scopes ?? ['catalog_management'],
+        },
+      })
+
+      // A successful (re)connect must clear any prior disabled / error state so
+      // the catalog can be listed again.
+      await this.socialHealth.clearHealth(socialAccount.id)
+
       let catalog = await this.prisma.catalog.findFirst({
         where: { organisationId, providerId: metaCatalog.id },
       })
@@ -449,7 +468,7 @@ export class SocialService {
         })
       }
 
-      // Link catalog to social account
+      // Link catalog to its own per-catalog social account
       await this.prisma.catalogSocialAccount.upsert({
         where: {
           catalogId_socialAccountId: {
@@ -464,7 +483,26 @@ export class SocialService {
         update: {},
       })
 
+      // Drop the stale link to the legacy shared account so token resolution can
+      // no longer pick the overwritten shared token for this catalog.
+      if (legacySharedAccount) {
+        await this.prisma.catalogSocialAccount.deleteMany({
+          where: { catalogId: catalog.id, socialAccountId: legacySharedAccount.id },
+        })
+      }
+
       savedCatalogs.push(catalog)
+    }
+
+    // Remove the legacy shared account once every catalog has moved to its own
+    // per-catalog account (no links left), so it stops lingering as dead infra.
+    if (legacySharedAccount) {
+      const remaining = await this.prisma.catalogSocialAccount.count({
+        where: { socialAccountId: legacySharedAccount.id },
+      })
+      if (remaining === 0) {
+        await this.prisma.socialAccount.delete({ where: { id: legacySharedAccount.id } })
+      }
     }
 
     this.logger.log(

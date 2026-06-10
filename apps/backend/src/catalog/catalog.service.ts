@@ -268,7 +268,7 @@ export class CatalogService {
       this.logger.warn(`hydrateProducts: no catalog found for providerId ${catalogProviderId}`)
       return []
     }
-    const socialLink = catalog.socialAccounts[0]
+    const socialLink = this.pickCatalogSocialLink(catalog.socialAccounts)
     if (!socialLink) {
       this.logger.warn(`hydrateProducts: no linked social account for catalog ${catalog.id}`)
       return []
@@ -687,6 +687,18 @@ export class CatalogService {
 
   // ─── Resolve access token for a catalog ───
 
+  /**
+   * Pick the social account backing a catalog's Graph product calls. A catalog
+   * can be linked to both a FACEBOOK_CATALOG account (its Commerce Manager
+   * token) and a WHATSAPP account (SMB phone link), so prefer the
+   * FACEBOOK_CATALOG one and fall back to the first link otherwise.
+   */
+  private pickCatalogSocialLink<T extends { socialAccount: { provider: SocialProvider } }>(
+    links: T[],
+  ): T | undefined {
+    return links.find((link) => link.socialAccount.provider === 'FACEBOOK_CATALOG') ?? links[0]
+  }
+
   private async resolveAccessToken(catalogId: string): Promise<string> {
     const catalog = await this.prisma.catalog.findUnique({
       where: { id: catalogId },
@@ -701,7 +713,7 @@ export class CatalogService {
       throw new NotFoundException('Catalogue ou providerId introuvable')
     }
 
-    const socialLink = catalog.socialAccounts[0]
+    const socialLink = this.pickCatalogSocialLink(catalog.socialAccounts)
     if (!socialLink) {
       throw new NotFoundException('Aucun compte social lié au catalogue')
     }
@@ -739,7 +751,7 @@ export class CatalogService {
         },
       },
     })
-    return catalog?.socialAccounts[0]?.socialAccount ?? null
+    return this.pickCatalogSocialLink(catalog?.socialAccounts ?? [])?.socialAccount ?? null
   }
 
   /** Parses a Meta/TikTok error code from a raw provider error payload. */
