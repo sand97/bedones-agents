@@ -81,6 +81,7 @@ export class TicketAgentService {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
       select: {
+        socialAccountId: true,
         participantId: true,
         participantName: true,
         socialAccount: {
@@ -162,6 +163,7 @@ export class TicketAgentService {
             contactId: conversation.participantId,
             contactName: conversation.participantName,
             provider: conversation.socialAccount.provider,
+            socialAccountId: conversation.socialAccountId,
             ...(metadata ? { metadata } : {}),
           },
           include: { status: true },
@@ -191,6 +193,7 @@ export class TicketAgentService {
         contactName: conversation.participantName,
         provider: conversation.socialAccount.provider,
         conversationId,
+        socialAccountId: conversation.socialAccountId,
         metadata,
       },
       include: { status: true },
