@@ -736,7 +736,7 @@ export interface paths {
         get: operations["MessagingController_getMessages"];
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["MessagingController_clearConversationMessages"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4293,6 +4293,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DirectMessageResponseDto"][];
+                };
+            };
+        };
+    };
+    MessagingController_clearConversationMessages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        cleared: number;
+                    };
                 };
             };
         };
