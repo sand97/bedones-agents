@@ -10,6 +10,7 @@ export const CONTACT_LANGUAGE_QUEUE = 'contact-language'
 export const WHATSAPP_PRODUCT_IMAGE_SYNC_QUEUE = 'whatsapp-product-image-sync'
 export const CATALOG_MIGRATION_QUEUE = 'catalog-migration'
 export const MESSAGE_HISTORY_SYNC_QUEUE = 'message-history-sync'
+export const TICKET_AGENT_QUEUE = 'ticket-agent'
 
 const catalogQueue = BullModule.registerQueue({ name: CATALOG_INDEXING_QUEUE })
 const whatsappOptinQueue = BullModule.registerQueue({ name: WHATSAPP_OPTIN_QUEUE })
@@ -21,6 +22,7 @@ const whatsappProductImageSyncQueue = BullModule.registerQueue({
 })
 const catalogMigrationQueue = BullModule.registerQueue({ name: CATALOG_MIGRATION_QUEUE })
 const messageHistorySyncQueue = BullModule.registerQueue({ name: MESSAGE_HISTORY_SYNC_QUEUE })
+const ticketAgentQueue = BullModule.registerQueue({ name: TICKET_AGENT_QUEUE })
 
 @Module({
   imports: [
@@ -47,6 +49,7 @@ const messageHistorySyncQueue = BullModule.registerQueue({ name: MESSAGE_HISTORY
     whatsappProductImageSyncQueue,
     catalogMigrationQueue,
     messageHistorySyncQueue,
+    ticketAgentQueue,
   ],
   exports: [
     catalogQueue,
@@ -57,6 +60,7 @@ const messageHistorySyncQueue = BullModule.registerQueue({ name: MESSAGE_HISTORY
     whatsappProductImageSyncQueue,
     catalogMigrationQueue,
     messageHistorySyncQueue,
+    ticketAgentQueue,
   ],
 })
 export class QueueModule {}

@@ -42,6 +42,13 @@ export interface LiveAgentToolContext {
   catalogProviderMap: Record<string, string>
   canSendButtons: boolean
   canSendProducts: boolean
+  /** Enqueue an async ticket evaluation for this conversation. Omitted in dry-run. */
+  enqueueTicketRequest?: (payload: {
+    conversationId: string
+    agentId: string
+    organisationId: string
+    note?: string
+  }) => Promise<void> | void
 }
 
 /**
@@ -87,11 +94,10 @@ export async function buildLiveAgentTools(ctx: LiveAgentToolContext) {
       conversationId: ctx.conversationId,
     }),
     ...createTicketTools({
-      prisma: ctx.prisma,
-      gateway: ctx.gateway,
       agentId: ctx.agentId,
       organisationId: ctx.organisationId,
       conversationId: ctx.conversationId,
+      enqueueTicketRequest: ctx.enqueueTicketRequest,
     }),
     ...(hasPromotions
       ? createPromotionTools({
