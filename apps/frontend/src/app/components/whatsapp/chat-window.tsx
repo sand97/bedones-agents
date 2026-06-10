@@ -1,6 +1,6 @@
 import { useMemo, useRef, useEffect, useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Avatar, Popover, Button, Spin, Tooltip, message as antdMessage } from 'antd'
+import { Avatar, Popover, Popconfirm, Button, Spin, Tooltip, message as antdMessage } from 'antd'
 import {
   Play,
   Pause,
@@ -14,8 +14,9 @@ import {
   Smile,
   Sparkles,
   BotOff,
+  Trash2,
 } from 'lucide-react'
-import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { DoubleCheckIcon, SingleCheckIcon, OptionsIcon } from '@app/components/icons/social-icons'
@@ -909,13 +910,25 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
     '/messaging/conversations/{conversationId}/agent-override',
   )
 
+  const { orgSlug } = useParams({ strict: false }) as { orgSlug?: string }
+  const meQuery = $api.useQuery('get', '/auth/me')
+  const isAdmin = useMemo(() => {
+    const org = meQuery.data?.organisations?.find((o) => o.id === orgSlug)
+    return org?.role === 'OWNER' || org?.role === 'ADMIN'
+  }, [meQuery.data, orgSlug])
+
+  const clearMutation = $api.useMutation(
+    'delete',
+    '/messaging/conversations/{conversationId}/messages',
+  )
+
   const agentStatus = agentStatusQuery.data
   const agent = agentStatus?.agent ?? null
   const isAgentReady =
     !!agent && agent.score >= 80 && agent.status !== 'DRAFT' && agent.status !== 'CONFIGURING'
   const isActive = agentStatus?.isActive === true
   const hasHeaderActions = Boolean(
-    conversation.contact.phone || conversation.contact.username || isAgentReady,
+    conversation.contact.phone || conversation.contact.username || isAgentReady || isAdmin,
   )
 
   const handleCopy = async () => {
@@ -949,6 +962,26 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
       )
     } catch {
       antdMessage.error(t('chat.agent_toggle_error'))
+    }
+  }
+
+  const handleClearConversation = async () => {
+    try {
+      await clearMutation.mutateAsync({
+        params: { path: { conversationId: conversation.id } },
+      })
+      queryClient.invalidateQueries({
+        queryKey: [
+          'get',
+          '/messaging/conversations/{conversationId}/messages',
+          { params: { path: { conversationId: conversation.id } } },
+        ],
+      })
+      queryClient.invalidateQueries({ queryKey: ['get', '/messaging/conversations/{accountId}'] })
+      antdMessage.success(t('chat.conversation_cleared'))
+      setOptionsOpen(false)
+    } catch {
+      antdMessage.error(t('chat.clear_conversation_error'))
     }
   }
 
@@ -999,6 +1032,7 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
                 <Button
                   type="text"
                   block
+                  danger={isActive}
                   onClick={handleToggleAgent}
                   loading={setOverrideMutation.isPending}
                   icon={isActive ? <BotOff size={14} /> : <Sparkles size={14} />}
@@ -1006,6 +1040,20 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
                 >
                   {isActive ? t('chat.deactivate_agent') : t('chat.activate_agent')}
                 </Button>
+              )}
+              {isAdmin && (
+                <Popconfirm
+                  title={t('chat.clear_conversation_confirm')}
+                  okText={t('chat.clear_conversation')}
+                  cancelText={t('promotions.cancel')}
+                  okButtonProps={{ danger: true, loading: clearMutation.isPending }}
+                  onConfirm={handleClearConversation}
+                  placement="left"
+                >
+                  <Button type="text" block danger icon={<Trash2 size={14} />} className="py-2.5!">
+                    {t('chat.clear_conversation')}
+                  </Button>
+                </Popconfirm>
               )}
             </div>
           }

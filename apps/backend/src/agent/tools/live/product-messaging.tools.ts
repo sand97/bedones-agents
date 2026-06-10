@@ -47,13 +47,22 @@ export function createProductMessagingTools(deps: {
       }
 
       try {
+        // One product → keep the message on the card. Several individual cards
+        // (`product` format) → send the message once as its own text first, then
+        // the cards with no body, otherwise the same text repeats on every card.
+        // (carousel/product_list already carry a single shared body, untouched.)
+        const trimmedBody = bodyText?.trim()
+        const textFirst = format === 'product' && productIds.length > 1 && !!trimmedBody
+        if (textFirst && trimmedBody) {
+          await deps.messagingService.sendMessageAsAgent(deps.conversationId, trimmedBody)
+        }
         await deps.messagingService.sendProductMessageAsAgent(
           deps.conversationId,
           productIds,
           metaCatalogId,
           format,
           headerText,
-          bodyText,
+          textFirst ? undefined : bodyText,
         )
         if (deps.replyGuard) deps.replyGuard.sent = true
         return `Successfully sent ${productIds.length} product(s) as ${format} message.`

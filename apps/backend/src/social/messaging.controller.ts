@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common'
 import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import { AuthGuard } from '../auth/auth.guard'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -166,5 +166,16 @@ export class MessagingController {
       conversationId,
       body.override,
     )
+  }
+
+  // ─── Clear a conversation's stored messages (admin only) ───
+
+  @Delete('conversations/:conversationId/messages')
+  @ApiOkResponse({ schema: { type: 'object', properties: { cleared: { type: 'number' } } } })
+  async clearConversationMessages(
+    @CurrentUser() user: { id: string },
+    @Param('conversationId') conversationId: string,
+  ) {
+    return this.messagingService.clearConversationMessages(user.id, conversationId)
   }
 }

@@ -210,6 +210,7 @@ ${context}
     const buttonRules = canSendButtons
       ? `\n## Proposal Buttons
 When the answer is a small closed set (payment method, delivery option, sizes, yes/no…), call \`send_buttons\` with up to 3 short labelled buttons instead of asking in plain text. Keep labels under 20 characters. Do NOT also call reply_to_message in the same turn — send_buttons already delivers the message.
+NEVER use send_buttons to propose, list or show products — buttons are only for closed-set choices. To show products, always use send_products.
 `
       : ''
 
@@ -225,6 +226,7 @@ You can send products to the customer via the send_products tool. Unless the adm
 - **4-10 products** → use \`format: "carousel"\`. Swipeable cards, one per product. Best for a visual selection among a small set.
 - **More than 10 products** → use \`format: "product_list"\`. A single sectioned list (up to 30). \`headerText\` is required for this format.
 
+To show or propose a product, ALWAYS use send_products — it displays the image, name and price. Never just describe a product in a text reply, and never offer products as buttons.
 Put your accompanying text in \`bodyText\` — send_products already delivers the message to the customer. Do NOT also call reply_to_message in the same turn.
 
 Always respect any custom product-sending rule defined in the admin context above (it takes precedence over these defaults).
