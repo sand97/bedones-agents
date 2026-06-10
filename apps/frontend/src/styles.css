@@ -244,37 +244,6 @@ a {
   height: 14px !important;
 }
 
-/* Loading buttons must keep their resting height.
-   When a button enters the `loading` state Ant Design swaps its content for the
-   spinner; inside modal / popover / dropdown footers this can let the button
-   grow taller than its idle state. Re-assert the control height for the loading
-   state (values mirror the Button tokens in core/theme.ts) so toggling
-   `loading` never resizes the button. Scoped to overlay containers, where
-   buttons always use the standard control sizes. */
-.ant-modal .ant-btn-loading:not(.ant-btn-icon-only),
-.ant-drawer .ant-btn-loading:not(.ant-btn-icon-only),
-.ant-popover .ant-btn-loading:not(.ant-btn-icon-only),
-.ant-dropdown .ant-btn-loading:not(.ant-btn-icon-only) {
-  height: 40px;
-  min-height: 0;
-}
-
-.ant-modal .ant-btn-sm.ant-btn-loading:not(.ant-btn-icon-only),
-.ant-drawer .ant-btn-sm.ant-btn-loading:not(.ant-btn-icon-only),
-.ant-popover .ant-btn-sm.ant-btn-loading:not(.ant-btn-icon-only),
-.ant-dropdown .ant-btn-sm.ant-btn-loading:not(.ant-btn-icon-only) {
-  height: 34px;
-  min-height: 0;
-}
-
-.ant-modal .ant-btn-lg.ant-btn-loading:not(.ant-btn-icon-only),
-.ant-drawer .ant-btn-lg.ant-btn-loading:not(.ant-btn-icon-only),
-.ant-popover .ant-btn-lg.ant-btn-loading:not(.ant-btn-icon-only),
-.ant-dropdown .ant-btn-lg.ant-btn-loading:not(.ant-btn-icon-only) {
-  height: 48px;
-  min-height: 0;
-}
-
 /* Ant Design Select overrides */
 .ant-select-item {
   border-radius: 8px !important;
