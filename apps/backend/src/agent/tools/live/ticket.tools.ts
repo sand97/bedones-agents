@@ -11,9 +11,72 @@ export function createTicketTools(deps: {
   conversationId?: string
 }) {
   const createTicket = tool(
-    async ({ title, description, priority, contactName, provider }) => {
+    async ({ title, description, priority, contactName, provider, articles }) => {
       try {
-        // Find default status for this organisation
+        // Resolve the real contact from the conversation — authoritative, so the
+        // ticket carries a proper contactId + a link to the conversation instead
+        // of just a free-text name the model typed.
+        let contactId: string | undefined
+        let resolvedName = contactName
+        let resolvedProvider = provider as
+          | 'WHATSAPP'
+          | 'INSTAGRAM'
+          | 'FACEBOOK'
+          | 'TIKTOK'
+          | undefined
+        if (deps.conversationId) {
+          const conv = await deps.prisma.conversation.findUnique({
+            where: { id: deps.conversationId },
+            select: {
+              participantId: true,
+              participantName: true,
+              socialAccount: { select: { provider: true } },
+            },
+          })
+          if (conv) {
+            contactId = conv.participantId
+            resolvedName = conv.participantName || contactName
+            resolvedProvider = conv.socialAccount?.provider ?? resolvedProvider
+          }
+        }
+
+        const ticketPriority = (priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT') || 'MEDIUM'
+        const metadata =
+          articles && articles.length > 0 ? { articles } : undefined
+
+        // De-dupe: keep a single open ticket per conversation. The live agent
+        // tends to re-create a ticket every turn; if one already exists for this
+        // conversation, update it instead of stacking duplicates.
+        const existing = deps.conversationId
+          ? await deps.prisma.ticket.findFirst({
+              where: {
+                organisationId: deps.organisationId,
+                conversationId: deps.conversationId,
+                resolvedAt: null,
+              },
+              orderBy: { createdAt: 'desc' },
+              select: { id: true },
+            })
+          : null
+
+        if (existing) {
+          const ticket = await deps.prisma.ticket.update({
+            where: { id: existing.id },
+            data: {
+              title,
+              description,
+              priority: ticketPriority,
+              contactId,
+              contactName: resolvedName,
+              provider: resolvedProvider,
+              ...(metadata ? { metadata } : {}),
+            },
+            include: { status: true },
+          })
+          deps.gateway.emitToOrg(deps.organisationId, 'ticket:updated', ticket)
+          return `Demande prise en compte (ticket existant mis a jour, ID: ${ticket.id}).`
+        }
+
         const defaultStatus = await deps.prisma.ticketStatus.findFirst({
           where: { organisationId: deps.organisationId, isDefault: true },
         })
@@ -25,16 +88,18 @@ export function createTicketTools(deps: {
             statusId: defaultStatus?.id,
             title,
             description,
-            priority: (priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT') || 'MEDIUM',
-            contactName,
-            provider: provider as 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK' | 'TIKTOK' | undefined,
+            priority: ticketPriority,
+            contactId,
+            contactName: resolvedName,
+            provider: resolvedProvider,
             conversationId: deps.conversationId,
+            metadata,
           },
           include: { status: true },
         })
 
         deps.gateway.emitToOrg(deps.organisationId, 'ticket:created', ticket)
-        return `Ticket cree avec succes. ID: ${ticket.id}, Titre: "${ticket.title}", Statut: ${ticket.status?.name || 'Par defaut'}`
+        return `Demande prise en compte (ticket cree, ID: ${ticket.id}).`
       } catch (error: unknown) {
         return `Erreur lors de la creation du ticket: ${error instanceof Error ? error.message : 'Unknown error'}`
       }
@@ -42,7 +107,7 @@ export function createTicketTools(deps: {
     {
       name: 'create_ticket',
       description:
-        'Create a support ticket (lead) to track a customer request, order, or inquiry. Use this when a customer shows interest in a product, wants to place an order, or needs follow-up.',
+        'Create or update the lead/ticket for THIS conversation (it is de-duplicated automatically — there is at most one open ticket per conversation, so calling it again updates that ticket). The contact is linked automatically from the conversation. Use it when the customer wants to order/book or needs follow-up.',
       schema: z.object({
         title: z
           .string()
@@ -52,11 +117,15 @@ export function createTicketTools(deps: {
           .enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])
           .optional()
           .describe('Ticket priority. Default: MEDIUM'),
-        contactName: z.string().optional().describe('Name of the contact/customer'),
+        contactName: z.string().optional().describe('Fallback contact name (the conversation name is used when available)'),
         provider: z
           .enum(['WHATSAPP', 'INSTAGRAM', 'FACEBOOK', 'TIKTOK'])
           .optional()
           .describe('Social platform of the conversation'),
+        articles: z
+          .array(z.string())
+          .optional()
+          .describe('Names or ids of the product(s)/article(s) the customer chose, e.g. ["Studio cosy"]'),
       }),
     },
   )
