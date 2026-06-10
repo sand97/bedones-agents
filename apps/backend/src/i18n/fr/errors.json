@@ -15,6 +15,7 @@
   "invitation": {
     "not_found_or_accepted": "Invitation introuvable ou déjà acceptée",
     "otp_sent": "OTP envoyé avec succès",
+    "otp_send_failed": "Impossible d'envoyer le code de vérification pour le moment. Veuillez réessayer plus tard.",
     "no_pending_otp": "Aucun OTP en attente pour ce numéro",
     "otp_expired": "OTP expiré, veuillez en demander un nouveau",
     "otp_invalid": "Code OTP invalide",
