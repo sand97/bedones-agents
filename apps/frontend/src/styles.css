@@ -244,6 +244,19 @@ a {
   height: 14px !important;
 }
 
+/* Keep loading buttons aligned with their siblings in overlay footers.
+   These rows are `display: block` with inline-flex buttons aligned on the text
+   baseline. When a button enters the `loading` state its spinner shifts the
+   button's baseline, bumping it a few pixels out of line — so it looks taller /
+   misaligned next to the other buttons. Aligning on the middle keeps the
+   loading state from ever moving a button (size-agnostic — no fixed heights). */
+.ant-modal-footer .ant-btn,
+.ant-modal-confirm-btns .ant-btn,
+.ant-popconfirm-buttons .ant-btn,
+.ant-drawer-footer .ant-btn {
+  vertical-align: middle;
+}
+
 /* Ant Design Select overrides */
 .ant-select-item {
   border-radius: 8px !important;
