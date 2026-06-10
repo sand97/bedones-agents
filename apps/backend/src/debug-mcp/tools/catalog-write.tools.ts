@@ -59,6 +59,8 @@ export class DebugCatalogTools {
         currency: p.currency ?? 'XAF',
         description: p.description ?? null,
         category: p.category ?? null,
+        imageUrl: p.imageUrl ?? null,
+        additionalImageUrls: p.additionalImageUrls ?? [],
       })),
       ...Array.from({ length: args.count ?? 0 }, (_, k) => {
         const category = SYNTHETIC_CATEGORIES[k % SYNTHETIC_CATEGORIES.length]

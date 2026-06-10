@@ -52,6 +52,11 @@ export const addProductsSchema = z.object({
         currency: z.string().optional().describe('Default "XAF".'),
         description: z.string().optional(),
         category: z.string().optional(),
+        imageUrl: z.string().optional().describe('Public image URL (main product image).'),
+        additionalImageUrls: z
+          .array(z.string())
+          .optional()
+          .describe('Additional public image URLs.'),
       }),
     )
     .optional()

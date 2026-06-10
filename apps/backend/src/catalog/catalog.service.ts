@@ -13,6 +13,13 @@ import { SocialHealthService } from '../social/social-health.service'
 import { ErrorExplanationService, redactSecrets } from '../social/error-explanation.service'
 import type { SocialFeature, SocialProvider } from 'generated/prisma/enums'
 import { Prisma } from 'generated/prisma/client'
+import { InjectQueue } from '@nestjs/bullmq'
+import { Queue } from 'bullmq'
+import { CATALOG_INDEXING_QUEUE } from '../queue/queue.module'
+import {
+  INDEX_PRODUCT_JOB,
+  type SingleProductIndexingJobData,
+} from '../image-processing/catalog-indexing.processor'
 
 @Injectable()
 export class CatalogService {
@@ -49,6 +56,7 @@ export class CatalogService {
     private encryptionService: EncryptionService,
     private socialHealth: SocialHealthService,
     private errorExplanation: ErrorExplanationService,
+    @InjectQueue(CATALOG_INDEXING_QUEUE) private readonly catalogIndexingQueue: Queue,
   ) {}
 
   // ─── CRUD ───
@@ -871,6 +879,36 @@ export class CatalogService {
       if (!addRes.ok) {
         this.logger.warn(
           `Failed to add product ${result.id} to collection ${data.collectionId}: ${await addRes.text()}`,
+        )
+      }
+    }
+
+    // Best-effort: index the freshly created product into Qdrant so the agent
+    // can find it immediately. Never fail product creation if indexing hiccups.
+    if (result.id) {
+      try {
+        await this.catalogIndexingQueue.add(
+          INDEX_PRODUCT_JOB,
+          {
+            catalogId,
+            product: {
+              id: result.id,
+              retailer_id: data.retailerId.trim(),
+              name: data.name,
+              description: data.description,
+              image_url: data.imageUrl,
+              price: data.price,
+              currency: data.currency,
+              category: data.category,
+            },
+          } satisfies SingleProductIndexingJobData,
+          { jobId: `index-product-${catalogId}-${result.id}` },
+        )
+      } catch (error) {
+        this.logger.warn(
+          `Failed to enqueue indexing for product ${result.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
         )
       }
     }

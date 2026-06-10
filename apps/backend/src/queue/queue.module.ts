@@ -11,7 +11,14 @@ export const WHATSAPP_PRODUCT_IMAGE_SYNC_QUEUE = 'whatsapp-product-image-sync'
 export const CATALOG_MIGRATION_QUEUE = 'catalog-migration'
 export const MESSAGE_HISTORY_SYNC_QUEUE = 'message-history-sync'
 
-const catalogQueue = BullModule.registerQueue({ name: CATALOG_INDEXING_QUEUE })
+const catalogQueue = BullModule.registerQueue({
+  name: CATALOG_INDEXING_QUEUE,
+  defaultJobOptions: {
+    removeOnComplete: true,
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 2000 },
+  },
+})
 const whatsappOptinQueue = BullModule.registerQueue({ name: WHATSAPP_OPTIN_QUEUE })
 const socialAvatarSyncQueue = BullModule.registerQueue({ name: SOCIAL_AVATAR_SYNC_QUEUE })
 const loyaltyCampaignQueue = BullModule.registerQueue({ name: LOYALTY_CAMPAIGN_QUEUE })
