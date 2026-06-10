@@ -1,4 +1,10 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common'
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Prisma } from 'generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
@@ -1088,6 +1094,27 @@ export class MessagingService {
     })
 
     return this.getAgentStatusForConversation(userId, conversationId)
+  }
+
+  /**
+   * Admin-only: wipe every stored message of a conversation (e.g. to declutter a
+   * test thread). Platform-side messages are untouched — this only removes our
+   * DirectMessage rows and resets the conversation's last-message summary.
+   */
+  async clearConversationMessages(userId: string, conversationId: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { socialAccount: { select: { organisationId: true } } },
+    })
+    if (!conversation) throw new NotFoundException('Conversation not found')
+    await this.assertAdmin(userId, conversation.socialAccount.organisationId)
+
+    const { count } = await this.prisma.directMessage.deleteMany({ where: { conversationId } })
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { lastMessageText: null, lastMessageAt: null, unreadCount: 0 },
+    })
+    return { cleared: count }
   }
 
   /**
@@ -4088,6 +4115,18 @@ export class MessagingService {
     })
     if (!membership) {
       throw new BadRequestException('Not a member of this organisation')
+    }
+  }
+
+  private async assertAdmin(userId: string, organisationId: string) {
+    const membership = await this.prisma.organisationMember.findUnique({
+      where: { userId_organisationId: { userId, organisationId } },
+    })
+    if (!membership) {
+      throw new BadRequestException('Not a member of this organisation')
+    }
+    if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
+      throw new ForbiddenException('Only an admin can perform this action')
     }
   }
 }
