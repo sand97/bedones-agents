@@ -23,7 +23,7 @@ export interface IndexingResult {
   message: string
 }
 
-interface MetaProduct {
+export interface MetaProduct {
   id: string
   retailer_id?: string
   name?: string
@@ -49,6 +49,21 @@ export class ProductImageIndexingService {
     private readonly geminiEmbeddingService: GeminiEmbeddingService,
     private readonly qdrantService: QdrantService,
   ) {}
+
+  /**
+   * Index a SINGLE product into Qdrant — used right after a product is created
+   * through our own creation service (UI / migration), via the `index-product`
+   * queue job. Ensures the collection exists, then indexes the one product.
+   * Idempotent: reuses the same point id as the full `syncCatalog`.
+   */
+  async indexProduct(catalogId: string, product: MetaProduct): Promise<void> {
+    if (!this.qdrantService.isConfigured()) {
+      this.logger.warn(`Qdrant not configured — skipping on-create index for product ${product.id}`)
+      return
+    }
+    await this.qdrantService.ensureCollection(catalogId)
+    await this.indexSingleProduct(catalogId, product)
+  }
 
   /**
    * Smart sync: only indexes what's new or changed.
