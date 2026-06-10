@@ -378,7 +378,9 @@ export class ProductImageIndexingService {
       throw new Error(`Catalog ${catalogId} not found or missing providerId`)
     }
 
-    const socialLink = catalog.socialAccounts[0]
+    const socialLink =
+      catalog.socialAccounts.find((l) => l.socialAccount.provider === 'FACEBOOK_CATALOG') ??
+      catalog.socialAccounts[0]
     if (!socialLink) {
       throw new Error(`No social account linked to catalog ${catalogId}`)
     }
@@ -421,7 +423,9 @@ export class ProductImageIndexingService {
 
     if (!catalog?.providerId) return 0
 
-    const socialLink = catalog.socialAccounts[0]
+    const socialLink =
+      catalog.socialAccounts.find((l) => l.socialAccount.provider === 'FACEBOOK_CATALOG') ??
+      catalog.socialAccounts[0]
     if (!socialLink) return 0
 
     const accessToken = await this.encryptionService.decrypt(socialLink.socialAccount.accessToken)
