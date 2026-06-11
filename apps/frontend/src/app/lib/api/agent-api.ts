@@ -547,6 +547,7 @@ export interface Ticket {
   contactId?: string
   provider?: string
   conversationId?: string
+  socialAccountId?: string
   assignedTo?: string
   metadata?: Record<string, unknown>
   resolvedAt?: string

@@ -276,6 +276,7 @@ model SocialAccount {
   labels                  Label[]
   notificationPreferences NotificationPreference[]
   errorLogs               SocialAccountErrorLog[]
+  tickets                 Ticket[]
 
   loyaltyContacts                 LoyaltyContact[]
   loyaltyBonuses                  LoyaltyBonus[]
@@ -585,6 +586,8 @@ model Ticket {
   contactId      String? // Platform user ID
   provider       SocialProvider?
   conversationId String? // Link to Conversation
+  socialAccountId String? // Page/number (social account) the conversation belongs to
+  socialAccount  SocialAccount?  @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
   assignedTo     String? // OrganisationMember ID
   metadata       Json? // Extra data (order details, etc.)
   resolvedAt     DateTime?
@@ -596,6 +599,7 @@ model Ticket {
   @@index([organisationId])
   @@index([agentId])
   @@index([statusId])
+  @@index([socialAccountId])
   @@index([createdAt])
 }
 

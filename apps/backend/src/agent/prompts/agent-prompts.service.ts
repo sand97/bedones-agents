@@ -362,4 +362,49 @@ ${productList}
 
 Réponds uniquement avec la description, sans préambule.`
   }
+
+  /**
+   * System prompt for the dedicated, asynchronous ticket agent. It reads the
+   * conversation + the conversation's open tickets and decides ONE action:
+   * create (new request), update (same request as an existing ticket) or noop.
+   */
+  buildTicketAgentPrompt(input: {
+    agentContext: string
+    existingTickets: Array<{
+      id: string
+      title: string
+      description?: string | null
+      priority: string
+    }>
+  }): string {
+    const ticketsBlock =
+      input.existingTickets.length > 0
+        ? input.existingTickets
+            .map(
+              (t) =>
+                `- id: ${t.id} | titre: ${t.title} | priorité: ${t.priority}${t.description ? ` | ${t.description}` : ''}`,
+            )
+            .join('\n')
+        : '(aucun ticket ouvert pour cette conversation)'
+
+    return `Tu es l'agent qui gère les tickets (leads) d'une entreprise.
+À partir de la conversation et des tickets déjà ouverts pour ce contact, tu décides UNE seule action :
+- "create" : la demande du client est NOUVELLE / distincte des tickets existants.
+- "update" : la demande concerne la MÊME chose qu'un ticket existant (mêmes dates / produit / réservation, le client précise ou complète) → fournis son "ticketId".
+- "noop" : rien d'actionnable (salutation, simple question d'info sans intention de commande/réservation, ou rien de nouveau par rapport aux tickets existants).
+
+## Contexte business
+${input.agentContext || '(non configuré)'}
+
+## Tickets déjà ouverts pour cette conversation
+${ticketsBlock}
+
+## Règles
+- Un ticket = une demande concrète (commande, réservation, suivi). Jamais pour une simple question.
+- Si le client complète une demande déjà ouverte (dates, produit, taille, total…), c'est un "update" de CE ticket, jamais un nouveau.
+- Titre court et descriptif ; description = résumé (produit/studio, dates, prix, infos utiles).
+- "articles" = les produits concrets choisis par le client.
+- Le contact est rattaché automatiquement par le système — n'invente ni numéro ni nom.
+- Réponds via l'outil structuré.`
+  }
 }

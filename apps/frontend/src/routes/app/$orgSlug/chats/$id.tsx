@@ -53,6 +53,7 @@ import type { Conversation, Message } from '@app/components/whatsapp/mock-data'
 export const Route = createFileRoute('/app/$orgSlug/chats/$id')({
   component: ChatsPage,
   validateSearch: (search: Record<string, unknown>) => ({
+    account: (search.account as string) || undefined,
     conv: (search.conv as string) || undefined,
     ticket: (search.ticket as string) || undefined,
   }),

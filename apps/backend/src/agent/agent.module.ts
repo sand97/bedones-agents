@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common'
+import { BullModule } from '@nestjs/bullmq'
 import { AuthModule } from '../auth/auth.module'
 import { ImageProcessingModule } from '../image-processing/image-processing.module'
-import { QueueModule } from '../queue/queue.module'
+import { QueueModule, TICKET_AGENT_QUEUE } from '../queue/queue.module'
 import { SocialModule } from '../social/social.module'
 import { StatsModule } from '../stats/stats.module'
 import { AgentController } from './agent.controller'
@@ -11,9 +12,18 @@ import { AgentPromptsService } from './prompts/agent-prompts.service'
 import { AgentDbToolsService } from './tools/agent-db-tools.service'
 import { AgentMessageProcessorService } from './agent-message-processor.service'
 import { AgentFeedbackService } from './feedback.service'
+import { TicketAgentService } from './ticket-agent.service'
+import { TicketAgentProcessor } from './ticket-agent.processor'
 
 @Module({
-  imports: [AuthModule, ImageProcessingModule, QueueModule, SocialModule, StatsModule],
+  imports: [
+    AuthModule,
+    ImageProcessingModule,
+    QueueModule,
+    SocialModule,
+    StatsModule,
+    BullModule.registerQueue({ name: TICKET_AGENT_QUEUE }),
+  ],
   controllers: [AgentController],
   providers: [
     AgentService,
@@ -22,6 +32,8 @@ import { AgentFeedbackService } from './feedback.service'
     AgentDbToolsService,
     AgentMessageProcessorService,
     AgentFeedbackService,
+    TicketAgentService,
+    TicketAgentProcessor,
   ],
   exports: [AgentService],
 })

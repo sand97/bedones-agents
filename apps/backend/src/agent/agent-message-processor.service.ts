@@ -15,6 +15,7 @@ import { CreditService } from '../stats/credit.service'
 import type { CreditMediaType } from '../../generated/prisma/client'
 
 import { runLiveAgent } from './run-live-agent'
+import { TicketAgentService } from './ticket-agent.service'
 import { contactMatchesConversation } from '../social/contact-match.util'
 
 @Injectable()
@@ -31,6 +32,7 @@ export class AgentMessageProcessorService {
     private readonly prompts: AgentPromptsService,
     private readonly creditService: CreditService,
     private readonly llmFactory: LlmFactoryService,
+    private readonly ticketAgent: TicketAgentService,
   ) {}
 
   @OnEvent('message.incoming', { async: true })
@@ -321,6 +323,7 @@ export class AgentMessageProcessorService {
           catalogProviderMap,
           canSendButtons,
           canSendProducts,
+          enqueueTicketRequest: (p) => this.ticketAgent.enqueue(p),
         },
       })
 

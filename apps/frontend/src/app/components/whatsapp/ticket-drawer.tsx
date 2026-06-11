@@ -9,15 +9,20 @@ import { ArticleListItem } from '@app/components/catalog/article-list-item'
 
 /** Metadata shape stored in the ticket */
 interface TicketMetadata {
-  articles?: Array<{
-    id: string
-    name: string
-    price: number
-    currency: string
-    quantity: number
-    imageUrl?: string
-    description?: string
-  }>
+  // The manual ticket modal stores rich article objects; the async ticket agent
+  // stores plain article names (string[]). Both are supported.
+  articles?: Array<
+    | string
+    | {
+        id: string
+        name: string
+        price: number
+        currency: string
+        quantity: number
+        imageUrl?: string
+        description?: string
+      }
+  >
   charges?: Array<{
     id: string
     reason: string
@@ -214,6 +219,7 @@ export function TicketDrawer({
   onEdit,
   promotionOptions,
 }: TicketDrawerProps) {
+  const { t } = useTranslation()
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({})
 
   // Compute active promotions from metadata + available promotions
@@ -260,11 +266,16 @@ export function TicketDrawer({
 
   // Extract items from metadata or from ticket.items (mock)
   const meta = (ticket.metadata ?? {}) as TicketMetadata
-  const metaArticles = meta.articles ?? []
+  const rawArticles = meta.articles ?? []
+  const namedArticles = rawArticles.filter((a): a is string => typeof a === 'string')
+  const objectArticles = rawArticles.filter(
+    (a): a is Exclude<(typeof rawArticles)[number], string> =>
+      typeof a === 'object' && a !== null,
+  )
   const items: TicketItem[] =
     ticket.items && ticket.items.length > 0
       ? ticket.items
-      : metaArticles.map((a) => ({
+      : objectArticles.map((a) => ({
           id: a.id,
           title: a.name,
           description: a.description || '',
@@ -405,6 +416,20 @@ export function TicketDrawer({
               <div className="mb-2 text-xs text-text-muted">Description</div>
               <div className="text-sm font-normal text-text-primary leading-relaxed">
                 {ticket.description}
+              </div>
+            </div>
+          )}
+
+          {/* Chosen articles (names provided by the async ticket agent) */}
+          {namedArticles.length > 0 && (
+            <div className="border-b border-border-subtle px-4 py-4">
+              <div className="mb-2 text-xs text-text-muted">{t('tickets.chosen_articles')}</div>
+              <div className="flex flex-wrap gap-2">
+                {namedArticles.map((articleName, i) => (
+                  <Tag key={`${articleName}-${i}`} bordered={false}>
+                    {articleName}
+                  </Tag>
+                ))}
               </div>
             </div>
           )}
