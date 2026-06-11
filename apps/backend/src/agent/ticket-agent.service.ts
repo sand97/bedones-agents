@@ -119,6 +119,16 @@ export class TicketAgentService {
       select: { id: true, title: true, description: true, priority: true },
     })
 
+    // What the live agent already learned about this customer (address, phone,
+    // sizes, preferences…). The live agent may rightly NOT re-ask for these since
+    // it already knows them — so the ticket agent must capture them itself and
+    // surface anything still missing.
+    const contactNotes = await this.prisma.contactNote.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: 'asc' },
+      select: { category: true, content: true },
+    })
+
     // Products actually shown to the customer in this conversation. Their details
     // (name/price/image) were hydrated and frozen into the message metadata when
     // sent — so the ticket can attach a frozen snapshot, and the agent can only
@@ -131,7 +141,12 @@ export class TicketAgentService {
     })
     const shownProducts = new Map<
       string,
-      { name: string | null; price: number | null; currency: string | null; imageUrl: string | null }
+      {
+        name: string | null
+        price: number | null
+        currency: string | null
+        imageUrl: string | null
+      }
     >()
     for (const dm of productMessages) {
       const items = (dm.metadata as { items?: Array<Record<string, unknown>> } | null)?.items
@@ -156,6 +171,7 @@ export class TicketAgentService {
         retailerId,
         name: p.name,
       })),
+      contactNotes,
     })
 
     const model = this.llmFactory.createStructuredChatModel('thinking', decisionSchema)

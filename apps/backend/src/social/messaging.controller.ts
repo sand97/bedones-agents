@@ -13,6 +13,8 @@ import {
   SendTemplateMessageDto,
   MarkConversationReadDto,
   SetConversationAgentOverrideDto,
+  ContactNotesResponseDto,
+  SetContactNotesDto,
 } from './dto/messaging.dto'
 
 @ApiTags('Messaging')
@@ -166,6 +168,28 @@ export class MessagingController {
       conversationId,
       body.override,
     )
+  }
+
+  // ─── Customer knowledge (durable notes the AI keeps about the customer) ───
+
+  @Get('conversations/:conversationId/contact-notes')
+  @ApiOkResponse({ type: ContactNotesResponseDto })
+  async getContactNotes(
+    @CurrentUser() user: { id: string },
+    @Param('conversationId') conversationId: string,
+  ) {
+    return this.messagingService.getContactNotes(user.id, conversationId)
+  }
+
+  @Put('conversations/:conversationId/contact-notes')
+  @ApiBody({ type: SetContactNotesDto })
+  @ApiOkResponse({ type: ContactNotesResponseDto })
+  async setContactNotes(
+    @CurrentUser() user: { id: string },
+    @Param('conversationId') conversationId: string,
+    @Body() body: SetContactNotesDto,
+  ) {
+    return this.messagingService.setContactNotes(user.id, conversationId, body.content)
   }
 
   // ─── Clear a conversation's stored messages (admin only) ───
