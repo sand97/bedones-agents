@@ -886,6 +886,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/messaging/conversations/{conversationId}/contact-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MessagingController_getContactNotes"];
+        put: operations["MessagingController_setContactNotes"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/labels/account/{socialAccountId}": {
         parameters: {
             query?: never;
@@ -2782,6 +2798,14 @@ export interface components {
             /** @enum {string} */
             override: "FORCE_ON" | "FORCE_OFF";
         };
+        ContactNotesResponseDto: {
+            /** @description Everything the AI knows about this customer — one durable fact per line. */
+            content: string;
+        };
+        SetContactNotesDto: {
+            /** @description The edited customer knowledge — one durable fact per line. An empty value clears it. */
+            content: string;
+        };
         CreateLabelDto: Record<string, never>;
         UpdateLabelDto: Record<string, never>;
         CreateCatalogDto: {
@@ -4513,6 +4537,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationAgentStatusDto"];
+                };
+            };
+        };
+    };
+    MessagingController_getContactNotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactNotesResponseDto"];
+                };
+            };
+        };
+    };
+    MessagingController_setContactNotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetContactNotesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactNotesResponseDto"];
                 };
             };
         };

@@ -1118,6 +1118,69 @@ export class MessagingService {
   }
 
   /**
+   * Read the durable "customer knowledge" the agent (and operators) accumulated
+   * for a conversation — surfaced in the dashboard so an admin can review what the
+   * AI knows about the customer. Returned as one fact per line.
+   */
+  async getContactNotes(userId: string, conversationId: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { socialAccount: { select: { organisationId: true } } },
+    })
+    if (!conversation) throw new NotFoundException('Conversation not found')
+    await this.assertMembership(userId, conversation.socialAccount.organisationId)
+
+    const notes = await this.prisma.contactNote.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: 'asc' },
+      select: { content: true },
+    })
+    return { content: notes.map((n) => n.content).join('\n') }
+  }
+
+  /**
+   * Admin-only: replace the customer knowledge of a conversation with the edited
+   * text (one fact per non-empty line). The category of an unchanged line is kept
+   * so curating one fact doesn't wipe the structure the agent built.
+   */
+  async setContactNotes(userId: string, conversationId: string, content: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { socialAccount: { select: { organisationId: true } } },
+    })
+    if (!conversation) throw new NotFoundException('Conversation not found')
+    await this.assertAdmin(userId, conversation.socialAccount.organisationId)
+
+    const lines = (content ?? '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0)
+
+    const existing = await this.prisma.contactNote.findMany({
+      where: { conversationId },
+      select: { content: true, category: true },
+    })
+    const categoryByContent = new Map(existing.map((n) => [n.content, n.category]))
+
+    await this.prisma.$transaction([
+      this.prisma.contactNote.deleteMany({ where: { conversationId } }),
+      ...(lines.length > 0
+        ? [
+            this.prisma.contactNote.createMany({
+              data: lines.map((line) => ({
+                conversationId,
+                content: line,
+                category: categoryByContent.get(line) ?? null,
+              })),
+            }),
+          ]
+        : []),
+    ])
+
+    return { content: lines.join('\n') }
+  }
+
+  /**
    * Whether the agent would currently process a new message on this conversation.
    * Combinable scopes (contacts / ads / new conversations) are OR'd; `aiActivateAll`
    * short-circuits to true. Kept in sync with

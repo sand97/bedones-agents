@@ -378,6 +378,7 @@ Réponds uniquement avec la description, sans préambule.`
       priority: string
     }>
     availableProducts?: Array<{ retailerId: string; name: string | null }>
+    contactNotes?: Array<{ category?: string | null; content: string }>
   }): string {
     const ticketsBlock =
       input.existingTickets.length > 0
@@ -396,6 +397,13 @@ Réponds uniquement avec la description, sans préambule.`
             .join('\n')
         : '(aucun produit montré dans cette conversation)'
 
+    const notesBlock =
+      input.contactNotes && input.contactNotes.length > 0
+        ? input.contactNotes
+            .map((n) => `- ${n.category ? `[${n.category}] ` : ''}${n.content}`)
+            .join('\n')
+        : '(rien de connu sur ce client pour le moment)'
+
     return `Tu es l'agent qui gère les tickets (leads) d'une entreprise.
 À partir de la conversation et des tickets déjà ouverts pour ce contact, tu décides UNE seule action :
 - "create" : la demande du client est NOUVELLE / distincte des tickets existants.
@@ -411,10 +419,16 @@ ${ticketsBlock}
 ## Produits montrés au client dans cette conversation
 ${productsBlock}
 
+## Connaissance sur le client
+Infos durables déjà connues sur ce client (mémorisées au fil des échanges). L'agent conversationnel ne re-demande pas ce qu'il sait déjà — c'est donc à toi de les reporter sur le ticket.
+${notesBlock}
+
 ## Règles
 - Un ticket = une demande concrète (commande, réservation, suivi). Jamais pour une simple question.
 - Si le client complète une demande déjà ouverte (dates, produit, taille, total…), c'est un "update" de CE ticket, jamais un nouveau.
 - Titre court et descriptif ; description = résumé (produit/studio, dates, prix, infos utiles).
+- Reporte dans la description les infos client pertinentes issues de la "Connaissance sur le client" (adresse de livraison, téléphone, tailles, préférences…) — ne les redemande pas, elles sont connues.
+- Si une info essentielle à l'exécution de la demande manque (ex: adresse de livraison ou téléphone non connus), signale-le explicitement dans la description, préfixé par "À confirmer:".
 - "articleRetailerIds" = les retailerId des produits que le client a choisis, UNIQUEMENT depuis la liste "Produits montrés". N'invente JAMAIS un retailerId ; si rien n'a été choisi, laisse vide.
 - Le contact est rattaché automatiquement par le système — n'invente ni numéro ni nom.
 - Réponds via l'outil structuré.`

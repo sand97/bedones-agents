@@ -274,3 +274,18 @@ export class SetConversationAgentOverrideDto {
   @ApiProperty({ enum: ['FORCE_ON', 'FORCE_OFF'] })
   override: 'FORCE_ON' | 'FORCE_OFF'
 }
+
+export class ContactNotesResponseDto {
+  @ApiProperty({
+    description: 'Everything the AI knows about this customer — one durable fact per line.',
+  })
+  content: string
+}
+
+export class SetContactNotesDto {
+  @ApiProperty({
+    description:
+      'The edited customer knowledge — one durable fact per line. An empty value clears it.',
+  })
+  content: string
+}

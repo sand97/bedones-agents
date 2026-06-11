@@ -15,6 +15,7 @@ import {
   Sparkles,
   BotOff,
   Trash2,
+  BookUser,
 } from 'lucide-react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
@@ -27,6 +28,7 @@ import { TicketCard } from './ticket-card'
 import { TicketDrawer, type RealTicket } from './ticket-drawer'
 import { ChatInput } from './chat-input'
 import { FeedbackModal, type FeedbackSubmitResult, type FeedbackTurn } from './feedback-modal'
+import { CustomerKnowledgeModal } from './customer-knowledge-modal'
 
 type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger' | 'tiktok'
 
@@ -898,6 +900,7 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
   const queryClient = useQueryClient()
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [knowledgeOpen, setKnowledgeOpen] = useState(false)
 
   const agentStatusQuery = $api.useQuery(
     'get',
@@ -1041,6 +1044,18 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
                   {isActive ? t('chat.deactivate_agent') : t('chat.activate_agent')}
                 </Button>
               )}
+              <Button
+                type="text"
+                block
+                onClick={() => {
+                  setKnowledgeOpen(true)
+                  setOptionsOpen(false)
+                }}
+                icon={<BookUser size={14} />}
+                className="py-2.5!"
+              >
+                {t('chat.knowledge_menu')}
+              </Button>
               {isAdmin && (
                 <Popconfirm
                   title={t('chat.clear_conversation_confirm')}
@@ -1071,6 +1086,12 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
           />
         </Popover>
       )}
+      <CustomerKnowledgeModal
+        conversationId={conversation.id}
+        open={knowledgeOpen}
+        onClose={() => setKnowledgeOpen(false)}
+        canEdit={isAdmin}
+      />
     </div>
   )
 }
