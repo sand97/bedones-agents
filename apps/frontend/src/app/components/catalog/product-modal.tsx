@@ -4,7 +4,6 @@ import { Modal, Form, Input, InputNumber, Select, Upload, Button, message } from
 import { X } from 'lucide-react'
 import { uploadProductImage } from '@app/lib/api'
 import type { Product, Collection } from '@app/lib/api/agent-api'
-import { getCategoryOptions } from '@app/lib/product-categories'
 
 /** Normalize currency aliases to ISO 4217 */
 function normalizeCurrency(c?: string): string {
@@ -31,7 +30,6 @@ interface ProductModalProps {
     imageUrls?: string[]
     price?: number
     currency?: string
-    category?: string
     url?: string
     availability?: string
     brand?: string
@@ -128,7 +126,6 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
     ref,
   ) {
     const { t } = useTranslation()
-    const { t: tCat } = useTranslation('categories')
     const [form] = Form.useForm()
     const currency = Form.useWatch('currency', form) as string | undefined
     const [uploading, setUploading] = useState(false)
@@ -172,7 +169,6 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
           description: product.description,
           price: product.price,
           currency: normalizeCurrency(product.currency),
-          category: product.category,
           url: product.url,
           availability: product.availability,
           brand: product.brand,
@@ -264,8 +260,6 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
     }
 
     useImperativeHandle(ref, () => ({ submit: handleSubmit }), [handleSubmit])
-
-    const categoryOptions = getCategoryOptions(tCat)
 
     return (
       <>
@@ -420,16 +414,8 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
           </Form.Item>
 
           <div className="flex gap-4">
-            <Form.Item name="category" label={t('catalog.category')} className="flex-1">
-              <Select
-                showSearch
-                allowClear
-                options={categoryOptions}
-                placeholder={t('catalog.category_placeholder')}
-                filterOption={(input, option) =>
-                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                }
-              />
+            <Form.Item name="brand" label={t('catalog.product_brand')} className="flex-1">
+              <Input placeholder={t('catalog.product_brand_placeholder')} />
             </Form.Item>
             <Form.Item name="collectionId" label={t('catalog.collection')} className="flex-1">
               <Select
@@ -473,10 +459,6 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
               />
             </Form.Item>
           </div>
-
-          <Form.Item name="brand" label={t('catalog.product_brand')}>
-            <Input placeholder={t('catalog.product_brand_placeholder')} />
-          </Form.Item>
         </Form>
       </>
     )
