@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
 import { buildShareMeta } from '@app/lib/share-meta'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, Spin, Tooltip } from 'antd'
+import { Button, Spin, Tooltip, App } from 'antd'
 import { SetupSuccessModal } from '@app/components/dashboard/setup-success-modal'
 import { AgentReadyModal } from '@app/components/agent/agent-ready-modal'
 import {
@@ -257,6 +257,8 @@ function AgentsPage() {
 
   // ─── Mutations ───
 
+  const { message } = App.useApp()
+
   const createMutation = useMutation({
     mutationFn: ({ name, socialAccountIds }: { name?: string; socialAccountIds: string[] }) =>
       agentApi.create({ organisationId: orgSlug, socialAccountIds, name }),
@@ -305,6 +307,18 @@ function AgentsPage() {
       } catch {
         // Setup status is non-critical here — activation already succeeded.
       }
+    },
+  })
+
+  const updateModelMutation = useMutation({
+    mutationFn: (tier: 'flash' | 'pro' | 'ultra') =>
+      agentApi.updateLiveModelTier(selectedAgentId!, tier),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents', orgSlug] })
+      message.success(t('agent.model_updated'))
+    },
+    onError: () => {
+      message.error(t('agent.model_update_error'))
     },
   })
 
@@ -684,6 +698,8 @@ function AgentsPage() {
           onSubmit={(data) => activateMutation.mutate(data)}
           agent={selectedAgent}
           loading={activateMutation.isPending}
+          onChangeModelTier={(tier) => updateModelMutation.mutate(tier)}
+          modelTierSaving={updateModelMutation.isPending}
         />
       )}
 

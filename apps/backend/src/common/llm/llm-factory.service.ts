@@ -10,7 +10,18 @@ import type { ZodV4Like } from '@langchain/core/utils/types'
 import { LangChainCallbackHandler } from '@posthog/ai/langchain'
 import { PostHogService } from '../../posthog/posthog.service'
 
-export type LlmTier = 'thinking' | 'flash'
+/**
+ * Capability tiers. `thinking` is internal (agent onboarding / context analysis).
+ * `flash` | `pro` | `ultra` are the user-facing live-agent tiers an admin can
+ * pick per agent — flash is fast/cheap, ultra is the most capable. Every tier
+ * maps to a model on BOTH providers, so the provider+fallback choice
+ * (LLM_DEFAULT_PROVIDER) is orthogonal to the tier.
+ */
+export type LlmTier = 'thinking' | 'flash' | 'pro' | 'ultra'
+
+/** User-facing live-agent model tiers (what an admin picks in the UI). */
+export const LIVE_MODEL_TIERS = ['flash', 'pro', 'ultra'] as const
+export type LiveModelTier = (typeof LIVE_MODEL_TIERS)[number]
 
 /**
  * Optional PostHog LLM-observability context. When provided, the LLM call is
@@ -45,22 +56,26 @@ export type StructuredChatModel<T> = Runnable<BaseLanguageModelInput, T>
  * Gemini is primary by default; set LLM_DEFAULT_PROVIDER=openai to make ChatGPT
  * primary instead.
  *
- * Two tiers are supported:
- * - `thinking`: most capable reasoning models with extended thinking enabled.
- *   Use this for agent context processing (onboarding, catalog analysis,
- *   knowledge ingestion) where correctness matters more than cost.
- * - `flash`: lightweight/fast models for live response generation (DM replies,
- *   comment auto-replies, moderation).
+ * Tiers:
+ * - `thinking`: most capable reasoning model with extended thinking — internal,
+ *   for agent context processing (onboarding, catalog analysis).
+ * - `flash`: fast/cheap, the default for live response generation.
+ * - `pro`: flash-class model with reasoning enabled — a "smarter flash".
+ * - `ultra`: the most capable model (≈ thinking) for live responses.
  *
  * Env vars (with stable defaults):
  *   LLM_DEFAULT_PROVIDER    (default: gemini; set to "openai" to make ChatGPT primary)
  *   GEMINI_API_KEY, OPENAI_API_KEY (legacy: OPENIA_API_KEY)
  *   GEMINI_MODEL_THINKING   (default: gemini-3.1-pro-preview)
  *   GEMINI_MODEL_FLASH      (default: gemini-3-flash-preview)
+ *   GEMINI_MODEL_PRO        (default: gemini-3-flash-preview, reasoning on)
+ *   GEMINI_MODEL_ULTRA      (default: gemini-3.1-pro-preview)
  *   OPENAI_MODEL_THINKING   (default: gpt-5)
  *   OPENAI_MODEL_FLASH      (default: gpt-5-mini)
- *   GEMINI_THINKING_BUDGET  (default: -1 = dynamic for thinking, 0 = off for flash)
- *   OPENAI_REASONING_EFFORT (default: medium)
+ *   OPENAI_MODEL_PRO        (default: gpt-5-mini, reasoning on)
+ *   OPENAI_MODEL_ULTRA      (default: gpt-5)
+ *   GEMINI_THINKING_BUDGET  (default: 0 = off for flash, -1 = dynamic otherwise)
+ *   OPENAI_REASONING_EFFORT (default: medium; applied to every tier except flash)
  */
 @Injectable()
 export class LlmFactoryService {
@@ -79,9 +94,8 @@ export class LlmFactoryService {
     const primary = openaiFirst ? openai : gemini
     const fallback = openaiFirst ? gemini : openai
 
-    let model: ChatModel | null = null
-    if (primary && fallback) model = primary.withFallbacks([fallback])
-    else model = primary ?? fallback
+    const model: ChatModel | null =
+      primary && fallback ? primary.withFallbacks([fallback]) : (primary ?? fallback)
 
     if (!model) {
       throw new Error(
@@ -116,10 +130,10 @@ export class LlmFactoryService {
     const primary = openaiFirst ? openaiStructured : geminiStructured
     const fallback = openaiFirst ? geminiStructured : openaiStructured
 
-    let model: StructuredChatModel<T> | null = null
-    if (primary && fallback) {
-      model = primary.withFallbacks([fallback]) as StructuredChatModel<T>
-    } else model = primary ?? fallback
+    const model: StructuredChatModel<T> | null =
+      primary && fallback
+        ? (primary.withFallbacks([fallback]) as StructuredChatModel<T>)
+        : (primary ?? fallback)
 
     if (!model) {
       throw new Error(
@@ -210,23 +224,49 @@ export class LlmFactoryService {
       : 'gemini'
   }
 
+  /** Concrete Gemini model id for a tier (env-overridable). */
+  private geminiModelFor(tier: LlmTier): string {
+    const c = (key: string, def: string) => this.config.get<string>(key) || def
+    switch (tier) {
+      case 'thinking':
+        return c('GEMINI_MODEL_THINKING', 'gemini-3.1-pro-preview')
+      case 'ultra':
+        return c('GEMINI_MODEL_ULTRA', 'gemini-3.1-pro-preview')
+      case 'pro':
+        return c('GEMINI_MODEL_PRO', 'gemini-3-flash-preview')
+      default:
+        return c('GEMINI_MODEL_FLASH', 'gemini-3-flash-preview')
+    }
+  }
+
+  /** Concrete OpenAI model id for a tier (env-overridable). */
+  private openaiModelFor(tier: LlmTier): string {
+    const c = (key: string, def: string) => this.config.get<string>(key) || def
+    switch (tier) {
+      case 'thinking':
+        return c('OPENAI_MODEL_THINKING', 'gpt-5')
+      case 'ultra':
+        return c('OPENAI_MODEL_ULTRA', 'gpt-5')
+      case 'pro':
+        return c('OPENAI_MODEL_PRO', 'gpt-5-mini')
+      default:
+        return c('OPENAI_MODEL_FLASH', 'gpt-5-mini')
+    }
+  }
+
   private buildGemini(tier: LlmTier, options: LlmFactoryOptions): ChatGoogleGenerativeAI | null {
     const apiKey = this.config.get<string>('GEMINI_API_KEY')
     if (!apiKey) return null
 
-    const model =
-      options.model ??
-      (tier === 'thinking'
-        ? this.config.get<string>('GEMINI_MODEL_THINKING') || 'gemini-3.1-pro-preview'
-        : this.config.get<string>('GEMINI_MODEL_FLASH') || 'gemini-3-flash-preview')
+    const model = options.model ?? this.geminiModelFor(tier)
 
     const thinkingBudgetRaw = this.config.get<string>('GEMINI_THINKING_BUDGET')
     const thinkingBudget =
       thinkingBudgetRaw !== undefined && thinkingBudgetRaw !== ''
         ? Number(thinkingBudgetRaw)
-        : tier === 'thinking'
-          ? -1
-          : 0
+        : tier === 'flash'
+          ? 0
+          : -1
 
     return new ChatGoogleGenerativeAI({
       apiKey,
@@ -242,11 +282,7 @@ export class LlmFactoryService {
       this.config.get<string>('OPENAI_API_KEY') || this.config.get<string>('OPENIA_API_KEY')
     if (!apiKey) return null
 
-    const model =
-      options.model ??
-      (tier === 'thinking'
-        ? this.config.get<string>('OPENAI_MODEL_THINKING') || 'gpt-5'
-        : this.config.get<string>('OPENAI_MODEL_FLASH') || 'gpt-5-mini')
+    const model = options.model ?? this.openaiModelFor(tier)
 
     const reasoningEffort =
       (this.config.get<string>('OPENAI_REASONING_EFFORT') as
@@ -267,7 +303,7 @@ export class LlmFactoryService {
       model,
       temperature: supportsTemperature ? (options.temperature ?? 0.3) : undefined,
       maxTokens: options.maxOutputTokens,
-      reasoning: tier === 'thinking' ? { effort: reasoningEffort } : undefined,
+      reasoning: tier !== 'flash' ? { effort: reasoningEffort } : undefined,
     })
   }
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react'
-import { Modal, Button, Tag, Input, Checkbox } from 'antd'
+import { Modal, Button, Tag, Input, Checkbox, Segmented } from 'antd'
 import { Plus, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { CountryPhoneInput } from '@app/components/shared/country-phone-input'
@@ -16,7 +16,12 @@ interface AgentActivateModalProps {
   }) => void
   agent: Agent
   loading?: boolean
+  /** Persist a new live-agent model tier immediately (independent of submit). */
+  onChangeModelTier?: (tier: LiveTier) => void
+  modelTierSaving?: boolean
 }
+
+type LiveTier = 'flash' | 'pro' | 'ultra'
 
 const PROVIDER_LABELS: Record<string, string> = {
   WHATSAPP: 'WhatsApp',
@@ -58,6 +63,8 @@ export function AgentActivateModal({
   onSubmit,
   agent,
   loading,
+  onChangeModelTier,
+  modelTierSaving,
 }: AgentActivateModalProps) {
   const { t } = useTranslation()
   const [activateAll, setActivateAll] = useState(false)
@@ -65,6 +72,7 @@ export function AgentActivateModal({
   const [activateNew, setActivateNew] = useState(false)
   const [contactsEnabled, setContactsEnabled] = useState(false)
   const [contacts, setContacts] = useState<Record<string, string[]>>({})
+  const [modelTier, setModelTier] = useState<LiveTier>('flash')
 
   // Group social accounts by provider type
   const providerGroups = useMemo(() => {
@@ -97,7 +105,8 @@ export function AgentActivateModal({
     setActivateNew(!allOn && links.some((sa) => sa.aiActivateNewConversations))
     setContactsEnabled(!allOn && hasContacts)
     setContacts(savedContacts)
-  }, [open, agent.socialAccounts])
+    setModelTier(agent.liveModelTier ?? 'flash')
+  }, [open, agent.socialAccounts, agent.liveModelTier])
 
   // "All conversations" is exclusive — selecting it clears the more specific scopes.
   const handleToggleAll = (checked: boolean) => {
@@ -187,6 +196,32 @@ export function AgentActivateModal({
       width={520}
     >
       <div className="flex flex-col gap-3 py-2">
+        {onChangeModelTier && (
+          <div className="flex flex-col gap-2 rounded-lg border border-border-subtle p-3">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-text-primary">
+                {t('agent.model_section_label')}
+              </span>
+              <span className="text-xs text-text-muted">{t('agent.model_hint')}</span>
+            </div>
+            <Segmented
+              block
+              value={modelTier}
+              disabled={modelTierSaving}
+              onChange={(v) => {
+                const tier = v as LiveTier
+                setModelTier(tier)
+                onChangeModelTier(tier)
+              }}
+              options={[
+                { label: 'Flash', value: 'flash' },
+                { label: 'Pro', value: 'pro' },
+                { label: 'Ultra', value: 'ultra' },
+              ]}
+            />
+          </div>
+        )}
+
         <span className="text-sm text-text-secondary">{t('agent.activate_how_question')}</span>
 
         <OptionRow

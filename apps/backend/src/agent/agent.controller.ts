@@ -7,6 +7,7 @@ import {
   ActivateAgentDto,
   CreateAgentDto,
   SendAgentMessageDto,
+  UpdateAgentModelDto,
   UpdateAgentSocialAccountsDto,
 } from './dto/agent.dto'
 import { AgentFeedbackRequestDto, AgentFeedbackResponseDto } from './dto/feedback.dto'
@@ -43,6 +44,11 @@ export class AgentController {
   @Put(':id/social-accounts')
   async updateSocialAccounts(@Param('id') id: string, @Body() dto: UpdateAgentSocialAccountsDto) {
     return this.agentService.updateSocialAccounts(id, dto.socialAccountIds)
+  }
+
+  @Put(':id/model')
+  async updateModel(@Param('id') id: string, @Body() dto: UpdateAgentModelDto) {
+    return this.agentService.updateLiveModelTier(id, dto.tier)
   }
 
   // ─── Messages ───

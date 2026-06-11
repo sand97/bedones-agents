@@ -2,7 +2,11 @@ import { Injectable, Logger } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
 import { ConfigService } from '@nestjs/config'
 import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
-import { LlmFactoryService } from '../common/llm/llm-factory.service'
+import {
+  LlmFactoryService,
+  LIVE_MODEL_TIERS,
+  type LiveModelTier,
+} from '../common/llm/llm-factory.service'
 
 import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
@@ -151,6 +155,7 @@ export class AgentMessageProcessorService {
       context: string | null
       organisationId: string
       status: string
+      liveModelTier: string
       socialAccounts: {
         socialAccount: {
           catalogs: { catalog: { id: string; providerId: string | null } }[]
@@ -284,8 +289,14 @@ export class AgentMessageProcessorService {
         return new HumanMessage(content)
       })
 
-    // Create LLM with fallback (flash tier: Gemini primary, OpenAI fallback)
-    const model = this.createModel()
+    // Live model tier is per-agent (admin-selectable). Unknown/legacy values fall
+    // back to flash so a bad value can never break the agent.
+    const tier: LiveModelTier = (LIVE_MODEL_TIERS as readonly string[]).includes(
+      agent.liveModelTier,
+    )
+      ? (agent.liveModelTier as LiveModelTier)
+      : 'flash'
+    const model = this.createModel(tier)
 
     const callLimit = this.config.get<number>('AGENT_MODEL_CALL_LIMIT') || 6
 
@@ -336,15 +347,14 @@ export class AgentMessageProcessorService {
   }
 
   /**
-   * Returns the LLM used when the agent replies to an incoming DM/comment.
-   * Uses the "flash" tier: lightweight/fast model for live response generation.
-   * Gemini primary, OpenAI fallback.
+   * Returns the LLM used when the agent replies to an incoming DM/comment, on the
+   * agent's chosen live tier (flash/pro/ultra). Gemini primary, OpenAI fallback.
    */
-  private createModel() {
+  private createModel(tier: LiveModelTier) {
     // createReactAgent needs a model that exposes `bindTools`, so we use a single
     // tool-callable model here (not the fallback/traced Runnable from
     // createChatModel). PostHog tracing is attached at invoke time via callbacks.
-    return this.llmFactory.createToolCallingModel('flash')
+    return this.llmFactory.createToolCallingModel(tier)
   }
 
   private async downloadMedia(url: string): Promise<Buffer> {

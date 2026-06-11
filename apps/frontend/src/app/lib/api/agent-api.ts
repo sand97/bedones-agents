@@ -77,6 +77,8 @@ export interface Agent {
   status: 'DRAFT' | 'CONFIGURING' | 'READY' | 'ACTIVE' | 'PAUSED'
   score: number
   context?: string
+  /** Live-agent model tier. Absent on legacy records → treat as 'flash'. */
+  liveModelTier?: 'flash' | 'pro' | 'ultra'
   createdAt: string
   updatedAt: string
   socialAccounts: AgentSocialAccount[]
@@ -147,6 +149,12 @@ export const agentApi = {
     }),
 
   deactivate: (id: string) => fetchJson<Agent>(`/agent/${id}/deactivate`, { method: 'PUT' }),
+
+  updateLiveModelTier: (id: string, tier: 'flash' | 'pro' | 'ultra') =>
+    fetchJson<Agent>(`/agent/${id}/model`, {
+      method: 'PUT',
+      body: JSON.stringify({ tier }),
+    }),
 
   updateSocialAccounts: (id: string, socialAccountIds: string[]) =>
     fetchJson<Agent>(`/agent/${id}/social-accounts`, {
