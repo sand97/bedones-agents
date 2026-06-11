@@ -15,6 +15,14 @@ import { CatalogConnectorClient } from './catalog-connector.client'
 import { catalogJsonKey } from './catalog-migration-callback.controller'
 import { MIGRATION_CALLBACK_SCOPE } from './catalog-migration-callback.guard'
 import { StartCatalogMigrationDto } from './dto/catalog-migration.dto'
+import {
+  MINUTES_PER_SYNC,
+  deriveErrorCode,
+  isAlreadyExists,
+  isWrongCatalogVertical,
+  toCreateProduct,
+} from './catalog-migration.helpers'
+import type { StoredCollection, StoredProduct } from './catalog-migration.helpers'
 
 /** Data carried by every job on the `catalog-migration` queue. */
 export interface CatalogMigrationJobData {
@@ -23,27 +31,6 @@ export interface CatalogMigrationJobData {
   catalogId: string
   sourcePhone: string
 }
-
-/** A product as stored by the page script's save-catalog callback. */
-interface StoredProduct {
-  name: string
-  description?: string | null
-  price?: number | null
-  currency?: string | null
-  availability?: string | null
-  retailerId?: string | null
-  imageUrl?: string | null
-  additionalImageUrls?: string[]
-}
-
-/** A collection (product set) as stored by the page script's save-catalog callback. */
-interface StoredCollection {
-  name: string
-  retailerIds: string[]
-}
-
-/** Notion spec: an extraction is capped at ~1 minute, one at a time. */
-const MINUTES_PER_SYNC = 1
 
 @Injectable()
 export class CatalogMigrationService {
@@ -236,7 +223,7 @@ export class CatalogMigrationService {
         products: StoredProduct[]
         collections?: StoredCollection[]
       }>(catalogJsonKey(migrationId))
-      const prepared = (stored?.products ?? []).map((p) => this.toCreateProduct(p))
+      const prepared = (stored?.products ?? []).map((p) => toCreateProduct(p))
       const storedCollections = stored?.collections ?? []
 
       await this.prisma.catalogMigration.update({
@@ -261,7 +248,7 @@ export class CatalogMigrationService {
           const message = error instanceof Error ? error.message : String(error)
           // Re-sync: a product already present in the catalogue (same
           // retailer_id) is a no-op on Meta's side — count it, don't fail it.
-          if (this.isAlreadyExists(message)) {
+          if (isAlreadyExists(message)) {
             imported++
           } else {
             failed++
@@ -271,7 +258,7 @@ export class CatalogMigrationService {
             // A wrong catalog vertical rejects every product identically — abort
             // now with an actionable error instead of hammering Meta for each
             // product (and then each collection).
-            if (this.isWrongCatalogVertical(message)) throw error
+            if (isWrongCatalogVertical(message)) throw error
           }
         }
 
@@ -306,7 +293,7 @@ export class CatalogMigrationService {
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
           // A collection (product set) that already exists is also counted.
-          if (this.isAlreadyExists(message)) {
+          if (isAlreadyExists(message)) {
             collectionsCreated++
           } else {
             this.logger.warn(`Failed to create collection "${collection.name}": ${message}`)
@@ -350,7 +337,7 @@ export class CatalogMigrationService {
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      const errorCode = this.deriveErrorCode(message)
+      const errorCode = deriveErrorCode(message)
       await this.prisma.catalogMigration.update({
         where: { id: migrationId },
         data: { status: 'FAILED', error: message, finishedAt: new Date() },
@@ -471,46 +458,6 @@ export class CatalogMigrationService {
     }
   }
 
-  /** Shape a stored product for CatalogService.createProduct (price → major-unit string). */
-  private toCreateProduct(p: StoredProduct) {
-    const additional =
-      Array.isArray(p.additionalImageUrls) && p.additionalImageUrls.length > 0
-        ? p.additionalImageUrls
-        : undefined
-    return {
-      name: p.name || 'Sans nom',
-      // The merchant's product code carried over from the scraped catalogue.
-      retailerId: p.retailerId ?? '',
-      description: p.description ?? undefined,
-      imageUrl: p.imageUrl ?? undefined,
-      additionalImageUrls: additional,
-      // Major currency units (createProduct converts to Meta's minor units).
-      price: p.price != null ? String(p.price) : undefined,
-      currency: p.currency ?? undefined,
-      availability: p.availability ?? undefined,
-    }
-  }
-
-  /** True when a Meta error is the "wrong catalog vertical" rejection (subcode 1803298). */
-  private isWrongCatalogVertical(raw: string): boolean {
-    return /1803298|Wrong Catalog Vertical|not support(?:ed)? in this catalog vertical/i.test(raw)
-  }
-
-  /**
-   * True when Meta rejects an item because it already exists in the catalogue
-   * (duplicate retailer_id / product set). On a re-sync that's a no-op we count
-   * as success rather than a failure.
-   */
-  private isAlreadyExists(raw: string): boolean {
-    return /already exists|2310021|duplicate/i.test(raw)
-  }
-
-  /** Map a stored failure message to a stable, frontend-actionable error code. */
-  private deriveErrorCode(error?: string | null): string | undefined {
-    if (error && this.isWrongCatalogVertical(error)) return 'WRONG_CATALOG_VERTICAL'
-    return undefined
-  }
-
   private toResponse(migration: CatalogMigration, position: number, etaMinutes: number) {
     return {
       id: migration.id,
@@ -521,7 +468,7 @@ export class CatalogMigrationService {
       importedProducts: migration.importedProducts,
       failedProducts: migration.failedProducts,
       error: migration.error,
-      errorCode: this.deriveErrorCode(migration.error),
+      errorCode: deriveErrorCode(migration.error),
       position,
       etaMinutes,
       createdAt: migration.createdAt,

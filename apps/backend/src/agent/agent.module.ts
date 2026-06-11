@@ -6,6 +6,7 @@ import { SocialModule } from '../social/social.module'
 import { StatsModule } from '../stats/stats.module'
 import { AgentController } from './agent.controller'
 import { AgentService } from './agent.service'
+import { AgentCrudService } from './agent-crud.service'
 import { AgentGateway } from './agent.gateway'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import { AgentDbToolsService } from './tools/agent-db-tools.service'
@@ -17,6 +18,7 @@ import { AgentFeedbackService } from './feedback.service'
   controllers: [AgentController],
   providers: [
     AgentService,
+    AgentCrudService,
     AgentGateway,
     AgentPromptsService,
     AgentDbToolsService,

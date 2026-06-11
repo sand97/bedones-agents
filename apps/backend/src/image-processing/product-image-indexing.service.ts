@@ -2,16 +2,15 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { PrismaService } from '../prisma/prisma.service'
-import { EncryptionService } from '../auth/encryption.service'
 import { EventsGateway } from '../gateway/events.gateway'
 
 import { GeminiEmbeddingService } from './gemini-embedding.service'
 import { GeminiVisionService } from './gemini-vision.service'
 import { QdrantService, type IndexedProductInfo } from './qdrant.service'
+import { MetaCatalogProductsService, type MetaProduct } from './meta-catalog-products.service'
 
-const META_API_BASE = 'https://graph.facebook.com/v22.0'
-const META_PRODUCT_FIELDS =
-  'id,retailer_id,name,description,image_url,price,currency,category,product_type,availability'
+export type { MetaProduct } from './meta-catalog-products.service'
+
 const IMAGE_DOWNLOAD_TIMEOUT_MS = 30000
 
 export interface IndexingResult {
@@ -23,19 +22,6 @@ export interface IndexingResult {
   message: string
 }
 
-export interface MetaProduct {
-  id: string
-  retailer_id?: string
-  name?: string
-  description?: string
-  image_url?: string
-  price?: string
-  currency?: string
-  category?: string
-  product_type?: string
-  availability?: string
-}
-
 @Injectable()
 export class ProductImageIndexingService {
   private readonly logger = new Logger(ProductImageIndexingService.name)
@@ -43,11 +29,11 @@ export class ProductImageIndexingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    private readonly encryptionService: EncryptionService,
     private readonly gateway: EventsGateway,
     private readonly geminiVisionService: GeminiVisionService,
     private readonly geminiEmbeddingService: GeminiEmbeddingService,
     private readonly qdrantService: QdrantService,
+    private readonly metaCatalogProducts: MetaCatalogProductsService,
   ) {}
 
   /**
@@ -362,88 +348,15 @@ export class ProductImageIndexingService {
     this.logger.debug(`Indexed product ${product.id} (${product.name})`)
   }
 
-  // ─── Meta API ───
+  // ─── Meta API (delegated to MetaCatalogProductsService) ───
 
   async fetchAllProducts(catalogId: string): Promise<MetaProduct[]> {
-    const catalog = await this.prisma.catalog.findUnique({
-      where: { id: catalogId },
-      include: {
-        socialAccounts: {
-          include: { socialAccount: { omit: { accessToken: false } } },
-        },
-      },
-    })
-
-    if (!catalog?.providerId) {
-      throw new Error(`Catalog ${catalogId} not found or missing providerId`)
-    }
-
-    const socialLink =
-      catalog.socialAccounts.find((l) => l.socialAccount.provider === 'FACEBOOK_CATALOG') ??
-      catalog.socialAccounts[0]
-    if (!socialLink) {
-      throw new Error(`No social account linked to catalog ${catalogId}`)
-    }
-
-    const accessToken = await this.encryptionService.decrypt(socialLink.socialAccount.accessToken)
-
-    const allProducts: MetaProduct[] = []
-    let url: string | null =
-      `${META_API_BASE}/${catalog.providerId}/products?fields=${META_PRODUCT_FIELDS}&limit=50&access_token=${accessToken}`
-
-    while (url) {
-      const response = await fetch(url)
-      if (!response.ok) {
-        const error = await response.text()
-        throw new Error(`Meta API error: ${error}`)
-      }
-
-      const data = (await response.json()) as {
-        data: MetaProduct[]
-        paging?: { next?: string }
-      }
-
-      allProducts.push(...(data.data || []))
-      url = data.paging?.next || null
-    }
-
-    return allProducts
+    return this.metaCatalogProducts.fetchAllProducts(catalogId)
   }
 
   /** Fetch just the product count without downloading all product data */
   async fetchProductCount(catalogId: string): Promise<number> {
-    const catalog = await this.prisma.catalog.findUnique({
-      where: { id: catalogId },
-      include: {
-        socialAccounts: {
-          include: { socialAccount: { omit: { accessToken: false } } },
-        },
-      },
-    })
-
-    if (!catalog?.providerId) return 0
-
-    const socialLink =
-      catalog.socialAccounts.find((l) => l.socialAccount.provider === 'FACEBOOK_CATALOG') ??
-      catalog.socialAccounts[0]
-    if (!socialLink) return 0
-
-    const accessToken = await this.encryptionService.decrypt(socialLink.socialAccount.accessToken)
-    const url = `${META_API_BASE}/${catalog.providerId}/products?summary=true&limit=0&access_token=${accessToken}`
-
-    try {
-      const response = await fetch(url)
-      if (!response.ok) return 0
-
-      const data = (await response.json()) as {
-        summary?: { total_count?: number }
-        data?: unknown[]
-      }
-
-      return data.summary?.total_count ?? data.data?.length ?? 0
-    } catch {
-      return 0
-    }
+    return this.metaCatalogProducts.fetchProductCount(catalogId)
   }
 
   // ─── Helpers ───
