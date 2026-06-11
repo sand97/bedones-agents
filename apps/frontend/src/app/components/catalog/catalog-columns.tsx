@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next'
 import type { ColumnsType } from 'antd/es/table'
 import { StatusTag } from '@app/components/shared/status-tag'
 import { formatPrice } from '@app/lib/format'
-import { resolveCategory } from '@app/lib/product-categories'
 import {
   CATALOG_STATUS_CONFIG,
   type CatalogArticle,
@@ -11,7 +10,6 @@ import {
 
 export function useCatalogColumns(): ColumnsType<CatalogArticle> {
   const { t } = useTranslation()
-  const { t: tCat } = useTranslation('categories')
 
   return [
     {
@@ -34,15 +32,6 @@ export function useCatalogColumns(): ColumnsType<CatalogArticle> {
       key: 'contentId',
       width: 160,
       render: (contentId: string) => <span className="text-xs text-text-muted">{contentId}</span>,
-    },
-    {
-      title: t('catalog.category'),
-      dataIndex: 'category',
-      key: 'category',
-      width: 140,
-      render: (cat: string) => (
-        <span className="text-sm text-text-secondary">{resolveCategory(cat, tCat)}</span>
-      ),
     },
     {
       title: t('catalog.collection'),
