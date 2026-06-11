@@ -1,10 +1,9 @@
-import type { ReactNode } from 'react'
 import { useState, useCallback, useMemo } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
-import { App, Button, Progress } from 'antd'
-import { ArrowLeft, CheckCircle, MessageSquareOff, Settings } from 'lucide-react'
+import { App, Progress } from 'antd'
+import { CheckCircle, MessageSquareOff, Settings } from 'lucide-react'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { SocialSetup } from '@app/components/social/social-setup'
 import {
@@ -15,7 +14,9 @@ import {
 } from '@app/components/social/account-switcher'
 import { CommentsLayout } from '@app/components/comments/comments-layout'
 import { CommentsConfigModal } from '@app/components/comments/comments-config'
-import { FacebookIcon, InstagramIcon, TikTokIcon } from '@app/components/icons/social-icons'
+import { COMMENT_CONFIG } from '@app/components/comments/comments-page-config'
+import { mapPost } from '@app/components/comments/map-post'
+import { MobileBackButton } from '@app/components/comments/mobile-back-button'
 import { useLayout } from '@app/contexts/layout-context'
 import { useUnreadCounts } from '@app/contexts/unread-context'
 import { $api } from '@app/lib/api/$api'
@@ -35,126 +36,6 @@ export const Route = createFileRoute('/app/$orgSlug/comments/$id')({
     account: (search.account as string) || undefined,
   }),
 })
-
-const ICON_SIZE = 40
-
-interface CommentConfigEntry {
-  labelKey: string
-  mobileLabel: string
-  icon: ReactNode
-  color: string
-  titleKey: string
-  descriptionKey: string
-  buttonKey: string
-  connectLabelKey: string
-  provider: 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK'
-}
-
-const COMMENT_CONFIG: Record<string, CommentConfigEntry> = {
-  facebook: {
-    labelKey: 'comments.facebook_label',
-    mobileLabel: 'Facebook',
-    icon: <FacebookIcon width={ICON_SIZE} height={ICON_SIZE} />,
-    color: 'var(--color-brand-facebook)',
-    titleKey: 'comments.connect_facebook_title',
-    descriptionKey: 'comments.connect_facebook_desc',
-    buttonKey: 'comments.connect_facebook_btn',
-    connectLabelKey: 'comments.connect_facebook_short',
-    provider: 'FACEBOOK',
-  },
-  instagram: {
-    labelKey: 'comments.instagram_label',
-    mobileLabel: 'Instagram',
-    icon: <InstagramIcon width={ICON_SIZE} height={ICON_SIZE} />,
-    color: 'var(--color-brand-instagram)',
-    titleKey: 'comments.connect_instagram_title',
-    descriptionKey: 'comments.connect_instagram_desc',
-    buttonKey: 'comments.connect_instagram_btn',
-    connectLabelKey: 'comments.connect_instagram_short',
-    provider: 'INSTAGRAM',
-  },
-  tiktok: {
-    labelKey: 'comments.tiktok_label',
-    mobileLabel: 'TikTok',
-    icon: <TikTokIcon width={ICON_SIZE} height={ICON_SIZE} />,
-    color: 'var(--color-brand-tiktok)',
-    titleKey: 'comments.connect_tiktok_title',
-    descriptionKey: 'comments.connect_tiktok_desc',
-    buttonKey: 'comments.connect_tiktok_btn',
-    connectLabelKey: 'comments.connect_tiktok_short',
-    provider: 'TIKTOK',
-  },
-}
-
-/** Map API post response to component Post type */
-function mapPost(p: {
-  id: string
-  message?: string
-  imageUrl?: string
-  permalinkUrl?: string
-  totalComments: number
-  unreadComments: number
-  comments: {
-    id: string
-    postId: string
-    parentId?: string
-    message: string
-    fromId: string
-    fromName: string
-    fromAvatar?: string
-    createdTime: string
-    isRead: boolean
-    isPageReply: boolean
-    status: string
-    action: string
-    actionReason?: string
-    replyMessage?: string
-  }[]
-}): Post {
-  return {
-    id: p.id,
-    message: p.message ?? undefined,
-    imageUrl: p.imageUrl ?? undefined,
-    permalinkUrl: p.permalinkUrl ?? undefined,
-    totalComments: p.totalComments,
-    unreadComments: p.unreadComments,
-    comments: p.comments.map((c) => ({
-      id: c.id,
-      postId: c.postId,
-      parentId: c.parentId ?? undefined,
-      message: c.message,
-      fromId: c.fromId,
-      fromName: c.fromName,
-      fromAvatar: c.fromAvatar ?? undefined,
-      createdTime: c.createdTime as string,
-      isRead: c.isRead,
-      isPageReply: c.isPageReply,
-      status: c.status as 'VISIBLE' | 'HIDDEN' | 'DELETED',
-      action: c.action as 'NONE' | 'HIDE' | 'DELETE' | 'REPLY',
-      actionReason: c.actionReason ?? undefined,
-      replyMessage: c.replyMessage ?? undefined,
-    })),
-  }
-}
-
-function MobileBackButton() {
-  const navigate = useNavigate()
-
-  return (
-    <Button
-      type="text"
-      onClick={() =>
-        navigate({
-          search: (prev: Record<string, unknown>) => ({ ...prev, post: undefined }) as never,
-        })
-      }
-      icon={<ArrowLeft size={18} strokeWidth={1.5} />}
-      className="p-0!"
-    >
-      Posts
-    </Button>
-  )
-}
 
 function CommentsPage() {
   const { t } = useTranslation()

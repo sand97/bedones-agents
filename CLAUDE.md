@@ -1,5 +1,30 @@
 # Bedones Agents
 
+## Règles Architecture & Taille des fichiers
+
+- **Maximum ~500 lignes par fichier** (hors fichiers générés comme `routeTree.gen.ts`, `v1.d.ts`, et hors fichiers de données comme `google-product-categories.ts`). Si un fichier dépasse, le découper AVANT d'y ajouter du code. Ne jamais faire grossir un fichier déjà au-dessus de la limite.
+
+### Backend (NestJS)
+
+- NestJS existe pour l'**injection de dépendances** : tout mettre dans un seul gros service la rend inutile. Un module = un domaine, découpé en plusieurs petits services `@Injectable()` par responsabilité (ex: `social/messaging/whatsapp-messaging.service.ts`, `loyalty/services/loyalty-campaign.service.ts`).
+- Quand un service devient trop gros : extraire des **sous-services** dans un sous-dossier du module, enregistrés dans les `providers` du module. Le service d'origine peut rester en **façade** (mêmes méthodes publiques, qui délèguent) pour ne pas casser les appelants.
+- **Jamais de dépendance circulaire** : un sous-service n'injecte jamais sa façade. Les helpers partagés entre sous-services vont dans un service/util partagé du même dossier.
+- Les contrôleurs restent minces : validation/DTO + appel de service, aucune logique métier.
+
+### Frontend (React + TanStack Router + Antd)
+
+Le frontend est structuré en 4 couches — respecter cette hiérarchie pour tout nouveau code :
+
+1. **Design system** : composants Ant Design customisés par le thème et le CSS centralisé (voir Règles Design System ci-dessous). Pas de style visuel ad hoc.
+2. **Composants généraux réutilisables** : `app/components/shared/` (et `app/components/icons`, `layout`) — sans logique métier de domaine.
+3. **Composants de section / par domaine** : `app/components/<domaine>/` (ex: `whatsapp/`, `catalog/`, `auth/`, `agent/`). Quand un composant grossit, le découper en sous-dossier du même nom (ex: `chat-window.tsx` + `chat-window/message-bubble.tsx`) en gardant le fichier d'origine comme point d'entrée pour ne pas casser les imports. La logique d'état/queries d'une page va dans un hook `use-<nom>.ts` du domaine.
+4. **Pages / routes** : `routes/**` = routing par fichiers TanStack. **Ne jamais déplacer ni renommer un fichier de route**, ne jamais toucher `routeTree.gen.ts`. Une route ne contient que la définition (`createFileRoute`, `validateSearch`...) et l'assemblage de sections — pas de gros blocs de JSX ni de logique métier.
+
+### Refactoring
+
+- Tout découpage de fichier doit être **mécanique** (déplacement verbatim) : ne pas en profiter pour "corriger" de la logique, renommer des APIs publiques ou changer des textes.
+- Vérifier après découpage : `npx tsc --noEmit -p tsconfig.json` dans l'app concernée, puis eslint/prettier sur les fichiers touchés.
+
 ## Règles Sécurité
 
 - **Toujours masquer les données sensibles par défaut** via le `omit` global de Prisma dans `PrismaService`. Les champs comme `passwordHash`, `accessToken`, `refreshToken` ne doivent **jamais** être retournés par défaut dans les requêtes Prisma. Si un service interne a besoin d'un champ masqué, utiliser `omit: { fieldName: false }` ou un `select` explicite dans la requête concernée.
