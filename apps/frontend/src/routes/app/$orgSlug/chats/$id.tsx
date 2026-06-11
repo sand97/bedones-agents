@@ -1,11 +1,9 @@
-import type { ReactNode } from 'react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { usePersistedQuery } from '@app/lib/use-persisted-query'
-import { App, Button } from 'antd'
-import { ArrowLeft } from 'lucide-react'
+import { App } from 'antd'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { ChatConfigModal } from '@app/components/whatsapp/chat-config-modal'
@@ -22,33 +20,26 @@ import { ChatLayout } from '@app/components/whatsapp/chat-layout'
 import { ProductSendModal } from '@app/components/whatsapp/product-send-modal'
 import { CatalogSendModal } from '@app/components/whatsapp/catalog-send-modal'
 import { TemplateMessageModal } from '@app/components/whatsapp/template-message-modal'
-import {
-  TikTokMessageModal,
-  type TikTokRichMessagePayload,
-} from '@app/components/tiktok/tiktok-message-modal'
+import { TikTokMessageModal } from '@app/components/tiktok/tiktok-message-modal'
 import { LoyaltyTemplateModal } from '@app/components/loyalty/loyalty-template-modal'
-import { uploadChatMedia } from '@app/lib/api'
-import {
-  WhatsAppIcon,
-  InstagramIcon,
-  MessengerIcon,
-  TikTokIcon,
-} from '@app/components/icons/social-icons'
 import { useLayout } from '@app/contexts/layout-context'
 import { $api } from '@app/lib/api/$api'
-import { agentApi, catalogApi, socialApi, type Agent } from '@app/lib/api/agent-api'
-import {
-  setAuthRedirect,
-  buildFacebookOAuthUrl,
-  buildInstagramOAuthUrl,
-  buildTikTokOAuthUrl,
-} from '@app/lib/auth-redirect'
-import { launchWhatsAppSignup } from '@app/lib/facebook-sdk'
+import { agentApi, socialApi, type Agent } from '@app/lib/api/agent-api'
+import { setAuthRedirect, buildTikTokOAuthUrl } from '@app/lib/auth-redirect'
 import { useTikTokBusinessCheck } from '@app/hooks/use-tiktok-business-check'
 import { TikTokBusinessGuideModal } from '@app/components/tiktok/tiktok-business-guide-modal'
 import { getStoredChatAccount, setStoredChatAccount } from '@app/lib/chat-account-storage'
 import { readCatalogMigrationDraft } from '@app/lib/catalog-migration-draft'
-import type { Conversation, Message } from '@app/components/whatsapp/mock-data'
+import type { Conversation } from '@app/components/whatsapp/mock-data'
+import {
+  CHAT_CONFIG,
+  PROVIDER_MAP,
+  MobileBackButton,
+} from '@app/components/whatsapp/chats/chat-config'
+import { mapApiConversation } from '@app/components/whatsapp/chats/map-api-conversation'
+import { useChatMessaging } from '@app/components/whatsapp/chats/use-chat-messaging'
+import { useChatCatalog } from '@app/components/whatsapp/chats/use-chat-catalog'
+import { useChatConnect } from '@app/components/whatsapp/chats/use-chat-connect'
 
 export const Route = createFileRoute('/app/$orgSlug/chats/$id')({
   component: ChatsPage,
@@ -57,277 +48,6 @@ export const Route = createFileRoute('/app/$orgSlug/chats/$id')({
     ticket: (search.ticket as string) || undefined,
   }),
 })
-
-const ICON_SIZE = 40
-
-interface ChatConfigEntry {
-  label: string
-  mobileLabel: string
-  icon: ReactNode
-  color: string
-  titleKey: string
-  descriptionKey: string
-  buttonKey: string
-  connectLabelKey: string
-  provider: 'FACEBOOK' | 'INSTAGRAM' | 'WHATSAPP' | 'TIKTOK'
-}
-
-const CHAT_CONFIG: Record<string, ChatConfigEntry> = {
-  whatsapp: {
-    label: 'WhatsApp',
-    mobileLabel: 'WhatsApp',
-    icon: <WhatsAppIcon width={ICON_SIZE} height={ICON_SIZE} />,
-    color: 'var(--color-brand-whatsapp)',
-    titleKey: 'chat.whatsapp_setup_title',
-    descriptionKey: 'chat.whatsapp_setup_desc',
-    buttonKey: 'chat.whatsapp_setup_btn',
-    connectLabelKey: 'chat.whatsapp_connect_label',
-    provider: 'WHATSAPP',
-  },
-  'instagram-dm': {
-    label: 'Messages Instagram',
-    mobileLabel: 'Instagram DM',
-    icon: <InstagramIcon width={ICON_SIZE} height={ICON_SIZE} />,
-    color: 'var(--color-brand-instagram)',
-    titleKey: 'chat.instagram_setup_title',
-    descriptionKey: 'chat.instagram_setup_desc',
-    buttonKey: 'chat.instagram_setup_btn',
-    connectLabelKey: 'chat.instagram_connect_label',
-    provider: 'INSTAGRAM',
-  },
-  messenger: {
-    label: 'Messenger',
-    mobileLabel: 'Messenger',
-    icon: <MessengerIcon width={ICON_SIZE} height={ICON_SIZE} />,
-    color: 'var(--color-brand-messenger)',
-    titleKey: 'chat.messenger_setup_title',
-    descriptionKey: 'chat.messenger_setup_desc',
-    buttonKey: 'chat.messenger_setup_btn',
-    connectLabelKey: 'chat.messenger_connect_label',
-    provider: 'FACEBOOK',
-  },
-  tiktok: {
-    label: 'TikTok',
-    mobileLabel: 'TikTok DM',
-    icon: <TikTokIcon width={ICON_SIZE} height={ICON_SIZE} />,
-    color: 'var(--color-brand-tiktok)',
-    titleKey: 'chat.tiktok_setup_title',
-    descriptionKey: 'chat.tiktok_setup_desc',
-    buttonKey: 'chat.tiktok_setup_btn',
-    connectLabelKey: 'chat.tiktok_connect_label',
-    provider: 'TIKTOK',
-  },
-}
-
-/* ── Mobile back button ── */
-
-function MobileBackButton() {
-  const navigate = useNavigate()
-
-  return (
-    <Button
-      type="text"
-      onClick={() =>
-        navigate({
-          search: (prev: Record<string, unknown>) =>
-            ({ ...prev, conv: undefined, ticket: undefined }) as never,
-        })
-      }
-      icon={<ArrowLeft size={18} strokeWidth={1.5} />}
-      className="p-0!"
-    >
-      Chats
-    </Button>
-  )
-}
-
-/** Map API conversation to ChatLayout Conversation type */
-function mapApiConversation(
-  conv: {
-    id: string
-    participantId: string
-    participantName: string
-    participantUsername?: string | null
-    participantAvatar?: string | null
-    lastMessageText?: string | null
-    lastMessageAt?: string | null
-    unreadCount: number
-  },
-  messages: Array<{
-    id: string
-    message: string
-    senderId: string
-    senderName: string
-    isFromPage: boolean
-    mediaUrl?: string | null
-    mediaType?: string | null
-    fileName?: string | null
-    fileSize?: number | null
-    replyTo?: { id: string; text: string; from: string } | null
-    reactions?: { senderId: string; emoji: string }[] | null
-    metadata?: Record<string, unknown> | null
-    createdTime: string
-    isRead: boolean
-  }>,
-  provider?: string,
-): Conversation {
-  const isWhatsApp = provider === 'whatsapp'
-  const isTikTok = provider === 'tiktok'
-  return {
-    id: conv.id,
-    contact: {
-      id: conv.participantId,
-      name: conv.participantName,
-      phone: isWhatsApp && conv.participantId ? `+${conv.participantId}` : isTikTok ? '' : '',
-      username:
-        isTikTok && conv.participantUsername && conv.participantUsername !== conv.participantName
-          ? `@${conv.participantUsername}`
-          : undefined,
-      avatarUrl: conv.participantAvatar ?? undefined,
-    },
-    messages: messages.map((m) => {
-      const raw = m as Record<string, unknown>
-      const status = raw._status as 'sending' | 'sent' | 'error' | undefined
-      const localId = raw._localId as string | undefined
-      const deliveryStatus = raw.deliveryStatus as 'sent' | 'delivered' | 'read' | undefined
-      const meta = (m.metadata || undefined) as
-        | {
-            kind?: 'catalog' | 'order' | 'tiktok_template' | 'tiktok_post'
-            format?: 'product' | 'product_list' | 'carousel' | 'catalog_message'
-            header?: string
-            body?: string
-            footer?: string
-            catalogId?: string
-            text?: string
-            itemId?: string
-            embedUrl?: string | null
-            template?: {
-              type?: 'QA_BUTTON_CARD' | 'QA_LINK_CARD'
-              title?: string
-              buttons?: Array<{ id?: string; title?: string; type?: string }>
-            }
-            total?: number
-            currency?: string | null
-            items?: Array<{
-              productRetailerId?: string
-              name?: string
-              imageUrl?: string | null
-              price?: number | null
-              quantity?: number
-              itemPrice?: number
-              currency?: string | null
-            }>
-          }
-        | undefined
-      const catalogItems =
-        meta?.kind === 'catalog' && meta.items?.length
-          ? meta.items.map((item) => ({
-              retailerId: item.productRetailerId,
-              name: item.name ?? item.productRetailerId ?? '',
-              imageUrl: item.imageUrl ?? null,
-              price: item.price ?? null,
-              currency: item.currency ?? null,
-            }))
-          : undefined
-      const order =
-        meta?.kind === 'order'
-          ? {
-              catalogId: meta.catalogId ?? null,
-              text: meta.text,
-              items: (meta.items || []).map((item) => ({
-                retailerId: item.productRetailerId,
-                name: item.name ?? item.productRetailerId ?? '',
-                imageUrl: item.imageUrl ?? null,
-                quantity: item.quantity ?? 1,
-                itemPrice: item.itemPrice ?? 0,
-                currency: item.currency ?? null,
-              })),
-              total: meta.total ?? 0,
-              currency: meta.currency ?? null,
-            }
-          : undefined
-      const tiktokTemplate = meta?.kind === 'tiktok_template' ? meta.template : undefined
-      const tiktokPostText =
-        meta?.kind === 'tiktok_post'
-          ? meta.embedUrl || meta.itemId || m.message || 'TikTok post'
-          : undefined
-      const resolvedBody =
-        meta?.kind === 'catalog'
-          ? meta.body || m.message
-          : tiktokTemplate
-            ? tiktokTemplate.title || m.message
-            : tiktokPostText || m.message
-      const rawType = m.mediaType || 'text'
-      const type =
-        tiktokTemplate || rawType === 'button'
-          ? 'button'
-          : rawType === 'tiktok_post'
-            ? 'text'
-            : (rawType as
-                | 'text'
-                | 'image'
-                | 'video'
-                | 'audio'
-                | 'file'
-                | 'catalog'
-                | 'catalog_message'
-                | 'order')
-      return {
-        id: m.id,
-        type,
-        from: (m.isFromPage ? 'business' : 'customer') as 'business' | 'customer',
-        isAi: m.isFromPage && m.senderName === 'AI Agent',
-        text: resolvedBody,
-        timestamp: m.createdTime,
-        isRead: m.isRead,
-        deliveryStatus,
-        localId,
-        status,
-        imageUrl: m.mediaType === 'image' ? (m.mediaUrl ?? undefined) : undefined,
-        audioUrl: m.mediaType === 'audio' ? (m.mediaUrl ?? undefined) : undefined,
-        videoUrl: m.mediaType === 'video' ? (m.mediaUrl ?? undefined) : undefined,
-        videoThumbnail: m.mediaType === 'video' ? (m.mediaUrl ?? undefined) : undefined,
-        fileUrl: m.mediaType === 'file' ? (m.mediaUrl ?? undefined) : undefined,
-        fileName: m.fileName ?? undefined,
-        fileSize: m.fileSize ?? undefined,
-        mediaUrl: m.mediaUrl ?? undefined,
-        catalogItems,
-        catalogHeader: meta?.header,
-        catalogFooter: meta?.footer,
-        catalogFormat: meta?.format,
-        order,
-        buttons: tiktokTemplate?.buttons?.map((button, idx) => ({
-          id: button.id || `button-${idx}`,
-          label: button.title || '',
-        })),
-        buttonHeader: tiktokTemplate?.type === 'QA_LINK_CARD' ? 'TikTok Q&A' : undefined,
-        replyTo: m.replyTo
-          ? {
-              id: m.replyTo.id,
-              text: m.replyTo.text,
-              from: m.replyTo.from as 'customer' | 'business',
-            }
-          : undefined,
-        reactions: m.reactions?.length ? m.reactions : undefined,
-      }
-    }),
-    unreadCount: conv.unreadCount,
-    labels: [],
-    tickets: [],
-    lastMessage: conv.lastMessageText || '',
-    // No timestamp for contacts synced from the address book that have no
-    // message yet (smb_app_state_sync) — keep it empty so the list neither
-    // shows a fake "now" time nor floats them to the top.
-    lastMessageTime: conv.lastMessageAt || '',
-  }
-}
-
-const PROVIDER_MAP: Record<string, string> = {
-  whatsapp: 'WHATSAPP',
-  messenger: 'FACEBOOK',
-  'instagram-dm': 'INSTAGRAM',
-  tiktok: 'TIKTOK',
-}
 
 function ChatsPage() {
   const { t } = useTranslation()
@@ -351,7 +71,6 @@ function ChatsPage() {
   const hasSelectedConv = !!search.conv
 
   const { message } = App.useApp()
-  const [connecting, setConnecting] = useState(false)
   const [chatConfigOpen, setChatConfigOpen] = useState(false)
   const [disconnectOpen, setDisconnectOpen] = useState(false)
   const [catalogLinkOpen, setCatalogLinkOpen] = useState(false)
@@ -428,65 +147,9 @@ function ChatsPage() {
     config?.provider,
   )
 
-  // ─── WhatsApp commerce settings query ───
-  // Doubles as SMB detection: Meta rejects the WABA product_catalogs call with
-  // a (#10) "SMB business type" error for WhatsApp Business app numbers, which
-  // the backend surfaces as `isSmb`. No extra round-trip needed.
-  type CommerceEntry = { is_catalog_visible: boolean; id?: string }
-  type CommerceData = { data: CommerceEntry[]; isSmb?: boolean }
-  const commerceQuery = usePersistedQuery<CommerceData>({
-    queryKey: ['whatsapp-commerce', currentAccount?.providerAccountId],
-    queryFn: () => catalogApi.getWhatsappCommerceSettings(currentAccount?.providerAccountId || ''),
-    enabled: id === 'whatsapp' && !!currentAccountId && !!currentAccount,
-    staleTime: 5 * 60 * 1000,
-  })
-
-  // ─── Catalogs query (for the shared config modal + DB-link detection) ───
-  // Enabled for every channel so the catalog/labels modal can associate a
-  // catalog via our DB link (Instagram DM / Messenger / TikTok), not just WA.
-  const catalogsQuery = useQuery({
-    queryKey: ['catalogs', orgSlug],
-    queryFn: () => catalogApi.list(orgSlug),
-    enabled: !!currentAccountId,
-    staleTime: 30_000,
-  })
-
-  // A number is "linked" to a catalogue if Meta has a commerce catalog for it OR
-  // if we recorded the link in our DB (CatalogSocialAccount) — the latter covers
-  // SMB numbers, which can't be linked through the Meta API.
-  const dbLinkedCatalog = useMemo(
-    () =>
-      (catalogsQuery.data || []).find((c) =>
-        c.socialAccounts?.some((sa) => sa.socialAccount.id === currentAccount?.id),
-      ),
-    [catalogsQuery.data, currentAccount],
-  )
-
-  const hasCatalogAssociated = useMemo(() => {
-    const data = commerceQuery.data?.data
-    if (data && data.some((entry) => !!entry.id)) return true
-    return !!dbLinkedCatalog
-  }, [commerceQuery.data, dbLinkedCatalog])
-
-  // Only an SMB number owns an in-app WhatsApp Business catalogue worth
-  // migrating — offer "migrate your catalog" only for those, with none yet.
-  const canMigrateCatalog = !hasCatalogAssociated && commerceQuery.data?.isSmb === true
-
-  // Find the catalog linked to the current WhatsApp number (for product sending)
-  const linkedCatalog = useMemo(() => {
-    if (id !== 'whatsapp' || !currentAccount) return undefined
-    const catalogs = catalogsQuery.data || []
-    const commerceId = commerceQuery.data?.data?.find((e) => !!e.id)?.id
-    if (commerceId) {
-      // Match by Meta providerId
-      const match = catalogs.find((c) => c.providerId === String(commerceId))
-      if (match) return match
-    }
-    // DB link (CatalogSocialAccount) — source of truth for SMB numbers.
-    if (dbLinkedCatalog) return dbLinkedCatalog
-    // Fallback: first catalog with a providerId
-    return catalogs.find((c) => !!c.providerId)
-  }, [id, currentAccount, catalogsQuery.data, commerceQuery.data, dbLinkedCatalog])
+  // ─── Catalog / commerce state ───
+  const { commerceQuery, catalogsQuery, hasCatalogAssociated, canMigrateCatalog, linkedCatalog } =
+    useChatCatalog({ id, orgSlug, currentAccount, currentAccountId })
 
   // Auto-select first account
   const setAccountInUrl = useCallback(
@@ -520,18 +183,26 @@ function ChatsPage() {
     { enabled: !!search.conv },
   )
 
-  // ─── Send mutation ───
-  const sendMutation = $api.useMutation('post', '/messaging/send')
-  const sendTemplateMutation = $api.useMutation('post', '/messaging/send-template')
-  const sendProductMutation = $api.useMutation('post', '/messaging/send-products')
-  const markReadMutation = $api.useMutation('post', '/messaging/mark-read')
-  const typingMutation = $api.useMutation('post', '/messaging/typing/{conversationId}')
-
-  const handleTyping = useCallback(() => {
-    const convId = search.conv
-    if (!convId) return
-    typingMutation.mutate({ params: { path: { conversationId: convId } } })
-  }, [search.conv, typingMutation])
+  // ─── Messaging logic (optimistic send, retry, mark-read, …) ───
+  const {
+    sendMutation,
+    sendTemplateMutation,
+    handleTyping,
+    handleSend,
+    handleUploadAndSend,
+    handleRetry,
+    handleChatClick,
+    handleSendProducts,
+    handleSendTemplate,
+    handleSendTikTokRichMessage,
+  } = useChatMessaging({
+    convId: search.conv,
+    currentAccountId,
+    conversationsData: conversationsQuery.data,
+    id,
+    orgSlug,
+    setTikTokMessageOpen,
+  })
 
   // ─── Map conversations to ChatLayout format ───
   const apiConversations: Conversation[] = useMemo(() => {
@@ -547,373 +218,6 @@ function ChatsPage() {
       )
     })
   }, [conversationsQuery.data, messagesQuery.data, search.conv, id])
-
-  // ─── Cache keys ───
-  const conversationsKey = [
-    'get',
-    '/messaging/conversations/{accountId}',
-    { params: { path: { accountId: currentAccountId! } } },
-  ]
-  const messagesKey = (convId: string) => [
-    'get',
-    '/messaging/conversations/{conversationId}/messages',
-    { params: { path: { conversationId: convId } } },
-  ]
-
-  // ─── Pending messages for retry ───
-  const pendingMessagesRef = useRef<
-    Map<
-      string,
-      {
-        message: string
-        mediaUrl?: string
-        mediaType?: 'image' | 'video' | 'audio' | 'file'
-        fileName?: string
-        fileSize?: number
-        file?: File
-      }
-    >
-  >(new Map())
-
-  // ─── Helper: insert optimistic message ───
-  const insertOptimisticMessage = useCallback(
-    (convId: string, localId: string, msg: Partial<Message>) => {
-      const optimistic: Record<string, unknown> = {
-        id: `optimistic-${localId}`,
-        _localId: localId,
-        conversationId: convId,
-        message: msg.text || '',
-        senderId: 'page',
-        senderName: 'Page',
-        isFromPage: true,
-        isRead: true,
-        mediaUrl: msg.imageUrl || msg.audioUrl || msg.videoUrl || msg.fileUrl || null,
-        mediaType: msg.type === 'text' ? null : msg.type,
-        fileName: msg.fileName || null,
-        fileSize: msg.fileSize || null,
-        createdTime: new Date().toISOString(),
-        _status: 'sending',
-      }
-
-      queryClient.setQueryData(messagesKey(convId), (old: unknown[] | undefined) => [
-        ...(old ?? []),
-        optimistic,
-      ])
-
-      const displayText = msg.text || (msg.type !== 'text' ? `[${msg.type}]` : '')
-      queryClient.setQueryData(conversationsKey, (old: unknown[] | undefined) =>
-        (old ?? []).map((c) => {
-          const item = c as Record<string, unknown>
-          return item.id === convId
-            ? { ...item, lastMessageText: displayText, lastMessageAt: new Date().toISOString() }
-            : c
-        }),
-      )
-    },
-    [queryClient, conversationsKey],
-  )
-
-  // ─── Helper: reconcile optimistic → real ───
-  const reconcileMessage = useCallback(
-    (convId: string, localId: string, savedMsg: Record<string, unknown>) => {
-      queryClient.setQueryData(messagesKey(convId), (old: unknown[] | undefined) =>
-        (old ?? []).map((m) => {
-          const msg = m as Record<string, unknown>
-          if (msg._localId !== localId) return m
-          // Keep local blob URLs for image/video to avoid re-downloading the same file
-          const mediaType = savedMsg.mediaType as string | undefined
-          const keepLocal =
-            (mediaType === 'image' || mediaType === 'video') && typeof msg.mediaUrl === 'string'
-          return {
-            ...savedMsg,
-            _status: undefined,
-            ...(keepLocal ? { mediaUrl: msg.mediaUrl } : {}),
-          }
-        }),
-      )
-      pendingMessagesRef.current.delete(localId)
-    },
-    [queryClient],
-  )
-
-  // ─── Helper: mark optimistic as error ───
-  const markMessageError = useCallback(
-    (convId: string, localId: string) => {
-      queryClient.setQueryData(messagesKey(convId), (old: unknown[] | undefined) =>
-        (old ?? []).map((m) => {
-          const msg = m as Record<string, unknown>
-          return msg._localId === localId ? { ...msg, _status: 'error' } : m
-        }),
-      )
-    },
-    [queryClient],
-  )
-
-  // ─── Handlers ───
-  const handleSend = async (
-    message: string,
-    media?: { url: string; type: 'image' | 'video' | 'audio' | 'file' },
-    replyToId?: string,
-  ) => {
-    if (!search.conv) return
-    const localId = crypto.randomUUID()
-    const convId = search.conv
-
-    // Store for retry
-    pendingMessagesRef.current.set(localId, {
-      message,
-      mediaUrl: media?.url,
-      mediaType: media?.type,
-    })
-
-    // Insert optimistic message
-    insertOptimisticMessage(convId, localId, {
-      type: media?.type || 'text',
-      text: message || undefined,
-      imageUrl: media?.type === 'image' ? media.url : undefined,
-      audioUrl: media?.type === 'audio' ? media.url : undefined,
-      videoUrl: media?.type === 'video' ? media.url : undefined,
-      fileUrl: media?.type === 'file' ? media.url : undefined,
-    })
-
-    try {
-      const savedMsg = await sendMutation.mutateAsync({
-        body: {
-          conversationId: convId,
-          message: message || undefined,
-          mediaUrl: media?.url,
-          mediaType: media?.type,
-          replyToId,
-        },
-      })
-      reconcileMessage(convId, localId, savedMsg as Record<string, unknown>)
-    } catch {
-      markMessageError(convId, localId)
-    }
-  }
-
-  const handleUploadAndSend = async (
-    file: File,
-    type: 'image' | 'video' | 'audio' | 'file',
-    replyToId?: string,
-  ) => {
-    if (!search.conv) return
-    const localId = crypto.randomUUID()
-    const convId = search.conv
-
-    // Create a local preview URL for images/videos to avoid re-downloading after upload
-    const localUrl = type === 'image' || type === 'video' ? URL.createObjectURL(file) : undefined
-
-    // Store for retry
-    pendingMessagesRef.current.set(localId, {
-      message: '',
-      mediaType: type,
-      fileName: file.name,
-      fileSize: file.size,
-      file,
-    })
-
-    // Insert optimistic message
-    insertOptimisticMessage(convId, localId, {
-      type,
-      imageUrl: type === 'image' ? localUrl : undefined,
-      videoUrl: type === 'video' ? localUrl : undefined,
-      fileUrl: type === 'file' ? undefined : undefined,
-      fileName: file.name,
-      fileSize: file.size,
-    })
-
-    try {
-      const url = await uploadChatMedia(file)
-      const savedMsg = await sendMutation.mutateAsync({
-        body: {
-          conversationId: convId,
-          message: undefined,
-          mediaUrl: url,
-          mediaType: type,
-          fileName: file.name,
-          fileSize: file.size,
-          replyToId,
-        },
-      })
-      reconcileMessage(convId, localId, savedMsg as Record<string, unknown>)
-    } catch {
-      markMessageError(convId, localId)
-    }
-  }
-
-  // ─── Retry handler ───
-  const handleRetry = useCallback(
-    (messageId: string) => {
-      // messageId here is the localId
-      const pending = pendingMessagesRef.current.get(messageId)
-      if (!pending || !search.conv) return
-      const convId = search.conv
-
-      // Remove the failed message from cache
-      queryClient.setQueryData(messagesKey(convId), (old: unknown[] | undefined) =>
-        (old ?? []).filter((m) => (m as Record<string, unknown>)._localId !== messageId),
-      )
-      pendingMessagesRef.current.delete(messageId)
-
-      // Re-send
-      if (pending.file) {
-        handleUploadAndSend(pending.file, pending.mediaType!)
-      } else if (pending.mediaUrl) {
-        handleSend(pending.message, { url: pending.mediaUrl, type: pending.mediaType! })
-      } else {
-        handleSend(pending.message)
-      }
-    },
-    [search.conv, queryClient],
-  )
-
-  // Map route id to sidebar unread provider key
-  const unreadProviderKey =
-    id === 'instagram-dm'
-      ? 'INSTAGRAM_DM'
-      : id === 'whatsapp'
-        ? 'WHATSAPP'
-        : id === 'tiktok'
-          ? 'TIKTOK_DM'
-          : 'MESSENGER'
-  const unreadCountsKey = [
-    'get',
-    '/social/unread-counts/{organisationId}',
-    { params: { path: { organisationId: orgSlug } } },
-  ]
-
-  // ─── Mark as read when conv is opened, clicked, or tab becomes visible ───
-  const markAsRead = useCallback(
-    (convId: string) => {
-      const convs = conversationsQuery.data as Record<string, unknown>[] | undefined
-      const conv = convs?.find((c) => c.id === convId)
-      if (!conv || (conv.unreadCount as number) === 0) return
-
-      const convUnread = conv.unreadCount as number
-
-      markReadMutation.mutate({ body: { conversationId: convId } })
-      queryClient.setQueryData(conversationsKey, (old: unknown[] | undefined) =>
-        (old ?? []).map((c) => {
-          const item = c as Record<string, unknown>
-          return item.id === convId ? { ...item, unreadCount: 0 } : c
-        }),
-      )
-      // Optimistically subtract from sidebar badge count
-      queryClient.setQueryData(
-        unreadCountsKey,
-        (old: { provider: string; count: number }[] | undefined) =>
-          (old ?? []).map((item) =>
-            item.provider === unreadProviderKey
-              ? { ...item, count: Math.max(0, item.count - convUnread) }
-              : item,
-          ),
-      )
-    },
-    [
-      conversationsQuery.data,
-      markReadMutation,
-      queryClient,
-      conversationsKey,
-      unreadCountsKey,
-      unreadProviderKey,
-    ],
-  )
-
-  const handleChatClick = useCallback(() => {
-    if (search.conv) markAsRead(search.conv)
-  }, [search.conv, markAsRead])
-
-  const markReadConvRef = useRef(search.conv)
-  markReadConvRef.current = search.conv
-
-  // Mark as read when conversation URL changes
-  useEffect(() => {
-    if (search.conv) markAsRead(search.conv)
-  }, [search.conv, markAsRead])
-
-  // Mark as read when tab becomes visible again
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && markReadConvRef.current) {
-        markAsRead(markReadConvRef.current)
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [markAsRead])
-
-  const handleSendProducts = async (data: {
-    productRetailerIds: string[]
-    catalogId: string
-    format: 'product' | 'product_list' | 'carousel' | 'catalog_message'
-    headerText?: string
-    bodyText?: string
-    footerText?: string
-  }) => {
-    if (!search.conv) return
-    const convId = search.conv
-
-    await sendProductMutation.mutateAsync({
-      body: {
-        conversationId: convId,
-        ...data,
-      },
-    })
-
-    // Invalidate messages to show the new product message
-    queryClient.invalidateQueries({
-      queryKey: messagesKey(convId),
-    })
-  }
-
-  const handleSendTemplate = async (data: {
-    template: { id: string; name: string; language: string }
-    variables: Record<string, string>
-    renderedBody: string
-  }) => {
-    if (!search.conv) return
-    const convId = search.conv
-    await sendTemplateMutation.mutateAsync({
-      body: {
-        conversationId: convId,
-        metaTemplateId: data.template.id,
-        metaTemplateName: data.template.name,
-        metaTemplateLanguage: data.template.language,
-        variables: data.variables,
-        renderedBody: data.renderedBody,
-      },
-    })
-    queryClient.invalidateQueries({ queryKey: messagesKey(convId) })
-  }
-
-  const handleSendTikTokRichMessage = async (payload: TikTokRichMessagePayload) => {
-    if (!search.conv) return
-    const convId = search.conv
-    const savedMsg = await sendMutation.mutateAsync({
-      body: {
-        conversationId: convId,
-        ...payload,
-      },
-    })
-
-    queryClient.setQueryData(messagesKey(convId), (old: unknown[] | undefined) => [
-      ...(old ?? []),
-      savedMsg,
-    ])
-
-    const displayText =
-      payload.tiktokMessageType === 'SHARE_POST' ? '[tiktok post]' : payload.tiktokTemplate.title
-    queryClient.setQueryData(conversationsKey, (old: unknown[] | undefined) =>
-      (old ?? []).map((c) => {
-        const item = c as Record<string, unknown>
-        return item.id === convId
-          ? { ...item, lastMessageText: displayText, lastMessageAt: new Date().toISOString() }
-          : c
-      }),
-    )
-    setTikTokMessageOpen(false)
-  }
 
   const handleConfigureAgent = useCallback(() => {
     navigate({ to: '/app/$orgSlug/agents' as string, params: { orgSlug } })
@@ -939,83 +243,8 @@ function ChatsPage() {
     })
   }
 
-  // ─── WhatsApp connect mutation ───
-  const connectWhatsAppMutation = $api.useMutation('post', '/social/connect/whatsapp')
-
-  const handleConnect = async () => {
-    setConnecting(true)
-
-    if (id === 'whatsapp') {
-      try {
-        const appId = import.meta.env.VITE_FACEBOOK_APP_ID
-        const waConfigId = import.meta.env.VITE_WHATSAPP_CONFIGGURATION_ID
-        if (!appId || !waConfigId) {
-          setConnecting(false)
-          return
-        }
-
-        const { loginResponse, sessionInfo } = await launchWhatsAppSignup(appId, waConfigId)
-        if (!loginResponse.authResponse?.code) {
-          setConnecting(false)
-          return
-        }
-
-        await connectWhatsAppMutation.mutateAsync({
-          body: {
-            organisationId: orgSlug,
-            code: loginResponse.authResponse.code,
-            wabaId: sessionInfo.waba_id,
-            phoneNumberId: sessionInfo.phone_number_id,
-          },
-        })
-
-        // Refresh accounts list
-        queryClient.invalidateQueries({
-          queryKey: ['get', '/social/accounts/{organisationId}'],
-        })
-      } catch (err) {
-        console.error('[WhatsApp] Connect failed:', err)
-      } finally {
-        setConnecting(false)
-      }
-      return
-    }
-
-    if (id === 'messenger') {
-      setAuthRedirect({
-        intent: 'connect_pages',
-        orgId: orgSlug,
-        provider: 'facebook',
-        pageId: 'messenger',
-        scopes: ['messages'],
-      })
-      const configId = import.meta.env.VITE_FB_MESSAGES_CONFIGGURATION_ID
-      if (!configId) {
-        setConnecting(false)
-        return
-      }
-      window.location.href = buildFacebookOAuthUrl(configId)
-    } else if (id === 'instagram-dm') {
-      setAuthRedirect({
-        intent: 'connect_pages',
-        orgId: orgSlug,
-        provider: 'instagram',
-        igScope: 'messages',
-        pageId: 'instagram-dm',
-        scopes: ['messages'],
-      })
-      window.location.href = buildInstagramOAuthUrl('messages')
-    } else if (id === 'tiktok') {
-      setAuthRedirect({
-        intent: 'connect_pages',
-        orgId: orgSlug,
-        provider: 'tiktok',
-        pageId: 'tiktok',
-        scopes: ['messages', 'message.list.read', 'message.list.send', 'message.list.manage'],
-      })
-      window.location.href = buildTikTokOAuthUrl('messages')
-    }
-  }
+  // ─── Connect flow ───
+  const { connecting, handleConnect } = useChatConnect({ id, orgSlug })
 
   // ─── Not found ───
   if (!config) {

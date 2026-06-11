@@ -1,77 +1,24 @@
-import type { ReactNode } from 'react'
 import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Button, Popover, Checkbox } from 'antd'
-import {
-  FileText,
-  Megaphone,
-  MessageCircle,
-  Search,
-  Sparkles,
-  ShoppingBag,
-  Tag,
-  Unlink,
-  Wrench,
-} from 'lucide-react'
+import { Button } from 'antd'
+import { MessageCircle, Search, Sparkles, ShoppingBag, Wrench } from 'lucide-react'
 import { ConversationList } from './conversation-list'
 import { ChatWindow } from './chat-window'
 import { SocialSetup } from '@app/components/social/social-setup'
 import { HeaderHelper } from '@app/components/shared/header-helper'
 import { ListSearchInput } from '@app/components/shared/list-search-input'
-import {
-  WhatsAppIcon,
-  InstagramIcon,
-  MessengerIcon,
-  TikTokIcon,
-  LabelBadgeIcon,
-} from '@app/components/icons/social-icons'
 import { ConversationListSkeleton, ChatWindowSkeleton } from './chat-skeleton'
 import { labelApi } from '@app/lib/api/agent-api'
 import type { Conversation } from './mock-data'
-
-type ChatProvider = 'whatsapp' | 'instagram-dm' | 'messenger' | 'tiktok'
-
-const PROVIDER_EMPTY_STATE: Record<
-  ChatProvider,
-  {
-    icon: ReactNode
-    color: string
-    noConvTitleKey: string
-    selectTitleKey: string
-    selectDescKey: string
-  }
-> = {
-  whatsapp: {
-    icon: <WhatsAppIcon width={40} height={40} />,
-    color: 'var(--color-brand-whatsapp)',
-    noConvTitleKey: 'chat.no_conversations',
-    selectTitleKey: 'chat.select_conversation',
-    selectDescKey: 'chat.whatsapp_select_desc',
-  },
-  'instagram-dm': {
-    icon: <InstagramIcon width={40} height={40} />,
-    color: 'var(--color-brand-instagram)',
-    noConvTitleKey: 'chat.no_messages',
-    selectTitleKey: 'chat.select_conversation',
-    selectDescKey: 'chat.instagram_select_desc',
-  },
-  messenger: {
-    icon: <MessengerIcon width={40} height={40} />,
-    color: 'var(--color-brand-messenger)',
-    noConvTitleKey: 'chat.no_messages',
-    selectTitleKey: 'chat.select_conversation',
-    selectDescKey: 'chat.messenger_select_desc',
-  },
-  tiktok: {
-    icon: <TikTokIcon width={40} height={40} />,
-    color: 'var(--color-brand-tiktok)',
-    noConvTitleKey: 'chat.no_messages',
-    selectTitleKey: 'chat.select_conversation',
-    selectDescKey: 'chat.tiktok_select_desc',
-  },
-}
+import {
+  PROVIDER_EMPTY_STATE,
+  useSetupState,
+  type ChatProvider,
+} from './chat-layout/provider-empty-state'
+import { LabelsFilterPopover } from './chat-layout/labels-filter-popover'
+import { ChatToolsPopover } from './chat-layout/chat-tools-popover'
 
 interface ChatLayoutProps {
   conversations: Conversation[]
@@ -122,176 +69,6 @@ interface ChatLayoutProps {
   onCatalogClick?: () => void
   onTemplateClick?: () => void
   onTikTokMessageClick?: () => void
-}
-
-/* ── Labels filter popover ── */
-
-function LabelsFilterPopover({
-  labels,
-  selectedLabelIds,
-  onToggle,
-  children,
-}: {
-  labels: { id: string; name: string; color: string }[]
-  selectedLabelIds: string[]
-  onToggle: (labelId: string) => void
-  children: React.ReactNode
-}) {
-  const [open, setOpen] = useState(false)
-  const { t } = useTranslation()
-
-  return (
-    <Popover
-      content={
-        <div className="flex w-48 flex-col gap-0.5">
-          <div className="px-3 py-2 text-xs font-semibold text-text-muted">
-            {t('chat.filter_by_label')}
-          </div>
-          {labels.map((label) => (
-            <Button
-              key={label.id}
-              type="text"
-              block
-              onClick={() => onToggle(label.id)}
-              className="py-2!"
-            >
-              <Checkbox checked={selectedLabelIds.includes(label.id)} />
-              <LabelBadgeIcon
-                width={12}
-                height={12}
-                style={{ color: label.color }}
-                className="flex-shrink-0"
-              />
-              <span className="flex-1 truncate">{label.name}</span>
-            </Button>
-          ))}
-        </div>
-      }
-      trigger="click"
-      open={open}
-      onOpenChange={setOpen}
-      placement="bottomLeft"
-      overlayClassName="org-switcher-popover"
-      arrow={false}
-    >
-      {children}
-    </Popover>
-  )
-}
-
-/**
- * Determine which single setup state to show, in priority order:
- * 1. No catalog (WhatsApp only) → configure catalog
- * 2. Catalog but no agent → configure agent
- * 3. Everything configured → null (show conversations or "empty" state)
- */
-type SetupState = 'catalog' | 'agent' | null
-
-function useSetupState(
-  provider: ChatProvider,
-  hasCatalogAssociated: boolean,
-  hasReadyAgent: boolean,
-): SetupState {
-  if (provider === 'whatsapp' && !hasCatalogAssociated) return 'catalog'
-  if (!hasReadyAgent) return 'agent'
-  return null
-}
-
-function ChatToolsPopover({
-  provider,
-  onOpenOptions,
-  onOpenTemplates,
-  onOpenCampaigns,
-  onDisconnect,
-  children,
-}: {
-  provider: ChatProvider
-  onOpenOptions?: () => void
-  onOpenTemplates?: () => void
-  onOpenCampaigns?: () => void
-  onDisconnect?: () => void
-  children: React.ReactNode
-}) {
-  const [open, setOpen] = useState(false)
-  const { t } = useTranslation()
-  const items = [
-    {
-      label: t('chat.tools_catalog'),
-      icon: <ShoppingBag size={18} />,
-      color: 'text-green-500',
-      bgColor: 'bg-green-50',
-      onClick: onOpenOptions,
-    },
-    {
-      label: t('chat.tools_labels'),
-      icon: <Tag size={18} />,
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-50',
-      onClick: onOpenOptions,
-    },
-    // Templates & campaigns are WhatsApp-only features.
-    ...(provider === 'whatsapp'
-      ? [
-          {
-            label: t('chat.tools_templates'),
-            icon: <FileText size={18} />,
-            color: 'text-blue-500',
-            bgColor: 'bg-blue-50',
-            onClick: onOpenTemplates,
-          },
-          {
-            label: t('chat.tools_campaigns'),
-            icon: <Megaphone size={18} />,
-            color: 'text-orange-500',
-            bgColor: 'bg-orange-50',
-            onClick: onOpenCampaigns,
-          },
-        ]
-      : []),
-    {
-      label: t('chat.tools_disconnect'),
-      icon: <Unlink size={18} />,
-      color: 'text-red-500',
-      bgColor: 'bg-red-50',
-      onClick: onDisconnect,
-    },
-  ]
-
-  return (
-    <Popover
-      content={
-        <div className="flex w-48 flex-col gap-0.5">
-          {items.map((item) => (
-            <Button
-              key={item.label}
-              type="text"
-              block
-              onClick={() => {
-                setOpen(false)
-                item.onClick?.()
-              }}
-              className="py-2.5!"
-            >
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${item.bgColor} ${item.color}`}
-              >
-                {item.icon}
-              </div>
-              {item.label}
-            </Button>
-          ))}
-        </div>
-      }
-      trigger="click"
-      open={open}
-      onOpenChange={setOpen}
-      placement="bottomRight"
-      overlayClassName="org-switcher-popover"
-      arrow={false}
-    >
-      {children}
-    </Popover>
-  )
 }
 
 export function ChatLayout({
