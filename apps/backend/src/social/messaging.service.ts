@@ -3613,11 +3613,29 @@ export class MessagingService {
 
     const accessToken = await this.getDecryptedToken(conversation.socialAccount.id)
 
+    // Guard against the agent hallucinating products: only send retailer ids that
+    // actually exist in the catalog (resolved + cached via Meta). Unknown ids are
+    // dropped; if none survive we refuse rather than send a card/body for a
+    // product that does not exist.
+    const hydrated = await this.catalogService.hydrateProductsByRetailerIdsWithAccessToken(
+      catalogId,
+      productRetailerIds,
+      accessToken,
+    )
+    const validRetailerIds = productRetailerIds.filter((id) =>
+      hydrated.some((p) => p.retailerId === id),
+    )
+    if (validRetailerIds.length === 0) {
+      throw new BadRequestException(
+        `None of these products exist in the catalog: ${productRetailerIds.join(', ')}. Never invent a retailer id — only use ids returned by search_products.`,
+      )
+    }
+
     const { sends, effectiveFormat } = await this.dispatchWhatsAppProductMessage(
       conversation.socialAccount.providerAccountId,
       conversation.participantId,
       accessToken,
-      productRetailerIds,
+      validRetailerIds,
       catalogId,
       format,
       headerText,

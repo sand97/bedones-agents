@@ -147,7 +147,9 @@ export class TicketAgentService {
     }
 
     const metadata =
-      decision.articles && decision.articles.length > 0 ? { articles: decision.articles } : undefined
+      decision.articles && decision.articles.length > 0
+        ? { articleNames: decision.articles }
+        : undefined
     const priority = decision.priority ?? 'MEDIUM'
 
     // Update path — only when the target ticket really belongs to this conversation.
