@@ -20,6 +20,8 @@ const GENERIC_COVER_EN_TOKENS = new Set([
 
 export interface ProductSearchResult {
   id: string
+  /** Meta retailer_id (merchant SKU) — the id required by send_products. */
+  retailerId?: string
   name: string
   description?: string
   price?: number
@@ -95,6 +97,7 @@ export class CatalogSearchService {
 
     const products: ProductSearchResult[] = filteredResults.map((hit) => ({
       id: hit.productId,
+      retailerId: (hit.metadata.retailer_id as string) || undefined,
       name: (hit.metadata.product_name as string) || (hit.metadata.name as string) || '',
       description: (hit.metadata.description as string) || undefined,
       price: (hit.metadata.price as number) || undefined,

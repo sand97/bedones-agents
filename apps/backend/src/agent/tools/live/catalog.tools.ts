@@ -23,16 +23,19 @@ export function createCatalogTools(deps: {
         return `No products found for query "${query}". ${result.error || ''}`
       }
 
-      const lines = result.products.map(
-        (p) =>
-          `${p.id},${(p.rankingScore ?? p.similarity ?? 0).toFixed(3)},${p.name},${p.price || 'N/A'}`,
-      )
-      return `productID,score,name,price\n${lines.join('\n')}`
+      // send_products needs the Meta retailer_id (merchant SKU), NOT the internal
+      // product_id — sending a product_id triggers Meta error 131009 ("product
+      // not found for product_retailer_id"). Expose the retailer_id here.
+      const lines = result.products.map((p) => {
+        const retailerId = p.retailerId || p.id
+        return `${retailerId},${(p.rankingScore ?? p.similarity ?? 0).toFixed(3)},${p.name},${p.price || 'N/A'}`
+      })
+      return `retailerID,score,name,price\n${lines.join('\n')}`
     },
     {
       name: 'search_products',
       description:
-        'Search for products in the catalog using semantic search. Provide the query in the user language, and optionally an English translation for better matching.',
+        'Search for products in the catalog using semantic search. Provide the query in the user language, and optionally an English translation for better matching. Returns CSV `retailerID,score,name,price`; pass the retailerID values to send_products.',
       schema: z.object({
         query: z.string().describe('Search query in the user language'),
         queryEn: z

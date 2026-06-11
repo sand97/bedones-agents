@@ -110,6 +110,7 @@ export class DebugCatalogTools {
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
+        providerProductId: true,
         name: true,
         description: true,
         price: true,
@@ -138,6 +139,7 @@ export class DebugCatalogTools {
           { text: vector },
           {
             product_id: p.id,
+            retailer_id: p.providerProductId ?? null,
             product_name: p.name,
             description: p.description ?? null,
             category: p.category ?? null,
