@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Modal, Button, Empty, Spin, Alert, message } from 'antd'
-import { ExternalLink, Trash2, AlertCircle } from 'lucide-react'
+import { ExternalLink, Trash2, AlertCircle, Link2 } from 'lucide-react'
 import { catalogApi, type PostLink } from '@app/lib/api/agent-api'
 
 interface LinkedPostsModalProps {
@@ -10,11 +10,19 @@ interface LinkedPostsModalProps {
   /** Either a product or a collection — the modal handles both. */
   entity: { kind: 'product' | 'collection'; id: string; name?: string } | null
   onClose: () => void
+  /** Open the post-linking flow pre-filled with this entity (page-selection step). */
+  onAddPost?: () => void
 }
 
 const PAGE_SIZE = 10
 
-export function LinkedPostsModal({ open, catalogId, entity, onClose }: LinkedPostsModalProps) {
+export function LinkedPostsModal({
+  open,
+  catalogId,
+  entity,
+  onClose,
+  onAddPost,
+}: LinkedPostsModalProps) {
   const qc = useQueryClient()
   const [limit, setLimit] = useState(PAGE_SIZE)
 
@@ -82,7 +90,15 @@ export function LinkedPostsModal({ open, catalogId, entity, onClose }: LinkedPos
       open={open}
       onCancel={onClose}
       title={entity?.name ? `Posts liés – ${entity.name}` : 'Posts liés'}
-      footer={null}
+      footer={
+        onAddPost ? (
+          <div className="flex justify-end">
+            <Button type="primary" icon={<Link2 size={14} />} onClick={onAddPost}>
+              Lier un post
+            </Button>
+          </div>
+        ) : null
+      }
       width={560}
       centered
     >
