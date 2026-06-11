@@ -65,6 +65,9 @@ export function ProductModal({
   const { t } = useTranslation()
   const contentRef = useRef<ProductModalContentHandle>(null)
   const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState(0)
+  // Submission in flight = images uploading (local) or product data being saved (parent mutation)
+  const inProgress = !!loading || uploading
   return (
     <Modal
       open={open}
@@ -73,17 +76,21 @@ export function ProductModal({
       width={640}
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       destroyOnHidden
+      // Lock the modal while submitting so it can't be dismissed mid-upload
+      closable={!inProgress}
+      maskClosable={!inProgress}
+      keyboard={!inProgress}
       footer={[
-        <Button key="cancel" onClick={onClose}>
+        <Button key="cancel" onClick={onClose} disabled={inProgress}>
           {t('common.cancel')}
         </Button>,
         <Button
           key="submit"
           type="primary"
           onClick={() => contentRef.current?.submit()}
-          loading={loading || uploading}
+          loading={inProgress}
         >
-          {product ? t('common.save') : t('common.create')}
+          {inProgress ? `${progress}%` : product ? t('common.save') : t('common.create')}
         </Button>,
       ]}
     >
@@ -92,7 +99,9 @@ export function ProductModal({
         onSubmit={onSubmit}
         product={product}
         collections={collections}
+        submitting={inProgress}
         onUploadingChange={setUploading}
+        onProgressChange={setProgress}
       />
     </Modal>
   )
@@ -106,11 +115,18 @@ interface ProductModalContentProps {
   onSubmit: ProductModalProps['onSubmit']
   product?: Product
   collections?: Collection[]
+  /** Whole submission in flight (images + product save) — disables all fields */
+  submitting: boolean
   onUploadingChange: (uploading: boolean) => void
+  /** Report submission progress (0-100) for the submit button */
+  onProgressChange: (progress: number) => void
 }
 
 const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalContentProps>(
-  function ProductModalContent({ onSubmit, product, collections, onUploadingChange }, ref) {
+  function ProductModalContent(
+    { onSubmit, product, collections, submitting, onUploadingChange, onProgressChange },
+    ref,
+  ) {
     const { t } = useTranslation()
     const { t: tCat } = useTranslation('categories')
     const [form] = Form.useForm()
@@ -204,16 +220,26 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
 
       let finalImageUrls = imageUrls
 
+      // Progress model: image uploads fill 0→90% (the 90% is split evenly across
+      // the pending images, advancing as each one finishes), and the final 10% is
+      // the product-data submission, tracked via the parent `loading` flag.
+      onProgressChange(0)
+
       // Upload pending files to the server (like chat media upload).
       // Map each blob preview to its uploaded URL and replace it in place so
       // the user-defined order (drag & drop) is preserved on save.
       if (pendingFiles.length > 0) {
         setUploading(true)
         try {
+          const total = pendingFiles.length
+          let uploaded = 0
           const uploadedByPreview = new Map<string, string>()
           await Promise.all(
             pendingFiles.map(async (pf) => {
-              uploadedByPreview.set(pf.previewUrl, await uploadProductImage(pf.file))
+              const url = await uploadProductImage(pf.file)
+              uploadedByPreview.set(pf.previewUrl, url)
+              uploaded += 1
+              onProgressChange(Math.round((uploaded / total) * 90))
             }),
           )
           finalImageUrls = imageUrls.map((u) => uploadedByPreview.get(u) ?? u)
@@ -225,6 +251,10 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
           setUploading(false)
         }
       }
+
+      // Images done → 90%. The remaining 10% covers the product-data submission,
+      // shown while the parent mutation is in flight (until the modal closes).
+      onProgressChange(90)
 
       // Clean up blob URLs
       pendingFiles.forEach((pf) => URL.revokeObjectURL(pf.previewUrl))
@@ -239,7 +269,13 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
 
     return (
       <>
-        <Form form={form} layout="vertical" className="pt-2" initialValues={initialValues}>
+        <Form
+          form={form}
+          layout="vertical"
+          className="pt-2"
+          initialValues={initialValues}
+          disabled={submitting}
+        >
           <Form.Item
             name="name"
             label={t('catalog.product_name')}
@@ -284,8 +320,9 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
                           ? ' is-drop-target'
                           : ''
                       }`}
-                      draggable
+                      draggable={!submitting}
                       onDragStart={(e) => {
+                        if (submitting) return
                         setDragIndex(i)
                         e.dataTransfer.effectAllowed = 'move'
                         // Required for Firefox to actually start the drag
