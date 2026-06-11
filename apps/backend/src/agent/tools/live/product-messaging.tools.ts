@@ -1,7 +1,12 @@
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod'
 import type { MessagingService } from '../../../social/messaging.service'
-import { type SingleReplyGuard, REPLY_ALREADY_SENT_NOTICE } from './turn-guard'
+import {
+  type SingleReplyGuard,
+  REPLY_ALREADY_SENT_NOTICE,
+  claimReply,
+  releaseReply,
+} from './turn-guard'
 
 export function createProductMessagingTools(deps: {
   messagingService: MessagingService
@@ -46,6 +51,10 @@ export function createProductMessagingTools(deps: {
         return `Failed: could not resolve a sendable catalog for these products. Run search_products first, or pass a valid catalogId (one of: ${catalogKeys.join(', ')}). Do not force a different catalog.`
       }
 
+      // Claim the single customer-facing send synchronously (before any await), so
+      // a parallel reply_to_message in the same batch is suppressed, not doubled.
+      if (!claimReply(deps.replyGuard)) return REPLY_ALREADY_SENT_NOTICE
+
       try {
         // One product → keep the message on the card. Several individual cards
         // (`product` format) → send the message once as its own text first, then
@@ -64,9 +73,9 @@ export function createProductMessagingTools(deps: {
           headerText,
           textFirst ? undefined : bodyText,
         )
-        if (deps.replyGuard) deps.replyGuard.sent = true
         return `Successfully sent ${productIds.length} product(s) as ${format} message.`
       } catch (error: unknown) {
+        releaseReply(deps.replyGuard)
         return `Failed to send products: ${error instanceof Error ? error.message : 'Unknown error'}`
       }
     },
