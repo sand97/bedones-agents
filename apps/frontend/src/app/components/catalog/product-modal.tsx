@@ -4,7 +4,6 @@ import { Modal, Form, Input, InputNumber, Select, Upload, Button, message } from
 import { X } from 'lucide-react'
 import { uploadProductImage } from '@app/lib/api'
 import type { Product, Collection } from '@app/lib/api/agent-api'
-import { getCategoryOptions } from '@app/lib/product-categories'
 
 /** Normalize currency aliases to ISO 4217 */
 function normalizeCurrency(c?: string): string {
@@ -31,7 +30,6 @@ interface ProductModalProps {
     imageUrls?: string[]
     price?: number
     currency?: string
-    category?: string
     url?: string
     availability?: string
     brand?: string
@@ -65,6 +63,9 @@ export function ProductModal({
   const { t } = useTranslation()
   const contentRef = useRef<ProductModalContentHandle>(null)
   const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState(0)
+  // Submission in flight = images uploading (local) or product data being saved (parent mutation)
+  const inProgress = !!loading || uploading
   return (
     <Modal
       open={open}
@@ -73,17 +74,21 @@ export function ProductModal({
       width={640}
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       destroyOnHidden
+      // Lock the modal while submitting so it can't be dismissed mid-upload
+      closable={!inProgress}
+      maskClosable={!inProgress}
+      keyboard={!inProgress}
       footer={[
-        <Button key="cancel" onClick={onClose}>
+        <Button key="cancel" onClick={onClose} disabled={inProgress}>
           {t('common.cancel')}
         </Button>,
         <Button
           key="submit"
           type="primary"
           onClick={() => contentRef.current?.submit()}
-          loading={loading || uploading}
+          loading={inProgress}
         >
-          {product ? t('common.save') : t('common.create')}
+          {inProgress ? `${progress}%` : product ? t('common.save') : t('common.create')}
         </Button>,
       ]}
     >
@@ -92,7 +97,9 @@ export function ProductModal({
         onSubmit={onSubmit}
         product={product}
         collections={collections}
+        submitting={inProgress}
         onUploadingChange={setUploading}
+        onProgressChange={setProgress}
       />
     </Modal>
   )
@@ -106,13 +113,19 @@ interface ProductModalContentProps {
   onSubmit: ProductModalProps['onSubmit']
   product?: Product
   collections?: Collection[]
+  /** Whole submission in flight (images + product save) — disables all fields */
+  submitting: boolean
   onUploadingChange: (uploading: boolean) => void
+  /** Report submission progress (0-100) for the submit button */
+  onProgressChange: (progress: number) => void
 }
 
 const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalContentProps>(
-  function ProductModalContent({ onSubmit, product, collections, onUploadingChange }, ref) {
+  function ProductModalContent(
+    { onSubmit, product, collections, submitting, onUploadingChange, onProgressChange },
+    ref,
+  ) {
     const { t } = useTranslation()
-    const { t: tCat } = useTranslation('categories')
     const [form] = Form.useForm()
     const currency = Form.useWatch('currency', form) as string | undefined
     const [uploading, setUploading] = useState(false)
@@ -156,7 +169,6 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
           description: product.description,
           price: product.price,
           currency: normalizeCurrency(product.currency),
-          category: product.category,
           url: product.url,
           availability: product.availability,
           brand: product.brand,
@@ -204,16 +216,26 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
 
       let finalImageUrls = imageUrls
 
+      // Progress model: image uploads fill 0→90% (the 90% is split evenly across
+      // the pending images, advancing as each one finishes), and the final 10% is
+      // the product-data submission, tracked via the parent `loading` flag.
+      onProgressChange(0)
+
       // Upload pending files to the server (like chat media upload).
       // Map each blob preview to its uploaded URL and replace it in place so
       // the user-defined order (drag & drop) is preserved on save.
       if (pendingFiles.length > 0) {
         setUploading(true)
         try {
+          const total = pendingFiles.length
+          let uploaded = 0
           const uploadedByPreview = new Map<string, string>()
           await Promise.all(
             pendingFiles.map(async (pf) => {
-              uploadedByPreview.set(pf.previewUrl, await uploadProductImage(pf.file))
+              const url = await uploadProductImage(pf.file)
+              uploadedByPreview.set(pf.previewUrl, url)
+              uploaded += 1
+              onProgressChange(Math.round((uploaded / total) * 90))
             }),
           )
           finalImageUrls = imageUrls.map((u) => uploadedByPreview.get(u) ?? u)
@@ -226,6 +248,10 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
         }
       }
 
+      // Images done → 90%. The remaining 10% covers the product-data submission,
+      // shown while the parent mutation is in flight (until the modal closes).
+      onProgressChange(90)
+
       // Clean up blob URLs
       pendingFiles.forEach((pf) => URL.revokeObjectURL(pf.previewUrl))
       setPendingFiles([])
@@ -235,11 +261,15 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
 
     useImperativeHandle(ref, () => ({ submit: handleSubmit }), [handleSubmit])
 
-    const categoryOptions = getCategoryOptions(tCat)
-
     return (
       <>
-        <Form form={form} layout="vertical" className="pt-2" initialValues={initialValues}>
+        <Form
+          form={form}
+          layout="vertical"
+          className="pt-2"
+          initialValues={initialValues}
+          disabled={submitting}
+        >
           <Form.Item
             name="name"
             label={t('catalog.product_name')}
@@ -284,8 +314,9 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
                           ? ' is-drop-target'
                           : ''
                       }`}
-                      draggable
+                      draggable={!submitting}
                       onDragStart={(e) => {
+                        if (submitting) return
                         setDragIndex(i)
                         e.dataTransfer.effectAllowed = 'move'
                         // Required for Firefox to actually start the drag
@@ -383,16 +414,8 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
           </Form.Item>
 
           <div className="flex gap-4">
-            <Form.Item name="category" label={t('catalog.category')} className="flex-1">
-              <Select
-                showSearch
-                allowClear
-                options={categoryOptions}
-                placeholder={t('catalog.category_placeholder')}
-                filterOption={(input, option) =>
-                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                }
-              />
+            <Form.Item name="brand" label={t('catalog.product_brand')} className="flex-1">
+              <Input placeholder={t('catalog.product_brand_placeholder')} />
             </Form.Item>
             <Form.Item name="collectionId" label={t('catalog.collection')} className="flex-1">
               <Select
@@ -436,10 +459,6 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
               />
             </Form.Item>
           </div>
-
-          <Form.Item name="brand" label={t('catalog.product_brand')}>
-            <Input placeholder={t('catalog.product_brand_placeholder')} />
-          </Form.Item>
         </Form>
       </>
     )
