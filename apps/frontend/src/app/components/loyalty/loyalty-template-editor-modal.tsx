@@ -1,26 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  Alert,
-  App,
-  Button,
-  Divider,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Space,
-  Tag,
-  Tooltip,
-  Upload,
-} from 'antd'
-import { Image as ImageIcon, Plus, Trash2, Video as VideoIcon } from 'lucide-react'
+import { App, Button, Form, Input, Modal, Select } from 'antd'
 import { uploadChatMedia } from '@app/lib/api'
 import { loyaltyApi, type LoyaltyTemplate } from '@app/lib/api/loyalty-api'
 import {
   bodyToVariableKeys,
-  findUnknownTokens,
   formatTemplateName,
   getTemplateVariables,
   metaPlaceholdersToTokens,
@@ -33,6 +18,14 @@ import {
   type HeaderType,
   type PreviewButton,
 } from './loyalty-template-preview'
+import {
+  isProductTemplateButton,
+  MAX_BUTTONS,
+  type ButtonDraft,
+} from './loyalty-template-editor/constants'
+import { LoyaltyTemplateHeaderSection } from './loyalty-template-editor/header-section'
+import { LoyaltyTemplateBodySection } from './loyalty-template-editor/body-section'
+import { LoyaltyTemplateButtonsSection } from './loyalty-template-editor/buttons-section'
 
 interface Props {
   open: boolean
@@ -41,23 +34,6 @@ interface Props {
   /** Used as the default footer text when none is provided. */
   defaultFooter?: string
   editingTemplate?: LoyaltyTemplate | null
-}
-
-const MAX_BUTTONS = 10
-const MAX_BUTTON_TEXT = 25
-const MAX_HEADER_TEXT = 60
-const MAX_FOOTER_TEXT = 60
-const PRODUCT_TEMPLATE_BUTTON_TYPES: ButtonType[] = ['CATALOG', 'MPM']
-
-interface ButtonDraft {
-  type: ButtonType
-  text: string
-  url?: string
-  phoneNumber?: string
-}
-
-function isProductTemplateButton(type: ButtonType) {
-  return PRODUCT_TEMPLATE_BUTTON_TYPES.includes(type)
 }
 
 export function LoyaltyTemplateEditorModal({
@@ -340,6 +316,18 @@ export function LoyaltyTemplateEditorModal({
     setButtons((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const handleHeaderTypeChange = (val: HeaderType) => {
+    setHeaderType(val)
+    if (val !== 'IMAGE' && val !== 'VIDEO') clearMediaPreview()
+    if (val !== 'TEXT') form.setFieldValue('headerText', undefined)
+  }
+
+  const stageHeaderMediaFile = (file: File) => {
+    clearMediaPreview()
+    setHeaderMediaFile(file)
+    setHeaderMediaPreviewUrl(URL.createObjectURL(file))
+  }
+
   const previewButtons: PreviewButton[] = buttons
     .map((button) => ({
       ...button,
@@ -433,259 +421,34 @@ export function LoyaltyTemplateEditorModal({
               </Form.Item>
             </div>
 
-            {/* ─── Section: Header ─── */}
-            <Divider orientation="left" plain>
-              {t('loyalty.section_header')}
-            </Divider>
+            <LoyaltyTemplateHeaderSection
+              headerType={headerType}
+              headerTypeOptions={headerTypeOptions}
+              hasMpmTemplateButton={hasMpmTemplateButton}
+              headerMediaPreviewUrl={headerMediaPreviewUrl}
+              onHeaderTypeChange={handleHeaderTypeChange}
+              clearMediaPreview={clearMediaPreview}
+              onStageFile={stageHeaderMediaFile}
+            />
 
-            <Form.Item label={t('loyalty.header_type')} required={hasMpmTemplateButton}>
-              <Select
-                value={headerType}
-                onChange={(val) => {
-                  setHeaderType(val)
-                  if (val !== 'IMAGE' && val !== 'VIDEO') clearMediaPreview()
-                  if (val !== 'TEXT') form.setFieldValue('headerText', undefined)
-                }}
-                options={headerTypeOptions}
-              />
-            </Form.Item>
+            <LoyaltyTemplateBodySection
+              templateVariables={templateVariables}
+              insertToken={insertToken}
+              liveCategory={liveCategory}
+              onFooterTouched={() => setFooterTouched(true)}
+            />
 
-            {headerType === 'TEXT' && (
-              <Form.Item
-                label={t('loyalty.header_text')}
-                name="headerText"
-                rules={[{ max: MAX_HEADER_TEXT }]}
-              >
-                <Input
-                  placeholder={t('loyalty.header_text_placeholder')}
-                  maxLength={MAX_HEADER_TEXT}
-                  showCount
-                />
-              </Form.Item>
-            )}
-
-            {(headerType === 'IMAGE' || headerType === 'VIDEO') && (
-              <Form.Item
-                label={
-                  headerType === 'IMAGE' ? t('loyalty.header_image') : t('loyalty.header_video')
-                }
-              >
-                {headerMediaPreviewUrl ? (
-                  <div className="flex items-center gap-3">
-                    {headerType === 'IMAGE' ? (
-                      <img
-                        src={headerMediaPreviewUrl}
-                        alt="header"
-                        className="h-20 w-20 rounded-lg object-cover"
-                      />
-                    ) : (
-                      <video
-                        src={headerMediaPreviewUrl}
-                        className="h-20 w-32 rounded-lg object-cover"
-                        muted
-                      />
-                    )}
-                    <Button
-                      size="small"
-                      danger
-                      icon={<Trash2 size={14} />}
-                      onClick={clearMediaPreview}
-                    >
-                      {t('common.delete')}
-                    </Button>
-                  </div>
-                ) : (
-                  <Upload.Dragger
-                    showUploadList={false}
-                    accept={headerType === 'IMAGE' ? '.jpg,.jpeg,.png,.webp' : '.mp4,.mov'}
-                    beforeUpload={(file) => {
-                      // Stage the file locally, no network call yet.
-                      // Actual upload happens on Create.
-                      clearMediaPreview()
-                      setHeaderMediaFile(file)
-                      setHeaderMediaPreviewUrl(URL.createObjectURL(file))
-                      return false
-                    }}
-                    customRequest={() => {}}
-                  >
-                    <div className="flex flex-col items-center gap-2 py-2">
-                      {headerType === 'IMAGE' ? (
-                        <ImageIcon size={24} className="text-text-muted" />
-                      ) : (
-                        <VideoIcon size={24} className="text-text-muted" />
-                      )}
-                      <span className="text-sm font-medium text-text-primary">
-                        {headerType === 'IMAGE'
-                          ? t('loyalty.header_upload_image')
-                          : t('loyalty.header_upload_video')}
-                      </span>
-                    </div>
-                  </Upload.Dragger>
-                )}
-              </Form.Item>
-            )}
-
-            {/* ─── Section: Body ─── */}
-            <Divider orientation="left" plain>
-              {t('loyalty.section_body')}
-            </Divider>
-
-            <Form.Item
-              label={t('loyalty.template_body')}
-              name="body"
-              rules={[
-                { required: true, message: t('promotions.required') },
-                {
-                  validator: (_, value: string) => {
-                    const unknown = findUnknownTokens(value ?? '')
-                    if (unknown.length === 0) return Promise.resolve()
-                    return Promise.reject(
-                      new Error(
-                        t('loyalty.template_unknown_variables', {
-                          tokens: unknown.map((tok) => `[${tok}]`).join(', '),
-                        }),
-                      ),
-                    )
-                  },
-                },
-              ]}
-              extra={t('loyalty.template_body_hint')}
-            >
-              <Input.TextArea rows={5} placeholder={t('loyalty.template_body_placeholder')} />
-            </Form.Item>
-
-            <div className="mb-4 flex flex-wrap gap-1">
-              {templateVariables.map((v) => (
-                <Tooltip
-                  key={v.key}
-                  title={
-                    <div className="flex flex-col gap-1">
-                      <span>{v.description}</span>
-                      <span className="text-xs opacity-80">
-                        {t('loyalty.template_variable_example')}: {v.example}
-                      </span>
-                    </div>
-                  }
-                >
-                  <Tag
-                    bordered={false}
-                    color="processing"
-                    className="cursor-pointer"
-                    onClick={() => insertToken(v.token)}
-                  >
-                    + [{v.token}]
-                  </Tag>
-                </Tooltip>
-              ))}
-            </div>
-
-            <Form.Item
-              label={t('loyalty.footer_text')}
-              name="footerText"
-              rules={[
-                { max: MAX_FOOTER_TEXT },
-                {
-                  validator: (_, value: string | undefined) => {
-                    if (liveCategory !== 'MARKETING') return Promise.resolve()
-                    const footer = value?.trim() ?? ''
-                    if (!footer.includes('STOP')) {
-                      return Promise.reject(new Error(t('loyalty.footer_stop_required')))
-                    }
-                    return Promise.resolve()
-                  },
-                },
-              ]}
-              extra={t('loyalty.footer_text_hint')}
-            >
-              <Input
-                placeholder={t('loyalty.footer_text_placeholder')}
-                maxLength={MAX_FOOTER_TEXT}
-                showCount
-                onChange={() => setFooterTouched(true)}
-              />
-            </Form.Item>
-
-            {/* ─── Section: Buttons ─── */}
-            <Divider orientation="left" plain>
-              {t('loyalty.section_buttons')}
-            </Divider>
-
-            <div className="flex flex-col gap-2">
-              {buttons.map((btn, i) => {
-                const hasFixedLabel = isProductTemplateButton(btn.type)
-                const fixedLabel = getTemplateButtonText(btn.type)
-
-                return (
-                  <div key={i} className="flex flex-col gap-2">
-                    <Space.Compact block>
-                      <Select
-                        value={btn.type}
-                        onChange={(val: ButtonType) => updateButton(i, { type: val })}
-                        options={buttonTypeOptions}
-                        style={{ width: hasFixedLabel ? 'calc(100% - var(--height-input))' : 220 }}
-                      />
-                      {!hasFixedLabel && (
-                        <Input
-                          value={btn.text}
-                          onChange={(e) => updateButton(i, { text: e.target.value })}
-                          maxLength={MAX_BUTTON_TEXT}
-                          showCount
-                          placeholder={t('loyalty.button_text_placeholder')}
-                        />
-                      )}
-                      <Button
-                        danger
-                        icon={<Trash2 size={14} />}
-                        onClick={() => removeButton(i)}
-                        className="loyalty-template-button-delete"
-                      />
-                    </Space.Compact>
-                    {hasFixedLabel && (
-                      <div className="text-xs text-text-muted">
-                        {t('loyalty.button_fixed_label_hint', { label: fixedLabel })}
-                      </div>
-                    )}
-                    {btn.type === 'MPM' && (
-                      <Alert
-                        type="info"
-                        showIcon
-                        message={t('loyalty.button_mpm_header_required_title')}
-                        description={t('loyalty.button_mpm_header_required_desc')}
-                      />
-                    )}
-                    {btn.type === 'URL' && (
-                      <Input
-                        addonBefore={t('loyalty.button_url')}
-                        value={btn.url ?? ''}
-                        onChange={(e) => updateButton(i, { url: e.target.value })}
-                        placeholder="https://"
-                      />
-                    )}
-                    {btn.type === 'PHONE_NUMBER' && (
-                      <Input
-                        addonBefore={t('loyalty.button_phone')}
-                        value={btn.phoneNumber ?? ''}
-                        onChange={(e) => updateButton(i, { phoneNumber: e.target.value })}
-                        placeholder="+237 6XX XXX XXX"
-                      />
-                    )}
-                  </div>
-                )
-              })}
-
-              <Button
-                onClick={handleAddButton}
-                icon={<Plus size={14} />}
-                disabled={!canAddButton}
-                className="self-start"
-              >
-                {t('loyalty.add_button')}
-              </Button>
-              <div className="text-xs text-text-muted">{buttonHelpText}</div>
-              {liveCategory === 'MARKETING' && !hasProductTemplateButton && (
-                <div className="text-xs text-text-muted">{t('loyalty.product_buttons_hint')}</div>
-              )}
-            </div>
+            <LoyaltyTemplateButtonsSection
+              buttons={buttons}
+              buttonTypeOptions={buttonTypeOptions}
+              updateButton={updateButton}
+              removeButton={removeButton}
+              handleAddButton={handleAddButton}
+              canAddButton={canAddButton}
+              buttonHelpText={buttonHelpText}
+              liveCategory={liveCategory}
+              hasProductTemplateButton={hasProductTemplateButton}
+            />
           </Form>
         </div>
 
