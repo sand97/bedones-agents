@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { createFileRoute, useParams } from '@tanstack/react-router'
+import { buildShareMeta } from '@app/lib/share-meta'
 import { useTranslation } from 'react-i18next'
 import { DatePicker, Skeleton } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -63,6 +64,12 @@ function formatBucketLabel(date: string, period: Period): string {
 }
 
 export const Route = createFileRoute('/app/$orgSlug/stats')({
+  head: () =>
+    buildShareMeta({
+      title: 'Voir les statistiques',
+      description: 'Cliquez pour consulter les statistiques de ce compte',
+      image: '/og/stats.png',
+    }),
   component: StatsPage,
 })
 

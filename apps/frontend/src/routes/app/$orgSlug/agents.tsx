@@ -1,10 +1,20 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
+import { buildShareMeta } from '@app/lib/share-meta'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, Spin, Tooltip } from 'antd'
 import { SetupSuccessModal } from '@app/components/dashboard/setup-success-modal'
 import { AgentReadyModal } from '@app/components/agent/agent-ready-modal'
-import { Plus, Sparkles, Bot, Zap, MoreHorizontal, Loader2, ArrowLeft, Settings } from 'lucide-react'
+import {
+  Plus,
+  Sparkles,
+  Bot,
+  Zap,
+  MoreHorizontal,
+  Loader2,
+  ArrowLeft,
+  Settings,
+} from 'lucide-react'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
@@ -27,6 +37,12 @@ import {
 import type { AgentMessage, AgentChoiceOption } from '@app/components/agent/mock-data'
 
 export const Route = createFileRoute('/app/$orgSlug/agents')({
+  head: () =>
+    buildShareMeta({
+      title: 'Voir les agents IA',
+      description: 'Cliquez pour découvrir les agents IA de ce compte',
+      image: '/og/agents.png',
+    }),
   component: AgentsPage,
 })
 

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { buildShareMeta } from '@app/lib/share-meta'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { Table, Input, Button, Modal, message } from 'antd'
@@ -22,6 +23,12 @@ import {
 import { NotificationPreferencesModal } from '@app/components/notifications/notification-preferences-modal'
 
 export const Route = createFileRoute('/app/$orgSlug/members')({
+  head: () =>
+    buildShareMeta({
+      title: 'Voir les membres',
+      description: 'Cliquez pour voir l’équipe de cette organisation',
+      image: '/og/members.png',
+    }),
   component: MembersPage,
 })
 

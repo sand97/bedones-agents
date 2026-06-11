@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useState, useCallback, useMemo } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
+import { buildShareMeta } from '@app/lib/share-meta'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { App, Button, Progress } from 'antd'
@@ -28,6 +29,12 @@ import {
 } from '@app/lib/auth-redirect'
 
 export const Route = createFileRoute('/app/$orgSlug/comments/$id')({
+  head: () =>
+    buildShareMeta({
+      title: 'Voir les commentaires',
+      description: 'Cliquez pour voir les commentaires de ce compte',
+      image: '/og/comments.png',
+    }),
   component: CommentsPage,
   validateSearch: (search: Record<string, unknown>) => ({
     post: (search.post as string) || undefined,

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useDebouncedValue } from '@app/hooks/use-debounced-value'
 import { createFileRoute, useParams } from '@tanstack/react-router'
+import { buildShareMeta } from '@app/lib/share-meta'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Table, Input, Button, Modal, App } from 'antd'
@@ -25,6 +26,12 @@ import {
 } from '@app/lib/query-cache'
 
 export const Route = createFileRoute('/app/$orgSlug/promotions')({
+  head: () =>
+    buildShareMeta({
+      title: 'Voir les promotions',
+      description: 'Cliquez pour découvrir les promotions de ce compte',
+      image: '/og/promotions.png',
+    }),
   component: PromotionsPage,
 })
 
