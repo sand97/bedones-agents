@@ -39,10 +39,12 @@ const decisionSchema = z
       .optional()
       .describe('Summary of the request: product/studio, dates, total, useful info.'),
     priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
-    articles: z
+    articleRetailerIds: z
       .array(z.string())
       .optional()
-      .describe('Concrete product(s)/article(s) the customer chose (names as shown).'),
+      .describe(
+        'Retailer ids of the product(s) the customer chose — ONLY ids from the "Produits montrés" list. Never invent an id.',
+      ),
   })
   .describe('Single ticket decision for the conversation.')
 
@@ -117,9 +119,43 @@ export class TicketAgentService {
       select: { id: true, title: true, description: true, priority: true },
     })
 
+    // Products actually shown to the customer in this conversation. Their details
+    // (name/price/image) were hydrated and frozen into the message metadata when
+    // sent — so the ticket can attach a frozen snapshot, and the agent can only
+    // pick from products that really exist (never an invented one).
+    const productMessages = await this.prisma.directMessage.findMany({
+      where: { conversationId, mediaType: { in: ['catalog', 'catalog_message'] } },
+      orderBy: { createdTime: 'desc' },
+      take: 20,
+      select: { metadata: true },
+    })
+    const shownProducts = new Map<
+      string,
+      { name: string | null; price: number | null; currency: string | null; imageUrl: string | null }
+    >()
+    for (const dm of productMessages) {
+      const items = (dm.metadata as { items?: Array<Record<string, unknown>> } | null)?.items
+      if (!Array.isArray(items)) continue
+      for (const it of items) {
+        const rid = it.productRetailerId
+        if (typeof rid === 'string' && !shownProducts.has(rid)) {
+          shownProducts.set(rid, {
+            name: (it.name as string) ?? null,
+            price: (it.price as number) ?? null,
+            currency: (it.currency as string) ?? null,
+            imageUrl: (it.imageUrl as string) ?? null,
+          })
+        }
+      }
+    }
+
     const systemPrompt = this.prompts.buildTicketAgentPrompt({
       agentContext: conversation.socialAccount.agentLink?.agent?.context || '',
       existingTickets,
+      availableProducts: [...shownProducts.entries()].map(([retailerId, p]) => ({
+        retailerId,
+        name: p.name,
+      })),
     })
 
     const model = this.llmFactory.createStructuredChatModel('thinking', decisionSchema)
@@ -146,8 +182,20 @@ export class TicketAgentService {
       return
     }
 
-    const metadata =
-      decision.articles && decision.articles.length > 0 ? { articles: decision.articles } : undefined
+    // Freeze the chosen products as a snapshot (only ids that were really shown).
+    const chosenIds = (decision.articleRetailerIds ?? []).filter((id) => shownProducts.has(id))
+    const articles = chosenIds.map((rid) => {
+      const p = shownProducts.get(rid)!
+      return {
+        id: rid,
+        name: p.name ?? rid,
+        price: p.price ?? 0,
+        currency: p.currency ?? 'XAF',
+        quantity: 1,
+        imageUrl: p.imageUrl ?? undefined,
+      }
+    })
+    const metadata = articles.length > 0 ? { articles } : undefined
     const priority = decision.priority ?? 'MEDIUM'
 
     // Update path — only when the target ticket really belongs to this conversation.

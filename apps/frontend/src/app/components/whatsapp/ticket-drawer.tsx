@@ -10,7 +10,9 @@ import { ArticleListItem } from '@app/components/catalog/article-list-item'
 /** Metadata shape stored in the ticket */
 interface TicketMetadata {
   // The manual ticket modal stores rich article objects; the async ticket agent
-  // stores plain article names (string[]). Both are supported.
+  // stores chosen article names separately (articleNames) so it never breaks the
+  // modal's rich-object rendering. Both are supported here.
+  articleNames?: string[]
   articles?: Array<
     | string
     | {
@@ -267,11 +269,15 @@ export function TicketDrawer({
   // Extract items from metadata or from ticket.items (mock)
   const meta = (ticket.metadata ?? {}) as TicketMetadata
   const rawArticles = meta.articles ?? []
-  const namedArticles = rawArticles.filter((a): a is string => typeof a === 'string')
   const objectArticles = rawArticles.filter(
     (a): a is Exclude<(typeof rawArticles)[number], string> =>
       typeof a === 'object' && a !== null,
   )
+  // Agent-provided names, plus any legacy string entries stored under `articles`.
+  const namedArticles = [
+    ...(meta.articleNames ?? []),
+    ...rawArticles.filter((a): a is string => typeof a === 'string'),
+  ]
   const items: TicketItem[] =
     ticket.items && ticket.items.length > 0
       ? ticket.items
