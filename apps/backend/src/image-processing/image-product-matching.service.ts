@@ -221,18 +221,22 @@ export class ImageProductMatchingService {
 
     if (data.matchedProducts.length > 0) {
       const primary = data.matchedProducts[0]
-      const productsLine = data.matchedProducts.map((p) => `${p.name} (${p.id})`).join(' | ')
+      // The id handed to send_products MUST be the merchant retailer_id — WhatsApp
+      // rejects the internal Qdrant product_id ("product not found for
+      // product_retailer_id …"). Fall back to the product_id only when no
+      // retailer_id is indexed (mirrors catalog.tools send-id resolution).
+      const sendId = (p: MatchedProduct) => p.retailer_id || p.id
+      const productsLine = data.matchedProducts.map((p) => `${p.name} (${sendId(p)})`).join(' | ')
 
       return [
         '[IMAGE_CONTEXT]',
         `search_method=${data.searchMethod}`,
         `products_found=${data.matchedProducts.length}`,
         `products=${productsLine}`,
-        `primary_product_id=${primary.id}`,
+        `primary_retailer_id=${sendId(primary)}`,
         `primary_product_name=${primary.name}`,
-        `retailer_id=${primary.retailer_id || 'N/A'}`,
         `confidence=${confidencePercent}`,
-        'instruction=Confirme avec le contact si ce produit correspond bien a son image.',
+        'instruction=Confirme avec le contact si ce produit correspond bien a son image. Pour envoyer la fiche produit, appelle send_products avec ce(s) retailer_id entre parentheses, jamais le product_id interne.',
       ].join('\n')
     }
 
