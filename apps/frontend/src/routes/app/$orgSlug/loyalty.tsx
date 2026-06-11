@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
+import { buildShareMeta } from '@app/lib/share-meta'
 import { useTranslation } from 'react-i18next'
 import { Segmented } from 'antd'
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
@@ -25,6 +26,12 @@ const VALID_TABS = ['contacts', 'bonus', 'campaigns'] as const
 type LoyaltyTab = (typeof VALID_TABS)[number]
 
 export const Route = createFileRoute('/app/$orgSlug/loyalty')({
+  head: () =>
+    buildShareMeta({
+      title: 'Voir le programme de fidélité',
+      description: 'Cliquez pour découvrir le programme de fidélité de ce compte',
+      image: '/og/loyalty.png',
+    }),
   component: LoyaltyPage,
   validateSearch: (search: Record<string, unknown>) => ({
     tab: VALID_TABS.includes(search.tab as LoyaltyTab) ? (search.tab as LoyaltyTab) : undefined,

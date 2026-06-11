@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
+import { buildShareMeta } from '@app/lib/share-meta'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Table, Input, Button, Skeleton, Dropdown, Modal, App } from 'antd'
@@ -53,6 +54,12 @@ import { useDebouncedValue } from '@app/hooks/use-debounced-value'
 const CATALOG_SELECTION_SCOPE = 'catalog-current'
 
 export const Route = createFileRoute('/app/$orgSlug/catalog')({
+  head: () =>
+    buildShareMeta({
+      title: 'Voir le catalogue',
+      description: 'Cliquez pour voir les produits de ce catalogue',
+      image: '/og/catalog.png',
+    }),
   component: CatalogPage,
   validateSearch: (search: Record<string, unknown>) => ({
     catalogId: (search.catalogId as string) || undefined,

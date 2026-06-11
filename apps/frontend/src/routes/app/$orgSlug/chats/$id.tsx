@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
+import { buildShareMeta } from '@app/lib/share-meta'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { usePersistedQuery } from '@app/lib/use-persisted-query'
@@ -51,6 +52,12 @@ import { readCatalogMigrationDraft } from '@app/lib/catalog-migration-draft'
 import type { Conversation, Message } from '@app/components/whatsapp/mock-data'
 
 export const Route = createFileRoute('/app/$orgSlug/chats/$id')({
+  head: () =>
+    buildShareMeta({
+      title: 'Voir la messagerie',
+      description: 'Cliquez pour ouvrir les conversations de ce compte',
+      image: '/og/messaging.png',
+    }),
   component: ChatsPage,
   validateSearch: (search: Record<string, unknown>) => ({
     account: (search.account as string) || undefined,

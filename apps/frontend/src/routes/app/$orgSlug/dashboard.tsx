@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
+import { buildShareMeta } from '@app/lib/share-meta'
 import { Skeleton, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -17,6 +18,12 @@ type PendingComment = components['schemas']['PendingCommentsStepDto']
 type PendingAgent = components['schemas']['PendingAgentStepDto']
 
 export const Route = createFileRoute('/app/$orgSlug/dashboard')({
+  head: () =>
+    buildShareMeta({
+      title: 'Voir le tableau de bord',
+      description: 'Cliquez pour voir l’activité de ce compte',
+      image: '/og/dashboard.png',
+    }),
   component: DashboardPage,
 })
 

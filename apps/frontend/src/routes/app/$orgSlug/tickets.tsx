@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useDebouncedValue } from '@app/hooks/use-debounced-value'
 import { createFileRoute, useParams } from '@tanstack/react-router'
+import { buildShareMeta } from '@app/lib/share-meta'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Table, Input, DatePicker, Button, Modal, App } from 'antd'
 import dayjs from 'dayjs'
@@ -42,6 +43,12 @@ import {
 dayjs.locale('fr')
 
 export const Route = createFileRoute('/app/$orgSlug/tickets')({
+  head: () =>
+    buildShareMeta({
+      title: 'Voir les tickets',
+      description: 'Cliquez pour suivre les tickets et commandes de ce compte',
+      image: '/og/tickets.png',
+    }),
   component: TicketsPage,
 })
 
