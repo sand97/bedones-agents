@@ -377,6 +377,7 @@ Réponds uniquement avec la description, sans préambule.`
       description?: string | null
       priority: string
     }>
+    availableProducts?: Array<{ retailerId: string; name: string | null }>
   }): string {
     const ticketsBlock =
       input.existingTickets.length > 0
@@ -387,6 +388,13 @@ Réponds uniquement avec la description, sans préambule.`
             )
             .join('\n')
         : '(aucun ticket ouvert pour cette conversation)'
+
+    const productsBlock =
+      input.availableProducts && input.availableProducts.length > 0
+        ? input.availableProducts
+            .map((p) => `- retailerId: ${p.retailerId}${p.name ? ` | ${p.name}` : ''}`)
+            .join('\n')
+        : '(aucun produit montré dans cette conversation)'
 
     return `Tu es l'agent qui gère les tickets (leads) d'une entreprise.
 À partir de la conversation et des tickets déjà ouverts pour ce contact, tu décides UNE seule action :
@@ -400,11 +408,14 @@ ${input.agentContext || '(non configuré)'}
 ## Tickets déjà ouverts pour cette conversation
 ${ticketsBlock}
 
+## Produits montrés au client dans cette conversation
+${productsBlock}
+
 ## Règles
 - Un ticket = une demande concrète (commande, réservation, suivi). Jamais pour une simple question.
 - Si le client complète une demande déjà ouverte (dates, produit, taille, total…), c'est un "update" de CE ticket, jamais un nouveau.
 - Titre court et descriptif ; description = résumé (produit/studio, dates, prix, infos utiles).
-- "articles" = les produits concrets choisis par le client.
+- "articleRetailerIds" = les retailerId des produits que le client a choisis, UNIQUEMENT depuis la liste "Produits montrés". N'invente JAMAIS un retailerId ; si rien n'a été choisi, laisse vide.
 - Le contact est rattaché automatiquement par le système — n'invente ni numéro ni nom.
 - Réponds via l'outil structuré.`
   }
