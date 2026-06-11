@@ -9,6 +9,7 @@ import { EventsGateway } from '../gateway/events.gateway'
 import { MessagingService } from '../social/messaging.service'
 import { CatalogSearchService } from '../image-processing/catalog-search.service'
 import { ImageProductMatchingService } from '../image-processing/image-product-matching.service'
+import { ReferralProductMatchingService } from '../image-processing/referral-product-matching.service'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import type { IncomingMessageEvent } from '../social/webhook.service'
 import { CreditService } from '../stats/credit.service'
@@ -29,6 +30,7 @@ export class AgentMessageProcessorService {
     private readonly messagingService: MessagingService,
     private readonly catalogSearchService: CatalogSearchService,
     private readonly imageProductMatchingService: ImageProductMatchingService,
+    private readonly referralProductMatchingService: ReferralProductMatchingService,
     private readonly prompts: AgentPromptsService,
     private readonly creditService: CreditService,
     private readonly llmFactory: LlmFactoryService,
@@ -260,6 +262,10 @@ export class AgentMessageProcessorService {
       select: { category: true, content: true },
     })
 
+    // Message opened from a social post: resolve the product it was about so the agent
+    // can answer "more info on this?" without re-asking. Best-effort — never blocks a reply.
+    const postOrigin = await this.buildPostOrigin(event, agent.organisationId)
+
     const systemPrompt = this.prompts.buildLiveAgentSystemPrompt({
       agentContext: agent.context || '',
       labels,
@@ -267,6 +273,7 @@ export class AgentMessageProcessorService {
       canSendProducts,
       canSendButtons,
       contactNotes,
+      postOrigin,
     })
 
     // Build conversation history for context
@@ -345,6 +352,52 @@ export class AgentMessageProcessorService {
     // tool-callable model here (not the fallback/traced Runnable from
     // createChatModel). PostHog tracing is attached at invoke time via callbacks.
     return this.llmFactory.createToolCallingModel('flash')
+  }
+
+  /**
+   * Resolve the catalog product a social-post referral points to, shaped for the
+   * system prompt's `postOrigin`. Returns undefined when the message has no referral;
+   * returns the post text with a null product when nothing could be resolved.
+   */
+  private async buildPostOrigin(
+    event: IncomingMessageEvent,
+    organisationId: string,
+  ): Promise<
+    | {
+        headline: string | null
+        body: string | null
+        product: {
+          name: string
+          price?: number
+          currency?: string
+          source: 'post-link' | 'semantic'
+        } | null
+      }
+    | undefined
+  > {
+    const referral = event.referral
+    if (!referral) return undefined
+
+    const match = await this.referralProductMatchingService
+      .resolveFromReferral({
+        organisationId,
+        sourceId: referral.sourceId,
+        body: referral.body,
+      })
+      .catch((error: unknown) => {
+        this.logger.warn(
+          `Referral product resolution failed: ${error instanceof Error ? error.message : error}`,
+        )
+        return null
+      })
+
+    return {
+      headline: referral.headline,
+      body: referral.body,
+      product: match
+        ? { name: match.name, price: match.price, currency: match.currency, source: match.source }
+        : null,
+    }
   }
 
   private async downloadMedia(url: string): Promise<Buffer> {

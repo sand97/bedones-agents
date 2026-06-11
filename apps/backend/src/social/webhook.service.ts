@@ -12,6 +12,21 @@ import { EventsGateway } from '../gateway/events.gateway'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
 import { SocialHealthService } from './social-health.service'
 
+/**
+ * Provenance captured when a WhatsApp customer messages us straight from an organic
+ * social post (referral `source_type === 'post'`). Carried on the incoming-message
+ * event so the agent can answer about the product the post was about.
+ */
+export interface PostReferralContext {
+  sourceType: 'post'
+  sourceId: string | null
+  sourceUrl: string | null
+  headline: string | null
+  body: string | null
+  imageUrl: string | null
+  mediaType: string | null
+}
+
 export interface IncomingMessageEvent {
   conversationId: string
   socialAccountId: string
@@ -24,6 +39,8 @@ export interface IncomingMessageEvent {
     senderId: string
     senderName: string
   }
+  /** Set when the conversation was opened from a social post (WhatsApp only, best-effort). */
+  referral?: PostReferralContext | null
 }
 
 /**
@@ -570,6 +587,25 @@ export class WebhookService {
     }
   }
 
+  /**
+   * Persist organic-post referral provenance on the conversation. Unlike ad referrals
+   * this deliberately does NOT set `fromAd`: a post is not an ad, so it must not change
+   * agent activation — it only enriches the agent's context for that message.
+   */
+  private async attachPostReferral(
+    conversationId: string,
+    referral: Prisma.InputJsonValue,
+  ): Promise<void> {
+    try {
+      await this.prisma.conversation.update({
+        where: { id: conversationId },
+        data: { adReferral: referral },
+      })
+    } catch (error) {
+      this.logger.warn(`Failed to attach post referral to conversation ${conversationId}`, error)
+    }
+  }
+
   /** Meta (Messenger / Instagram) ad referral — from message, top-level, or postback. */
   private extractMetaAdReferral(messaging: MessagingEvent): Prisma.InputJsonValue | null {
     const ref = messaging.message?.referral ?? messaging.referral ?? messaging.postback?.referral
@@ -600,6 +636,26 @@ export class WebhookService {
       ctwaClid: ref.ctwa_clid ?? null,
       headline: ref.headline ?? null,
       body: ref.body ?? null,
+    }
+  }
+
+  /**
+   * WhatsApp organic-post referral (`source_type === 'post'`): the customer tapped
+   * "Send message" on one of our Facebook/Instagram posts. Distinct from CTWA ads —
+   * see {@link extractWhatsAppAdReferral} — and used to tell the agent which product
+   * the post was about, without changing activation.
+   */
+  private extractWhatsAppPostReferral(msg: WhatsAppMessage): PostReferralContext | null {
+    const ref = msg.referral
+    if (!ref || ref.source_type !== 'post') return null
+    return {
+      sourceType: 'post',
+      sourceId: ref.source_id ?? null,
+      sourceUrl: ref.source_url ?? null,
+      headline: ref.headline ?? null,
+      body: ref.body ?? null,
+      imageUrl: ref.image_url ?? null,
+      mediaType: ref.media_type ?? null,
     }
   }
 
@@ -1328,6 +1384,17 @@ export class WebhookService {
 
     await this.markConversationFromAd(conversation.id, this.extractWhatsAppAdReferral(msg))
 
+    // Organic post referral: the customer wrote from one of our posts. Persist the
+    // provenance (without touching `fromAd`/activation) and forward it so the agent
+    // can resolve and answer about the product the post was about.
+    const postReferral = this.extractWhatsAppPostReferral(msg)
+    if (postReferral) {
+      await this.attachPostReferral(
+        conversation.id,
+        postReferral as unknown as Prisma.InputJsonValue,
+      )
+    }
+
     await this.markOutboundMessagesAsRead(conversation.id, orgId, timestamp)
 
     this.logger.log(
@@ -1346,6 +1413,7 @@ export class WebhookService {
       provider: 'WHATSAPP',
       orgId,
       message: { text: messageText, mediaUrl, mediaType, senderId, senderName },
+      referral: postReferral,
     } satisfies IncomingMessageEvent)
   }
 
@@ -3830,7 +3898,8 @@ interface WhatsAppMessage {
   button?: { payload?: string; text?: string }
   reaction?: { message_id: string; emoji: string }
   context?: { id?: string; from?: string }
-  // Present only on Click-to-WhatsApp (CTWA) ad messages.
+  // Present when the message originates from an ad (Click-to-WhatsApp) or an organic
+  // post the customer tapped to message us from.
   referral?: {
     source_type?: string // e.g. 'ad', 'post'
     source_id?: string // ad / post id
@@ -3838,6 +3907,8 @@ interface WhatsAppMessage {
     ctwa_clid?: string // Click-to-WhatsApp click id
     headline?: string
     body?: string
+    media_type?: string // e.g. 'image', 'video'
+    image_url?: string
   }
 }
 
