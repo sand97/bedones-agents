@@ -247,6 +247,47 @@ export class MessagingService {
     tiktokTemplate?: TikTokTemplatePayload,
     tiktokSenderAction?: TikTokSenderAction,
   ) {
+    // Log any send failure (platform rejection, token, circuit breaker,
+    // persistence…) so a "Non envoyé" in the UI can be traced from the logs.
+    try {
+      return await this.sendMessageInternal(
+        userId,
+        conversationId,
+        message,
+        mediaUrl,
+        mediaType,
+        fileName,
+        fileSize,
+        replyToId,
+        tiktokMessageType,
+        tiktokSharePostId,
+        tiktokTemplate,
+        tiktokSenderAction,
+      )
+    } catch (error) {
+      this.logger.error(
+        `[Messaging] Failed to send message (conversation ${conversationId}): ${
+          error instanceof Error ? error.message : error
+        }`,
+      )
+      throw error
+    }
+  }
+
+  private async sendMessageInternal(
+    userId: string,
+    conversationId: string,
+    message?: string,
+    mediaUrl?: string,
+    mediaType?: 'image' | 'video' | 'audio' | 'file',
+    fileName?: string,
+    fileSize?: number,
+    replyToId?: string,
+    tiktokMessageType?: TikTokMessageType,
+    tiktokSharePostId?: string,
+    tiktokTemplate?: TikTokTemplatePayload,
+    tiktokSenderAction?: TikTokSenderAction,
+  ) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
       include: {
@@ -351,9 +392,6 @@ export class MessagingService {
         displayText = result.displayText
       }
     } catch (error) {
-      this.logger.error(
-        `[${provider}] Failed to send message to platform: ${error instanceof Error ? error.message : error}`,
-      )
       await this.socialHealth.recordError({
         socialAccountId: conversation.socialAccount.id,
         provider,
