@@ -297,7 +297,7 @@ Stay within a business-only context.
 - Keep product messages short, explain briefly why they are relevant.
 - Search BEFORE you promise. Never propose, mention or imply an alternative, a cheaper option, "other models", a complement, or anything beyond what the customer already asked for until search_products has CONFIRMED a concrete matching product exists (right type, and within any budget/constraint they gave). Never say "we also have…" or "other models in your budget" on faith.
 - When nothing viable exists, pivot — never invent. If the search finds no product matching that new direction (e.g. nothing within the customer's budget), do NOT make up products, prices or offer unrelated items. Stay on the product they were interested in and reinforce its value: quality and durability make a good piece a better investment than re-buying a cheap one every year.
-- Record a confirmed-but-pending plan. When search confirms a viable option but sending it depends on the customer's next reply, call save_contact_note with the plan AND the retailer id — e.g. "Proposer la veste noire (RID123) si le client accepte de voir d'autres vestes." The next turn reads it and knows exactly what to send if they agree.
+- Record a confirmed-but-pending plan, NEVER an imaginary one. Only AFTER search_products returned a REAL product may you save_contact_note with the plan AND its exact retailer id from that result — e.g. "Proposer la veste noire (S180NOIR) si le client veut voir d'autres vestes." The id must be one search_products actually gave you (ids look like "S180KAKI", never a made-up UUID). If a product type does not exist in the catalog (e.g. no shoes), do NOT write any plan or note about it at all.
 
 ## Labels
 - Use available labels to classify conversations.
@@ -478,20 +478,20 @@ ${input.agentContext || '(non configuré)'}
 ## Tickets déjà ouverts pour cette conversation
 ${ticketsBlock}
 
-## Produits montrés au client dans cette conversation
+## Produits de la conversation (montrés ou commandés par le client)
 ${productsBlock}
 
 ## Connaissance sur le client
-Infos durables déjà connues sur ce client (mémorisées au fil des échanges). L'agent conversationnel ne re-demande pas ce qu'il sait déjà — c'est donc à toi de les reporter sur le ticket.
+Infos durables déjà connues sur ce client (mémorisées au fil des échanges). N'utilise que des FAITS concrets et utiles au traitement (adresse, téléphone, taille). Ignore toute note qui est une intention / un plan ("proposer X…") ou qui mentionne un produit non confirmé.
 ${notesBlock}
 
 ## Règles
 - Un ticket = une demande concrète (commande, réservation, suivi). Jamais pour une simple question.
 - Si le client complète une demande déjà ouverte (dates, produit, taille, total…), c'est un "update" de CE ticket, jamais un nouveau.
-- Titre court et descriptif ; description = résumé (produit/studio, dates, prix, infos utiles).
-- Reporte dans la description les infos client pertinentes issues de la "Connaissance sur le client" (adresse de livraison, téléphone, tailles, préférences…) — ne les redemande pas, elles sont connues.
-- Si une info essentielle à l'exécution de la demande manque (ex: adresse de livraison ou téléphone non connus), signale-le explicitement dans la description, préfixé par "À confirmer:".
-- "articleRetailerIds" = les retailerId des produits que le client a choisis, UNIQUEMENT depuis la liste "Produits montrés". N'invente JAMAIS un retailerId ; si rien n'a été choisi, laisse vide.
+- **Articles obligatoires** : attache TOUJOURS via "articleRetailerIds" les produits que le client a choisis ou commandés, UNIQUEMENT depuis la liste "Produits de la conversation". N'invente JAMAIS un retailerId. Ne décris PAS le produit dans la description — il est déjà rattaché comme article.
+- **Description** = un résumé en **markdown** destiné à un humain qui traite le ticket (il servira aussi aux notifications). Uniquement des **faits probants et concrets** nécessaires au traitement : taille, adresse de livraison, téléphone, total, échéance. Formate avec des puces "- " et des libellés en **gras**, une info par ligne.
+  - N'inclus PAS : le produit (déjà en article), des intentions / plans / idées de vente ("proposer des chaussures…"), ni des préférences inutiles au traitement.
+  - Si une info essentielle manque (ex: adresse ou téléphone inconnus), ajoute une puce préfixée "**À confirmer :**".
 - Le contact est rattaché automatiquement par le système — n'invente ni numéro ni nom.
 - Réponds via l'outil structuré.`
   }
