@@ -25,6 +25,24 @@ export class CreatePromotionDto {
   @ApiPropertyOptional()
   endDate?: string
 
+  @ApiPropertyOptional({ description: 'Minimum order amount (FCFA) to be eligible' })
+  minOrderAmount?: number
+
+  @ApiPropertyOptional({ description: 'Minimum number of articles in the order to be eligible' })
+  minItemCount?: number
+
+  @ApiPropertyOptional({ enum: ['PRODUCTS', 'CREDIT', 'PERCENT'] })
+  rewardType?: string
+
+  @ApiPropertyOptional()
+  rewardCredit?: number
+
+  @ApiPropertyOptional()
+  rewardPercent?: number
+
+  @ApiPropertyOptional({ type: [String] })
+  rewardProductIds?: string[]
+
   @ApiPropertyOptional({ type: [String] })
   productIds?: string[]
 
@@ -56,6 +74,24 @@ export class UpdatePromotionDto {
 
   @ApiPropertyOptional({ enum: ['DRAFT', 'ACTIVE', 'PAUSED', 'EXPIRED'] })
   status?: string
+
+  @ApiPropertyOptional({ description: 'Minimum order amount (FCFA) to be eligible' })
+  minOrderAmount?: number
+
+  @ApiPropertyOptional({ description: 'Minimum number of articles in the order to be eligible' })
+  minItemCount?: number
+
+  @ApiPropertyOptional({ enum: ['PRODUCTS', 'CREDIT', 'PERCENT'] })
+  rewardType?: string
+
+  @ApiPropertyOptional()
+  rewardCredit?: number
+
+  @ApiPropertyOptional()
+  rewardPercent?: number
+
+  @ApiPropertyOptional({ type: [String] })
+  rewardProductIds?: string[]
 
   @ApiPropertyOptional({ type: [String] })
   productIds?: string[]

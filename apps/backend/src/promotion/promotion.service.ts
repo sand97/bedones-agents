@@ -39,6 +39,20 @@ export class PromotionService {
               },
             },
           },
+          rewardProducts: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  providerProductId: true,
+                  name: true,
+                  imageUrl: true,
+                  price: true,
+                  currency: true,
+                },
+              },
+            },
+          },
           _count: { select: { products: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -56,6 +70,20 @@ export class PromotionService {
       where: { id },
       include: {
         products: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                providerProductId: true,
+                name: true,
+                imageUrl: true,
+                price: true,
+                currency: true,
+              },
+            },
+          },
+        },
+        rewardProducts: {
           include: {
             product: {
               select: {
@@ -92,6 +120,28 @@ export class PromotionService {
     return products.map((p) => p.id)
   }
 
+  /**
+   * Keep the legacy discountType/discountValue pair in sync with the richer
+   * reward model so existing consumers (agent tools, list/table rendering)
+   * keep working. Returns null when no rewardType is provided (legacy path).
+   */
+  private discountFromReward(data: {
+    rewardType?: string
+    rewardCredit?: number
+    rewardPercent?: number
+  }): { discountType: 'PERCENTAGE' | 'FIXED_AMOUNT'; discountValue: number } | null {
+    switch (data.rewardType) {
+      case 'PERCENT':
+        return { discountType: 'PERCENTAGE', discountValue: data.rewardPercent ?? 0 }
+      case 'CREDIT':
+        return { discountType: 'FIXED_AMOUNT', discountValue: data.rewardCredit ?? 0 }
+      case 'PRODUCTS':
+        return { discountType: 'FIXED_AMOUNT', discountValue: 0 }
+      default:
+        return null
+    }
+  }
+
   async create(data: {
     organisationId: string
     name: string
@@ -101,36 +151,51 @@ export class PromotionService {
     code?: string
     startDate?: string
     endDate?: string
+    minOrderAmount?: number
+    minItemCount?: number
+    rewardType?: string
+    rewardCredit?: number
+    rewardPercent?: number
+    rewardProductIds?: string[]
     productIds?: string[]
     stackable?: boolean
   }) {
     const resolvedIds = data.productIds?.length ? await this.resolveProductIds(data.productIds) : []
+    const rewardIds = data.rewardProductIds?.length
+      ? await this.resolveProductIds(data.rewardProductIds)
+      : []
+
+    const derived = this.discountFromReward(data)
 
     const promotion = await this.prisma.promotion.create({
       data: {
         organisationId: data.organisationId,
         name: data.name,
         description: data.description,
-        discountType: (data.discountType as 'PERCENTAGE' | 'FIXED_AMOUNT') || 'PERCENTAGE',
-        discountValue: data.discountValue || 0,
+        discountType:
+          derived?.discountType ??
+          (data.discountType as 'PERCENTAGE' | 'FIXED_AMOUNT') ??
+          'PERCENTAGE',
+        discountValue: derived?.discountValue ?? data.discountValue ?? 0,
         code: data.code,
         startDate: data.startDate ? new Date(data.startDate) : null,
         endDate: data.endDate ? new Date(data.endDate) : null,
+        minOrderAmount: data.minOrderAmount ?? null,
+        minItemCount: data.minItemCount ?? null,
+        rewardType: (data.rewardType as 'PRODUCTS' | 'CREDIT' | 'PERCENT' | undefined) ?? null,
+        rewardCredit: data.rewardCredit ?? null,
+        rewardPercent: data.rewardPercent ?? null,
         stackable: data.stackable ?? false,
         products: resolvedIds.length
-          ? {
-              create: resolvedIds.map((productId) => ({ productId })),
-            }
+          ? { create: resolvedIds.map((productId) => ({ productId })) }
           : undefined,
-      },
-      include: {
-        products: {
-          include: { product: { select: { id: true, name: true } } },
-        },
+        rewardProducts: rewardIds.length
+          ? { create: rewardIds.map((productId) => ({ productId })) }
+          : undefined,
       },
     })
 
-    return promotion
+    return this.findById(promotion.id)
   }
 
   async update(
@@ -144,27 +209,41 @@ export class PromotionService {
       startDate?: string
       endDate?: string
       status?: string
+      minOrderAmount?: number | null
+      minItemCount?: number | null
+      rewardType?: string
+      rewardCredit?: number | null
+      rewardPercent?: number | null
+      rewardProductIds?: string[]
       productIds?: string[]
       stackable?: boolean
     },
   ) {
+    const derived = this.discountFromReward(data as { rewardType?: string })
+
     // Update promotion data
     await this.prisma.promotion.update({
       where: { id },
       data: {
         name: data.name,
         description: data.description,
-        discountType: data.discountType as 'PERCENTAGE' | 'FIXED_AMOUNT' | undefined,
-        discountValue: data.discountValue,
+        discountType:
+          derived?.discountType ?? (data.discountType as 'PERCENTAGE' | 'FIXED_AMOUNT' | undefined),
+        discountValue: derived?.discountValue ?? data.discountValue,
         code: data.code,
         startDate: data.startDate ? new Date(data.startDate) : undefined,
         endDate: data.endDate ? new Date(data.endDate) : undefined,
         status: data.status as 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'EXPIRED' | undefined,
+        minOrderAmount: data.minOrderAmount,
+        minItemCount: data.minItemCount,
+        rewardType: data.rewardType as 'PRODUCTS' | 'CREDIT' | 'PERCENT' | undefined,
+        rewardCredit: data.rewardCredit,
+        rewardPercent: data.rewardPercent,
         stackable: data.stackable,
       },
     })
 
-    // Update product links if provided
+    // Update eligible product links if provided
     if (data.productIds !== undefined) {
       await this.prisma.promotionProduct.deleteMany({ where: { promotionId: id } })
       if (data.productIds.length > 0) {
@@ -172,6 +251,19 @@ export class PromotionService {
         if (resolvedIds.length > 0) {
           await this.prisma.promotionProduct.createMany({
             data: resolvedIds.map((productId) => ({ promotionId: id, productId })),
+          })
+        }
+      }
+    }
+
+    // Update reward product links if provided
+    if (data.rewardProductIds !== undefined) {
+      await this.prisma.promotionRewardProduct.deleteMany({ where: { promotionId: id } })
+      if (data.rewardProductIds.length > 0) {
+        const rewardIds = await this.resolveProductIds(data.rewardProductIds)
+        if (rewardIds.length > 0) {
+          await this.prisma.promotionRewardProduct.createMany({
+            data: rewardIds.map((productId) => ({ promotionId: id, productId })),
           })
         }
       }

@@ -649,9 +649,24 @@ export interface PromotionItem {
   endDate?: string
   status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'EXPIRED'
   stackable: boolean
+  minOrderAmount?: number | null
+  minItemCount?: number | null
+  rewardType?: 'PRODUCTS' | 'CREDIT' | 'PERCENT' | null
+  rewardCredit?: number | null
+  rewardPercent?: number | null
   createdAt: string
   updatedAt: string
   products: Array<{
+    product: {
+      id: string
+      providerProductId?: string
+      name: string
+      imageUrl?: string
+      price?: number
+      currency?: string
+    }
+  }>
+  rewardProducts?: Array<{
     product: {
       id: string
       providerProductId?: string
@@ -693,6 +708,12 @@ export const promotionApi = {
     code?: string
     startDate?: string
     endDate?: string
+    minOrderAmount?: number | null
+    minItemCount?: number | null
+    rewardType?: string
+    rewardCredit?: number | null
+    rewardPercent?: number | null
+    rewardProductIds?: string[]
     productIds?: string[]
     stackable?: boolean
   }) => fetchJson<PromotionItem>('/promotion', { method: 'POST', body: JSON.stringify(data) }),
@@ -708,6 +729,12 @@ export const promotionApi = {
       startDate?: string
       endDate?: string
       status?: string
+      minOrderAmount?: number | null
+      minItemCount?: number | null
+      rewardType?: string
+      rewardCredit?: number | null
+      rewardPercent?: number | null
+      rewardProductIds?: string[]
       productIds?: string[]
       stackable?: boolean
     },

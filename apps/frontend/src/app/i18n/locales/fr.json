@@ -874,7 +874,22 @@
     "status_paused": "En pause",
     "status_expired": "Expirée",
     "created": "Promotion créée avec succès",
-    "updated": "Promotion mise à jour avec succès"
+    "updated": "Promotion mise à jour avec succès",
+    "eligibility_conditions": "Conditions d'éligibilité",
+    "eligibility_conditions_hint": "Activez le montant minimum de commande et/ou le nombre minimum d'articles requis pour bénéficier de la promotion.",
+    "min_order_amount": "Montant minimum de commande",
+    "min_item_count": "Nombre minimum d'articles",
+    "start_date_required": "La date de début est requise",
+    "reward_type": "Type de récompense",
+    "reward_products": "Produits offerts",
+    "reward_credit": "Crédit (FCFA)",
+    "reward_percent": "Pourcentage (%)",
+    "reward_credit_value": "Montant offert",
+    "reward_percent_value": "Pourcentage de réduction",
+    "no_reward_products": "Aucun produit offert",
+    "reward_products_hint": "Sélectionnez les produits offerts au client lorsqu'il bénéficie de la promotion.",
+    "reward_products_count_one": "{{count}} produit offert",
+    "reward_products_count_other": "{{count}} produits offerts"
   },
   "agent": {
     "title": "Mon Agent",

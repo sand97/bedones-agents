@@ -874,7 +874,22 @@
     "status_paused": "Paused",
     "status_expired": "Expired",
     "created": "Promotion created successfully",
-    "updated": "Promotion updated successfully"
+    "updated": "Promotion updated successfully",
+    "eligibility_conditions": "Eligibility conditions",
+    "eligibility_conditions_hint": "Enable a minimum order amount and/or a minimum number of articles required to qualify for the promotion.",
+    "min_order_amount": "Minimum order amount",
+    "min_item_count": "Minimum number of articles",
+    "start_date_required": "Start date is required",
+    "reward_type": "Reward type",
+    "reward_products": "Free products",
+    "reward_credit": "Credit (FCFA)",
+    "reward_percent": "Percentage (%)",
+    "reward_credit_value": "Credit amount",
+    "reward_percent_value": "Discount percentage",
+    "no_reward_products": "No free products",
+    "reward_products_hint": "Select the products offered to the customer when the promotion applies.",
+    "reward_products_count_one": "{{count}} free product",
+    "reward_products_count_other": "{{count}} free products"
   },
   "agent": {
     "title": "My Agent",

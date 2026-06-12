@@ -125,6 +125,14 @@ enum PromotionDiscountType {
   FIXED_AMOUNT
 }
 
+// Reward granted by a promotion. Mirrors LoyaltyRewardType so promotions can
+// reward free products / store credit / a percentage, like loyalty bonuses.
+enum PromotionRewardType {
+  PRODUCTS
+  CREDIT
+  PERCENT
+}
+
 enum CreditMediaType {
   TEXT
   AUDIO
@@ -450,9 +458,10 @@ model Product {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  promotionProducts   PromotionProduct[]
-  loyaltyTriggerLinks LoyaltyBonusTriggerProduct[]
-  loyaltyRewardLinks  LoyaltyBonusRewardProduct[]
+  promotionProducts       PromotionProduct[]
+  promotionRewardProducts PromotionRewardProduct[]
+  loyaltyTriggerLinks     LoyaltyBonusTriggerProduct[]
+  loyaltyRewardLinks      LoyaltyBonusRewardProduct[]
 
   @@unique([catalogId, providerProductId])
   @@index([catalogId])
@@ -633,16 +642,42 @@ model Promotion {
   endDate        DateTime?
   status         PromotionStatus       @default(DRAFT)
   stackable      Boolean               @default(false)
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
 
-  products PromotionProduct[]
+  // Eligibility thresholds (stackable). The promo applies only when the order
+  // meets every threshold that is set. Null = the threshold is not enforced.
+  minOrderAmount Float? // minimum order amount (FCFA) to be eligible
+  minItemCount   Int? // minimum number of articles in the order to be eligible
+
+  // Reward (mirrors LoyaltyBonus). When rewardType is null the legacy
+  // discountType/discountValue pair still describes the reduction.
+  rewardType    PromotionRewardType?
+  rewardCredit  Float?
+  rewardPercent Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products       PromotionProduct[]
+  rewardProducts PromotionRewardProduct[]
 
   @@index([organisationId])
   @@index([status])
 }
 
 model PromotionProduct {
+  id          String    @id @default(uuid())
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([promotionId, productId])
+  @@index([promotionId])
+  @@index([productId])
+}
+
+// Free products offered as a promotion reward (rewardType = PRODUCTS).
+model PromotionRewardProduct {
   id          String    @id @default(uuid())
   promotionId String
   promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
