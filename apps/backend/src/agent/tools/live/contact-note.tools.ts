@@ -59,7 +59,7 @@ export function createContactNoteTools(deps: {
     {
       name: 'save_contact_note',
       description:
-        'Save a NEW durable fact about THIS customer (address, phone, sizes, preferences) to reuse later instead of asking again. Do NOT re-save a fact already listed in "What we already know about this customer". Never save secrets or card numbers.',
+        'Save a NEW durable fact about THIS customer (address, phone, sizes, preferences) — or a confirmed next-step plan (e.g. a product to propose, with its retailer id, if the customer agrees) — to reuse on the next turn instead of asking again. Do NOT re-save something already listed in "What we already know about this customer". Never save secrets or card numbers.',
       schema: z.object({
         content: z.string().describe('The information to remember, in a short factual sentence.'),
         category: z
