@@ -277,6 +277,58 @@ export class CatalogService {
     return this.hydrateProductsByRetailerIdsWithAccessToken(catalogProviderId, ids, accessToken)
   }
 
+  /**
+   * Best-effort: the set of collection (product_set) ids the given products
+   * belong to. Used to route ticket notifications by collection. Returns [] on
+   * any failure so callers degrade gracefully to "no collection".
+   */
+  async collectionIdsForRetailerIds(
+    catalogProviderId: string,
+    retailerIds: string[],
+  ): Promise<string[]> {
+    const ids = Array.from(new Set(retailerIds.filter(Boolean)))
+    if (ids.length === 0) return []
+
+    const catalog = await this.prisma.catalog.findFirst({
+      where: { providerId: catalogProviderId },
+      include: {
+        socialAccounts: { include: { socialAccount: { omit: { accessToken: false } } } },
+      },
+    })
+    if (!catalog) return []
+    const socialLink = this.pickCatalogSocialLink(catalog.socialAccounts)
+    if (!socialLink) return []
+
+    let accessToken: string
+    try {
+      accessToken = await this.encryptionService.decrypt(socialLink.socialAccount.accessToken)
+    } catch {
+      return []
+    }
+
+    const filter = JSON.stringify({ retailer_id: { is_any: ids } })
+    const query = new URLSearchParams({
+      fields: 'retailer_id,product_sets{id}',
+      limit: String(Math.max(ids.length, 50)),
+      filter,
+      access_token: accessToken,
+    })
+    const url = `${this.META_API_BASE}/${catalogProviderId}/products?${query}`
+    try {
+      const response = await fetch(url)
+      if (!response.ok) return []
+      const data = (await response.json()) as { data?: Array<Record<string, unknown>> }
+      const set = new Set<string>()
+      for (const p of data.data ?? []) {
+        const sets = (p.product_sets as { data?: Array<{ id: string }> } | undefined)?.data ?? []
+        for (const s of sets) if (s?.id) set.add(s.id)
+      }
+      return [...set]
+    } catch {
+      return []
+    }
+  }
+
   async hydrateProductsByRetailerIdsWithAccessToken(
     catalogProviderId: string,
     retailerIds: string[],

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
 
@@ -7,6 +8,7 @@ export class TicketService {
   constructor(
     private prisma: PrismaService,
     private gateway: EventsGateway,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async findAllByOrg(
@@ -116,6 +118,10 @@ export class TicketService {
     })
 
     this.gateway.emitToOrg(data.organisationId, 'ticket:created', ticket)
+    this.eventEmitter.emit('ticket.notify', {
+      ticketId: ticket.id,
+      type: 'MESSAGE_TICKET_CREATED',
+    })
     return ticket
   }
 
@@ -183,6 +189,11 @@ export class TicketService {
           },
         },
       })
+    }
+
+    // Notify members who subscribed to the status the ticket just moved into.
+    if (data.statusId && data.statusId !== current.statusId) {
+      this.eventEmitter.emit('ticket.status-changed', { ticketId: id, statusId: data.statusId })
     }
 
     this.gateway.emitToOrg(ticket.organisationId, 'ticket:updated', ticket)

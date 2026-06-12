@@ -8,6 +8,7 @@ import { I18nContext } from 'nestjs-i18n'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   BulkUpdateNotificationPreferenceDto,
+  BulkUpdateTicketStatusNotificationDto,
   NotificationTypeValue,
 } from './dto/notification-preference.dto'
 
@@ -23,7 +24,6 @@ const MESSAGE_TYPES: NotificationTypeValue[] = [
   'MESSAGE_TO_READ',
   'MESSAGE_AI_SUGGESTION',
   'MESSAGE_TICKET_CREATED',
-  'MESSAGE_TICKET_CLOSED',
   'MESSAGE_DAILY_SUMMARY',
 ]
 
@@ -37,46 +37,78 @@ export class NotificationPreferenceService {
     const userIds = this.parseUserIds(rawUserIds, currentUserId)
     await this.assertUsersAreMembers(userIds, organisationId)
 
-    const [socialAccounts, members, preferences] = await Promise.all([
-      this.prisma.socialAccount.findMany({
-        where: {
-          organisationId,
-          provider: { in: ['FACEBOOK', 'INSTAGRAM', 'WHATSAPP', 'TIKTOK'] },
-        },
-        select: {
-          id: true,
-          provider: true,
-          providerAccountId: true,
-          pageName: true,
-          username: true,
-          profilePictureUrl: true,
-        },
-      }),
-      this.prisma.organisationMember.findMany({
-        where: { organisationId, userId: { in: userIds } },
-        select: {
-          userId: true,
-          user: { select: { id: true, name: true, avatar: true, email: true } },
-        },
-      }),
-      this.prisma.notificationPreference.findMany({
-        where: {
-          userId: { in: userIds },
-          socialAccount: { organisationId },
-        },
-        select: {
-          userId: true,
-          socialAccountId: true,
-          type: true,
-          enabled: true,
-        },
-      }),
-    ])
+    const [socialAccounts, members, preferences, ticketStatuses, ticketStatusNotifications] =
+      await Promise.all([
+        this.prisma.socialAccount.findMany({
+          where: {
+            organisationId,
+            provider: { in: ['FACEBOOK', 'INSTAGRAM', 'WHATSAPP', 'TIKTOK'] },
+          },
+          select: {
+            id: true,
+            provider: true,
+            providerAccountId: true,
+            pageName: true,
+            username: true,
+            profilePictureUrl: true,
+            catalogs: { select: { catalog: { select: { id: true } } }, take: 1 },
+          },
+        }),
+        this.prisma.organisationMember.findMany({
+          where: { organisationId, userId: { in: userIds } },
+          select: {
+            userId: true,
+            user: { select: { id: true, name: true, avatar: true, email: true } },
+          },
+        }),
+        this.prisma.notificationPreference.findMany({
+          where: {
+            userId: { in: userIds },
+            socialAccount: { organisationId },
+          },
+          select: {
+            userId: true,
+            socialAccountId: true,
+            type: true,
+            enabled: true,
+            collectionIds: true,
+          },
+        }),
+        this.prisma.ticketStatus.findMany({
+          where: { organisationId },
+          orderBy: { order: 'asc' },
+          select: { id: true, name: true, color: true, order: true },
+        }),
+        this.prisma.ticketStatusNotification.findMany({
+          where: {
+            userId: { in: userIds },
+            socialAccount: { organisationId },
+          },
+          select: {
+            userId: true,
+            socialAccountId: true,
+            ticketStatusId: true,
+            enabled: true,
+            collectionIds: true,
+          },
+        }),
+      ])
 
-    const commentSocialAccounts = socialAccounts.filter((sa) =>
+    // Flatten the (first) linked catalog id so the UI can list its collections
+    // for the per-member ticket-notification collection filter.
+    const flat = socialAccounts.map((sa) => ({
+      id: sa.id,
+      provider: sa.provider,
+      providerAccountId: sa.providerAccountId,
+      pageName: sa.pageName,
+      username: sa.username,
+      profilePictureUrl: sa.profilePictureUrl,
+      catalogId: sa.catalogs[0]?.catalog?.id ?? null,
+    }))
+    const commentSocialAccounts = flat.filter((sa) =>
       (COMMENT_PROVIDERS as readonly string[]).includes(sa.provider),
     )
-    const messagingSocialAccounts = socialAccounts.filter((sa) =>
+    const messagingSocialAccounts = flat.filter((sa) =>
       (MESSAGING_PROVIDERS as readonly string[]).includes(sa.provider),
     )
 
@@ -87,6 +119,10 @@ export class NotificationPreferenceService {
       commentTypes: COMMENT_TYPES,
       messageTypes: MESSAGE_TYPES,
       preferences,
+      // Per-status ticket notifications (opt-in): the org's statuses + each
+      // member's enabled rows. The UI lists one toggle per status.
+      ticketStatuses,
+      ticketStatusNotifications,
     }
   }
 
@@ -115,8 +151,12 @@ export class NotificationPreferenceService {
             socialAccountId: dto.socialAccountId,
             type: dto.type,
             enabled: dto.enabled,
+            collectionIds: dto.collectionIds ?? [],
           },
-          update: { enabled: dto.enabled },
+          update: {
+            enabled: dto.enabled,
+            ...(dto.collectionIds !== undefined ? { collectionIds: dto.collectionIds } : {}),
+          },
         }),
       ),
     )
@@ -132,6 +172,59 @@ export class NotificationPreferenceService {
         socialAccountId: true,
         type: true,
         enabled: true,
+        collectionIds: true,
+      },
+    })
+  }
+
+  /** Upsert the per-status ticket notification for the given members/account. */
+  async bulkUpdateTicketStatus(
+    currentUserId: string,
+    organisationId: string,
+    dto: BulkUpdateTicketStatusNotificationDto,
+  ) {
+    await this.assertMembership(currentUserId, organisationId)
+    await this.assertUsersAreMembers(dto.userIds, organisationId)
+    await this.assertSocialAccountInOrg(dto.socialAccountId, organisationId)
+    await this.assertTicketStatusInOrg(dto.ticketStatusId, organisationId)
+
+    await this.prisma.$transaction(
+      dto.userIds.map((userId) =>
+        this.prisma.ticketStatusNotification.upsert({
+          where: {
+            userId_socialAccountId_ticketStatusId: {
+              userId,
+              socialAccountId: dto.socialAccountId,
+              ticketStatusId: dto.ticketStatusId,
+            },
+          },
+          create: {
+            userId,
+            socialAccountId: dto.socialAccountId,
+            ticketStatusId: dto.ticketStatusId,
+            enabled: dto.enabled,
+            collectionIds: dto.collectionIds ?? [],
+          },
+          update: {
+            enabled: dto.enabled,
+            ...(dto.collectionIds !== undefined ? { collectionIds: dto.collectionIds } : {}),
+          },
+        }),
+      ),
+    )
+
+    return this.prisma.ticketStatusNotification.findMany({
+      where: {
+        userId: { in: dto.userIds },
+        socialAccountId: dto.socialAccountId,
+        ticketStatusId: dto.ticketStatusId,
+      },
+      select: {
+        userId: true,
+        socialAccountId: true,
+        ticketStatusId: true,
+        enabled: true,
+        collectionIds: true,
       },
     })
   }
@@ -176,6 +269,14 @@ export class NotificationPreferenceService {
     })
     if (!sa) throw new NotFoundException('Compte social introuvable')
     return sa
+  }
+
+  private async assertTicketStatusInOrg(ticketStatusId: string, organisationId: string) {
+    const status = await this.prisma.ticketStatus.findFirst({
+      where: { id: ticketStatusId, organisationId },
+      select: { id: true },
+    })
+    if (!status) throw new NotFoundException('Statut de ticket introuvable')
   }
 
   private assertTypeMatchesProvider(type: NotificationTypeValue, provider: string) {

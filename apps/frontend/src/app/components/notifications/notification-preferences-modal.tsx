@@ -18,6 +18,8 @@ import {
   useBulkUpdateNotificationPreferenceMutation,
   useNotificationPreferencesQuery,
 } from './notification-preferences-api'
+import { TicketCollectionSelect } from './ticket-collection-select'
+import { TicketStatusNotifications } from './ticket-status-notifications'
 
 const NETWORK_LABEL: Record<SocialProvider, string> = {
   FACEBOOK: 'Facebook',
@@ -39,8 +41,10 @@ function initialsOf(name: string) {
   return parts.slice(0, 2).join('').toUpperCase()
 }
 
-function defaultEnabled(type: NotificationType) {
-  return !type.endsWith('_AI_SUGGESTION') && !type.endsWith('_DAILY_SUMMARY')
+// New members start with every notification disabled — nothing is delivered
+// until it's explicitly enabled, for any type.
+function defaultEnabled(_type: NotificationType) {
+  return false
 }
 
 type PendingMap = Record<string, boolean>
@@ -570,6 +574,7 @@ interface RowProps {
   members: NotifMember[]
   preferences: NotificationPreferenceRow[]
   pending: PendingMap
+  organisationId: string
   onStage: (input: {
     userIds: string[]
     type: NotificationType
@@ -578,10 +583,23 @@ interface RowProps {
   }) => void
 }
 
-function Row({ page, group, type, members, preferences, pending, onStage }: RowProps) {
+function Row({
+  page,
+  group,
+  type,
+  members,
+  preferences,
+  pending,
+  onStage,
+  organisationId,
+}: RowProps) {
   const { t } = useTranslation()
   const status = aggregateStatus(preferences, pending, members, page.id, type)
   const { onUsers, offUsers } = splitByStatus(preferences, pending, members, page.id, type)
+  const isTicketType = type === 'MESSAGE_TICKET_CREATED'
+  const memberPref = preferences.find(
+    (p) => p.userId === members[0]?.id && p.socialAccountId === page.id && p.type === type,
+  )
   const optionLabel = t(`notifications.types.${type.toLowerCase()}`)
   const optionSub = t(`notifications.types.${type.toLowerCase()}_desc`)
   const networkLabel =
@@ -601,6 +619,17 @@ function Row({ page, group, type, members, preferences, pending, onStage }: RowP
         </div>
         <div className="notif-modal__row-sub">{optionSub}</div>
       </div>
+      {isTicketType && page.catalogId && members[0] && (
+        <TicketCollectionSelect
+          organisationId={organisationId}
+          catalogId={page.catalogId}
+          socialAccountId={page.id}
+          userIds={members.map((m) => m.id)}
+          type={type}
+          enabled={memberPref?.enabled ?? true}
+          value={memberPref?.collectionIds ?? []}
+        />
+      )}
       <ActionsRow
         status={status}
         members={members}
@@ -762,6 +791,7 @@ export function NotificationPreferencesModal({
                     members={renderMembers}
                     preferences={query.data.preferences}
                     pending={pending}
+                    organisationId={organisationId}
                     onStage={stage}
                   />
                 ))}
@@ -778,9 +808,19 @@ export function NotificationPreferencesModal({
                     members={renderMembers}
                     preferences={query.data.preferences}
                     pending={pending}
+                    organisationId={organisationId}
                     onStage={stage}
                   />
                 ))}
+                {query.data.ticketStatuses.length > 0 && (
+                  <TicketStatusNotifications
+                    organisationId={organisationId}
+                    page={page}
+                    userIds={renderMembers.map((m) => m.id)}
+                    statuses={query.data.ticketStatuses}
+                    rows={query.data.ticketStatusNotifications}
+                  />
+                )}
               </PageSection>
             ))}
           </>
