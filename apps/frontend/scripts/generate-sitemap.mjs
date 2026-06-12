@@ -5,7 +5,7 @@ import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const SITE = 'https://bedones.com'
+const SITE = 'https://moderator.bedones.com'
 const BLOG_DIR = resolve(__dirname, '../src/app/data/blog')
 const OUT = resolve(__dirname, '../public/sitemap.xml')
 
