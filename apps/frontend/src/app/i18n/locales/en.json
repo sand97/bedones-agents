@@ -668,6 +668,7 @@
     "confirm_deactivate": "Disable",
     "table_action_title": "Notification preferences",
     "all_collections": "All collections",
+    "ticket_status_section": "Notify on status change",
     "types": {
       "comment_to_read": "Comments to review",
       "comment_to_read_desc": "Comments needing intervention from a team member.",

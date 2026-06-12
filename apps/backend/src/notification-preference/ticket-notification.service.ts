@@ -4,18 +4,37 @@ import { PrismaService } from '../prisma/prisma.service'
 import { WhatsappOptinService } from '../whatsapp-optin/whatsapp-optin.service'
 import { CatalogService } from '../catalog/catalog.service'
 
-type TicketNotifType = 'MESSAGE_TICKET_CREATED' | 'MESSAGE_TICKET_CLOSED'
-
-/** Event payload emitted by the ticket create/close paths. */
+/** Emitted on the ticket create path. */
 export interface TicketNotifyEvent {
   ticketId: string
-  type: TicketNotifType
+  type: 'MESSAGE_TICKET_CREATED'
+}
+
+/** Emitted when a ticket moves into a (different) status. */
+export interface TicketStatusChangedEvent {
+  ticketId: string
+  statusId: string
+}
+
+type LoadedTicket = {
+  id: string
+  organisationId: string
+  socialAccountId: string | null
+  title: string
+  contactName: string | null
+  metadata: unknown
+  socialAccount: { catalogs: { catalog: { providerId: string | null } }[] } | null
 }
 
 /**
  * Sends a WhatsApp notification (via the CORE number, opt-in window permitting)
- * to the org members who asked to be notified when a ticket is created or
- * closed — restricted to the product collections each member selected.
+ * to the org members who asked to be notified — restricted to the product
+ * collections each member selected. Two flavours:
+ *  - "ticket created": default-ON, stored in NotificationPreference
+ *    (MESSAGE_TICKET_CREATED).
+ *  - "status changed": opt-IN per ticket status, stored in
+ *    TicketStatusNotification — members define a notification for any of the
+ *    statuses they manage (e.g. a "closed" status they created).
  */
 @Injectable()
 export class TicketNotificationService {
@@ -29,20 +48,86 @@ export class TicketNotificationService {
 
   @OnEvent('ticket.notify')
   handleTicketNotify(payload: TicketNotifyEvent): void {
-    this.notify(payload.ticketId, payload.type)
-  }
-
-  /** Fire-and-forget — callers should not await this on the request path. */
-  notify(ticketId: string, type: TicketNotifType): void {
-    void this.run(ticketId, type).catch((err) =>
-      this.logger.error(
-        `[TicketNotif] ${type} for ${ticketId} failed: ${err instanceof Error ? err.message : err}`,
-      ),
+    void this.runCreated(payload.ticketId).catch((err) =>
+      this.logFailure('created', payload.ticketId, err),
     )
   }
 
-  private async run(ticketId: string, type: TicketNotifType): Promise<void> {
-    const ticket = await this.prisma.ticket.findUnique({
+  @OnEvent('ticket.status-changed')
+  handleStatusChanged(payload: TicketStatusChangedEvent): void {
+    void this.runStatusChanged(payload.ticketId, payload.statusId).catch((err) =>
+      this.logFailure(`status:${payload.statusId}`, payload.ticketId, err),
+    )
+  }
+
+  private logFailure(kind: string, ticketId: string, err: unknown): void {
+    this.logger.error(
+      `[TicketNotif] ${kind} for ${ticketId} failed: ${err instanceof Error ? err.message : err}`,
+    )
+  }
+
+  // ─── "Ticket created" — default-on (NotificationPreference) ───
+
+  private async runCreated(ticketId: string): Promise<void> {
+    const ticket = await this.loadTicket(ticketId)
+    // Preferences are scoped per social account; without one we can't route.
+    if (!ticket?.socialAccountId) return
+
+    const ticketCollections = await this.resolveTicketCollections(ticket)
+    const recipients = await this.createdRecipients(
+      ticket.organisationId,
+      ticket.socialAccountId,
+      ticketCollections,
+    )
+    if (recipients.length === 0) return
+
+    const who = ticket.contactName ? ` — ${ticket.contactName}` : ''
+    await this.dispatch(
+      recipients,
+      ticket.organisationId,
+      `🎫 Nouveau ticket : ${ticket.title}${who}`,
+      'created',
+      ticketId,
+      ticketCollections.length,
+    )
+  }
+
+  // ─── "Status changed" — opt-in (TicketStatusNotification) ───
+
+  private async runStatusChanged(ticketId: string, statusId: string): Promise<void> {
+    const ticket = await this.loadTicket(ticketId)
+    if (!ticket?.socialAccountId) return
+
+    const status = await this.prisma.ticketStatus.findUnique({
+      where: { id: statusId },
+      select: { name: true },
+    })
+    if (!status) return
+
+    const ticketCollections = await this.resolveTicketCollections(ticket)
+    const recipients = await this.statusRecipients(
+      ticket.organisationId,
+      ticket.socialAccountId,
+      statusId,
+      ticketCollections,
+    )
+    if (recipients.length === 0) return
+
+    const who = ticket.contactName ? ` (${ticket.contactName})` : ''
+    await this.dispatch(
+      recipients,
+      ticket.organisationId,
+      `🔔 Ticket « ${ticket.title} » → ${status.name}${who}`,
+      `status:${status.name}`,
+      ticketId,
+      ticketCollections.length,
+    )
+  }
+
+  // ─── Shared helpers ───
+
+  private loadTicket(ticketId: string): Promise<LoadedTicket | null> {
+    return this.prisma.ticket.findUnique({
       where: { id: ticketId },
       select: {
         id: true,
@@ -56,33 +141,23 @@ export class TicketNotificationService {
         },
       },
     })
-    // Preferences are scoped per social account; without one we can't route.
-    if (!ticket?.socialAccountId) return
-
-    const ticketCollections = await this.resolveTicketCollections(ticket)
-    const recipients = await this.eligibleUserIds(
-      ticket.organisationId,
-      ticket.socialAccountId,
-      type,
-      ticketCollections,
-    )
-    if (recipients.length === 0) return
-
-    const text = this.buildText(type, ticket.title, ticket.contactName)
-    let sent = 0
-    for (const userId of recipients) {
-      if (await this.optin.dispatchNotification(userId, ticket.organisationId, text)) sent++
-    }
-    this.logger.log(
-      `[TicketNotif] ${type} ${ticketId}: ${sent}/${recipients.length} delivered (collections=${ticketCollections.length})`,
-    )
   }
 
-  private buildText(type: TicketNotifType, title: string, contact: string | null): string {
-    const who = contact ? ` — ${contact}` : ''
-    return type === 'MESSAGE_TICKET_CREATED'
-      ? `🎫 Nouveau ticket : ${title}${who}`
-      : `✅ Ticket clôturé : ${title}${who}`
+  private async dispatch(
+    recipients: string[],
+    organisationId: string,
+    text: string,
+    kind: string,
+    ticketId: string,
+    collectionsCount: number,
+  ): Promise<void> {
+    let sent = 0
+    for (const userId of recipients) {
+      if (await this.optin.dispatchNotification(userId, organisationId, text)) sent++
+    }
+    this.logger.log(
+      `[TicketNotif] ${kind} ${ticketId}: ${sent}/${recipients.length} delivered (collections=${collectionsCount})`,
+    )
   }
 
   /** Collections (Meta product_set ids) the ticket's frozen articles belong to. */
@@ -101,15 +176,14 @@ export class TicketNotificationService {
   }
 
   /**
-   * Active members with a phone who have this ticket type enabled for the
-   * account (TICKET types are default-on) and whose collection filter matches:
-   * an empty filter means "all collections", otherwise it must intersect the
-   * ticket's collections.
+   * "Ticket created" recipients: active members with a phone who have the
+   * MESSAGE_TICKET_CREATED type enabled for the account (default-ON: no row
+   * still counts) and whose collection filter matches — an empty filter means
+   * "all collections", otherwise it must intersect the ticket's collections.
    */
-  private async eligibleUserIds(
+  private async createdRecipients(
     organisationId: string,
     socialAccountId: string,
-    type: TicketNotifType,
     ticketCollections: string[],
   ): Promise<string[]> {
     const members = await this.prisma.organisationMember.findMany({
@@ -119,7 +193,11 @@ export class TicketNotificationService {
     if (members.length === 0) return []
 
     const prefs = await this.prisma.notificationPreference.findMany({
-      where: { userId: { in: members.map((m) => m.userId) }, socialAccountId, type },
+      where: {
+        userId: { in: members.map((m) => m.userId) },
+        socialAccountId,
+        type: 'MESSAGE_TICKET_CREATED',
+      },
       select: { userId: true, enabled: true, collectionIds: true },
     })
     const prefByUser = new Map(prefs.map((p) => [p.userId, p]))
@@ -127,13 +205,49 @@ export class TicketNotificationService {
     const out: string[] = []
     for (const m of members) {
       const pref = prefByUser.get(m.userId)
-      // TICKET types are default-ON when there is no explicit row.
+      // Default-ON when there is no explicit row.
       if (pref && !pref.enabled) continue
-      const filter = pref?.collectionIds ?? []
-      if (filter.length === 0 || ticketCollections.some((c) => filter.includes(c))) {
-        out.push(m.userId)
-      }
+      if (this.collectionsMatch(pref?.collectionIds ?? [], ticketCollections)) out.push(m.userId)
     }
     return out
+  }
+
+  /**
+   * "Status changed" recipients: opt-IN — only members with an *enabled*
+   * TicketStatusNotification row for this (account, status) are notified, again
+   * gated by the collection filter.
+   */
+  private async statusRecipients(
+    organisationId: string,
+    socialAccountId: string,
+    ticketStatusId: string,
+    ticketCollections: string[],
+  ): Promise<string[]> {
+    const members = await this.prisma.organisationMember.findMany({
+      where: { organisationId, status: 'ACTIVE', user: { phone: { not: null } } },
+      select: { userId: true },
+    })
+    if (members.length === 0) return []
+
+    const subs = await this.prisma.ticketStatusNotification.findMany({
+      where: {
+        userId: { in: members.map((m) => m.userId) },
+        socialAccountId,
+        ticketStatusId,
+        enabled: true,
+      },
+      select: { userId: true, collectionIds: true },
+    })
+
+    const out: string[] = []
+    for (const s of subs) {
+      if (this.collectionsMatch(s.collectionIds ?? [], ticketCollections)) out.push(s.userId)
+    }
+    return out
+  }
+
+  /** Empty filter = all collections; otherwise it must intersect the ticket's. */
+  private collectionsMatch(filter: string[], ticketCollections: string[]): boolean {
+    return filter.length === 0 || ticketCollections.some((c) => filter.includes(c))
   }
 }

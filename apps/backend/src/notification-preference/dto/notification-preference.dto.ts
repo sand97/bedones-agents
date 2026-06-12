@@ -55,6 +55,38 @@ export class BulkUpdateNotificationPreferenceDto {
   collectionIds?: string[]
 }
 
+export class BulkUpdateTicketStatusNotificationDto {
+  @ApiProperty({
+    type: [String],
+    description: 'Organisation members user IDs to apply the change to',
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('all', { each: true })
+  userIds: string[]
+
+  @ApiProperty()
+  @IsUUID()
+  socialAccountId: string
+
+  @ApiProperty({ description: 'Ticket status the notification is attached to' })
+  @IsUUID()
+  ticketStatusId: string
+
+  @ApiProperty()
+  @IsBoolean()
+  enabled: boolean
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Restrict to these product collection ids. Empty/omitted = all collections.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  collectionIds?: string[]
+}
+
 export class GetNotificationPreferencesQueryDto {
   @ApiPropertyOptional({
     description: 'Comma-separated user IDs to fetch preferences for. Defaults to current user.',

@@ -64,6 +64,23 @@ export interface NotificationPreferenceRow {
   collectionIds: string[]
 }
 
+/** One of the org's ticket statuses (a notification can be attached to each). */
+export interface NotifTicketStatus {
+  id: string
+  name: string
+  color: string
+  order: number
+}
+
+/** A member's opt-in notification for a given (social account, ticket status). */
+export interface TicketStatusNotificationRow {
+  userId: string
+  socialAccountId: string
+  ticketStatusId: string
+  enabled: boolean
+  collectionIds: string[]
+}
+
 export interface NotificationPreferencesResponse {
   members: NotifMember[]
   commentSocialAccounts: NotifSocialAccount[]
@@ -71,6 +88,8 @@ export interface NotificationPreferencesResponse {
   commentTypes: NotificationType[]
   messageTypes: NotificationType[]
   preferences: NotificationPreferenceRow[]
+  ticketStatuses: NotifTicketStatus[]
+  ticketStatusNotifications: TicketStatusNotificationRow[]
 }
 
 const queryKey = (organisationId: string, userIds: string[]) =>
@@ -127,6 +146,45 @@ export function useBulkUpdateNotificationPreferenceMutation(
           // but keep them — backend persists the explicit override either way.
           void variables
           return { ...prev, preferences: Array.from(map.values()) }
+        },
+      )
+    },
+  })
+}
+
+export function useBulkUpdateTicketStatusNotificationMutation(
+  organisationId: string,
+  userIds: string[],
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      userIds: string[]
+      socialAccountId: string
+      ticketStatusId: string
+      enabled: boolean
+      /** Restrict to these collection ids (empty = all). */
+      collectionIds?: string[]
+    }): Promise<TicketStatusNotificationRow[]> => {
+      return apiFetch<TicketStatusNotificationRow[]>(
+        `/notification-preferences/org/${organisationId}/ticket-status/bulk`,
+        { method: 'POST', body: JSON.stringify(input) },
+      )
+    },
+    onSuccess: (rows) => {
+      queryClient.setQueryData<NotificationPreferencesResponse>(
+        queryKey(organisationId, userIds),
+        (prev) => {
+          if (!prev) return prev
+          const map = new Map(
+            prev.ticketStatusNotifications.map(
+              (p) => [`${p.userId}|${p.socialAccountId}|${p.ticketStatusId}`, p] as const,
+            ),
+          )
+          for (const row of rows) {
+            map.set(`${row.userId}|${row.socialAccountId}|${row.ticketStatusId}`, row)
+          }
+          return { ...prev, ticketStatusNotifications: Array.from(map.values()) }
         },
       )
     },

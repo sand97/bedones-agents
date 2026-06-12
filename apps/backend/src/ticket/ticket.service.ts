@@ -191,15 +191,9 @@ export class TicketService {
       })
     }
 
-    // "Closed" = moved into the last column (highest-order status) → notify.
-    if (data.statusId && data.statusId !== current.statusId && ticket.status) {
-      const max = await this.prisma.ticketStatus.aggregate({
-        where: { organisationId: ticket.organisationId },
-        _max: { order: true },
-      })
-      if (ticket.status.order === max._max.order) {
-        this.eventEmitter.emit('ticket.notify', { ticketId: id, type: 'MESSAGE_TICKET_CLOSED' })
-      }
+    // Notify members who subscribed to the status the ticket just moved into.
+    if (data.statusId && data.statusId !== current.statusId) {
+      this.eventEmitter.emit('ticket.status-changed', { ticketId: id, statusId: data.statusId })
     }
 
     this.gateway.emitToOrg(ticket.organisationId, 'ticket:updated', ticket)

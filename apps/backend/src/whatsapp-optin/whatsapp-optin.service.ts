@@ -114,12 +114,13 @@ export class WhatsappOptinService {
 
   /**
    * For a given organisation, returns the active members with a phone number
-   * who have at least one messaging notification type effectively enabled.
-   * Default-on types are MESSAGE_TO_READ / MESSAGE_TICKET_CREATED /
-   * MESSAGE_TICKET_CLOSED — same default rule as the modal frontend.
-   * Overrides are scoped per (user, socialAccount, type), so a user is
-   * "eligible for org X" if they have at least one default-on or
-   * explicitly-on row tied to any social account of org X.
+   * who have at least one messaging notification effectively enabled.
+   * Default-on types are MESSAGE_TO_READ / MESSAGE_TICKET_CREATED — same default
+   * rule as the modal frontend. Overrides are scoped per (user, socialAccount,
+   * type), so a user is "eligible for org X" if they have at least one
+   * default-on or explicitly-on row tied to any social account of org X. An
+   * enabled per-status ticket notification (TicketStatusNotification) also makes
+   * a member eligible, even if every preference is off.
    */
   async listEligibleUsersForOrg(
     organisationId: string,
@@ -128,7 +129,6 @@ export class WhatsappOptinService {
       'MESSAGE_TO_READ',
       'MESSAGE_AI_SUGGESTION',
       'MESSAGE_TICKET_CREATED',
-      'MESSAGE_TICKET_CLOSED',
       'MESSAGE_DAILY_SUMMARY',
     ] as const
     const defaultOff = new Set(['MESSAGE_AI_SUGGESTION', 'MESSAGE_DAILY_SUMMARY'])
@@ -143,14 +143,24 @@ export class WhatsappOptinService {
     })
     if (members.length === 0) return []
 
-    const overrides = await this.prisma.notificationPreference.findMany({
-      where: {
-        userId: { in: members.map((m) => m.userId) },
-        socialAccount: { organisationId },
-        type: { in: messageTypes as unknown as never },
-      },
-      select: { userId: true, type: true, enabled: true },
-    })
+    const [overrides, statusSubs] = await Promise.all([
+      this.prisma.notificationPreference.findMany({
+        where: {
+          userId: { in: members.map((m) => m.userId) },
+          socialAccount: { organisationId },
+          type: { in: messageTypes as unknown as never },
+        },
+        select: { userId: true, type: true, enabled: true },
+      }),
+      this.prisma.ticketStatusNotification.findMany({
+        where: {
+          userId: { in: members.map((m) => m.userId) },
+          socialAccount: { organisationId },
+          enabled: true,
+        },
+        select: { userId: true },
+      }),
+    ])
     const explicitlyOn = new Set<string>()
     const explicitlyOff = new Map<string, Set<string>>()
     for (const o of overrides) {
@@ -161,6 +171,8 @@ export class WhatsappOptinService {
         explicitlyOff.set(o.userId, s)
       }
     }
+    // An enabled per-status notification is enough on its own.
+    for (const s of statusSubs) explicitlyOn.add(s.userId)
 
     const out: Array<{ userId: string; locale: string; name: string }> = []
     for (const m of members) {

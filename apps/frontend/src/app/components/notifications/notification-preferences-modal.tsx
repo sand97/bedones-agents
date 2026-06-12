@@ -19,6 +19,7 @@ import {
   useNotificationPreferencesQuery,
 } from './notification-preferences-api'
 import { TicketCollectionSelect } from './ticket-collection-select'
+import { TicketStatusNotifications } from './ticket-status-notifications'
 
 const NETWORK_LABEL: Record<SocialProvider, string> = {
   FACEBOOK: 'Facebook',
@@ -593,7 +594,7 @@ function Row({
   const { t } = useTranslation()
   const status = aggregateStatus(preferences, pending, members, page.id, type)
   const { onUsers, offUsers } = splitByStatus(preferences, pending, members, page.id, type)
-  const isTicketType = type === 'MESSAGE_TICKET_CREATED' || type === 'MESSAGE_TICKET_CLOSED'
+  const isTicketType = type === 'MESSAGE_TICKET_CREATED'
   const memberPref = preferences.find(
     (p) => p.userId === members[0]?.id && p.socialAccountId === page.id && p.type === type,
   )
@@ -809,6 +810,15 @@ export function NotificationPreferencesModal({
                     onStage={stage}
                   />
                 ))}
+                {query.data.ticketStatuses.length > 0 && (
+                  <TicketStatusNotifications
+                    organisationId={organisationId}
+                    page={page}
+                    userIds={renderMembers.map((m) => m.id)}
+                    statuses={query.data.ticketStatuses}
+                    rows={query.data.ticketStatusNotifications}
+                  />
+                )}
               </PageSection>
             ))}
           </>

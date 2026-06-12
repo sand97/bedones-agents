@@ -138,6 +138,9 @@ enum NotificationType {
   MESSAGE_TO_READ
   MESSAGE_AI_SUGGESTION
   MESSAGE_TICKET_CREATED
+  // Deprecated: ticket "closed" notifications are replaced by per-status
+  // notifications (see TicketStatusNotification). Kept in the enum to avoid a
+  // destructive migration; no longer emitted or surfaced in the UI.
   MESSAGE_TICKET_CLOSED
   MESSAGE_DAILY_SUMMARY
 }
@@ -167,10 +170,11 @@ model User {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  memberships             OrganisationMember[]
-  sessions                Session[]
-  notificationPreferences NotificationPreference[]
-  whatsappOptInWindows    WhatsAppOptInWindow[]
+  memberships               OrganisationMember[]
+  sessions                  Session[]
+  notificationPreferences   NotificationPreference[]
+  ticketStatusNotifications TicketStatusNotification[]
+  whatsappOptInWindows      WhatsAppOptInWindow[]
 }
 
 model Session {
@@ -254,7 +258,7 @@ model SocialAccount {
   // row (and its history) is kept so it can be reconnected later, but the
   // account is hidden from active lists and outbound calls are stopped. Cleared
   // on a successful (re)connect through the OAuth/embedded-signup callback.
-  disconnectedAt    DateTime?
+  disconnectedAt DateTime?
 
   // ─── Message history sync (14-day backfill on connect) ───
   // Tracks the initial backfill of the last 14 days of conversations/messages
@@ -268,15 +272,16 @@ model SocialAccount {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  settings                PageSettings?
-  posts                   Post[]
-  conversations           Conversation[]
-  catalogs                CatalogSocialAccount[]
-  agentLink               AgentSocialAccount?
-  labels                  Label[]
-  notificationPreferences NotificationPreference[]
-  errorLogs               SocialAccountErrorLog[]
-  tickets                 Ticket[]
+  settings                  PageSettings?
+  posts                     Post[]
+  conversations             Conversation[]
+  catalogs                  CatalogSocialAccount[]
+  agentLink                 AgentSocialAccount?
+  labels                    Label[]
+  notificationPreferences   NotificationPreference[]
+  ticketStatusNotifications TicketStatusNotification[]
+  errorLogs                 SocialAccountErrorLog[]
+  tickets                   Ticket[]
 
   loyaltyContacts                 LoyaltyContact[]
   loyaltyBonuses                  LoyaltyBonus[]
@@ -475,11 +480,11 @@ model CatalogSocialAccount {
 // catalogue" request. Processed one-at-a-time through the `catalog-migration`
 // Bull queue; progress is streamed to the browser over websockets.
 model CatalogMigration {
-  id             String       @id @default(uuid())
-  organisationId String
-  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  catalogId      String
-  catalog        Catalog      @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  id                    String                 @id @default(uuid())
+  organisationId        String
+  organisation          Organisation           @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  catalogId             String
+  catalog               Catalog                @relation(fields: [catalogId], references: [id], onDelete: Cascade)
   // Source WhatsApp number whose public catalogue is imported (digits only, no '+').
   sourcePhone           String
   // Optional link to the connected SocialAccount the number belongs to.
@@ -523,20 +528,20 @@ model Agent {
 }
 
 model AgentSocialAccount {
-  id                   String           @id @default(uuid())
-  agentId              String
-  agent                Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  socialAccountId      String           @unique // A social account can only be in ONE agent
-  socialAccount        SocialAccount    @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
-  aiActivationMode     AiActivationMode @default(OFF)
-  aiActivationLabels   String[] // Label IDs for LABELS / EXCLUDE_LABELS modes (legacy)
-  aiActivationContacts String[] // Phone numbers (WhatsApp) or profile names (IG/Messenger) — "by contacts" scope, mainly for testing
+  id                         String           @id @default(uuid())
+  agentId                    String
+  agent                      Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  socialAccountId            String           @unique // A social account can only be in ONE agent
+  socialAccount              SocialAccount    @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  aiActivationMode           AiActivationMode @default(OFF)
+  aiActivationLabels         String[] // Label IDs for LABELS / EXCLUDE_LABELS modes (legacy)
+  aiActivationContacts       String[] // Phone numbers (WhatsApp) or profile names (IG/Messenger) — "by contacts" scope, mainly for testing
   // ─── Activation scopes (combinable, except aiActivateAll which is exclusive) ───
-  aiActivateAll              Boolean  @default(false) // Respond on every conversation
-  aiActivateAds              Boolean  @default(false) // Respond when the message originates from an ad (Meta referral / CTWA, TikTok)
-  aiActivateNewConversations Boolean  @default(false) // Respond on conversations created after activation
+  aiActivateAll              Boolean          @default(false) // Respond on every conversation
+  aiActivateAds              Boolean          @default(false) // Respond when the message originates from an ad (Meta referral / CTWA, TikTok)
+  aiActivateNewConversations Boolean          @default(false) // Respond on conversations created after activation
   aiActivatedAt              DateTime? // Cutoff used by aiActivateNewConversations
-  createdAt            DateTime         @default(now())
+  createdAt                  DateTime         @default(now())
 
   @@unique([agentId, socialAccountId])
   @@index([agentId])
@@ -567,33 +572,34 @@ model TicketStatus {
   order          Int          @default(0)
   isDefault      Boolean      @default(false)
 
-  tickets Ticket[]
+  tickets       Ticket[]
+  notifications TicketStatusNotification[]
 
   @@index([organisationId])
 }
 
 model Ticket {
-  id             String          @id @default(uuid())
-  organisationId String
-  organisation   Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  agentId        String?
-  agent          Agent?          @relation(fields: [agentId], references: [id], onDelete: SetNull)
-  statusId       String?
-  status         TicketStatus?   @relation(fields: [statusId], references: [id], onDelete: SetNull)
-  title          String
-  description    String?
-  priority       TicketPriority  @default(MEDIUM)
-  contactName    String?
-  contactId      String? // Platform user ID
-  provider       SocialProvider?
-  conversationId String? // Link to Conversation
+  id              String          @id @default(uuid())
+  organisationId  String
+  organisation    Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  agentId         String?
+  agent           Agent?          @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  statusId        String?
+  status          TicketStatus?   @relation(fields: [statusId], references: [id], onDelete: SetNull)
+  title           String
+  description     String?
+  priority        TicketPriority  @default(MEDIUM)
+  contactName     String?
+  contactId       String? // Platform user ID
+  provider        SocialProvider?
+  conversationId  String? // Link to Conversation
   socialAccountId String? // Page/number (social account) the conversation belongs to
-  socialAccount  SocialAccount?  @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
-  assignedTo     String? // OrganisationMember ID
-  metadata       Json? // Extra data (order details, etc.)
-  resolvedAt     DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  socialAccount   SocialAccount?  @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  assignedTo      String? // OrganisationMember ID
+  metadata        Json? // Extra data (order details, etc.)
+  resolvedAt      DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   activities TicketActivity[]
 
@@ -687,16 +693,16 @@ model FAQRule {
 }
 
 model Post {
-  id              String        @id // Facebook Post ID or Instagram Media ID
+  id              String                  @id // Facebook Post ID or Instagram Media ID
   socialAccountId String
-  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  socialAccount   SocialAccount           @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
   message         String?
   imageUrl        String?
   permalinkUrl    String?
   aiOverride      AiConversationOverride? // Per-post override: FORCE_OFF disables agent replies to this post's comments
   comments        Comment[]
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
 
   productLinks    ProductPostLink[]
   collectionLinks CollectionPostLink[]
@@ -855,6 +861,30 @@ model NotificationPreference {
   @@unique([userId, socialAccountId, type])
   @@index([userId])
   @@index([socialAccountId])
+}
+
+// One row per (member, social account, ticket status). When a ticket on that
+// account moves INTO the status, the subscribed members are notified. Unlike
+// MESSAGE_TICKET_CREATED (default-on), these are opt-in: no row — or a disabled
+// one — means no notification. `collectionIds` restricts the notification to
+// these product collections (Meta product_set ids); empty = all collections.
+model TicketStatusNotification {
+  id              String        @id @default(uuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  socialAccountId String
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  ticketStatusId  String
+  ticketStatus    TicketStatus  @relation(fields: [ticketStatusId], references: [id], onDelete: Cascade)
+  enabled         Boolean       @default(true)
+  collectionIds   String[]      @default([])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([userId, socialAccountId, ticketStatusId])
+  @@index([userId])
+  @@index([socialAccountId])
+  @@index([ticketStatusId])
 }
 
 // ─── WhatsApp Opt-In Window ───

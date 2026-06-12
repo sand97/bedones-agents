@@ -2,7 +2,10 @@ import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/co
 import { ApiTags } from '@nestjs/swagger'
 import { AuthGuard } from '../auth/auth.guard'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
-import { BulkUpdateNotificationPreferenceDto } from './dto/notification-preference.dto'
+import {
+  BulkUpdateNotificationPreferenceDto,
+  BulkUpdateTicketStatusNotificationDto,
+} from './dto/notification-preference.dto'
 import { NotificationPreferenceService } from './notification-preference.service'
 
 @ApiTags('NotificationPreference')
@@ -27,5 +30,14 @@ export class NotificationPreferenceController {
     @Body() dto: BulkUpdateNotificationPreferenceDto,
   ) {
     return this.notificationPreferenceService.bulkUpdate(user.id, organisationId, dto)
+  }
+
+  @Post('org/:organisationId/ticket-status/bulk')
+  async bulkUpdateTicketStatus(
+    @CurrentUser() user: { id: string },
+    @Param('organisationId') organisationId: string,
+    @Body() dto: BulkUpdateTicketStatusNotificationDto,
+  ) {
+    return this.notificationPreferenceService.bulkUpdateTicketStatus(user.id, organisationId, dto)
   }
 }
