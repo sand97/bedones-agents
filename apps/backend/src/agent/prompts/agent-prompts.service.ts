@@ -196,9 +196,29 @@ ${context}
     canSendProducts?: boolean
     canSendButtons?: boolean
     contactNotes?: Array<{ category?: string | null; content: string }>
+    postOrigin?: {
+      headline?: string | null
+      body?: string | null
+      product?: {
+        name: string
+        price?: number
+        currency?: string
+        source: 'post-link' | 'semantic'
+      } | null
+    } | null
   }): string {
-    const { agentContext, labels, provider, canSendProducts, canSendButtons, contactNotes } = input
+    const {
+      agentContext,
+      labels,
+      provider,
+      canSendProducts,
+      canSendButtons,
+      contactNotes,
+      postOrigin,
+    } = input
     const nowIso = new Date().toISOString()
+
+    const postOriginContext = postOrigin ? this.buildPostOriginContext(postOrigin) : ''
 
     const contactNotesContext =
       contactNotes && contactNotes.length > 0
@@ -241,7 +261,7 @@ Current datetime (ISO 8601, UTC): ${nowIso}
 
 ## Platform
 This conversation is on: ${provider}
-${contactNotesContext}${labelsContext}${productSendRules}${buttonRules}
+${postOriginContext}${contactNotesContext}${labelsContext}${productSendRules}${buttonRules}
 
 # Role: AI Business Assistant
 
@@ -298,6 +318,45 @@ Stay within a business-only context.
 
 ## Language
 Always respond in the user's language.`
+  }
+
+  /**
+   * Section injected when the customer opened the chat from one of our social posts.
+   * Gives the agent the post's text and, when resolved, the product it was about, so
+   * a vague opener like "more info on this?" can be answered without re-asking.
+   */
+  private buildPostOriginContext(postOrigin: {
+    headline?: string | null
+    body?: string | null
+    product?: {
+      name: string
+      price?: number
+      currency?: string
+      source: 'post-link' | 'semantic'
+    } | null
+  }): string {
+    const lines: string[] = [
+      '\n\n## Message Origin (Social Post)',
+      'This customer started the conversation directly from one of your social media posts. When they say "this", "ça", "ceci" or "ce produit", they almost certainly mean what the post was about — do not ask which product unless they clearly switch topic.',
+    ]
+
+    if (postOrigin.headline) lines.push(`Post title: ${postOrigin.headline}`)
+    if (postOrigin.body) lines.push(`Post caption: "${postOrigin.body}"`)
+
+    const product = postOrigin.product
+    if (product) {
+      const price =
+        typeof product.price === 'number'
+          ? ` — ${product.price}${product.currency ? ` ${product.currency}` : ''}`
+          : ''
+      const lead =
+        product.source === 'post-link'
+          ? 'This post is linked to this catalog product:'
+          : 'This post most likely refers to this catalog product:'
+      lines.push(`${lead} ${product.name}${price}. Use send_products to show it when relevant.`)
+    }
+
+    return `${lines.join('\n')}\n`
   }
 
   /**

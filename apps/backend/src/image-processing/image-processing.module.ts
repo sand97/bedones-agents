@@ -14,6 +14,7 @@ import { OcrService } from './ocr.service'
 import { SmartCropService } from './smart-crop.service'
 import { ImageProductMatchingService } from './image-product-matching.service'
 import { CatalogSearchService } from './catalog-search.service'
+import { ReferralProductMatchingService } from './referral-product-matching.service'
 import { ProductImageIndexingService } from './product-image-indexing.service'
 import { CatalogIndexingProcessor } from './catalog-indexing.processor'
 
@@ -27,6 +28,7 @@ import { CatalogIndexingProcessor } from './catalog-indexing.processor'
     SmartCropService,
     ImageProductMatchingService,
     CatalogSearchService,
+    ReferralProductMatchingService,
     ProductImageIndexingService,
     CatalogIndexingProcessor,
   ],
@@ -35,6 +37,7 @@ import { CatalogIndexingProcessor } from './catalog-indexing.processor'
     GeminiEmbeddingService,
     CatalogSearchService,
     ImageProductMatchingService,
+    ReferralProductMatchingService,
     ProductImageIndexingService,
   ],
 })
