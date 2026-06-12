@@ -490,6 +490,7 @@ function TicketsPage() {
         statuses={statusesQuery.data || []}
         onSave={(statuses) => updateStatusesMutation.mutate(statuses)}
         saving={updateStatusesMutation.isPending}
+        loading={statusesQuery.isLoading}
       />
     </div>
   )

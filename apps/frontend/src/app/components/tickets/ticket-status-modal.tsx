@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Divider, Input, Modal, Select, Typography } from 'antd'
+import { Button, Divider, Input, Modal, Select, Spin, Typography } from 'antd'
 import { Plus, Trash2 } from 'lucide-react'
 import type { TicketStatusItem } from '@app/lib/api/agent-api'
 
@@ -30,6 +30,7 @@ interface TicketStatusModalProps {
   statuses: TicketStatusItem[]
   onSave: (statuses: TicketStatusItem[]) => void
   saving?: boolean
+  loading?: boolean
 }
 
 export function TicketStatusModal({
@@ -38,6 +39,7 @@ export function TicketStatusModal({
   statuses: initialStatuses,
   onSave,
   saving,
+  loading,
 }: TicketStatusModalProps) {
   const { t } = useTranslation()
   const [statuses, setStatuses] = useState<TicketStatusItem[]>([])
@@ -150,31 +152,37 @@ export function TicketStatusModal({
       </Text>
 
       {/* Existing statuses */}
-      <div className="mt-4 flex flex-col gap-2">
-        {statuses.map((status, index) => (
-          <div key={`${status.id ?? index}`} className="wa-label-row">
-            <Select
-              value={status.color}
-              className="wa-label-color"
-              onChange={(color) => handleColorChange(index, color)}
-              options={colorSelectOptions}
-              optionLabelProp="label"
-            />
-            <Input
-              value={status.name}
-              className="wa-label-name"
-              onChange={(e) => handleNameChange(index, e.target.value)}
-            />
-            <button
-              type="button"
-              className="wa-label-delete-btn"
-              onClick={() => handleDelete(index)}
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
-      </div>
+      {loading && statuses.length === 0 ? (
+        <div className="mt-4 flex items-center justify-center py-10">
+          <Spin />
+        </div>
+      ) : (
+        <div className="mt-4 flex flex-col gap-2">
+          {statuses.map((status, index) => (
+            <div key={`${status.id ?? index}`} className="wa-label-row">
+              <Select
+                value={status.color}
+                className="wa-label-color"
+                onChange={(color) => handleColorChange(index, color)}
+                options={colorSelectOptions}
+                optionLabelProp="label"
+              />
+              <Input
+                value={status.name}
+                className="wa-label-name"
+                onChange={(e) => handleNameChange(index, e.target.value)}
+              />
+              <button
+                type="button"
+                className="wa-label-delete-btn"
+                onClick={() => handleDelete(index)}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Add new status */}
       <Divider className="my-3" />
