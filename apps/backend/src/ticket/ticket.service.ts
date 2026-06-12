@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
 
@@ -7,6 +8,7 @@ export class TicketService {
   constructor(
     private prisma: PrismaService,
     private gateway: EventsGateway,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async findAllByOrg(
@@ -116,6 +118,10 @@ export class TicketService {
     })
 
     this.gateway.emitToOrg(data.organisationId, 'ticket:created', ticket)
+    this.eventEmitter.emit('ticket.notify', {
+      ticketId: ticket.id,
+      type: 'MESSAGE_TICKET_CREATED',
+    })
     return ticket
   }
 
@@ -183,6 +189,17 @@ export class TicketService {
           },
         },
       })
+    }
+
+    // "Closed" = moved into the last column (highest-order status) → notify.
+    if (data.statusId && data.statusId !== current.statusId && ticket.status) {
+      const max = await this.prisma.ticketStatus.aggregate({
+        where: { organisationId: ticket.organisationId },
+        _max: { order: true },
+      })
+      if (ticket.status.order === max._max.order) {
+        this.eventEmitter.emit('ticket.notify', { ticketId: id, type: 'MESSAGE_TICKET_CLOSED' })
+      }
     }
 
     this.gateway.emitToOrg(ticket.organisationId, 'ticket:updated', ticket)

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { Queue } from 'bullmq'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
@@ -70,6 +71,7 @@ export class TicketAgentService {
     private readonly llmFactory: LlmFactoryService,
     private readonly prompts: AgentPromptsService,
     private readonly gateway: EventsGateway,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /** Fire-and-forget: queue an async ticket evaluation for a conversation. */
@@ -267,5 +269,9 @@ export class TicketAgentService {
       include: { status: true },
     })
     this.gateway.emitToOrg(organisationId, 'ticket:created', ticket)
+    this.eventEmitter.emit('ticket.notify', {
+      ticketId: ticket.id,
+      type: 'MESSAGE_TICKET_CREATED',
+    })
   }
 }

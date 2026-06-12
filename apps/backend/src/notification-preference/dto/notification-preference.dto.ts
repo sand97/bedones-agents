@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { ArrayNotEmpty, IsArray, IsBoolean, IsIn, IsString, IsUUID } from 'class-validator'
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator'
 
 export const NOTIFICATION_TYPES = [
   'COMMENT_TO_READ',
@@ -35,6 +43,16 @@ export class BulkUpdateNotificationPreferenceDto {
   @ApiProperty()
   @IsBoolean()
   enabled: boolean
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Ticket notifications only: restrict to these product collection ids. Empty/omitted = all collections.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  collectionIds?: string[]
 }
 
 export class GetNotificationPreferencesQueryDto {

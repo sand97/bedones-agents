@@ -846,6 +846,9 @@ model NotificationPreference {
   socialAccount   SocialAccount    @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
   type            NotificationType
   enabled         Boolean          @default(true)
+  // For ticket notifications: restrict to these product collections (Meta
+  // product_set ids). Empty = all collections (no filter).
+  collectionIds   String[]         @default([])
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 

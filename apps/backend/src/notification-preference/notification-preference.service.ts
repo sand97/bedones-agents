@@ -69,6 +69,7 @@ export class NotificationPreferenceService {
           socialAccountId: true,
           type: true,
           enabled: true,
+          collectionIds: true,
         },
       }),
     ])
@@ -115,8 +116,12 @@ export class NotificationPreferenceService {
             socialAccountId: dto.socialAccountId,
             type: dto.type,
             enabled: dto.enabled,
+            collectionIds: dto.collectionIds ?? [],
           },
-          update: { enabled: dto.enabled },
+          update: {
+            enabled: dto.enabled,
+            ...(dto.collectionIds !== undefined ? { collectionIds: dto.collectionIds } : {}),
+          },
         }),
       ),
     )
@@ -132,6 +137,7 @@ export class NotificationPreferenceService {
         socialAccountId: true,
         type: true,
         enabled: true,
+        collectionIds: true,
       },
     })
   }
