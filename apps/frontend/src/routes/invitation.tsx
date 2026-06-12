@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { buildShareMeta } from '@app/lib/share-meta'
 import { useTranslation } from 'react-i18next'
 import { Button, Card, Typography, Input, message, Result, Avatar } from 'antd'
 import { Shield, Send, Building2 } from 'lucide-react'
@@ -7,11 +8,41 @@ import { $api } from '@app/lib/api/$api'
 
 const { Title, Text } = Typography
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
+
 export const Route = createFileRoute('/invitation')({
   component: InvitationPage,
   validateSearch: (search: Record<string, unknown>) => ({
     token: (search.token as string) || '',
   }),
+  // Résout le nom de l'organisation côté serveur pour que le lien d'invitation
+  // partagé affiche un aperçu riche (« Rejoignez {org} sur Bedones »). Les
+  // crawlers ne sont pas authentifiés, mais GET /invitations est public et ne
+  // demande que le token d'invitation (déjà présent dans le lien partagé).
+  loaderDeps: ({ search }) => ({ token: search.token }),
+  loader: async ({ deps }): Promise<{ organisationName: string | null }> => {
+    if (!deps.token) return { organisationName: null }
+    try {
+      const res = await fetch(`${API_URL}/invitations?token=${encodeURIComponent(deps.token)}`, {
+        headers: { accept: 'application/json' },
+      })
+      if (!res.ok) return { organisationName: null }
+      const data = (await res.json()) as { organisationName?: string | null }
+      return { organisationName: data.organisationName ?? null }
+    } catch {
+      return { organisationName: null }
+    }
+  },
+  head: ({ loaderData }) => {
+    const org = loaderData?.organisationName
+    return buildShareMeta({
+      title: org ? `Rejoignez ${org} sur Bedones` : 'Vous êtes invité sur Bedones',
+      description: org
+        ? `Vous êtes invité à rejoindre ${org} sur Bedones — cliquez pour accepter l’invitation.`
+        : 'Vous avez été invité à rejoindre une organisation sur Bedones — cliquez pour accepter l’invitation.',
+      image: '/og/invitation.png',
+    })
+  },
 })
 
 type Step = 'welcome' | 'otp' | 'accept' | 'done'
