@@ -586,7 +586,7 @@ function MessageBubble({
 
         if (items && items.length > 0) {
           return (
-            <div className="flex w-[18rem] flex-col gap-2 py-0.5">
+            <div className="flex w-[18rem] max-w-full flex-col gap-2 py-0.5">
               {header && <div className="text-sm font-semibold text-text-primary">{header}</div>}
               {body && <p className="m-0 whitespace-pre-wrap text-sm text-text-primary">{body}</p>}
               <div className="flex flex-col gap-1.5">
@@ -661,7 +661,7 @@ function MessageBubble({
           return <p className="m-0 text-sm text-text-primary">{message.text || ''}</p>
         }
         return (
-          <div className="flex w-[18rem] flex-col gap-2 py-0.5">
+          <div className="flex w-[18rem] max-w-full flex-col gap-2 py-0.5">
             <div className="text-sm font-semibold text-text-primary">{t('chat.order_title')}</div>
             {order.text && (
               <p className="m-0 whitespace-pre-wrap text-sm text-text-primary">{order.text}</p>
