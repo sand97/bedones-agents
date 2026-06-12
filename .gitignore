@@ -19,3 +19,6 @@
 /apps/design/dist/
 /apps/design/.env
 .env
+
+# TypeScript incremental build cache
+*.tsbuildinfo
