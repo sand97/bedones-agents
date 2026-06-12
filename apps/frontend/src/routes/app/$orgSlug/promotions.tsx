@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useDebouncedValue } from '@app/hooks/use-debounced-value'
-import { createFileRoute, useParams } from '@tanstack/react-router'
+import { createFileRoute, useParams, useSearch, useNavigate } from '@tanstack/react-router'
 import { buildShareMeta } from '@app/lib/share-meta'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -26,6 +26,12 @@ import {
 } from '@app/lib/query-cache'
 
 export const Route = createFileRoute('/app/$orgSlug/promotions')({
+  // Deep link from the catalog "Tools" modal: ?catalogId=…&step=2 opens the
+  // creation wizard on the given step with the catalog preselected.
+  validateSearch: (search: Record<string, unknown>): { catalogId?: string; step?: number } => ({
+    catalogId: typeof search.catalogId === 'string' ? search.catalogId : undefined,
+    step: typeof search.step === 'number' ? search.step : undefined,
+  }),
   head: () =>
     buildShareMeta({
       title: 'Voir les promotions',
@@ -45,6 +51,8 @@ function PromotionsPage() {
   const { message } = App.useApp()
   const queryClient = useQueryClient()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
+  const search = useSearch({ from: '/app/$orgSlug/promotions' })
+  const navigate = useNavigate()
 
   const STATUS_FILTER_OPTIONS: Array<{ key: string; label: string; color: string }> = [
     { key: 'DRAFT', label: t('promotions.status_draft'), color: '#8b5cf6' },
@@ -75,6 +83,10 @@ function PromotionsPage() {
   const [selectedProducts, setSelectedProducts] = useState<PickerProduct[]>([])
   const [rewardPickerOpen, setRewardPickerOpen] = useState(false)
   const [rewardProducts, setRewardProducts] = useState<PickerProduct[]>([])
+  // Catalog the promotion targets (step 1 of the wizard).
+  const [selectedCatalogId, setSelectedCatalogId] = useState<string | undefined>(undefined)
+  // Deep-link step (1-based) when opened from the catalog "Tools" modal.
+  const [initialStep, setInitialStep] = useState<number | undefined>(undefined)
 
   // Build API status param: only pass if single status selected (API accepts one status)
   const apiStatus = selectedStatuses.length === 1 ? selectedStatuses[0] : undefined
@@ -89,6 +101,24 @@ function PromotionsPage() {
     staleTime: Infinity,
     refetchOnMount: 'always',
   })
+
+  // Deep link from the catalog "Tools" modal: open the creation wizard on the
+  // requested step with the catalog preselected, then drop the URL params.
+  useEffect(() => {
+    if (!search.catalogId) return
+    setEditingPromo(null)
+    setSelectedProducts([])
+    setRewardProducts([])
+    setSelectedCatalogId(search.catalogId)
+    setInitialStep(search.step ?? 2)
+    setModalOpen(true)
+    navigate({
+      to: '/app/$orgSlug/promotions',
+      params: { orgSlug },
+      search: {},
+      replace: true,
+    })
+  }, [search.catalogId, search.step, orgSlug, navigate])
 
   const { data, isLoading } = useQuery({
     queryKey: ['promotions', orgSlug, debouncedSearch, apiStatus, currentPage, pageSize],
@@ -124,6 +154,8 @@ function PromotionsPage() {
     mutationFn: (data: PromotionSubmitData) =>
       promotionApi.create({
         organisationId: orgSlug,
+        catalogId: data.catalogId || undefined,
+        status: data.status,
         name: data.name,
         code: data.code,
         discountType: data.discountType,
@@ -155,6 +187,8 @@ function PromotionsPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: PromotionSubmitData }) =>
       promotionApi.update(id, {
+        catalogId: data.catalogId || null,
+        status: data.status,
         name: data.name,
         code: data.code,
         discountType: data.discountType,
@@ -268,6 +302,10 @@ function PromotionsPage() {
 
   const handleCreate = () => {
     setEditingPromo(null)
+    setSelectedCatalogId(undefined)
+    setInitialStep(undefined)
+    setSelectedProducts([])
+    setRewardProducts([])
     setModalOpen(true)
   }
 
@@ -276,6 +314,8 @@ function PromotionsPage() {
     setEditingPromo(null)
     setSelectedProducts([])
     setRewardProducts([])
+    setSelectedCatalogId(undefined)
+    setInitialStep(undefined)
   }
 
   const handleDelete = (promo: PromotionItem) => {
@@ -290,6 +330,10 @@ function PromotionsPage() {
   }
 
   const columns = usePromotionColumns({ onEdit: handleEdit, onDelete: handleDelete })
+
+  // Once a catalog is chosen in the wizard, scope the product pickers to it
+  // (and hide the catalog selector inside them).
+  const selectedCatalog = catalogsQuery.data?.find((c) => c.id === selectedCatalogId)
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -397,6 +441,10 @@ function PromotionsPage() {
         onClose={handleCloseModal}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         editingPromo={editingPromo as any}
+        catalogs={catalogsQuery.data ?? []}
+        selectedCatalogId={selectedCatalogId}
+        setSelectedCatalogId={setSelectedCatalogId}
+        initialStep={initialStep}
         onOpenProductPicker={() => setProductPickerOpen(true)}
         selectedProductIds={selectedProducts.map((p) => p.id)}
         setSelectedProductIds={(ids) => {
@@ -422,7 +470,8 @@ function PromotionsPage() {
         onSave={() => {}}
         onSaveProducts={setSelectedProducts}
         initialSelection={selectedProducts.map((p) => p.id)}
-        catalogs={catalogsQuery.data}
+        catalogs={selectedCatalog ? [selectedCatalog] : catalogsQuery.data}
+        hideCatalogSelect
       />
       <ProductPickerModal
         open={rewardPickerOpen}
@@ -430,7 +479,8 @@ function PromotionsPage() {
         onSave={() => {}}
         onSaveProducts={setRewardProducts}
         initialSelection={rewardProducts.map((p) => p.id)}
-        catalogs={catalogsQuery.data}
+        catalogs={selectedCatalog ? [selectedCatalog] : catalogsQuery.data}
+        hideCatalogSelect
       />
     </div>
   )

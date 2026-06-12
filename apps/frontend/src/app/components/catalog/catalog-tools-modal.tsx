@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { Button, Card, Modal, Typography } from 'antd'
-import { Sparkles, Link2, Wand2, Unlink } from 'lucide-react'
+import { Sparkles, Link2, Wand2, Unlink, BadgePercent } from 'lucide-react'
 import { ConfirmDisconnectModal } from '@app/components/shared/confirm-disconnect-modal'
 
 const { Text } = Typography
@@ -21,6 +21,8 @@ interface CatalogToolsModalProps {
   onOpenContextFlow: () => void
   onOpenLinkPostsFlow: () => void
   onOpenStudio: () => void
+  /** Navigate to the promotion creation wizard, preset to this catalog. */
+  onCreatePromotion: () => void
   /** Catalog name — typed back by the user to confirm the disconnect. */
   catalogName: string
   /** Performs the actual catalog deletion. */
@@ -33,6 +35,7 @@ export function CatalogToolsModal({
   onOpenContextFlow,
   onOpenLinkPostsFlow,
   onOpenStudio,
+  onCreatePromotion,
   catalogName,
   onDisconnect,
 }: CatalogToolsModalProps) {
@@ -45,6 +48,15 @@ export function CatalogToolsModal({
   }
 
   const actions: ToolAction[] = [
+    {
+      key: 'create-promotion',
+      icon: <BadgePercent size={20} strokeWidth={1.75} />,
+      title: 'Créer une promotion pour ce catalogue',
+      subtitle:
+        'Lancez une réduction, un crédit ou des produits offerts sur les produits de ce catalogue.',
+      actionLabel: 'Créer une promotion',
+      onClick: run(onCreatePromotion),
+    },
     {
       key: 'design-studio',
       icon: <Wand2 size={20} strokeWidth={1.75} />,

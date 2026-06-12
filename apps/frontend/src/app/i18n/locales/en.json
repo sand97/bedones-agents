@@ -889,7 +889,16 @@
     "no_reward_products": "No free products",
     "reward_products_hint": "Select the products offered to the customer when the promotion applies.",
     "reward_products_count_one": "{{count}} free product",
-    "reward_products_count_other": "{{count}} free products"
+    "reward_products_count_other": "{{count}} free products",
+    "step_catalog": "Catalog",
+    "step_info": "Information",
+    "step_eligibility": "Eligibility",
+    "step_reward": "Reward",
+    "select_catalog": "Choose a catalog",
+    "select_catalog_hint": "The promotion will apply to the products of this catalog.",
+    "no_catalogs": "No catalog available",
+    "next": "Next",
+    "back": "Back"
   },
   "agent": {
     "title": "My Agent",

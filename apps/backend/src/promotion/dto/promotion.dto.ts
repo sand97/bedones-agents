@@ -4,11 +4,17 @@ export class CreatePromotionDto {
   @ApiProperty()
   organisationId: string
 
+  @ApiPropertyOptional({ description: 'Catalog the promotion targets' })
+  catalogId?: string
+
   @ApiProperty()
   name: string
 
   @ApiPropertyOptional()
   description?: string
+
+  @ApiPropertyOptional({ enum: ['DRAFT', 'ACTIVE', 'PAUSED', 'EXPIRED'] })
+  status?: string
 
   @ApiPropertyOptional({ enum: ['PERCENTAGE', 'FIXED_AMOUNT'] })
   discountType?: string
@@ -51,6 +57,9 @@ export class CreatePromotionDto {
 }
 
 export class UpdatePromotionDto {
+  @ApiPropertyOptional({ description: 'Catalog the promotion targets' })
+  catalogId?: string
+
   @ApiPropertyOptional()
   name?: string
 

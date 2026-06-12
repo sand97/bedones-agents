@@ -642,6 +642,8 @@ export interface PromotionItem {
   id: string
   name: string
   description?: string
+  catalogId?: string | null
+  catalog?: { id: string; name: string } | null
   discountType: 'PERCENTAGE' | 'FIXED_AMOUNT'
   discountValue: number
   code?: string
@@ -701,8 +703,10 @@ export const promotionApi = {
 
   create: (data: {
     organisationId: string
+    catalogId?: string
     name: string
     description?: string
+    status?: string
     discountType?: string
     discountValue?: number
     code?: string
@@ -721,6 +725,7 @@ export const promotionApi = {
   update: (
     id: string,
     data: {
+      catalogId?: string | null
       name?: string
       description?: string
       discountType?: string

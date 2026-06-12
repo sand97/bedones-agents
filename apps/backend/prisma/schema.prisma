@@ -342,6 +342,7 @@ model Catalog {
   products            Product[]
   socialAccounts      CatalogSocialAccount[]
   pageSettings        PageSettings[]
+  promotions          Promotion[]
   productContexts     ProductContext[]
   collectionContexts  CollectionContext[]
   productPostLinks    ProductPostLink[]
@@ -633,6 +634,10 @@ model Promotion {
   id             String                @id @default(uuid())
   organisationId String
   organisation   Organisation          @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  // Catalog the promotion targets. Nullable for legacy org-wide promotions
+  // created before promotions became catalog-scoped.
+  catalogId      String?
+  catalog        Catalog?              @relation(fields: [catalogId], references: [id], onDelete: SetNull)
   name           String
   description    String?
   discountType   PromotionDiscountType @default(PERCENTAGE)
@@ -661,6 +666,7 @@ model Promotion {
   rewardProducts PromotionRewardProduct[]
 
   @@index([organisationId])
+  @@index([catalogId])
   @@index([status])
 }
 
