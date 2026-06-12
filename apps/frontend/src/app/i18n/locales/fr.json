@@ -667,6 +667,7 @@
     "confirm_body_multi": "Les membres ci-dessous ne recevront plus les notifications « {{label}} » pour le compte {{network}} · {{page}}.",
     "confirm_deactivate": "Désactiver",
     "table_action_title": "Préférences de notification",
+    "all_collections": "Toutes les collections",
     "types": {
       "comment_to_read": "Commentaires à lire",
       "comment_to_read_desc": "Commentaires nécessitant une intervention d'un membre de l'équipe.",

@@ -18,6 +18,7 @@ import {
   useBulkUpdateNotificationPreferenceMutation,
   useNotificationPreferencesQuery,
 } from './notification-preferences-api'
+import { TicketCollectionSelect } from './ticket-collection-select'
 
 const NETWORK_LABEL: Record<SocialProvider, string> = {
   FACEBOOK: 'Facebook',
@@ -570,6 +571,7 @@ interface RowProps {
   members: NotifMember[]
   preferences: NotificationPreferenceRow[]
   pending: PendingMap
+  organisationId: string
   onStage: (input: {
     userIds: string[]
     type: NotificationType
@@ -578,10 +580,23 @@ interface RowProps {
   }) => void
 }
 
-function Row({ page, group, type, members, preferences, pending, onStage }: RowProps) {
+function Row({
+  page,
+  group,
+  type,
+  members,
+  preferences,
+  pending,
+  onStage,
+  organisationId,
+}: RowProps) {
   const { t } = useTranslation()
   const status = aggregateStatus(preferences, pending, members, page.id, type)
   const { onUsers, offUsers } = splitByStatus(preferences, pending, members, page.id, type)
+  const isTicketType = type === 'MESSAGE_TICKET_CREATED' || type === 'MESSAGE_TICKET_CLOSED'
+  const memberPref = preferences.find(
+    (p) => p.userId === members[0]?.id && p.socialAccountId === page.id && p.type === type,
+  )
   const optionLabel = t(`notifications.types.${type.toLowerCase()}`)
   const optionSub = t(`notifications.types.${type.toLowerCase()}_desc`)
   const networkLabel =
@@ -601,6 +616,17 @@ function Row({ page, group, type, members, preferences, pending, onStage }: RowP
         </div>
         <div className="notif-modal__row-sub">{optionSub}</div>
       </div>
+      {isTicketType && page.catalogId && members[0] && (
+        <TicketCollectionSelect
+          organisationId={organisationId}
+          catalogId={page.catalogId}
+          socialAccountId={page.id}
+          userIds={members.map((m) => m.id)}
+          type={type}
+          enabled={memberPref?.enabled ?? true}
+          value={memberPref?.collectionIds ?? []}
+        />
+      )}
       <ActionsRow
         status={status}
         members={members}
@@ -762,6 +788,7 @@ export function NotificationPreferencesModal({
                     members={renderMembers}
                     preferences={query.data.preferences}
                     pending={pending}
+                    organisationId={organisationId}
                     onStage={stage}
                   />
                 ))}
@@ -778,6 +805,7 @@ export function NotificationPreferencesModal({
                     members={renderMembers}
                     preferences={query.data.preferences}
                     pending={pending}
+                    organisationId={organisationId}
                     onStage={stage}
                   />
                 ))}

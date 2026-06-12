@@ -50,6 +50,7 @@ export class NotificationPreferenceService {
           pageName: true,
           username: true,
           profilePictureUrl: true,
+          catalogs: { select: { catalog: { select: { id: true } } }, take: 1 },
         },
       }),
       this.prisma.organisationMember.findMany({
@@ -74,10 +75,21 @@ export class NotificationPreferenceService {
       }),
     ])
 
-    const commentSocialAccounts = socialAccounts.filter((sa) =>
+    // Flatten the (first) linked catalog id so the UI can list its collections
+    // for the per-member ticket-notification collection filter.
+    const flat = socialAccounts.map((sa) => ({
+      id: sa.id,
+      provider: sa.provider,
+      providerAccountId: sa.providerAccountId,
+      pageName: sa.pageName,
+      username: sa.username,
+      profilePictureUrl: sa.profilePictureUrl,
+      catalogId: sa.catalogs[0]?.catalog?.id ?? null,
+    }))
+    const commentSocialAccounts = flat.filter((sa) =>
       (COMMENT_PROVIDERS as readonly string[]).includes(sa.provider),
     )
-    const messagingSocialAccounts = socialAccounts.filter((sa) =>
+    const messagingSocialAccounts = flat.filter((sa) =>
       (MESSAGING_PROVIDERS as readonly string[]).includes(sa.provider),
     )
 

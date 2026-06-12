@@ -667,6 +667,7 @@
     "confirm_body_multi": "The members listed below will no longer receive « {{label}} » notifications for the {{network}} · {{page}} account.",
     "confirm_deactivate": "Disable",
     "table_action_title": "Notification preferences",
+    "all_collections": "All collections",
     "types": {
       "comment_to_read": "Comments to review",
       "comment_to_read_desc": "Comments needing intervention from a team member.",

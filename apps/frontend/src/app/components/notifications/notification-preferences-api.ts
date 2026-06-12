@@ -44,6 +44,8 @@ export interface NotifSocialAccount {
   pageName: string | null
   username: string | null
   profilePictureUrl: string | null
+  /** First linked catalog id (for the ticket collection filter), if any. */
+  catalogId: string | null
 }
 
 export interface NotifMember {
