@@ -1151,10 +1151,17 @@ export class MessagingService {
     if (!conversation) throw new NotFoundException('Conversation not found')
     await this.assertAdmin(userId, conversation.socialAccount.organisationId)
 
+    const seen = new Set<string>()
     const lines = (content ?? '')
       .split('\n')
       .map((l) => l.trim())
-      .filter((l) => l.length > 0)
+      .filter((l) => {
+        if (l.length === 0) return false
+        const key = l.toLowerCase()
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
 
     const existing = await this.prisma.contactNote.findMany({
       where: { conversationId },
