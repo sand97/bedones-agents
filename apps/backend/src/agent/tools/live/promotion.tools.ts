@@ -2,7 +2,16 @@ import { tool } from '@langchain/core/tools'
 import { z } from 'zod'
 import type { PrismaService } from '../../../prisma/prisma.service'
 
-export function createPromotionTools(deps: { prisma: PrismaService; organisationId: string }) {
+export function createPromotionTools(deps: {
+  prisma: PrismaService
+  organisationId: string
+  /** Catalogs linked to the social account the agent is serving. Promotions are
+   *  filtered to these catalogs (plus legacy org-wide promotions with no catalog). */
+  catalogIds: string[]
+}) {
+  // Promotions visible to this agent: the ones targeting one of the social
+  // account's catalogs, plus legacy org-wide promotions (catalogId = null).
+  const catalogScope = [{ catalogId: null }, { catalogId: { in: deps.catalogIds } }]
   type PromoLike = {
     discountType: string
     discountValue: number
@@ -37,6 +46,7 @@ export function createPromotionTools(deps: { prisma: PrismaService; organisation
       try {
         const where: Record<string, unknown> = {
           organisationId: deps.organisationId,
+          OR: catalogScope,
         }
         if (activeOnly) {
           where.status = 'ACTIVE'

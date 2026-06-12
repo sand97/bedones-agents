@@ -25,6 +25,7 @@ export class PromotionService {
       this.prisma.promotion.findMany({
         where,
         include: {
+          catalog: { select: { id: true, name: true } },
           products: {
             include: {
               product: {
@@ -69,6 +70,7 @@ export class PromotionService {
     const promotion = await this.prisma.promotion.findUnique({
       where: { id },
       include: {
+        catalog: { select: { id: true, name: true } },
         products: {
           include: {
             product: {
@@ -144,8 +146,10 @@ export class PromotionService {
 
   async create(data: {
     organisationId: string
+    catalogId?: string
     name: string
     description?: string
+    status?: string
     discountType?: string
     discountValue?: number
     code?: string
@@ -170,8 +174,10 @@ export class PromotionService {
     const promotion = await this.prisma.promotion.create({
       data: {
         organisationId: data.organisationId,
+        catalogId: data.catalogId ?? null,
         name: data.name,
         description: data.description,
+        status: (data.status as 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'EXPIRED' | undefined) ?? 'ACTIVE',
         discountType:
           derived?.discountType ??
           (data.discountType as 'PERCENTAGE' | 'FIXED_AMOUNT') ??
@@ -201,6 +207,7 @@ export class PromotionService {
   async update(
     id: string,
     data: {
+      catalogId?: string | null
       name?: string
       description?: string
       discountType?: string
@@ -225,6 +232,7 @@ export class PromotionService {
     await this.prisma.promotion.update({
       where: { id },
       data: {
+        catalogId: data.catalogId,
         name: data.name,
         description: data.description,
         discountType:

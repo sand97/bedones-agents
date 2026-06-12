@@ -821,6 +821,13 @@ function CatalogPage() {
               )}&org=${encodeURIComponent(orgSlug)}`
               window.open(url, '_blank', 'noopener,noreferrer')
             }}
+            onCreatePromotion={() =>
+              navigate({
+                to: '/app/$orgSlug/promotions',
+                params: { orgSlug },
+                search: { catalogId: selectedCatalog.id, step: 2 },
+              })
+            }
             catalogName={selectedCatalog.name}
             onDisconnect={() => deleteCatalogMutation.mutateAsync(selectedCatalog.id)}
           />

@@ -891,7 +891,16 @@
     "no_reward_products": "Aucun produit offert",
     "reward_products_hint": "Sélectionnez les produits offerts au client lorsqu'il bénéficie de la promotion.",
     "reward_products_count_one": "{{count}} produit offert",
-    "reward_products_count_other": "{{count}} produits offerts"
+    "reward_products_count_other": "{{count}} produits offerts",
+    "step_catalog": "Catalogue",
+    "step_info": "Informations",
+    "step_eligibility": "Éligibilité",
+    "step_reward": "Récompense",
+    "select_catalog": "Choisissez un catalogue",
+    "select_catalog_hint": "La promotion s'appliquera aux produits de ce catalogue.",
+    "no_catalogs": "Aucun catalogue disponible",
+    "next": "Suivant",
+    "back": "Précédent"
   },
   "agent": {
     "title": "Mon Agent",

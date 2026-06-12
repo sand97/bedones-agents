@@ -77,8 +77,15 @@ export async function buildLiveAgentTools(ctx: LiveAgentToolContext) {
   // labels / contact notes are injected into the system prompt rather than read
   // through a tool.)
   const hasCatalog = ctx.catalogIds.length > 0
+  // Promotions the agent may surface: those targeting one of this social
+  // account's catalogs, plus legacy org-wide promotions (no catalog).
   const hasPromotions =
-    (await ctx.prisma.promotion.count({ where: { organisationId: ctx.organisationId } })) > 0
+    (await ctx.prisma.promotion.count({
+      where: {
+        organisationId: ctx.organisationId,
+        OR: [{ catalogId: null }, { catalogId: { in: ctx.catalogIds } }],
+      },
+    })) > 0
 
   return [
     ...createCommunicationTools({
@@ -107,6 +114,7 @@ export async function buildLiveAgentTools(ctx: LiveAgentToolContext) {
       ? createPromotionTools({
           prisma: ctx.prisma,
           organisationId: ctx.organisationId,
+          catalogIds: ctx.catalogIds,
         })
       : []),
     ...createContactNoteTools({
