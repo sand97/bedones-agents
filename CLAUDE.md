@@ -1,5 +1,11 @@
 # Bedones Agents
 
+## Règles Workflow Git / PR
+
+- **Toute tâche doit se terminer par une PR ouverte sur la branche de travail.** Pousser sur une branche ne suffit **pas** : « pousser sur une PR » ne veut rien dire. On pousse sur une **branche** ; si cette branche n'a pas de PR ouverte, il faut en **ouvrir une**. Une tâche n'est jamais terminée tant qu'une PR n'est pas ouverte (ou déjà ouverte) sur la branche.
+- **Exception : si une PR est déjà ouverte sur la branche de travail**, continuer à pousser dessus — ne pas en ouvrir une nouvelle.
+- Ne pas demander à l'utilisateur s'il faut ouvrir une PR : ouvrir la PR (quand il n'y en a pas) fait partie intégrante de la tâche.
+
 ## Règles Sécurité
 
 - **Toujours masquer les données sensibles par défaut** via le `omit` global de Prisma dans `PrismaService`. Les champs comme `passwordHash`, `accessToken`, `refreshToken` ne doivent **jamais** être retournés par défaut dans les requêtes Prisma. Si un service interne a besoin d'un champ masqué, utiliser `omit: { fieldName: false }` ou un `select` explicite dans la requête concernée.
