@@ -265,7 +265,12 @@ function MembersPage() {
               </div>
             ) : (
               paginatedMembers.map((member) => (
-                <MemberDescriptionCard key={member.id} member={member} onDelete={handleDelete} />
+                <MemberDescriptionCard
+                  key={member.id}
+                  member={member}
+                  onDelete={handleDelete}
+                  onOpenNotifPrefs={(m) => setNotifPrefsMembers([m])}
+                />
               ))
             )}
           </div>

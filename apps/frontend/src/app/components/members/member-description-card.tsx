@@ -9,9 +9,14 @@ import { MEMBER_ROLE_CONFIG, type Member } from './mock-data'
 interface MemberDescriptionCardProps {
   member: Member
   onDelete?: (memberId: string) => Promise<void>
+  onOpenNotifPrefs?: (member: Member) => void
 }
 
-export function MemberDescriptionCard({ member, onDelete }: MemberDescriptionCardProps) {
+export function MemberDescriptionCard({
+  member,
+  onDelete,
+  onOpenNotifPrefs,
+}: MemberDescriptionCardProps) {
   const { t } = useTranslation()
   const roleConfig = MEMBER_ROLE_CONFIG[member.role]
   const isInvited = member.status === 'invited'
@@ -39,11 +44,13 @@ export function MemberDescriptionCard({ member, onDelete }: MemberDescriptionCar
       <Descriptions.Item label={t('members.added_at')}>
         <span className="text-text-secondary">{formatDate(member.joinedAt)}</span>
       </Descriptions.Item>
-      {member.role !== 'owner' && (
-        <Descriptions.Item>
-          <MemberActions member={member} onDelete={onDelete} />
-        </Descriptions.Item>
-      )}
+      {/* Always render the actions — MemberActions hides only the delete button
+          for owners, so a non-deletable account can still configure its
+          notifications. onOpenNotifPrefs must be forwarded or the bell is a no-op
+          on mobile. */}
+      <Descriptions.Item>
+        <MemberActions member={member} onDelete={onDelete} onOpenNotifPrefs={onOpenNotifPrefs} />
+      </Descriptions.Item>
     </Descriptions>
   )
 }
