@@ -56,6 +56,8 @@ const ICONS = {
     '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
   messageCircle: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
   messageSquare: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  userPlus:
+    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
 }
 
 // Une entrée par image : nom de fichier, icône, couleur d'accent de la section.
@@ -71,6 +73,7 @@ const SECTIONS = [
   { file: 'website', icon: 'globe', accent: '#14b8a6' },
   { file: 'messaging', icon: 'messageCircle', accent: '#22c55e' },
   { file: 'comments', icon: 'messageSquare', accent: '#f97316' },
+  { file: 'invitation', icon: 'userPlus', accent: '#4f46e5' },
   { file: 'app', icon: 'layoutGrid', accent: '#6366f1' },
 ]
 
