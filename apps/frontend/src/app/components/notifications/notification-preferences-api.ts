@@ -58,6 +58,8 @@ export interface NotificationPreferenceRow {
   socialAccountId: string
   type: NotificationType
   enabled: boolean
+  /** Ticket notifications: restrict to these collection ids (empty = all). */
+  collectionIds: string[]
 }
 
 export interface NotificationPreferencesResponse {
@@ -100,6 +102,8 @@ export function useBulkUpdateNotificationPreferenceMutation(
       socialAccountId: string
       type: NotificationType
       enabled: boolean
+      /** Ticket types only: restrict to these collection ids (empty = all). */
+      collectionIds?: string[]
     }): Promise<NotificationPreferenceRow[]> => {
       return apiFetch<NotificationPreferenceRow[]>(
         `/notification-preferences/org/${organisationId}/bulk`,
