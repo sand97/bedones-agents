@@ -412,7 +412,7 @@
     "clear_conversation_confirm": "Clear all messages in this conversation? This cannot be undone.",
     "conversation_cleared": "Conversation cleared",
     "clear_conversation_error": "Couldn't clear the conversation",
-    "knowledge_menu": "What we know about the customer",
+    "knowledge_menu": "Knowledge",
     "knowledge_title": "What we know about the customer",
     "knowledge_description": "The durable facts the AI keeps about this customer (delivery address, phone, sizes, preferences…). The agent uses it to avoid asking again, and the ticket agent uses it to complete orders. One fact per line.",
     "knowledge_placeholder": "Nothing known about this customer yet.",

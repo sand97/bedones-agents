@@ -190,7 +190,7 @@ export function AgentActivateModal({
           disabled={!canSubmit()}
           loading={loading}
         >
-          {t('agent.activate_modal_submit')}
+          {agent.status === 'ACTIVE' ? t('common.save') : t('agent.activate_modal_submit')}
         </Button>,
       ]}
       width={520}
@@ -205,6 +205,7 @@ export function AgentActivateModal({
               <span className="text-xs text-text-muted">{t('agent.model_hint')}</span>
             </div>
             <Segmented
+              className="pricing-billing-toggle"
               block
               value={modelTier}
               disabled={modelTierSaving}

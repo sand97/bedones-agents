@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { buildShareMeta } from '@app/lib/share-meta'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, Spin, Tooltip, App } from 'antd'
@@ -43,6 +43,9 @@ export const Route = createFileRoute('/app/$orgSlug/agents')({
       description: 'Cliquez pour découvrir les agents IA de ce compte',
       image: '/og/agents.png',
     }),
+  validateSearch: (search: Record<string, unknown>): { agent?: string } => ({
+    agent: (search.agent as string) || undefined,
+  }),
   component: AgentsPage,
 })
 
@@ -68,15 +71,22 @@ function AgentsPage() {
   const { isDesktop } = useLayout()
   const queryClient = useQueryClient()
 
-  // Unlike chats/comments, the agents page intentionally does NOT restore the
-  // last-opened agent on refresh — the user prefers to land back on the agent
-  // list rather than be sent straight into a conversation. Selection is kept in
-  // local state only (not mirrored in the URL).
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
+  // The open agent is mirrored in the URL (?agent=<id>) so a refresh restores it
+  // instead of dropping the user back on the agent list.
+  const search = useSearch({ from: '/app/$orgSlug/agents' })
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(search.agent ?? null)
 
-  const selectAgent = useCallback((agentId: string | null) => {
-    setSelectedAgentId(agentId)
-  }, [])
+  const selectAgent = useCallback(
+    (agentId: string | null) => {
+      setSelectedAgentId(agentId)
+      navigate({
+        search: (prev: Record<string, unknown>) =>
+          ({ ...prev, agent: agentId ?? undefined }) as never,
+        replace: true,
+      })
+    },
+    [navigate],
+  )
   const [createOpen, setCreateOpen] = useState(false)
   const [activateOpen, setActivateOpen] = useState(false)
   const [scorePromptOpen, setScorePromptOpen] = useState(false)
@@ -88,8 +98,9 @@ function AgentsPage() {
   const [messages, setMessages] = useState<AgentMessage[]>([])
   const [pendingQuestion, setPendingQuestion] = useState<AgentMessage | null>(null)
   const [isThinking, setIsThinking] = useState(false)
-  // On mobile the list is shown first; opening an agent hides it.
-  const [showList, setShowList] = useState(true)
+  // On mobile the list is shown first; opening an agent hides it. When an agent is
+  // restored from the URL on load, jump straight to it.
+  const [showList, setShowList] = useState(() => !search.agent)
   const [setupPhase, setSetupPhase] = useState<
     'analyzing-catalogs' | 'initializing' | 'error' | null
   >(null)
