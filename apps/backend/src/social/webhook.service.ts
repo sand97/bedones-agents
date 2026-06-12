@@ -1134,12 +1134,7 @@ export class WebhookService {
         // app address-book contacts (and later additions/changes) so we can show
         // the name the business saved instead of the raw phone number.
         const isAppStateSyncField = change.field === 'smb_app_state_sync'
-        if (
-          !isMessageField &&
-          !isMessageEchoField &&
-          !isHistoryField &&
-          !isAppStateSyncField
-        )
+        if (!isMessageField && !isMessageEchoField && !isHistoryField && !isAppStateSyncField)
           continue
 
         const value = change.value
@@ -1195,7 +1190,15 @@ export class WebhookService {
         }
 
         // Handle incoming messages
+        const ownNumber = value.metadata?.display_phone_number?.replace(/\D/g, '')
         for (const msg of value.messages || []) {
+          // Defensive: never treat the page's OWN number as an inbound customer
+          // message. Some coexistence setups echo self-sends into `messages`,
+          // which would wrongly run — and bill — the agent on its own message.
+          if (ownNumber && msg.from?.replace(/\D/g, '') === ownNumber) {
+            this.logger.debug(`[WhatsApp] Ignoring self-message from ${msg.from}`)
+            continue
+          }
           await this.handleWhatsAppMessage(
             socialAccount.id,
             phoneNumberId,
