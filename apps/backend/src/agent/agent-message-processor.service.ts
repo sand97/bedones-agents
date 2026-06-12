@@ -21,6 +21,7 @@ import type { CreditMediaType } from '../../generated/prisma/client'
 
 import { runLiveAgent } from './run-live-agent'
 import { describeMessageForAgent } from './message-history.util'
+import { createSingleReplyGuard } from './tools/live/turn-guard'
 import { TicketAgentService } from './ticket-agent.service'
 import { contactMatchesConversation } from '../social/contact-match.util'
 
@@ -320,8 +321,16 @@ export class AgentMessageProcessorService {
     const callLimit = this.config.get<number>('AGENT_MODEL_CALL_LIMIT') || 6
 
     // Fire-and-forget typing indicator while the agent is reflecting.
-    // WhatsApp/Meta indicators auto-expire after ~20-25s; we refresh every 18s.
+    // WhatsApp/Meta indicators auto-expire after ~20-25s; we refresh every 18s —
+    // but STOP as soon as the agent has delivered its message, otherwise a late
+    // tool call (save_contact_note, request_ticket…) would re-show "typing" to
+    // the customer after the reply was already sent.
+    const replyGuard = createSingleReplyGuard()
     const typingInterval = setInterval(() => {
+      if (replyGuard.sent) {
+        clearInterval(typingInterval)
+        return
+      }
       void this.messagingService.sendTypingIndicator(event.conversationId)
     }, 18_000)
     void this.messagingService.sendTypingIndicator(event.conversationId)
@@ -353,6 +362,7 @@ export class AgentMessageProcessorService {
           catalogProviderMap,
           canSendButtons,
           canSendProducts,
+          replyGuard,
           enqueueTicketRequest: (p) => this.ticketAgent.enqueue(p),
         },
       })

@@ -17,7 +17,7 @@ import { createPromotionTools } from './tools/live/promotion.tools'
 import { createProductMessagingTools } from './tools/live/product-messaging.tools'
 import { createContactNoteTools } from './tools/live/contact-note.tools'
 import { createButtonMessagingTools } from './tools/live/button-messaging.tools'
-import { createSingleReplyGuard } from './tools/live/turn-guard'
+import { createSingleReplyGuard, type SingleReplyGuard } from './tools/live/turn-guard'
 
 const _require = createRequire(__filename)
 const { createReactAgent } = _require('@langchain/langgraph/prebuilt')
@@ -42,6 +42,9 @@ export interface LiveAgentToolContext {
   catalogProviderMap: Record<string, string>
   canSendButtons: boolean
   canSendProducts: boolean
+  /** Shared single-reply guard. When provided, the caller can observe when the
+   *  agent has delivered its message (e.g. to stop the typing indicator). */
+  replyGuard?: SingleReplyGuard
   /** Enqueue an async ticket evaluation for this conversation. Omitted in dry-run. */
   enqueueTicketRequest?: (payload: {
     conversationId: string
@@ -58,8 +61,9 @@ export interface LiveAgentToolContext {
  */
 export async function buildLiveAgentTools(ctx: LiveAgentToolContext) {
   // One guard per turn, shared by the customer-facing tools, to GUARANTEE that
-  // at most one message is delivered to the customer (no double replies).
-  const replyGuard = createSingleReplyGuard()
+  // at most one message is delivered to the customer (no double replies). The
+  // caller may pass its own so it can observe delivery (e.g. to stop typing).
+  const replyGuard = ctx.replyGuard ?? createSingleReplyGuard()
 
   // Shared product→catalog index: search_products fills it, send_products reads
   // it so the catalog is resolved from the product (never guessed by the model).
