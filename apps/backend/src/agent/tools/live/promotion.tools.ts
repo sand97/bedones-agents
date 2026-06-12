@@ -3,6 +3,35 @@ import { z } from 'zod'
 import type { PrismaService } from '../../../prisma/prisma.service'
 
 export function createPromotionTools(deps: { prisma: PrismaService; organisationId: string }) {
+  type PromoLike = {
+    discountType: string
+    discountValue: number
+    rewardType: string | null
+    rewardCredit: number | null
+    rewardPercent: number | null
+    rewardProducts: Array<{ product: { name: string } }>
+    minOrderAmount: number | null
+    minItemCount: number | null
+  }
+
+  const formatReward = (p: PromoLike): string => {
+    if (p.rewardType === 'PRODUCTS') {
+      const names = p.rewardProducts.map((rp) => rp.product.name).filter(Boolean)
+      return names.length ? `Produits offerts: ${names.join(', ')}` : 'Produits offerts'
+    }
+    if (p.rewardType === 'CREDIT') return `Credit: ${p.rewardCredit ?? p.discountValue} FCFA`
+    if (p.rewardType === 'PERCENT') return `-${p.rewardPercent ?? p.discountValue}%`
+    // Legacy promos without a rewardType still rely on discountType/discountValue.
+    return p.discountType === 'PERCENTAGE' ? `-${p.discountValue}%` : `-${p.discountValue} FCFA`
+  }
+
+  const formatConditions = (p: PromoLike): string => {
+    const parts: string[] = []
+    if (p.minOrderAmount != null) parts.push(`Min commande: ${p.minOrderAmount} FCFA`)
+    if (p.minItemCount != null) parts.push(`Min articles: ${p.minItemCount}`)
+    return parts.join(', ')
+  }
+
   const listPromotions = tool(
     async ({ activeOnly }) => {
       try {
@@ -21,6 +50,9 @@ export function createPromotionTools(deps: { prisma: PrismaService; organisation
                 product: { select: { id: true, name: true, price: true, currency: true } },
               },
             },
+            rewardProducts: {
+              include: { product: { select: { id: true, name: true } } },
+            },
             _count: { select: { products: true } },
           },
           orderBy: { createdAt: 'desc' },
@@ -30,15 +62,17 @@ export function createPromotionTools(deps: { prisma: PrismaService; organisation
         if (promotions.length === 0) return 'Aucune promotion trouvee.'
 
         const lines = promotions.map((p) => {
-          const discount =
-            p.discountType === 'PERCENTAGE' ? `-${p.discountValue}%` : `-${p.discountValue} FCFA`
+          const reward = formatReward(p)
           const period =
             p.startDate && p.endDate
               ? `Du ${p.startDate.toISOString().split('T')[0]} au ${p.endDate.toISOString().split('T')[0]}`
-              : 'Sans periode'
+              : p.startDate
+                ? `A partir du ${p.startDate.toISOString().split('T')[0]}`
+                : 'Sans periode'
           const products =
             p._count.products > 0 ? `${p._count.products} produit(s)` : 'Tous les produits'
-          return `ID: ${p.id} | ${p.name} | Code: ${p.code || 'N/A'} | ${discount} | ${period} | ${products} | Statut: ${p.status} | Cumulable: ${p.stackable ? 'Oui' : 'Non'}`
+          const conditions = formatConditions(p)
+          return `ID: ${p.id} | ${p.name} | Code: ${p.code || 'N/A'} | ${reward} | ${period} | ${products} | Statut: ${p.status} | Cumulable: ${p.stackable ? 'Oui' : 'Non'}${conditions ? ` | ${conditions}` : ''}`
         })
         return lines.join('\n')
       } catch (error: unknown) {
@@ -68,20 +102,27 @@ export function createPromotionTools(deps: { prisma: PrismaService; organisation
                 },
               },
             },
+            rewardProducts: {
+              include: { product: { select: { id: true, name: true } } },
+            },
           },
         })
 
         if (!promo) return 'Promotion introuvable.'
 
-        const discount =
-          promo.discountType === 'PERCENTAGE'
-            ? `-${promo.discountValue}%`
-            : `-${promo.discountValue} FCFA`
+        const reward = formatReward(promo)
 
-        let result = `Nom: ${promo.name}\nCode: ${promo.code || 'N/A'}\nReduction: ${discount}\nStatut: ${promo.status}\nCumulable: ${promo.stackable ? 'Oui' : 'Non'}`
+        let result = `Nom: ${promo.name}\nCode: ${promo.code || 'N/A'}\nRecompense: ${reward}\nStatut: ${promo.status}\nCumulable: ${promo.stackable ? 'Oui' : 'Non'}`
+
+        const conditions = formatConditions(promo)
+        if (conditions) {
+          result += `\nConditions d'eligibilite: ${conditions}`
+        }
 
         if (promo.startDate && promo.endDate) {
           result += `\nPeriode: ${promo.startDate.toISOString().split('T')[0]} — ${promo.endDate.toISOString().split('T')[0]}`
+        } else if (promo.startDate) {
+          result += `\nPeriode: a partir du ${promo.startDate.toISOString().split('T')[0]}`
         }
 
         if (promo.description) {

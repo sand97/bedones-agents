@@ -43,13 +43,27 @@ export function usePromotionColumns({
       title: t('promotions.discount'),
       key: 'value',
       width: 140,
-      render: (_: unknown, record: PromotionItem) => (
-        <span className="text-sm font-medium text-text-primary">
-          {record.discountType === 'PERCENTAGE'
-            ? `-${record.discountValue}%`
-            : `-${formatPrice(record.discountValue, 'FCFA')}`}
-        </span>
-      ),
+      render: (_: unknown, record: PromotionItem) => {
+        if (record.rewardType === 'PRODUCTS') {
+          const names = (record.rewardProducts ?? []).map((p) => p.product.name).filter(Boolean)
+          return (
+            <Tooltip title={names.join(', ')}>
+              <span className="text-sm font-medium text-text-primary">
+                {t('promotions.reward_products_count', {
+                  count: record.rewardProducts?.length ?? 0,
+                })}
+              </span>
+            </Tooltip>
+          )
+        }
+        return (
+          <span className="text-sm font-medium text-text-primary">
+            {record.discountType === 'PERCENTAGE'
+              ? `-${record.discountValue}%`
+              : `-${formatPrice(record.discountValue, 'FCFA')}`}
+          </span>
+        )
+      },
     },
     {
       title: t('promotions.products'),

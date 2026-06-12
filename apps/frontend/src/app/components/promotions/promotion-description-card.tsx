@@ -39,6 +39,26 @@ export function PromotionDescriptionCard({
         .join(', ')
     : undefined
 
+  let rewardNode: React.ReactNode
+  if (promo.rewardType === 'PRODUCTS') {
+    const rewardNames = (promo.rewardProducts ?? []).map((p) => p.product.name).filter(Boolean)
+    rewardNode = (
+      <Tooltip title={rewardNames.join(', ')}>
+        <span className="font-medium">
+          {t('promotions.reward_products_count', { count: promo.rewardProducts?.length ?? 0 })}
+        </span>
+      </Tooltip>
+    )
+  } else {
+    rewardNode = (
+      <span className="font-medium">
+        {promo.discountType === 'PERCENTAGE'
+          ? `-${promo.discountValue}%`
+          : `-${formatPrice(promo.discountValue, 'FCFA')}`}
+      </span>
+    )
+  }
+
   return (
     <div className="catalog-card">
       <div className="catalog-card__header">
@@ -60,13 +80,7 @@ export function PromotionDescriptionCard({
             <StatusTag label={statusConfig.label} color={statusConfig.color} />
           ) : null}
         </Descriptions.Item>
-        <Descriptions.Item label={t('promotions.discount')}>
-          <span className="font-medium">
-            {promo.discountType === 'PERCENTAGE'
-              ? `-${promo.discountValue}%`
-              : `-${formatPrice(promo.discountValue, 'FCFA')}`}
-          </span>
-        </Descriptions.Item>
+        <Descriptions.Item label={t('promotions.discount')}>{rewardNode}</Descriptions.Item>
         <Descriptions.Item label={t('promotions.products')}>
           {eligibleNames ? (
             <Tooltip title={eligibleNames}>

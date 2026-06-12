@@ -73,6 +73,8 @@ function PromotionsPage() {
   const [editingPromo, setEditingPromo] = useState<PromotionItem | null>(null)
   const [productPickerOpen, setProductPickerOpen] = useState(false)
   const [selectedProducts, setSelectedProducts] = useState<PickerProduct[]>([])
+  const [rewardPickerOpen, setRewardPickerOpen] = useState(false)
+  const [rewardProducts, setRewardProducts] = useState<PickerProduct[]>([])
 
   // Build API status param: only pass if single status selected (API accepts one status)
   const apiStatus = selectedStatuses.length === 1 ? selectedStatuses[0] : undefined
@@ -130,6 +132,12 @@ function PromotionsPage() {
         endDate: data.endDate,
         productIds: data.productIds,
         stackable: data.stackable,
+        minOrderAmount: data.minOrderAmount,
+        minItemCount: data.minItemCount,
+        rewardType: data.rewardType,
+        rewardCredit: data.rewardCredit,
+        rewardPercent: data.rewardPercent,
+        rewardProductIds: data.rewardProductIds,
       }),
     onSuccess: (promotion) => {
       prependListItemCache<PromotionItem, 'promotions'>(
@@ -155,6 +163,12 @@ function PromotionsPage() {
         endDate: data.endDate,
         productIds: data.productIds,
         stackable: data.stackable,
+        minOrderAmount: data.minOrderAmount,
+        minItemCount: data.minItemCount,
+        rewardType: data.rewardType,
+        rewardCredit: data.rewardCredit,
+        rewardPercent: data.rewardPercent,
+        rewardProductIds: data.rewardProductIds,
       }),
     onSuccess: (promotion) => {
       updateListItemCache<PromotionItem, 'promotions'>(
@@ -261,6 +275,7 @@ function PromotionsPage() {
     setModalOpen(false)
     setEditingPromo(null)
     setSelectedProducts([])
+    setRewardProducts([])
   }
 
   const handleDelete = (promo: PromotionItem) => {
@@ -395,6 +410,9 @@ function PromotionsPage() {
           }
         }}
         selectedProducts={selectedProducts}
+        onOpenRewardPicker={() => setRewardPickerOpen(true)}
+        rewardProducts={rewardProducts}
+        setRewardProducts={setRewardProducts}
         onSubmit={handlePromoSubmit}
         submitLoading={createMutation.isPending || updateMutation.isPending}
       />
@@ -404,6 +422,14 @@ function PromotionsPage() {
         onSave={() => {}}
         onSaveProducts={setSelectedProducts}
         initialSelection={selectedProducts.map((p) => p.id)}
+        catalogs={catalogsQuery.data}
+      />
+      <ProductPickerModal
+        open={rewardPickerOpen}
+        onClose={() => setRewardPickerOpen(false)}
+        onSave={() => {}}
+        onSaveProducts={setRewardProducts}
+        initialSelection={rewardProducts.map((p) => p.id)}
         catalogs={catalogsQuery.data}
       />
     </div>
