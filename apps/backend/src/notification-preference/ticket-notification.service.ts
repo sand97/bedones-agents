@@ -176,10 +176,11 @@ export class TicketNotificationService {
   }
 
   /**
-   * "Ticket created" recipients: active members with a phone who have the
-   * MESSAGE_TICKET_CREATED type enabled for the account (default-ON: no row
-   * still counts) and whose collection filter matches — an empty filter means
-   * "all collections", otherwise it must intersect the ticket's collections.
+   * "Ticket created" recipients: opt-IN — only active members with a phone who
+   * explicitly enabled MESSAGE_TICKET_CREATED for the account are notified
+   * (every notification is off by default), gated by the collection filter: an
+   * empty filter means "all collections", otherwise it must intersect the
+   * ticket's collections.
    */
   private async createdRecipients(
     organisationId: string,
@@ -197,17 +198,14 @@ export class TicketNotificationService {
         userId: { in: members.map((m) => m.userId) },
         socialAccountId,
         type: 'MESSAGE_TICKET_CREATED',
+        enabled: true,
       },
-      select: { userId: true, enabled: true, collectionIds: true },
+      select: { userId: true, collectionIds: true },
     })
-    const prefByUser = new Map(prefs.map((p) => [p.userId, p]))
 
     const out: string[] = []
-    for (const m of members) {
-      const pref = prefByUser.get(m.userId)
-      // Default-ON when there is no explicit row.
-      if (pref && !pref.enabled) continue
-      if (this.collectionsMatch(pref?.collectionIds ?? [], ticketCollections)) out.push(m.userId)
+    for (const p of prefs) {
+      if (this.collectionsMatch(p.collectionIds ?? [], ticketCollections)) out.push(p.userId)
     }
     return out
   }

@@ -41,8 +41,10 @@ function initialsOf(name: string) {
   return parts.slice(0, 2).join('').toUpperCase()
 }
 
-function defaultEnabled(type: NotificationType) {
-  return !type.endsWith('_AI_SUGGESTION') && !type.endsWith('_DAILY_SUMMARY')
+// New members start with every notification disabled — nothing is delivered
+// until it's explicitly enabled, for any type.
+function defaultEnabled(_type: NotificationType) {
+  return false
 }
 
 type PendingMap = Record<string, boolean>
