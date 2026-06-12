@@ -211,6 +211,7 @@ function TicketsPage() {
       ticketApi.update(id, {
         title: data.title,
         description: data.description,
+        statusId: data.statusId,
         metadata: data.metadata,
       }),
     onSuccess: (ticket) => {
@@ -473,6 +474,7 @@ function TicketsPage() {
         promotionOptions={promotionOptions}
         onSubmit={handleTicketSubmit}
         submitLoading={createMutation.isPending || updateMutation.isPending}
+        statuses={statusesQuery.data}
         editingTicket={editingTicket}
       />
 

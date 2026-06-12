@@ -12,6 +12,7 @@ import { Plus, Trash2, ShoppingBag } from 'lucide-react'
 import { ArticleListItem } from '@app/components/catalog/article-list-item'
 import { SocialIconInline } from '@app/components/shared/social-badge'
 import { formatPrice } from '@app/lib/format'
+import type { TicketStatusItem } from '@app/lib/api/agent-api'
 import {
   MOCK_CONVERSATIONS,
   MOCK_PROMOTIONS,
@@ -43,6 +44,8 @@ export interface TicketSubmitData {
   provider?: string
   conversationId?: string
   metadata?: Record<string, unknown>
+  /** Selected ticket status — only set when editing */
+  statusId?: string
 }
 
 /** Promotion option from the real API */
@@ -69,6 +72,8 @@ interface CreateTicketModalProps {
   onSubmit?: (data: TicketSubmitData) => void
   /** Whether submit is loading */
   submitLoading?: boolean
+  /** Org ticket statuses — used to render the status selector when editing */
+  statuses?: TicketStatusItem[]
   /** When provided, opens modal in edit mode with pre-filled data */
   editingTicket?: {
     id: string
@@ -78,6 +83,7 @@ interface CreateTicketModalProps {
     contactName?: string
     provider?: string
     metadata?: Record<string, unknown> | null
+    status?: { id?: string; name?: string; color?: string }
   } | null
 }
 
@@ -126,6 +132,7 @@ export function CreateTicketModal({
   promotionOptions,
   onSubmit,
   submitLoading,
+  statuses,
   editingTicket,
 }: CreateTicketModalProps) {
   const { t } = useTranslation()
@@ -150,6 +157,7 @@ export function CreateTicketModal({
         description: editingTicket.description,
         platform: editingTicket.provider ? providerToPlat[editingTicket.provider] : undefined,
         contact: editingTicket.contactName,
+        statusId: editingTicket.status?.id,
       })
 
       // Restore articles, charges and promotions from metadata
@@ -331,6 +339,7 @@ export function CreateTicketModal({
           contactId: selectedContact?.participantId,
           provider: selectedContact?.provider || values.platform?.toUpperCase(),
           conversationId: selectedContact?.conversationId,
+          statusId: values.statusId,
           metadata: {
             articles: selectedArticles.map((sa) => ({
               id: sa.article.id,
@@ -392,13 +401,36 @@ export function CreateTicketModal({
       }
     >
       <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-2">
-        <Form.Item
-          label="Titre"
-          name="title"
-          rules={[{ required: true, message: 'Le titre est requis' }]}
-        >
-          <Input placeholder="Ex: Commande Robe Wax — Taille M" />
-        </Form.Item>
+        <div className="flex flex-col gap-x-3 sm:flex-row">
+          <Form.Item
+            label="Titre"
+            name="title"
+            rules={[{ required: true, message: 'Le titre est requis' }]}
+            className="flex-1"
+          >
+            <Input placeholder="Ex: Commande Robe Wax — Taille M" />
+          </Form.Item>
+          {isEditing && statuses && statuses.length > 0 && (
+            <Form.Item label={t('tickets.status')} name="statusId" className="sm:w-48">
+              <Select
+                placeholder={t('tickets.status')}
+                optionLabelProp="label"
+                options={statuses.map((s) => ({
+                  value: s.id,
+                  label: (
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="inline-block size-2.5 rounded-full"
+                        style={{ background: s.color }}
+                      />
+                      {s.name}
+                    </span>
+                  ),
+                }))}
+              />
+            </Form.Item>
+          )}
+        </div>
         <Form.Item label="Description" name="description">
           <Input.TextArea
             autoSize={{ minRows: 2, maxRows: 6 }}
