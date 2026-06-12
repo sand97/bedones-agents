@@ -8,6 +8,7 @@ import { LlmFactoryService } from '../common/llm/llm-factory.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import { TICKET_AGENT_QUEUE } from '../queue/queue.module'
+import { describeMessageForAgent } from './message-history.util'
 
 export interface TicketAgentJobData {
   conversationId: string
@@ -103,13 +104,13 @@ export class TicketAgentService {
       where: { conversationId },
       orderBy: { createdTime: 'desc' },
       take: HISTORY_LIMIT,
-      select: { message: true, isFromPage: true, mediaType: true },
+      select: { message: true, isFromPage: true, mediaType: true, metadata: true },
     })
     const history = messages
       .reverse()
       .map(
         (m) =>
-          `${m.isFromPage ? 'Agent' : 'Client'}: ${m.message || (m.mediaType ? `[${m.mediaType}]` : '')}`,
+          `${m.isFromPage ? 'Agent' : 'Client'}: ${describeMessageForAgent(m.message, m.mediaType, m.metadata)}`,
       )
       .join('\n')
 

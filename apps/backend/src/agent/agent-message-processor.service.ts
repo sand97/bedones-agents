@@ -20,6 +20,7 @@ import { CreditService } from '../stats/credit.service'
 import type { CreditMediaType } from '../../generated/prisma/client'
 
 import { runLiveAgent } from './run-live-agent'
+import { describeMessageForAgent } from './message-history.util'
 import { TicketAgentService } from './ticket-agent.service'
 import { contactMatchesConversation } from '../social/contact-match.util'
 
@@ -222,11 +223,22 @@ export class AgentMessageProcessorService {
         senderName: true,
         mediaType: true,
         mediaUrl: true,
+        metadata: true,
       },
     })
 
     // Build user message content
     let userMessageContent = event.message.text || ''
+
+    // An order (WhatsApp cart) arrives with empty text — describe it from the
+    // stored order metadata so the agent reacts to the products, not a blank.
+    if (!userMessageContent.trim() && recentMessages[0]?.mediaType === 'order') {
+      userMessageContent = describeMessageForAgent(
+        recentMessages[0].message,
+        recentMessages[0].mediaType,
+        recentMessages[0].metadata,
+      )
+    }
 
     // Handle image messages via product matching pipeline
     if (event.message.mediaType === 'image' && event.message.mediaUrl && catalogIds.length > 0) {
@@ -286,7 +298,7 @@ export class AgentMessageProcessorService {
       .reverse()
       .slice(0, -1) // Exclude the last message (current)
       .map((m) => {
-        const content = m.message || (m.mediaType ? `[${m.mediaType}]` : '')
+        const content = describeMessageForAgent(m.message, m.mediaType, m.metadata)
         // Previous page/agent replies must be AI messages, not system messages:
         // the model (Gemini) requires the single system message to be first, and
         // interleaved system messages trigger "System message should be the first one".
