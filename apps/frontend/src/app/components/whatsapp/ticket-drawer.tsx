@@ -6,6 +6,7 @@ import dayjs from 'dayjs'
 import type { TicketActivity, TicketActivityDiff, TicketItem, TicketStatus } from './mock-data'
 import { TICKET_STATUS_CONFIG } from './mock-data'
 import { ArticleListItem } from '@app/components/catalog/article-list-item'
+import { MarkdownLite } from '@app/components/shared/markdown-lite'
 
 /** Metadata shape stored in the ticket */
 interface TicketMetadata {
@@ -270,8 +271,7 @@ export function TicketDrawer({
   const meta = (ticket.metadata ?? {}) as TicketMetadata
   const rawArticles = meta.articles ?? []
   const objectArticles = rawArticles.filter(
-    (a): a is Exclude<(typeof rawArticles)[number], string> =>
-      typeof a === 'object' && a !== null,
+    (a): a is Exclude<(typeof rawArticles)[number], string> => typeof a === 'object' && a !== null,
   )
   // Agent-provided names, plus any legacy string entries stored under `articles`.
   const namedArticles = [
@@ -420,9 +420,10 @@ export function TicketDrawer({
           {ticket.description && (
             <div className="border-b border-border-subtle px-4 py-4">
               <div className="mb-2 text-xs text-text-muted">Description</div>
-              <div className="text-sm font-normal text-text-primary leading-relaxed">
-                {ticket.description}
-              </div>
+              <MarkdownLite
+                text={ticket.description}
+                className="flex flex-col gap-1 text-sm font-normal text-text-primary leading-relaxed"
+              />
             </div>
           )}
 

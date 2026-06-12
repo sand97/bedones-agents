@@ -118,6 +118,7 @@ export class DebugCatalogTools {
         currency: true,
         category: true,
         imageUrl: true,
+        providerProductId: true,
       },
     })
     if (products.length === 0) return { error: 'Catalog has no products to index.' }
@@ -142,6 +143,9 @@ export class DebugCatalogTools {
             product_id: p.id,
             product_name: p.name,
             description: p.description ?? null,
+            // Index the merchant retailer_id like production does, so search_products
+            // returns a sendable id (not the internal UUID) for seeded products.
+            retailer_id: p.providerProductId ?? null,
             category: p.category ?? null,
             price: p.price ?? null,
             currency: p.currency ?? null,

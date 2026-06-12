@@ -38,13 +38,15 @@ const decisionSchema = z
     description: z
       .string()
       .optional()
-      .describe('Summary of the request: product/studio, dates, total, useful info.'),
+      .describe(
+        'Markdown summary for a HUMAN handling the ticket. ONLY concrete, provable facts needed to fulfill it — size, delivery address, phone, total, deadline. Format with "- " bullets and **bold** labels, one fact per line. Do NOT restate the product (it is attached as articles), and do NOT include intentions, plans, cross-sell ideas or preferences that are not needed to process the order.',
+      ),
     priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
     articleRetailerIds: z
       .array(z.string())
       .optional()
       .describe(
-        'Retailer ids of the product(s) the customer chose — ONLY ids from the "Produits montrés" list. Never invent an id.',
+        'Retailer ids of the product(s) the customer chose or ORDERED — ONLY ids from the "Produits de la conversation" list. Always attach what the customer ordered. Never invent an id.',
       ),
   })
   .describe('Single ticket decision for the conversation.')
@@ -135,7 +137,7 @@ export class TicketAgentService {
     // sent — so the ticket can attach a frozen snapshot, and the agent can only
     // pick from products that really exist (never an invented one).
     const productMessages = await this.prisma.directMessage.findMany({
-      where: { conversationId, mediaType: { in: ['catalog', 'catalog_message'] } },
+      where: { conversationId, mediaType: { in: ['catalog', 'catalog_message', 'order'] } },
       orderBy: { createdTime: 'desc' },
       take: 20,
       select: { metadata: true },
@@ -157,7 +159,8 @@ export class TicketAgentService {
         if (typeof rid === 'string' && !shownProducts.has(rid)) {
           shownProducts.set(rid, {
             name: (it.name as string) ?? null,
-            price: (it.price as number) ?? null,
+            // Catalog items carry `price`; customer order items carry `itemPrice`.
+            price: ((it.price ?? it.itemPrice) as number) ?? null,
             currency: (it.currency as string) ?? null,
             imageUrl: (it.imageUrl as string) ?? null,
           })
