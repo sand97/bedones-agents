@@ -19,6 +19,24 @@ export function createSingleReplyGuard(): SingleReplyGuard {
   return { sent: false }
 }
 
+/**
+ * Atomically claim the single customer-facing send of this turn. Returns true if
+ * the caller may send, false if another tool already claimed it. The claim is
+ * synchronous (set BEFORE any await), so two tool calls executed in parallel
+ * within one model turn can't both pass the check and double-send.
+ */
+export function claimReply(guard?: SingleReplyGuard): boolean {
+  if (!guard) return true
+  if (guard.sent) return false
+  guard.sent = true
+  return true
+}
+
+/** Release a claim after a failed send, so another tool may still deliver. */
+export function releaseReply(guard?: SingleReplyGuard): void {
+  if (guard) guard.sent = false
+}
+
 /** Returned to the model when it tries to send a second message in one turn. */
 export const REPLY_ALREADY_SENT_NOTICE =
   'A reply has already been sent to the customer this turn. Do NOT send another message — end your turn now.'

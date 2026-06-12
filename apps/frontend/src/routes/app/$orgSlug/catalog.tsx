@@ -121,6 +121,11 @@ function CatalogPage() {
     currentContext: string
   } | null>(null)
   const [postLinkFlowOpen, setPostLinkFlowOpen] = useState(false)
+  // Optional seed when the flow is opened from an article's "linked posts" modal:
+  // pre-select that article and jump straight to page selection.
+  const [postLinkSeed, setPostLinkSeed] = useState<
+    { selected: PickerEntity[]; step: 'pick' | 'page' | 'posts' } | undefined
+  >(undefined)
   // Per-product context / linked-posts modals
   const [contextDetailFor, setContextDetailFor] = useState<Product | null>(null)
   const [sharedProductsConfig, setSharedProductsConfig] = useState<{ ids: string[] } | null>(null)
@@ -805,7 +810,10 @@ function CatalogPage() {
             open={toolsModalOpen}
             onClose={() => setToolsModalOpen(false)}
             onOpenContextFlow={() => setContextFlowOpen(true)}
-            onOpenLinkPostsFlow={() => setPostLinkFlowOpen(true)}
+            onOpenLinkPostsFlow={() => {
+              setPostLinkSeed(undefined)
+              setPostLinkFlowOpen(true)
+            }}
             onOpenStudio={() => {
               const base = import.meta.env.VITE_DESIGN_STUDIO_URL || 'https://design.bedones.com'
               const url = `${base}/?catalogId=${encodeURIComponent(
@@ -840,6 +848,8 @@ function CatalogPage() {
             organisationId={orgSlug}
             placeholderProducts={products}
             placeholderCollections={collections}
+            initialSelected={postLinkSeed?.selected}
+            initialStep={postLinkSeed?.step}
             onClose={() => setPostLinkFlowOpen(false)}
             onSaved={() => {
               queryClient.invalidateQueries({ queryKey: ['post-links', selectedCatalog.id] })
@@ -914,6 +924,23 @@ function CatalogPage() {
             catalogId={selectedCatalog.id}
             entity={linkedPostsFor}
             onClose={() => setLinkedPostsFor(null)}
+            onAddPost={() => {
+              if (!linkedPostsFor) return
+              const seed: PickerEntity =
+                linkedPostsFor.kind === 'product'
+                  ? {
+                      kind: 'product',
+                      id: linkedPostsFor.id,
+                      name: linkedPostsFor.name ?? 'Produit',
+                    }
+                  : {
+                      kind: 'collection',
+                      id: linkedPostsFor.id,
+                      name: linkedPostsFor.name ?? 'Collection',
+                    }
+              setPostLinkSeed({ selected: [seed], step: 'page' })
+              setPostLinkFlowOpen(true)
+            }}
           />
         </>
       )}

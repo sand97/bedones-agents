@@ -510,6 +510,7 @@ model Agent {
   status         AgentStatus  @default(DRAFT)
   score          Int          @default(0)
   context        String? // AI-generated business context (markdown)
+  liveModelTier  String       @default("flash") // live-agent model tier: flash | pro | ultra
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 

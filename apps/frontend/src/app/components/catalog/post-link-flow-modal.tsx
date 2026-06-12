@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Modal, Button, Select, Spin, Empty, Input, Checkbox, message } from 'antd'
 import { ArrowLeft, Link2, Search } from 'lucide-react'
@@ -22,6 +22,10 @@ interface PostLinkFlowModalProps {
   onSaved: () => void
   placeholderProducts?: Product[]
   placeholderCollections?: Collection[]
+  /** Pre-select these entities (e.g. the article the user is already viewing). */
+  initialSelected?: PickerEntity[]
+  /** Start on this step (e.g. 'page' when the article is already chosen). */
+  initialStep?: Step
 }
 
 function ProviderAvatar({
@@ -59,6 +63,8 @@ export function PostLinkFlowModal({
   onSaved,
   placeholderProducts,
   placeholderCollections,
+  initialSelected,
+  initialStep,
 }: PostLinkFlowModalProps) {
   const [step, setStep] = useState<Step>('pick')
   const [selected, setSelected] = useState<PickerEntity[]>([])
@@ -66,6 +72,16 @@ export function PostLinkFlowModal({
   const [selectedPostIds, setSelectedPostIds] = useState<Set<string>>(new Set())
   const [postSearch, setPostSearch] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Seed the flow each time it opens: pre-select the caller's entities and jump
+  // to the requested step (e.g. straight to page selection when the article is
+  // already known). Keyed on `open` only, so a parent re-render won't clobber the
+  // user's in-progress selection.
+  useEffect(() => {
+    if (!open) return
+    setSelected(initialSelected ?? [])
+    setStep(initialStep ?? 'pick')
+  }, [open])
 
   const accountsQuery = useQuery({
     queryKey: ['social-accounts', organisationId],

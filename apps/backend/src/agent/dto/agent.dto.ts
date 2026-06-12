@@ -21,6 +21,11 @@ export class UpdateAgentSocialAccountsDto {
   socialAccountIds: string[]
 }
 
+export class UpdateAgentModelDto {
+  @ApiProperty({ enum: ['flash', 'pro', 'ultra'], description: 'Live-agent model tier.' })
+  tier: string
+}
+
 export class ActivateAgentDto {
   @ApiPropertyOptional({
     description: 'Respond on every conversation. Exclusive: overrides the other scopes.',
@@ -60,6 +65,9 @@ export class AgentResponseDto {
 
   @ApiPropertyOptional()
   context?: string
+
+  @ApiProperty({ enum: ['flash', 'pro', 'ultra'] })
+  liveModelTier: string
 
   @ApiProperty()
   createdAt: Date

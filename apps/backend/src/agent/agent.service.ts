@@ -7,7 +7,7 @@ import { EventsGateway } from '../gateway/events.gateway'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import { AgentDbToolsService } from './tools/agent-db-tools.service'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
-import { LlmFactoryService } from '../common/llm/llm-factory.service'
+import { LlmFactoryService, LIVE_MODEL_TIERS } from '../common/llm/llm-factory.service'
 import { ProductImageIndexingService } from '../image-processing/product-image-indexing.service'
 import { CATALOG_INDEXING_QUEUE } from '../queue/queue.module'
 import type { CatalogIndexingJobData } from '../image-processing/catalog-indexing.processor'
@@ -157,6 +157,20 @@ export class AgentService {
       }),
     ])
 
+    return this.findById(agentId)
+  }
+
+  /**
+   * Set the live-agent model tier (flash | pro | ultra). Lets an admin A/B test a
+   * more capable model for an agent's real-time replies without redeploying.
+   */
+  async updateLiveModelTier(agentId: string, tier: string) {
+    const agent = await this.findById(agentId)
+    if (!agent) throw new NotFoundException('Agent introuvable')
+    if (!(LIVE_MODEL_TIERS as readonly string[]).includes(tier)) {
+      throw new BadRequestException(`Invalid model tier: ${tier}`)
+    }
+    await this.prisma.agent.update({ where: { id: agentId }, data: { liveModelTier: tier } })
     return this.findById(agentId)
   }
 
