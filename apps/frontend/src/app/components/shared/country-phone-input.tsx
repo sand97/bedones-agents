@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Input, Select } from 'antd'
+import type { InputRef } from 'antd'
 import countryCodes from '@app/data/CountryCodes.json'
 import { formatPhoneNumber } from '@app/lib/phone-format'
 
@@ -68,6 +69,29 @@ export function CountryPhoneInput({
   const [defaultCode, setDefaultCode] = useState(DEFAULT_DIAL_CODE)
   const [initialized, setInitialized] = useState(disableGeoDetect ?? false)
 
+  // Caret restoration: the input displays a *formatted* value (spaces inserted),
+  // so re-rendering after a change would otherwise jump the caret to the end.
+  // We remember how many digits sat before the caret and restore that position
+  // once the formatted value is in the DOM.
+  const inputRef = useRef<InputRef>(null)
+  const caretDigitsRef = useRef<number | null>(null)
+
+  useLayoutEffect(() => {
+    const target = caretDigitsRef.current
+    if (target === null) return
+    caretDigitsRef.current = null
+    const el = inputRef.current?.input
+    if (!el) return
+    // Walk the formatted value and place the caret right after `target` digits.
+    let pos = 0
+    let count = 0
+    while (pos < el.value.length && count < target) {
+      if (/[0-9]/.test(el.value[pos])) count++
+      pos += 1
+    }
+    el.setSelectionRange(pos, pos)
+  })
+
   // Detect country from IP on mount (skipped if the parent passes
   // disableGeoDetect — typically when the value is already prefilled).
   useEffect(() => {
@@ -107,7 +131,12 @@ export function CountryPhoneInput({
   }
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    emit(parsed.countryCode, e.target.value)
+    const el = e.target
+    const selectionStart = el.selectionStart ?? el.value.length
+    // Count digits before the caret in the raw input so we can re-place the
+    // caret after re-formatting (handles typing *and* pasting mid-string).
+    caretDigitsRef.current = el.value.slice(0, selectionStart).replace(/[^0-9]/g, '').length
+    emit(parsed.countryCode, el.value)
   }
 
   const selectBefore = (
@@ -128,6 +157,7 @@ export function CountryPhoneInput({
 
   return (
     <Input
+      ref={inputRef}
       addonBefore={selectBefore}
       addonAfter={addonAfter}
       value={formatPhoneNumber(parsed.number, iso)}
