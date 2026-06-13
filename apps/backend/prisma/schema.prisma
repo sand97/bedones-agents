@@ -139,6 +139,47 @@ enum CreditMediaType {
   IMAGE
 }
 
+// ─── Souscription & Paiement ───
+// Forfait actif d'une organisation. Dérivé (mis en cache) depuis la souscription
+// active : voir Subscription. FREE est le défaut tant qu'aucune souscription
+// payante n'est active.
+enum OrgPlan {
+  FREE
+  PRO
+  BUSINESS
+}
+
+// Prestataire de paiement. Seul STRIPE est réellement intégré pour l'instant ;
+// NOTCHPAY (Mobile Money) est prévu et déjà modélisé pour la suite.
+enum PaymentProvider {
+  STRIPE
+  NOTCHPAY
+}
+
+// Statut d'une souscription récurrente (calé sur les statuts Stripe).
+enum SubscriptionStatus {
+  INCOMPLETE // session de checkout créée, paiement initial pas encore confirmé
+  ACTIVE // abonnement actif et payé pour la période en cours
+  PAST_DUE // échec de renouvellement, en attente de régularisation
+  CANCELED // annulé (ne se renouvellera plus) — peut rester actif jusqu'à la fin de période
+  EXPIRED // période terminée sans renouvellement
+}
+
+// Statut d'un paiement (souscription récurrente OU achat ponctuel de crédits).
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// Nature d'un paiement : renouvellement/souscription récurrente, ou achat
+// ponctuel de crédits supplémentaires (par paliers de 1000).
+enum PaymentKind {
+  SUBSCRIPTION
+  CREDIT_PURCHASE
+}
+
 enum NotificationType {
   COMMENT_TO_READ
   COMMENT_AI_SUGGESTION
@@ -195,15 +236,23 @@ model Session {
 }
 
 model Organisation {
-  id        String   @id @default(uuid())
-  name      String
-  logoUrl   String?
+  id               String   @id @default(uuid())
+  name             String
+  logoUrl          String?
   // IANA timezone (e.g. "Africa/Douala", "Europe/Paris") used by the hourly
   // opt-in cron to detect when local 08:00 hits for this org. Set at creation
   // from the browser's Intl.DateTimeFormat().resolvedOptions().timeZone.
-  timezone  String   @default("Africa/Douala")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  timezone         String   @default("Africa/Douala")
+  // Forfait actif (cache dénormalisé de la souscription active). Source de
+  // vérité = la Subscription liée ; ce champ est mis à jour par les webhooks
+  // Stripe pour un accès rapide (quota crédits, gates de features) sans jointure.
+  plan             OrgPlan  @default(FREE)
+  // Solde de crédits supplémentaires achetés ponctuellement (achat par palier de
+  // 1000). S'ajoute au quota mensuel de base du forfait. Incrémenté à chaque
+  // achat de crédits confirmé (webhook checkout.session.completed, mode payment).
+  purchasedCredits Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   members              OrganisationMember[]
   socialAccounts       SocialAccount[]
@@ -215,6 +264,8 @@ model Organisation {
   creditOperations     CreditOperation[]
   whatsappOptInWindows WhatsAppOptInWindow[]
   catalogMigrations    CatalogMigration[]
+  subscription         Subscription?
+  payments             Payment[]
 }
 
 model OrganisationMember {
@@ -879,6 +930,76 @@ model CreditOperation {
   @@index([organisationId])
   @@index([organisationId, createdAt])
   @@index([createdAt])
+}
+
+// ─── Souscription récurrente (Stripe) ───
+// Une organisation a au plus UNE souscription. En mode Stripe c'est un vrai
+// abonnement récurrent (mode: subscription) qui se renouvelle automatiquement.
+// L'achat ponctuel de crédits supplémentaires ne passe PAS par ici (voir
+// Payment.kind = CREDIT_PURCHASE) : c'est un paiement one-shot, pas un abonnement.
+model Subscription {
+  id             String             @id @default(uuid())
+  organisationId String             @unique
+  organisation   Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  plan           OrgPlan
+  status         SubscriptionStatus @default(INCOMPLETE)
+  provider       PaymentProvider    @default(STRIPE)
+  // Cadence de facturation choisie (1, 6 ou 12 mois). Le prix récurrent applique
+  // la remise de durée correspondante ; l'abonnement Stripe se renouvelle tous
+  // les `billingMonths` mois.
+  billingMonths  Int                @default(1)
+  // Crédits de base inclus chaque mois par le forfait (free=200, pro=1000,
+  // business=3000). Dénormalisé pour le calcul du quota.
+  monthlyCredits Int
+
+  // Références Stripe (aucun price ID codé en dur : tout est créé dynamiquement).
+  stripeCustomerId     String?
+  stripeSubscriptionId String? @unique
+  stripePriceId        String?
+
+  // Période de facturation courante (renseignée par les webhooks Stripe).
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  // True quand l'utilisateur a demandé l'annulation : l'abonnement reste actif
+  // jusqu'à currentPeriodEnd puis bascule en FREE.
+  cancelAtPeriodEnd  Boolean   @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  payments  Payment[]
+
+  @@index([stripeCustomerId])
+}
+
+// ─── Paiement / Transaction ───
+// Enregistre aussi bien un paiement de souscription récurrente (kind =
+// SUBSCRIPTION) qu'un achat ponctuel de crédits (kind = CREDIT_PURCHASE).
+model Payment {
+  id               String          @id @default(uuid())
+  organisationId   String
+  organisation     Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  subscriptionId   String?
+  subscription     Subscription?   @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  kind             PaymentKind
+  provider         PaymentProvider @default(STRIPE)
+  status           PaymentStatus   @default(PENDING)
+  amount           Float
+  currency         String          @default("USD")
+  // Pour kind = CREDIT_PURCHASE : nombre de crédits achetés (multiple de 1000).
+  creditsPurchased Int?
+  description      String?
+
+  // Références Stripe pour la réconciliation et l'idempotence des webhooks.
+  stripeCheckoutSessionId String? @unique
+  stripePaymentIntentId   String?
+  stripeInvoiceId         String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organisationId])
+  @@index([subscriptionId])
+  @@index([stripePaymentIntentId])
 }
 
 // ─── Notification Preferences ───

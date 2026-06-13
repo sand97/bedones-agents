@@ -7,9 +7,9 @@ import type {
   TimeSeriesPointDto,
 } from './dto/stats.dto'
 
-export type StatsBucket = 'day' | 'week' | 'month'
+import { PLAN_CATALOG, planToApiKey } from '../payment/plans.config'
 
-const DEFAULT_MONTHLY_QUOTA = 10_000
+export type StatsBucket = 'day' | 'week' | 'month'
 
 interface StatsRangeParams {
   organisationId: string
@@ -81,17 +81,31 @@ export class StatsService {
     const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
 
-    const result = await this.prisma.creditOperation.aggregate({
-      where: {
-        organisationId,
-        createdAt: { gte: periodStart, lte: periodEnd },
-      },
-      _sum: { cost: true },
-    })
+    const [result, organisation] = await Promise.all([
+      this.prisma.creditOperation.aggregate({
+        where: {
+          organisationId,
+          createdAt: { gte: periodStart, lte: periodEnd },
+        },
+        _sum: { cost: true },
+      }),
+      this.prisma.organisation.findUnique({
+        where: { id: organisationId },
+        select: { plan: true, purchasedCredits: true },
+      }),
+    ])
+
+    // Quota = crédits de base du forfait actif + crédits supplémentaires achetés.
+    const plan = organisation?.plan ?? 'FREE'
+    const monthlyCredits = PLAN_CATALOG[plan].monthlyCredits
+    const purchasedCredits = organisation?.purchasedCredits ?? 0
 
     return {
       used: Math.round((result._sum.cost ?? 0) * 100) / 100,
-      total: DEFAULT_MONTHLY_QUOTA,
+      total: monthlyCredits + purchasedCredits,
+      plan: planToApiKey(plan),
+      monthlyCredits,
+      purchasedCredits,
       periodStart: periodStart.toISOString(),
       periodEnd: periodEnd.toISOString(),
     }
