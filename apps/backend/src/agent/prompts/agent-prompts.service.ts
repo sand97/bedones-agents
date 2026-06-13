@@ -440,6 +440,7 @@ Réponds uniquement avec la description, sans préambule.`
       priority: string
     }>
     availableProducts?: Array<{ retailerId: string; name: string | null }>
+    availablePromotions?: Array<{ id: string; name: string; code: string | null }>
     contactNotes?: Array<{ category?: string | null; content: string }>
   }): string {
     const ticketsBlock =
@@ -458,6 +459,13 @@ Réponds uniquement avec la description, sans préambule.`
             .map((p) => `- retailerId: ${p.retailerId}${p.name ? ` | ${p.name}` : ''}`)
             .join('\n')
         : '(aucun produit montré dans cette conversation)'
+
+    const promotionsBlock =
+      input.availablePromotions && input.availablePromotions.length > 0
+        ? input.availablePromotions
+            .map((p) => `- id: ${p.id} | ${p.name}${p.code ? ` | code: ${p.code}` : ''}`)
+            .join('\n')
+        : '(aucune promotion disponible)'
 
     const notesBlock =
       input.contactNotes && input.contactNotes.length > 0
@@ -481,6 +489,10 @@ ${ticketsBlock}
 ## Produits de la conversation (montrés ou commandés par le client)
 ${productsBlock}
 
+## Promotions disponibles
+Promotions actives que l'agent a pu proposer dans la conversation. Si une de ces promotions a été proposée / appliquée au client pour cette commande, rattache-la via "promotionIds".
+${promotionsBlock}
+
 ## Connaissance sur le client
 Infos durables déjà connues sur ce client (mémorisées au fil des échanges). N'utilise que des FAITS concrets et utiles au traitement (adresse, téléphone, taille). Ignore toute note qui est une intention / un plan ("proposer X…") ou qui mentionne un produit non confirmé.
 ${notesBlock}
@@ -489,6 +501,7 @@ ${notesBlock}
 - Un ticket = une demande concrète (commande, réservation, suivi). Jamais pour une simple question.
 - Si le client complète une demande déjà ouverte (dates, produit, taille, total…), c'est un "update" de CE ticket, jamais un nouveau.
 - **Articles obligatoires** : attache TOUJOURS via "articleRetailerIds" les produits que le client a choisis ou commandés, UNIQUEMENT depuis la liste "Produits de la conversation". N'invente JAMAIS un retailerId. Ne décris PAS le produit dans la description — il est déjà rattaché comme article.
+- **Promotions** : si l'agent a proposé ou appliqué une promotion au client dans la conversation, rattache-la TOUJOURS via "promotionIds", UNIQUEMENT depuis la liste "Promotions disponibles". N'invente JAMAIS un id. Ne re-mentionne pas la promotion dans la description — elle est déjà rattachée.
 - **Description** = un résumé en **markdown** destiné à un humain qui traite le ticket (il servira aussi aux notifications). Uniquement des **faits probants et concrets** nécessaires au traitement : taille, adresse de livraison, téléphone, total, échéance. Formate avec des puces "- " et des libellés en **gras**, une info par ligne.
   - N'inclus PAS : le produit (déjà en article), des intentions / plans / idées de vente ("proposer des chaussures…"), ni des préférences inutiles au traitement.
   - Si une info essentielle manque (ex: adresse ou téléphone inconnus), ajoute une puce préfixée "**À confirmer :**".
