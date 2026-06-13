@@ -4,10 +4,12 @@ import { PrismaService } from '../prisma/prisma.service'
 import { WhatsappOptinService } from '../whatsapp-optin/whatsapp-optin.service'
 import { CatalogService } from '../catalog/catalog.service'
 
-/** Emitted on the ticket create path. */
+/** Emitted on the ticket create path and on the agent's ticket-update path. */
 export interface TicketNotifyEvent {
   ticketId: string
   type: 'MESSAGE_TICKET_CREATED'
+  /** True when the agent updated an existing ticket (vs. created a new one). */
+  updated?: boolean
 }
 
 /** Emitted when a ticket moves into a (different) status. */
@@ -48,8 +50,8 @@ export class TicketNotificationService {
 
   @OnEvent('ticket.notify')
   handleTicketNotify(payload: TicketNotifyEvent): void {
-    void this.runCreated(payload.ticketId).catch((err) =>
-      this.logFailure('created', payload.ticketId, err),
+    void this.runCreated(payload.ticketId, payload.updated ?? false).catch((err) =>
+      this.logFailure(payload.updated ? 'agent-updated' : 'created', payload.ticketId, err),
     )
   }
 
@@ -66,9 +68,9 @@ export class TicketNotificationService {
     )
   }
 
-  // ─── "Ticket created" — default-on (NotificationPreference) ───
+  // ─── "Ticket created or updated by the agent" — opt-in (NotificationPreference) ───
 
-  private async runCreated(ticketId: string): Promise<void> {
+  private async runCreated(ticketId: string, updated: boolean): Promise<void> {
     const ticket = await this.loadTicket(ticketId)
     // Preferences are scoped per social account; without one we can't route.
     if (!ticket?.socialAccountId) return
@@ -82,11 +84,14 @@ export class TicketNotificationService {
     if (recipients.length === 0) return
 
     const who = ticket.contactName ? ` — ${ticket.contactName}` : ''
+    const text = updated
+      ? `✏️ Ticket mis à jour par l'agent : ${ticket.title}${who}`
+      : `🎫 Nouveau ticket : ${ticket.title}${who}`
     await this.dispatch(
       recipients,
       ticket.organisationId,
-      `🎫 Nouveau ticket : ${ticket.title}${who}`,
-      'created',
+      text,
+      updated ? 'agent-updated' : 'created',
       ticketId,
       ticketCollections.length,
     )

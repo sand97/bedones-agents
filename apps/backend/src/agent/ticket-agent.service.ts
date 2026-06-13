@@ -239,6 +239,13 @@ export class TicketAgentService {
           include: { status: true },
         })
         this.gateway.emitToOrg(organisationId, 'ticket:updated', ticket)
+        // Same preference as "ticket created" — members who opted in are also
+        // notified when the agent updates an existing ticket.
+        this.eventEmitter.emit('ticket.notify', {
+          ticketId: ticket.id,
+          type: 'MESSAGE_TICKET_CREATED',
+          updated: true,
+        })
         return
       }
       this.logger.warn(
