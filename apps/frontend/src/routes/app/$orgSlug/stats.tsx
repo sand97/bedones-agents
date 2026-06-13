@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { createFileRoute, useParams } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
 import { buildShareMeta } from '@app/lib/share-meta'
 import { useTranslation } from 'react-i18next'
 import { DatePicker, Skeleton } from 'antd'
@@ -76,6 +76,7 @@ export const Route = createFileRoute('/app/$orgSlug/stats')({
 function StatsPage() {
   const { t } = useTranslation()
   const { isDesktop } = useLayout()
+  const navigate = useNavigate()
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
   const [period, setPeriod] = useState<Period>('week')
   const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs())
@@ -96,6 +97,13 @@ function StatsPage() {
   const creditsQuery = $api.useQuery('get', '/stats/org/{organisationId}/credits', {
     params: { path: { organisationId: orgSlug } },
   })
+
+  // Le quota affiché correspond au forfait actif (free=200, pro=1000,
+  // business=3000). Selon le forfait, on propose soit de monter d'offre, soit
+  // d'acheter des crédits supplémentaires (cf. issues #101 et #102).
+  const plan = creditsQuery.data?.plan ?? 'free'
+  const creditActionLabel = plan === 'free' ? t('stats.upgrade_plan') : t('stats.buy_credits')
+  const goToPlanPage = () => navigate({ to: '/app/$orgSlug/plan', params: { orgSlug } })
 
   const overviewCards = useMemo(() => {
     const overview = statsQuery.data?.overview
@@ -160,6 +168,8 @@ function StatsPage() {
             used={creditsQuery.data?.used ?? 0}
             total={creditsQuery.data?.total ?? 0}
             loading={creditsQuery.isLoading}
+            actionLabel={creditsQuery.isLoading ? undefined : creditActionLabel}
+            onAction={goToPlanPage}
           />
         </div>
 

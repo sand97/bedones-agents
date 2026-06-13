@@ -988,7 +988,9 @@
     "messages": "messages",
     "credits": "credits",
     "messages_by_network": "Messages by network",
-    "comments_by_network": "Comments by network"
+    "comments_by_network": "Comments by network",
+    "upgrade_plan": "Upgrade my plan",
+    "buy_credits": "Buy credits"
   },
   "plan": {
     "title": "Subscription",

@@ -1004,7 +1004,9 @@
     "messages": "messages",
     "credits": "crédits",
     "messages_by_network": "Messages par réseau",
-    "comments_by_network": "Commentaires par réseau"
+    "comments_by_network": "Commentaires par réseau",
+    "upgrade_plan": "Améliorer mon offre",
+    "buy_credits": "Acheter des crédits"
   },
   "plan": {
     "title": "Souscription",

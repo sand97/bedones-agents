@@ -38,8 +38,14 @@ export type PlanConfig = {
   monthlyCredits?: number
   monthlyPrice: number
   overagePrice?: string
+  // Prix unitaire (USD) d'un crédit supplémentaire acheté hors forfait. Utilisé
+  // pour calculer le montant lors de l'achat de crédits par multiple de 1000.
+  overageRate?: number
   overageSuffix?: string
 }
+
+// Les crédits supplémentaires s'achètent par paliers de 1000 (cf. issue #102).
+export const CREDIT_PURCHASE_STEP = 1000
 
 export type CreditFact = {
   description: string
@@ -161,6 +167,7 @@ export const PLAN_CONTENT: Record<BillingPlanKey, PlanConfig> = {
     monthlyCredits: 1000,
     monthlyPrice: 10,
     overagePrice: '$0.01',
+    overageRate: 0.01,
     overageSuffix: 'par credit supplementaire',
   },
   business: {
@@ -195,6 +202,7 @@ export const PLAN_CONTENT: Record<BillingPlanKey, PlanConfig> = {
     monthlyCredits: 3000,
     monthlyPrice: 25,
     overagePrice: '$0.008',
+    overageRate: 0.008,
     overageSuffix: 'par credit supplementaire',
   },
 }

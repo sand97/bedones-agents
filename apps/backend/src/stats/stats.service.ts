@@ -9,7 +9,16 @@ import type {
 
 export type StatsBucket = 'day' | 'week' | 'month'
 
-const DEFAULT_MONTHLY_QUOTA = 10_000
+// Quota mensuel de crédits IA inclus par forfait. Les clés correspondent au
+// champ `Organisation.plan` (et au BillingPlanKey côté frontend) afin que les
+// stats affichent l'échelle de crédits du plan réellement actif.
+const PLAN_MONTHLY_QUOTA: Record<string, number> = {
+  free: 200,
+  pro: 1_000,
+  business: 3_000,
+}
+
+const DEFAULT_PLAN = 'free'
 
 interface StatsRangeParams {
   organisationId: string
@@ -81,17 +90,27 @@ export class StatsService {
     const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
 
-    const result = await this.prisma.creditOperation.aggregate({
-      where: {
-        organisationId,
-        createdAt: { gte: periodStart, lte: periodEnd },
-      },
-      _sum: { cost: true },
-    })
+    const [organisation, result] = await Promise.all([
+      this.prisma.organisation.findUnique({
+        where: { id: organisationId },
+        select: { plan: true },
+      }),
+      this.prisma.creditOperation.aggregate({
+        where: {
+          organisationId,
+          createdAt: { gte: periodStart, lte: periodEnd },
+        },
+        _sum: { cost: true },
+      }),
+    ])
+
+    const plan = organisation?.plan ?? DEFAULT_PLAN
+    const total = PLAN_MONTHLY_QUOTA[plan] ?? PLAN_MONTHLY_QUOTA[DEFAULT_PLAN]
 
     return {
       used: Math.round((result._sum.cost ?? 0) * 100) / 100,
-      total: DEFAULT_MONTHLY_QUOTA,
+      total,
+      plan,
       periodStart: periodStart.toISOString(),
       periodEnd: periodEnd.toISOString(),
     }

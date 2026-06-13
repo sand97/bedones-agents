@@ -1,12 +1,16 @@
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
-import { createFileRoute } from '@tanstack/react-router'
-import { Segmented } from 'antd'
+import { createFileRoute, useParams } from '@tanstack/react-router'
+import { Button, Segmented } from 'antd'
+import { ArrowRightOutlined } from '@ant-design/icons'
 import { useState } from 'react'
 
+import { $api } from '@app/lib/api/$api'
 import {
   BILLING_OPTIONS,
   CREDIT_FACTS,
+  CREDIT_PURCHASE_STEP,
   DURATION_DISCOUNT,
+  getPlanLabel,
   PLAN_CONTENT,
   PLAN_ORDER,
   type BillingDuration,
@@ -16,6 +20,7 @@ import { CreditFactCard } from '@app/components/pricing/CreditFactCard'
 import { PaymentMethodsSection } from '@app/components/pricing/PaymentMethodsSection'
 import { PlanCard } from '@app/components/pricing/PlanCard'
 import { CheckoutModal } from '@app/components/pricing/CheckoutModal'
+import { BuyCreditsModal } from '@app/components/pricing/BuyCreditsModal'
 import {
   PaymentResultModal,
   type PaymentResultState,
@@ -50,13 +55,22 @@ function DiscountContent({ duration }: { duration: BillingDuration }) {
 }
 
 function PlanPage() {
+  const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
   const [duration, setDuration] = useState<BillingDuration>(6)
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false)
   const [selectedPlanKey, setSelectedPlanKey] = useState<BillingPlanKey | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<BillingPaymentMethod>('CARD')
   const [paymentResult, setPaymentResult] = useState<PaymentResultState | null>(null)
+  const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false)
+  const [creditQuantity, setCreditQuantity] = useState(CREDIT_PURCHASE_STEP)
 
-  const currentPlan: BillingPlanKey = 'free'
+  // Le forfait actif est dérivé de l'usage des crédits (source de vérité backend)
+  // plutôt que codé en dur, afin que la page reflète le vrai plan (cf. issue #102).
+  const creditsQuery = $api.useQuery('get', '/stats/org/{organisationId}/credits', {
+    params: { path: { organisationId: orgSlug } },
+  })
+  const currentPlan = (creditsQuery.data?.plan ?? 'free') as BillingPlanKey
+  const isPaidPlan = currentPlan !== 'free'
   const mobileMoneyEnabled = true
 
   function openCheckoutModal(planKey: BillingPlanKey) {
@@ -68,6 +82,17 @@ function PlanPage() {
   function closeCheckoutModal() {
     setIsCheckoutModalOpen(false)
     setSelectedPlanKey(null)
+    setPaymentMethod('CARD')
+  }
+
+  function openBuyCreditsModal() {
+    setCreditQuantity(CREDIT_PURCHASE_STEP)
+    setPaymentMethod('CARD')
+    setIsBuyCreditsModalOpen(true)
+  }
+
+  function closeBuyCreditsModal() {
+    setIsBuyCreditsModalOpen(false)
     setPaymentMethod('CARD')
   }
 
@@ -83,7 +108,19 @@ function PlanPage() {
 
   function handleCheckout() {
     if (!selectedPlanKey) return
-    console.log('Checkout:', { duration, paymentMethod, planKey: selectedPlanKey })
+    closeCheckoutModal()
+    setPaymentResult({
+      status: 'pending',
+      provider: paymentMethod === 'CARD' ? 'stripe' : 'notch_pay',
+    })
+  }
+
+  function handleBuyCreditsCheckout() {
+    closeBuyCreditsModal()
+    setPaymentResult({
+      status: 'pending',
+      provider: paymentMethod === 'CARD' ? 'stripe' : 'notch_pay',
+    })
   }
 
   return (
@@ -100,6 +137,31 @@ function PlanPage() {
           />
           <DiscountContent duration={duration} />
         </div>
+
+        {isPaidPlan ? (
+          <div className="flex flex-col gap-4 rounded-panel border border-border-field-muted bg-bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="m-0 text-base font-semibold text-text-primary">
+                Besoin de plus de crédits&nbsp;?
+              </p>
+              <p className="m-0 mt-1 text-sm text-text-secondary">
+                Vous êtes sur le forfait {getPlanLabel(currentPlan)}. Achetez des crédits
+                supplémentaires par palier de {CREDIT_PURCHASE_STEP.toLocaleString('fr-FR')} au
+                tarif {PLAN_CONTENT[currentPlan].overagePrice}{' '}
+                {PLAN_CONTENT[currentPlan].overageSuffix}.
+              </p>
+            </div>
+            <Button
+              type="primary"
+              size="large"
+              icon={<ArrowRightOutlined />}
+              iconPosition="end"
+              onClick={openBuyCreditsModal}
+            >
+              Acheter des crédits
+            </Button>
+          </div>
+        ) : null}
 
         <div className="grid min-w-0 gap-4 md:flex md:items-stretch md:gap-0 md:-space-x-px">
           {PLAN_ORDER.map((plan, index) => (
@@ -137,6 +199,20 @@ function PlanPage() {
         mobileMoneyEnabled={mobileMoneyEnabled}
         onCheckout={handleCheckout}
       />
+
+      {isPaidPlan ? (
+        <BuyCreditsModal
+          open={isBuyCreditsModalOpen}
+          onClose={closeBuyCreditsModal}
+          planKey={currentPlan}
+          quantity={creditQuantity}
+          onQuantityChange={setCreditQuantity}
+          paymentMethod={paymentMethod}
+          onPaymentMethodChange={handlePaymentMethodSelection}
+          mobileMoneyEnabled={mobileMoneyEnabled}
+          onCheckout={handleBuyCreditsCheckout}
+        />
+      ) : null}
     </>
   )
 }
