@@ -7308,7 +7308,17 @@
             "type": "number"
           },
           "total": {
-            "type": "number"
+            "type": "number",
+            "description": "Quota mensuel de crédits inclus dans le forfait actif"
+          },
+          "plan": {
+            "type": "string",
+            "enum": [
+              "free",
+              "pro",
+              "business"
+            ],
+            "description": "Forfait de facturation actif de l’organisation"
           },
           "periodStart": {
             "type": "string",
@@ -7322,6 +7332,7 @@
         "required": [
           "used",
           "total",
+          "plan",
           "periodStart",
           "periodEnd"
         ]

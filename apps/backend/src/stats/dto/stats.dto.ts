@@ -59,8 +59,14 @@ export class CreditUsageDto {
   @ApiProperty()
   used: number
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Quota mensuel de crédits inclus dans le forfait actif' })
   total: number
+
+  @ApiProperty({
+    enum: ['free', 'pro', 'business'],
+    description: 'Forfait de facturation actif de l’organisation',
+  })
+  plan: string
 
   @ApiProperty({ description: 'Date ISO du début de la période de facturation (mois en cours)' })
   periodStart: string

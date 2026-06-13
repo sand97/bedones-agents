@@ -198,6 +198,10 @@ model Organisation {
   id        String   @id @default(uuid())
   name      String
   logoUrl   String?
+  // Forfait de facturation actif : 'free' | 'pro' | 'business'. Détermine le
+  // quota mensuel de crédits IA affiché dans les stats et l'usage. Conserve les
+  // mêmes clés que le frontend (BillingPlanKey).
+  plan      String   @default("free")
   // IANA timezone (e.g. "Africa/Douala", "Europe/Paris") used by the hourly
   // opt-in cron to detect when local 08:00 hits for this org. Set at creation
   // from the browser's Intl.DateTimeFormat().resolvedOptions().timeZone.

@@ -3032,7 +3032,13 @@ export interface components {
         };
         CreditUsageDto: {
             used: number;
+            /** @description Quota mensuel de crédits inclus dans le forfait actif */
             total: number;
+            /**
+             * @description Forfait de facturation actif de l’organisation
+             * @enum {string}
+             */
+            plan: "free" | "pro" | "business";
             /** @description Date ISO du début de la période de facturation (mois en cours) */
             periodStart: string;
             /** @description Date ISO de la fin de la période de facturation */
