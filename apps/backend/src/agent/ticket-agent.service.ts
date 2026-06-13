@@ -49,6 +49,12 @@ const decisionSchema = z
       .describe(
         'Retailer ids of the product(s) the customer chose or ORDERED — ONLY ids from the "Produits de la conversation" list. Always attach what the customer ordered. Never invent an id.',
       ),
+    promotionIds: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Ids of the promotion(s) the agent PROPOSED or APPLIED to this customer in the conversation — ONLY ids from the "Promotions disponibles" list. Attach every promotion that was mentioned/offered for this order so it appears on the ticket. Never invent an id.',
+      ),
   })
   .describe('Single ticket decision for the conversation.')
 
@@ -95,6 +101,7 @@ export class TicketAgentService {
           select: {
             provider: true,
             agentLink: { select: { agent: { select: { context: true } } } },
+            catalogs: { select: { catalogId: true } },
           },
         },
       },
@@ -170,6 +177,23 @@ export class TicketAgentService {
       }
     }
 
+    // Promotions the live agent could have proposed in this conversation, scoped
+    // exactly like the live promotion tools: the social account's catalogs plus
+    // legacy org-wide promotions (catalogId = null). Surfacing them lets the
+    // ticket agent re-attach, by id, any promo it offered the customer so it
+    // appears on the ticket (it is only ever mentioned as free text in the chat).
+    const catalogIds = conversation.socialAccount.catalogs.map((c) => c.catalogId)
+    const availablePromotions = await this.prisma.promotion.findMany({
+      where: {
+        organisationId,
+        status: 'ACTIVE',
+        OR: [{ catalogId: null }, { catalogId: { in: catalogIds } }],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { id: true, name: true, code: true },
+    })
+
     const systemPrompt = this.prompts.buildTicketAgentPrompt({
       agentContext: conversation.socialAccount.agentLink?.agent?.context || '',
       existingTickets,
@@ -177,6 +201,7 @@ export class TicketAgentService {
         retailerId,
         name: p.name,
       })),
+      availablePromotions,
       contactNotes,
     })
 
@@ -217,7 +242,17 @@ export class TicketAgentService {
         imageUrl: p.imageUrl ?? undefined,
       }
     })
-    const metadata = articles.length > 0 ? { articles } : undefined
+    // Keep only promotion ids that really exist for this account (never invented).
+    const knownPromotionIds = new Set(availablePromotions.map((p) => p.id))
+    const promotionIds = (decision.promotionIds ?? []).filter((id) => knownPromotionIds.has(id))
+
+    const metadata =
+      articles.length > 0 || promotionIds.length > 0
+        ? {
+            ...(articles.length > 0 ? { articles } : {}),
+            ...(promotionIds.length > 0 ? { promotionIds } : {}),
+          }
+        : undefined
     const priority = decision.priority ?? 'MEDIUM'
 
     // Update path — only when the target ticket really belongs to this conversation.
