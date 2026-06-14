@@ -1014,6 +1014,12 @@ model Payment {
   // Référence de transaction NotchPay (mobile money), unique pour l'idempotence.
   notchpayReference String? @unique
 
+  // Snapshot du moyen de paiement AU MOMENT du paiement (pour l'historique).
+  // Carte : marque + 4 derniers chiffres ; mobile money : numéro utilisé.
+  cardBrand    String?
+  cardLast4    String?
+  mobileNumber String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

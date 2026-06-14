@@ -1,6 +1,6 @@
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
 import { createFileRoute, useParams } from '@tanstack/react-router'
-import { App, Segmented } from 'antd'
+import { App, Button, Segmented } from 'antd'
 import { useState } from 'react'
 
 import { $api } from '@app/lib/api/$api'
@@ -62,6 +62,9 @@ function PlanPage() {
   const [paymentMethod, setPaymentMethod] = useState<BillingPaymentMethod>('CARD')
   const [paymentResult, setPaymentResult] = useState<PaymentResultState | null>(null)
   const [isBuyCreditsOpen, setIsBuyCreditsOpen] = useState(false)
+  // Quand l'org a déjà payé, on affiche le récap par défaut ; les forfaits/features
+  // ne s'affichent qu'au clic sur « Voir les fonctionnalités » / « Changer ».
+  const [showFeatures, setShowFeatures] = useState(false)
   const [showSuccess, setShowSuccess] = useState(
     () => new URLSearchParams(window.location.search).get('payment') === 'success',
   )
@@ -124,52 +127,62 @@ function PlanPage() {
     )
   }
 
+  const showRecap = hasPayments && !showFeatures
+
   return (
     <>
       <DashboardHeader title="Souscriptions" />
 
-      <div className="w-full space-y-8 px-4 py-5 sm:px-6 sm:py-6">
-        {hasPayments ? (
+      {showRecap ? (
+        <div className="w-full px-4 py-5 sm:px-6 sm:py-6">
           <SubscriptionRecap
             organisationId={orgSlug}
-            onUpgrade={() => setIsCheckoutModalOpen(false)}
+            onShowFeatures={() => setShowFeatures(true)}
             onBuyCredits={() => setIsBuyCreditsOpen(true)}
           />
-        ) : null}
-
-        <div className="sticky top-10 z-10 -mx-4 mb-8 flex flex-col items-center gap-3 bg-bg-surface px-4 py-4 text-center md:relative md:top-0">
-          <Segmented<BillingDuration>
-            className="pricing-billing-toggle"
-            value={duration}
-            options={BILLING_OPTIONS}
-            onChange={(value) => setDuration(value)}
-          />
-          <DiscountContent duration={duration} />
         </div>
+      ) : (
+        <div className="w-full space-y-8 px-4 py-5 sm:px-6 sm:py-6">
+          {hasPayments ? (
+            <Button type="text" className="-ml-2" onClick={() => setShowFeatures(false)}>
+              ← Retour à mon abonnement
+            </Button>
+          ) : null}
 
-        <div className="grid min-w-0 gap-4 md:flex md:items-stretch md:gap-0 md:-space-x-px">
-          {PLAN_ORDER.map((plan, index) => (
-            <PlanCard
-              key={plan}
-              planKey={plan}
-              config={PLAN_CONTENT[plan]}
-              isCurrent={currentPlan === plan}
-              duration={duration}
-              onUpgrade={(planKey) => openCheckoutModal(planKey)}
-              isFirst={index === 0}
-              isLast={index === PLAN_ORDER.length - 1}
+          <div className="sticky top-10 z-10 -mx-4 mb-8 flex flex-col items-center gap-3 bg-bg-surface px-4 py-4 text-center md:relative md:top-0">
+            <Segmented<BillingDuration>
+              className="pricing-billing-toggle"
+              value={duration}
+              options={BILLING_OPTIONS}
+              onChange={(value) => setDuration(value)}
             />
-          ))}
-        </div>
+            <DiscountContent duration={duration} />
+          </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          {CREDIT_FACTS.map((fact) => (
-            <CreditFactCard key={fact.title} fact={fact} />
-          ))}
-        </div>
+          <div className="grid min-w-0 gap-4 md:flex md:items-stretch md:gap-0 md:-space-x-px">
+            {PLAN_ORDER.map((plan, index) => (
+              <PlanCard
+                key={plan}
+                planKey={plan}
+                config={PLAN_CONTENT[plan]}
+                isCurrent={currentPlan === plan}
+                duration={duration}
+                onUpgrade={(planKey) => openCheckoutModal(planKey)}
+                isFirst={index === 0}
+                isLast={index === PLAN_ORDER.length - 1}
+              />
+            ))}
+          </div>
 
-        <PaymentMethodsSection />
-      </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {CREDIT_FACTS.map((fact) => (
+              <CreditFactCard key={fact.title} fact={fact} />
+            ))}
+          </div>
+
+          <PaymentMethodsSection />
+        </div>
+      )}
 
       <PaymentResultModal paymentResult={paymentResult} onClose={() => setPaymentResult(null)} />
 

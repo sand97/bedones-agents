@@ -137,6 +137,10 @@ export class SubscriptionService {
       currency: p.currency,
       creditsPurchased: p.creditsPurchased,
       description: p.description,
+      provider: p.provider,
+      cardBrand: p.cardBrand,
+      cardLast4: p.cardLast4,
+      mobileNumber: p.mobileNumber,
       createdAt: p.createdAt.toISOString(),
     }))
   }
@@ -681,6 +685,8 @@ export class SubscriptionService {
         data: {
           status: PaymentStatus.COMPLETED,
           stripePaymentIntentId: (session.payment_intent as string) ?? undefined,
+          cardBrand: card.brand,
+          cardLast4: card.last4,
         },
       }),
     ])
@@ -741,6 +747,9 @@ export class SubscriptionService {
             currency: (invoice.currency ?? 'usd').toUpperCase(),
             description: paymentLineRenewal(sub.plan, lang),
             stripeInvoiceId: invoice.id,
+            cardBrand: sub.cardBrand,
+            cardLast4: sub.cardLast4,
+            mobileNumber: sub.mobileNumber,
           },
         })
         this.logger.log(`Renouvellement enregistré pour org ${sub.organisationId}`)
@@ -852,6 +861,16 @@ export class SubscriptionService {
       }
       if (payment.status === PaymentStatus.COMPLETED) return // déjà crédité
 
+      // Snapshot du moyen de paiement, depuis l'abonnement de l'org.
+      const sub = await tx.subscription.findUnique({
+        where: { organisationId: payment.organisationId },
+        select: { provider: true, cardBrand: true, cardLast4: true, mobileNumber: true },
+      })
+      const methodSnapshot =
+        payment.provider === 'STRIPE'
+          ? { cardBrand: sub?.cardBrand ?? undefined, cardLast4: sub?.cardLast4 ?? undefined }
+          : { mobileNumber: sub?.mobileNumber ?? undefined }
+
       // Bascule atomique PENDING → COMPLETED : seul le gagnant de la course
       // (count === 1) procède au crédit.
       const flipped = await tx.payment.updateMany({
@@ -859,6 +878,7 @@ export class SubscriptionService {
         data: {
           status: PaymentStatus.COMPLETED,
           stripePaymentIntentId: args.paymentIntentId ?? payment.stripePaymentIntentId ?? undefined,
+          ...methodSnapshot,
         },
       })
       if (flipped.count !== 1) return
@@ -996,7 +1016,7 @@ export class SubscriptionService {
       await tx.organisation.update({ where: { id: payment.organisationId }, data: { plan } })
       await tx.payment.update({
         where: { id: paymentId },
-        data: { subscriptionId: sub?.id },
+        data: { subscriptionId: sub?.id, mobileNumber },
       })
     })
     this.logger.log(`Forfait mobile money activé (payment ${paymentId})`)
