@@ -71,3 +71,46 @@ export function planLabel(plan: OrgPlan): string {
       return 'Free'
   }
 }
+
+// ─── Localisation des libellés de paiement (langue de l'utilisateur, fallback EN) ───
+export type CheckoutLang = 'fr' | 'en'
+
+/** Langue des libellés/checkout : 'fr' si l'utilisateur est en français, sinon 'en'. */
+export function resolveCheckoutLang(locale: string | null | undefined): CheckoutLang {
+  return (locale ?? '').slice(0, 2).toLowerCase() === 'fr' ? 'fr' : 'en'
+}
+
+/** Nom + description du produit d'abonnement, localisés. */
+export function subscriptionProductText(
+  plan: OrgPlan,
+  billingMonths: number,
+  lang: CheckoutLang,
+): { name: string; description: string } {
+  const label = planLabel(plan)
+  const credits = PLAN_CATALOG[plan].monthlyCredits
+  if (lang === 'fr') {
+    return {
+      name: `Bedones ${label}`,
+      description: `Forfait ${label} — ${credits} crédits/mois (${billingMonths} mois)`,
+    }
+  }
+  return {
+    name: `Bedones ${label}`,
+    description: `${label} plan — ${credits} credits/month (${billingMonths} months)`,
+  }
+}
+
+/** Nom du produit "crédits supplémentaires", localisé. */
+export function creditProductName(credits: number, lang: CheckoutLang): string {
+  const n = credits.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US')
+  return lang === 'fr'
+    ? `Bedones — ${n} crédits supplémentaires`
+    : `Bedones — ${n} additional credits`
+}
+
+/** Description du paiement d'achat de crédits, localisée. */
+export function creditPaymentDescription(credits: number, lang: CheckoutLang): string {
+  return lang === 'fr'
+    ? `Achat de ${credits} crédits Bedones`
+    : `Purchase of ${credits} Bedones credits`
+}

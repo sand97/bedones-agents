@@ -21,10 +21,14 @@ import {
 import {
   CREDIT_PURCHASE_STEP,
   PLAN_CATALOG,
+  creditPaymentDescription,
+  creditProductName,
   getCreditPurchasePriceUsd,
   getRecurringTotalUsd,
   planLabel,
   planToApiKey,
+  resolveCheckoutLang,
+  subscriptionProductText,
 } from './plans.config'
 import {
   CreateCreditCheckoutDto,
@@ -251,10 +255,12 @@ export class SubscriptionService {
 
     const stripe = this.stripe.getClient()
     const label = planLabel(plan)
+    const lang = resolveCheckoutLang(user.locale)
+    const product = subscriptionProductText(plan, billingMonths, lang)
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
-      locale: 'fr',
+      locale: lang,
       allow_promotion_codes: true,
       line_items: [
         {
@@ -262,8 +268,8 @@ export class SubscriptionService {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `Bedones ${label}`,
-              description: `Forfait ${label} — ${def.monthlyCredits} crédits/mois`,
+              name: product.name,
+              description: product.description,
             },
             // Montant prélevé à chaque renouvellement (= total remisé de la
             // période), l'intervalle de renouvellement étant billingMonths mois.
@@ -380,18 +386,19 @@ export class SubscriptionService {
       paymentId,
     }
 
+    const lang = resolveCheckoutLang(user.locale)
     const stripe = this.stripe.getClient()
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer: customerId,
-      locale: 'fr',
+      locale: lang,
       line_items: [
         {
           quantity: 1,
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `Bedones — ${dto.credits.toLocaleString('fr-FR')} crédits supplémentaires`,
+              name: creditProductName(dto.credits, lang),
             },
             unit_amount: Math.round(priceUsd * 100),
           },
@@ -400,7 +407,7 @@ export class SubscriptionService {
       success_url: this.buildReturnUrl(orgId, 'success'),
       cancel_url: this.buildReturnUrl(orgId, 'cancelled'),
       payment_intent_data: {
-        description: `Achat de ${dto.credits} crédits Bedones`,
+        description: creditPaymentDescription(dto.credits, lang),
         // Recopie les métadonnées sur le PaymentIntent pour que
         // `payment_intent.succeeded` puisse créditer même sans la session.
         metadata: sharedMetadata,
@@ -451,7 +458,7 @@ export class SubscriptionService {
    */
   private async createNotchpaySubscriptionCheckout(args: {
     orgId: string
-    user: { id: string; email: string | null; name: string | null }
+    user: { id: string; email: string | null; name: string | null; locale: string | null }
     org: { subscription: { status: string } | null }
     plan: OrgPlan
     billingMonths: number
@@ -459,6 +466,7 @@ export class SubscriptionService {
   }): Promise<{ url: string }> {
     const { orgId, user, plan, billingMonths, totalUsd } = args
     const def = PLAN_CATALOG[plan]
+    const lang = resolveCheckoutLang(user.locale)
     const paymentId = randomUUID()
 
     // Souscription INCOMPLETE (forfait inchangé tant que le paiement n'est pas confirmé).
@@ -491,7 +499,7 @@ export class SubscriptionService {
       email: user.email,
       phone: null,
       name: user.name,
-      description: `Souscription ${planLabel(plan)} (${billingMonths} mois)`,
+      description: subscriptionProductText(plan, billingMonths, lang).description,
       reference: paymentId,
       callbackUrl: this.buildReturnUrl(orgId, 'success'),
     })
@@ -516,11 +524,12 @@ export class SubscriptionService {
   /** Achat ponctuel de crédits via NotchPay (mobile money). */
   private async createNotchpayCreditCheckout(args: {
     orgId: string
-    user: { id: string; email: string | null; name: string | null }
+    user: { id: string; email: string | null; name: string | null; locale: string | null }
     credits: number
     priceUsd: number
   }): Promise<{ url: string }> {
     const { orgId, user, credits, priceUsd } = args
+    const lang = resolveCheckoutLang(user.locale)
     const paymentId = randomUUID()
 
     const result = await this.notchpay.initializePayment({
@@ -529,7 +538,7 @@ export class SubscriptionService {
       email: user.email,
       phone: null,
       name: user.name,
-      description: `Achat de ${credits} crédits Bedones`,
+      description: creditPaymentDescription(credits, lang),
       reference: paymentId,
       callbackUrl: this.buildReturnUrl(orgId, 'success'),
     })
@@ -1149,7 +1158,7 @@ export class SubscriptionService {
     if (!org) throw new NotFoundException('Organisation introuvable')
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true },
+      select: { id: true, email: true, name: true, locale: true },
     })
     if (!user) throw new NotFoundException('Utilisateur introuvable')
     return { org, user }
