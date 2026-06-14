@@ -1,5 +1,10 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
-import Stripe from 'stripe'
+// Le package `stripe` est un module CommonJS `export =` (le module EST le
+// constructeur). Sans `esModuleInterop`, `import Stripe from 'stripe'` se
+// compile en `stripe_1.default` (undefined au runtime → « not a constructor »).
+// On utilise donc l'import `= require` qui pointe sur le constructeur lui-même.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import Stripe = require('stripe')
 
 // Le bundle de types CJS de stripe n'expose au niveau racine que le constructeur
 // (et le type d'instance `Stripe.Stripe`) ; le namespace de ressources n'est pas
