@@ -222,7 +222,7 @@ function CampaignDetailsModal({
             ]}
           />
           <Table
-            className="mt-3"
+            className="mt-3 tickets-table"
             rowKey="id"
             size="small"
             dataSource={details?.contacts.data ?? []}
@@ -1078,8 +1078,8 @@ function GeneralCampaignsPage() {
       {campaignsQuery.isLoading || campaigns.length > 0 ? (
         <div className="flex-1 p-4 lg:p-6">
           <Table
+            className="tickets-table"
             rowKey="id"
-            bordered
             loading={campaignsQuery.isLoading}
             dataSource={campaigns}
             columns={columns}
