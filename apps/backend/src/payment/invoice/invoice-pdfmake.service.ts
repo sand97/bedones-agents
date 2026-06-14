@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import type { TDocumentDefinitions, TableCell } from 'pdfmake/interfaces'
-import { type InvoiceData, formatMoney } from './invoice-data'
+import { type InvoiceData, formatMoney, invoiceLabels } from './invoice-data'
 
 const CELL_M: [number, number, number, number] = [0, 4, 0, 4]
 
@@ -58,12 +58,15 @@ export class InvoicePdfmakeService {
       },
     })
 
+    const L = invoiceLabels(d.lang)
+    const numberPrefix = d.lang === 'fr' ? 'N°' : 'No.'
+
     const tableBody: TableCell[][] = [
       [
-        { text: 'DESCRIPTION', style: 'th' },
-        { text: 'QTÉ', style: 'th', alignment: 'right' },
-        { text: 'PRIX UNIT.', style: 'th', alignment: 'right' },
-        { text: 'TOTAL', style: 'th', alignment: 'right' },
+        { text: L.colDescription, style: 'th' },
+        { text: L.colQty, style: 'th', alignment: 'right' },
+        { text: L.colUnit, style: 'th', alignment: 'right' },
+        { text: L.colTotal, style: 'th', alignment: 'right' },
       ],
       ...d.items.map((it): TableCell[] => [
         { text: it.description, margin: CELL_M },
@@ -86,14 +89,14 @@ export class InvoicePdfmakeService {
             ],
             [
               {
-                text: 'FACTURE',
+                text: L.invoice,
                 fontSize: 20,
                 bold: true,
                 alignment: 'right',
                 characterSpacing: 2,
               },
               {
-                text: `N° ${d.invoiceNumber}\nÉmise le ${d.issueDate}\nÉchéance ${d.dueDate}`,
+                text: `${numberPrefix} ${d.invoiceNumber}\n${L.issuedOn} ${d.issueDate}\n${L.due} ${d.dueDate}`,
                 alignment: 'right',
                 color: '#52606d',
                 fontSize: 9,
@@ -105,14 +108,14 @@ export class InvoicePdfmakeService {
         {
           columns: [
             [
-              { text: 'ÉMETTEUR', style: 'label' },
+              { text: L.seller, style: 'label' },
               { text: d.seller.name, bold: true },
               {
-                text: `${d.seller.address}\n${d.seller.email}\n${d.seller.phone}\nNUI : ${d.seller.taxId}`,
+                text: `${d.seller.address}\n${d.seller.email}\n${d.seller.phone}\n${L.taxId} : ${d.seller.taxId}`,
               },
             ],
             [
-              { text: 'FACTURÉ À', style: 'label' },
+              { text: L.billedTo, style: 'label' },
               { text: d.client.org, bold: true },
               { text: `${d.client.name}\n${d.client.email}\n${d.client.phone}` },
             ],
@@ -142,7 +145,7 @@ export class InvoicePdfmakeService {
               stack: [
                 {
                   columns: [
-                    { text: 'Sous-total', color: '#52606d' },
+                    { text: L.subtotal, color: '#52606d' },
                     {
                       text: formatMoney(d.subtotal, d.currency),
                       alignment: 'right',
@@ -152,7 +155,7 @@ export class InvoicePdfmakeService {
                 },
                 {
                   columns: [
-                    { text: `TVA (${d.taxRate}%)`, color: '#52606d' },
+                    { text: `${L.vat} (${d.taxRate}%)`, color: '#52606d' },
                     {
                       text: formatMoney(d.taxAmount, d.currency),
                       alignment: 'right',
@@ -163,7 +166,7 @@ export class InvoicePdfmakeService {
                 },
                 {
                   columns: [
-                    { text: 'Total', bold: true, fontSize: 15 },
+                    { text: L.grandTotal, bold: true, fontSize: 15 },
                     {
                       text: formatMoney(d.total, d.currency),
                       alignment: 'right',
@@ -177,7 +180,7 @@ export class InvoicePdfmakeService {
           ],
         },
         {
-          text: [{ text: 'Moyen de paiement : ', bold: true }, d.paymentMethod],
+          text: [{ text: `${L.paymentMethod} `, bold: true }, d.paymentMethod],
           margin: [0, 28, 0, 0],
           fillColor: '#f5f7fa',
         },

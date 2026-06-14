@@ -181,9 +181,11 @@ export class SubscriptionService {
       name: null,
       email: null,
       phone: null,
+      locale: null,
     }
 
     const data = buildInvoiceData({
+      lang: resolveCheckoutLang(recipient.locale),
       payment,
       orgName: org?.name ?? 'Organisation',
       recipient,
@@ -205,13 +207,13 @@ export class SubscriptionService {
     if (payerUserId) {
       const payer = await this.prisma.user.findUnique({
         where: { id: payerUserId },
-        select: { name: true, email: true, phone: true },
+        select: { name: true, email: true, phone: true, locale: true },
       })
       if (payer) return payer
     }
     const owner = await this.prisma.organisationMember.findFirst({
       where: { organisationId: orgId, role: 'OWNER' },
-      select: { user: { select: { name: true, email: true, phone: true } } },
+      select: { user: { select: { name: true, email: true, phone: true, locale: true } } },
     })
     return owner?.user ?? null
   }
