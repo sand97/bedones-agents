@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common'
-import { ApiBody, ApiOkResponse, ApiTags } from '@nestjs/swagger'
+import { Body, Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common'
+import type { Response } from 'express'
+import { ApiBody, ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger'
 import { AuthGuard } from '../auth/auth.guard'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { SubscriptionService } from './subscription.service'
@@ -75,5 +76,24 @@ export class PaymentController {
     @Param('organisationId') orgId: string,
   ): Promise<ChurnSurveyResponseDto[]> {
     return this.subscriptionService.listChurnSurveyResponses(user.id, orgId)
+  }
+
+  @Get('org/:organisationId/payments/:paymentId/invoice')
+  @ApiProduces('application/pdf')
+  @ApiOkResponse({ description: 'Facture PDF du paiement' })
+  async getInvoice(
+    @CurrentUser() user: { id: string },
+    @Param('organisationId') orgId: string,
+    @Param('paymentId') paymentId: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.subscriptionService.generateInvoice(
+      user.id,
+      orgId,
+      paymentId,
+    )
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`)
+    res.send(buffer)
   }
 }

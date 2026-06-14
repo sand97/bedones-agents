@@ -1,6 +1,5 @@
-// Données bidon pour comparer les 3 générateurs de PDF de facture
-// (pdfmake / Puppeteer / Gotenberg). Endpoints de démo temporaires — à supprimer
-// une fois l'outil retenu.
+import { OrgPlan, PaymentKind } from '../../../generated/prisma/client'
+import { planLabel } from '../plans.config'
 
 export interface InvoiceLineItem {
   description: string
@@ -25,45 +24,98 @@ export interface InvoiceData {
   notes: string
 }
 
-export const DEMO_INVOICE: InvoiceData = {
-  invoiceNumber: 'BED-2026-000142',
-  issueDate: '14 juin 2026',
-  dueDate: '14 juillet 2026',
-  seller: {
-    name: 'Bedones SAS',
-    address: 'Akwa, Douala, Cameroun',
-    email: 'facturation@bedones.com',
-    taxId: 'M061234567890X',
-  },
-  client: {
-    name: 'Brice Guenkam',
-    org: 'Boutique Le Bon Prix',
-    email: 'brice@lebonprix.cm',
-    phone: '+237 6 57 88 86 90',
-  },
-  currency: 'USD',
-  items: [
-    {
-      description: 'Forfait Pro — 6 mois (1000 crédits/mois)',
-      quantity: 1,
-      unitPrice: 48,
-      total: 48,
-    },
-    {
-      description: 'Crédits supplémentaires (pack de 1000)',
-      quantity: 2,
-      unitPrice: 10,
-      total: 20,
-    },
-  ],
-  subtotal: 68,
-  taxRate: 0,
-  taxAmount: 0,
-  total: 68,
-  paymentMethod: 'Carte Visa •••• 4242',
-  notes: 'Merci pour votre confiance. Cette facture est générée automatiquement.',
+// Émetteur (Bedones). Surchargeable par env pour s'adapter à l'entité légale.
+const SELLER = {
+  name: process.env.INVOICE_SELLER_NAME ?? 'Bedones SAS',
+  address: process.env.INVOICE_SELLER_ADDRESS ?? 'Akwa, Douala, Cameroun',
+  email: process.env.INVOICE_SELLER_EMAIL ?? 'facturation@bedones.com',
+  taxId: process.env.INVOICE_SELLER_TAX_ID ?? '',
 }
 
 export function formatMoney(amount: number, currency: string): string {
   return `${amount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`
+}
+
+function formatDate(d: Date): string {
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+}
+
+interface PaymentForInvoice {
+  id: string
+  kind: PaymentKind
+  amount: number
+  currency: string
+  creditsPurchased: number | null
+  description: string | null
+  createdAt: Date
+}
+
+type SubscriptionForInvoice = {
+  plan: OrgPlan
+  billingMonths: number
+  cardBrand: string | null
+  cardLast4: string | null
+  mobileNumber: string | null
+} | null
+
+/** Construit les données de facture à partir d'un paiement réel et de son contexte. */
+export function buildInvoiceData(args: {
+  payment: PaymentForInvoice
+  orgName: string
+  recipient: { name: string | null; email: string | null; phone: string | null }
+  subscription: SubscriptionForInvoice
+}): InvoiceData {
+  const { payment, orgName, recipient, subscription } = args
+  const year = payment.createdAt.getFullYear()
+  const shortId = payment.id.replace(/-/g, '').slice(0, 8).toUpperCase()
+
+  const items: InvoiceLineItem[] =
+    payment.kind === PaymentKind.SUBSCRIPTION
+      ? [
+          {
+            description: subscription
+              ? `Forfait ${planLabel(subscription.plan)} — ${subscription.billingMonths} mois`
+              : (payment.description ?? 'Abonnement'),
+            quantity: 1,
+            unitPrice: payment.amount,
+            total: payment.amount,
+          },
+        ]
+      : [
+          {
+            description: `Achat de ${payment.creditsPurchased ?? 0} crédits supplémentaires`,
+            quantity: 1,
+            unitPrice: payment.amount,
+            total: payment.amount,
+          },
+        ]
+
+  // Résumé du moyen de paiement.
+  let paymentMethod = 'Paiement en ligne'
+  if (subscription?.cardLast4) {
+    paymentMethod = `Carte ${subscription.cardBrand ?? ''} •••• ${subscription.cardLast4}`.trim()
+  } else if (subscription?.mobileNumber) {
+    paymentMethod = `Mobile money — ${subscription.mobileNumber}`
+  }
+
+  return {
+    invoiceNumber: `BED-${year}-${shortId}`,
+    issueDate: formatDate(payment.createdAt),
+    dueDate: formatDate(payment.createdAt),
+    seller: SELLER,
+    client: {
+      name: recipient.name ?? '',
+      org: orgName,
+      email: recipient.email ?? '',
+      phone: recipient.phone ?? '',
+    },
+    currency: payment.currency,
+    items,
+    subtotal: payment.amount,
+    taxRate: 0,
+    taxAmount: 0,
+    total: payment.amount,
+    paymentMethod,
+    notes: 'Merci pour votre confiance. Cette facture est générée automatiquement par Bedones.',
+  }
 }

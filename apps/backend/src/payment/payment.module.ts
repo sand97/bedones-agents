@@ -9,14 +9,11 @@ import { NotchpayService } from './notchpay.service'
 import { SubscriptionService } from './subscription.service'
 import { SubscriptionNotificationService } from './subscription-notification.service'
 import { PaymentProcessor } from './payment.processor'
-import { InvoiceDemoController } from './invoice/invoice-demo.controller'
 import { InvoicePdfmakeService } from './invoice/invoice-pdfmake.service'
-import { InvoicePuppeteerService } from './invoice/invoice-puppeteer.service'
-import { InvoiceGotenbergService } from './invoice/invoice-gotenberg.service'
 
 @Module({
   imports: [AuthModule, QueueModule, BullModule.registerQueue({ name: PAYMENT_QUEUE })],
-  controllers: [PaymentController, StripeWebhookController, InvoiceDemoController],
+  controllers: [PaymentController, StripeWebhookController],
   providers: [
     StripeService,
     NotchpayService,
@@ -24,8 +21,6 @@ import { InvoiceGotenbergService } from './invoice/invoice-gotenberg.service'
     SubscriptionNotificationService,
     PaymentProcessor,
     InvoicePdfmakeService,
-    InvoicePuppeteerService,
-    InvoiceGotenbergService,
   ],
   exports: [SubscriptionService],
 })

@@ -150,20 +150,14 @@ tutoriel/pricing quand l'org a déjà des paiements :
     téléphone du payeur).
 - L'historique (« crédits passés » + abonnements) : `GET /payment/org/:id/payments`.
 
-### Factures PDF — recommandation (non implémenté)
+### Factures PDF
 
-Pour générer des factures « HTML propres » côté Node, après comparaison :
-
-- **pdfmake** — pas de dépendance native, rapide (~50-80 ms), API déclarative
-  (JSON). **Recommandé par défaut** ici : factures propres et cohérentes sans
-  alourdir l'image Docker (le backend embarque déjà sharp/ffmpeg/tesseract).
-- **Puppeteer** — vrai rendu HTML/CSS (fidélité maximale) mais lourd (Chromium,
-  ~1.5-2.5 s, 150-200 Mo). À réserver si la fidélité pixel est requise.
-- **Gotenberg** (microservice HTML→PDF) — bon compromis « HTML facile » sans
-  embarquer Chromium dans le backend, cohérent avec l'archi multi-services
-  existante (whatsapp-connector, image-cropper).
-
-Décision à acter avant implémentation (ajout de dépendance / service).
+`GET /payment/org/:id/payments/:paymentId/invoice` renvoie la **facture PDF** d'un
+paiement abouti (membres de l'org uniquement). Générée via **pdfmake** (retenu
+après comparaison pdfmake / Puppeteer / Gotenberg : ~6× plus rapide, **aucun
+Chromium**, backend léger). Voir `invoice/invoice-pdfmake.service.ts` (rendu) et
+`invoice/invoice-data.ts` (mapping paiement → facture). Émetteur configurable via
+`INVOICE_SELLER_*`.
 
 ## Modes Stripe (production / sandbox)
 

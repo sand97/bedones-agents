@@ -4,7 +4,8 @@ import { type InvoiceData, formatMoney } from './invoice-data'
 
 const CELL_M: [number, number, number, number] = [0, 4, 0, 4]
 
-const BRAND = '#128c7e'
+// Noir Bedones (au lieu du vert) pour matcher le thème de l'app.
+const BRAND = '#111111'
 const INK = '#1f2933'
 const MUTED = '#7b8794'
 

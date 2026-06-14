@@ -10,6 +10,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter'
 import { PrismaService } from '../prisma/prisma.service'
 import { StripeService, type StripeEvent, type StripeMode } from './stripe.service'
 import { NotchpayService } from './notchpay.service'
+import { InvoicePdfmakeService } from './invoice/invoice-pdfmake.service'
+import { buildInvoiceData } from './invoice/invoice-data'
 import {
   OrgPlan,
   PaymentKind,
@@ -70,6 +72,7 @@ export class SubscriptionService {
     private stripe: StripeService,
     private notchpay: NotchpayService,
     private events: EventEmitter2,
+    private invoicePdf: InvoicePdfmakeService,
   ) {}
 
   // ─────────────────────────── Lectures ───────────────────────────
@@ -146,6 +149,67 @@ export class SubscriptionService {
       response: r.response as Record<string, unknown>,
       createdAt: r.createdAt.toISOString(),
     }))
+  }
+
+  /**
+   * Génère la facture PDF (pdfmake) d'un paiement de l'organisation. Seuls les
+   * paiements aboutis (COMPLETED) sont facturables.
+   */
+  async generateInvoice(
+    userId: string,
+    orgId: string,
+    paymentId: string,
+  ): Promise<{ buffer: Buffer; filename: string }> {
+    await this.assertMember(userId, orgId)
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, organisationId: orgId },
+    })
+    if (!payment) throw new NotFoundException('Paiement introuvable')
+    if (payment.status !== PaymentStatus.COMPLETED) {
+      throw new BadRequestException('Seul un paiement abouti peut être facturé')
+    }
+
+    const [org, sub] = await Promise.all([
+      this.prisma.organisation.findUnique({ where: { id: orgId }, select: { name: true } }),
+      this.prisma.subscription.findUnique({ where: { organisationId: orgId } }),
+    ])
+    const recipient = (await this.resolveInvoiceRecipient(orgId, sub?.payerUserId ?? null)) ?? {
+      name: null,
+      email: null,
+      phone: null,
+    }
+
+    const data = buildInvoiceData({
+      payment,
+      orgName: org?.name ?? 'Organisation',
+      recipient,
+      subscription: sub
+        ? {
+            plan: sub.plan,
+            billingMonths: sub.billingMonths,
+            cardBrand: sub.cardBrand,
+            cardLast4: sub.cardLast4,
+            mobileNumber: sub.mobileNumber,
+          }
+        : null,
+    })
+    const buffer = await this.invoicePdf.generate(data)
+    return { buffer, filename: `${data.invoiceNumber}.pdf` }
+  }
+
+  private async resolveInvoiceRecipient(orgId: string, payerUserId: string | null) {
+    if (payerUserId) {
+      const payer = await this.prisma.user.findUnique({
+        where: { id: payerUserId },
+        select: { name: true, email: true, phone: true },
+      })
+      if (payer) return payer
+    }
+    const owner = await this.prisma.organisationMember.findFirst({
+      where: { organisationId: orgId, role: 'OWNER' },
+      select: { user: { select: { name: true, email: true, phone: true } } },
+    })
+    return owner?.user ?? null
   }
 
   // ─────────────────────── Création de checkout ───────────────────────
