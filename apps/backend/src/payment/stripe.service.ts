@@ -8,46 +8,69 @@ import Stripe from 'stripe'
 export type StripeClient = Stripe.Stripe
 export type StripeEvent = ReturnType<StripeClient['webhooks']['constructEvent']>
 
+// Deux environnements Stripe distincts (clés + secret webhook séparés). Le mode
+// ACTIF (sortant : création de checkouts) est piloté par STRIPE_MODE ; les
+// webhooks, eux, sont routés par endpoint (/stripe = production,
+// /stripe-sandbox = sandbox) et vérifiés avec le secret de leur mode.
+export type StripeMode = 'sandbox' | 'production'
+
+const MODE_ENV: Record<StripeMode, { secretEnv: string; webhookEnv: string }> = {
+  production: { secretEnv: 'STRIPE_SECRET_KEY', webhookEnv: 'STRIPE_WEBHOOK_SECRET' },
+  sandbox: { secretEnv: 'STRIPE_SANDBOX_SECRET_KEY', webhookEnv: 'STRIPE_SANDBOX_WEBHOOK_SECRET' },
+}
+
 /**
- * Fin wrapper autour du SDK Stripe. Initialise le client de façon paresseuse à
- * partir de STRIPE_SECRET_KEY : le backend démarre même sans Stripe configuré
- * (les endpoints de paiement renverront alors une 500 explicite), ce qui évite
- * de bloquer les environnements de dev/CI où la clé n'est pas renseignée.
+ * Fin wrapper autour du SDK Stripe, multi-mode (production + sandbox).
+ *
+ * Les clients sont initialisés de façon paresseuse et mis en cache par mode, à
+ * partir des clés correspondantes : le backend démarre même sans Stripe
+ * configuré (les endpoints renverront alors une 500 explicite), ce qui évite de
+ * bloquer les environnements de dev/CI où les clés ne sont pas renseignées.
  */
 @Injectable()
 export class StripeService {
   private readonly logger = new Logger(StripeService.name)
-  private client: StripeClient | null = null
+  private readonly clients = new Map<StripeMode, StripeClient>()
 
-  getClient(): StripeClient {
-    if (this.client) return this.client
+  /** Mode sortant actif (création de checkouts). Défaut/fallback : production. */
+  get activeMode(): StripeMode {
+    return process.env.STRIPE_MODE === 'sandbox' ? 'sandbox' : 'production'
+  }
 
-    const secretKey = process.env.STRIPE_SECRET_KEY
+  getClient(mode: StripeMode = this.activeMode): StripeClient {
+    const cached = this.clients.get(mode)
+    if (cached) return cached
+
+    const secretKey = process.env[MODE_ENV[mode].secretEnv]
     if (!secretKey) {
-      this.logger.error('STRIPE_SECRET_KEY manquant — paiement Stripe indisponible')
+      this.logger.error(
+        `${MODE_ENV[mode].secretEnv} manquant — paiement Stripe (${mode}) indisponible`,
+      )
       throw new InternalServerErrorException('Paiement indisponible : Stripe non configuré')
     }
 
     // apiVersion non épinglé : on suit la version par défaut du SDK installé,
     // ce qui garde les types et les webhooks cohérents avec cette dépendance.
-    this.client = new Stripe(secretKey, { appInfo: { name: 'Bedones Agents' } })
-    return this.client
+    const client = new Stripe(secretKey, { appInfo: { name: 'Bedones Agents' } })
+    this.clients.set(mode, client)
+    return client
   }
 
-  get isConfigured(): boolean {
-    return Boolean(process.env.STRIPE_SECRET_KEY)
+  isConfigured(mode: StripeMode = this.activeMode): boolean {
+    return Boolean(process.env[MODE_ENV[mode].secretEnv])
   }
 
   /**
-   * Vérifie la signature d'un webhook Stripe et renvoie l'événement typé.
-   * Lève une erreur si la signature est invalide ou le secret absent.
+   * Vérifie la signature d'un webhook Stripe (avec le secret du mode indiqué) et
+   * renvoie l'événement typé. Lève une erreur si la signature est invalide ou le
+   * secret absent.
    */
-  constructWebhookEvent(rawBody: Buffer, signature: string): StripeEvent {
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+  constructWebhookEvent(rawBody: Buffer, signature: string, mode: StripeMode): StripeEvent {
+    const webhookSecret = process.env[MODE_ENV[mode].webhookEnv]
     if (!webhookSecret) {
-      this.logger.error('STRIPE_WEBHOOK_SECRET manquant — impossible de vérifier le webhook')
+      this.logger.error(`${MODE_ENV[mode].webhookEnv} manquant — impossible de vérifier le webhook`)
       throw new InternalServerErrorException('Webhook Stripe non configuré')
     }
-    return this.getClient().webhooks.constructEvent(rawBody, signature, webhookSecret)
+    return this.getClient(mode).webhooks.constructEvent(rawBody, signature, webhookSecret)
   }
 }

@@ -53,21 +53,50 @@ Authentifiés (cookie de session). Les mutations exigent le rôle **OWNER** ou *
 | `POST` | `/payment/org/:organisationId/checkout/subscription` | crée la session d'abonnement → `{ url }` |
 | `POST` | `/payment/org/:organisationId/checkout/credits` | crée la session d'achat de crédits → `{ url }` |
 | `POST` | `/payment/org/:organisationId/portal` | portail de facturation Stripe → `{ url }` |
-| `POST` | `/payment/webhook/stripe` | **webhook Stripe** (pas d'auth, signature vérifiée) |
+| `POST` | `/payment/webhook/stripe` | **webhook Stripe production** (pas d'auth, signature vérifiée) |
+| `POST` | `/payment/webhook/stripe-sandbox` | **webhook Stripe sandbox** (pas d'auth, signature vérifiée) |
 
 Le frontend redirige l'utilisateur vers l'`url` Stripe Checkout renvoyée. Le
 forfait/les crédits ne sont **appliqués qu'au webhook** (source de vérité), jamais
 côté client.
 
+## Modes Stripe (production / sandbox)
+
+Deux environnements Stripe coexistent, chacun avec ses clés et son secret webhook :
+
+- **Sortant** (création de checkouts) : `STRIPE_MODE` (`sandbox` | `production`,
+  défaut `production`) choisit l'environnement actif.
+- **Webhooks** : routés par endpoint et vérifiés avec le secret du mode —
+  `/payment/webhook/stripe` (production) et `/payment/webhook/stripe-sandbox`
+  (sandbox). Le client Stripe utilisé pendant le traitement (ex.
+  `subscriptions.retrieve`) correspond au mode de l'endpoint.
+
 ## Webhooks gérés
 
 - `checkout.session.completed` — active la souscription (forfait, période,
   `Organisation.plan`) ou crédite les crédits achetés ; marque le `Payment` COMPLETED.
+- `payment_intent.succeeded` — **filet de sécurité pour l'achat de crédits** :
+  crédite même si `checkout.session.completed` est manqué. Idempotent (cf. plus bas) :
+  aucun double crédit si les deux events arrivent.
 - `invoice.paid` — met à jour la période et enregistre un `Payment` de
   renouvellement (idempotent via `stripeInvoiceId`).
 - `customer.subscription.updated` — synchronise statut / `cancelAtPeriodEnd` / période.
 - `customer.subscription.deleted` — rebascule l'organisation en `FREE`.
 - `payment_intent.payment_failed` — marque le `Payment` correspondant FAILED.
+
+### Crédit exactement-une-fois (idempotence)
+
+L'achat de crédits peut être confirmé par `checkout.session.completed` **et/ou**
+`payment_intent.succeeded` (et chacun peut être rejoué par Stripe). La ligne
+`Payment` sert d'**ancre d'idempotence** : son id est propagé sur la session **et**
+sur le PaymentIntent (`payment_intent_data.metadata.paymentId`). Le crédit n'est
+appliqué que lors de la transition atomique `PENDING → COMPLETED`
+(`updateMany` filtré sur `status: PENDING`) ; une seule transaction gagne la
+course et incrémente `purchasedCredits`. **Aucun double crédit possible**, quel
+que soit l'event déclencheur ou l'ordre d'arrivée.
+
+> Le crédit ne dépend jamais du `success_url` (redirection navigateur) : Stripe
+> envoie les webhooks de serveur à serveur, que l'utilisateur revienne ou non.
 
 ## Quota de crédits
 
@@ -81,16 +110,21 @@ codé en dur d'avant, mais reflète le forfait réellement actif (issue #101).
 Variables d'environnement (cf. `.env.example`) :
 
 ```bash
-STRIPE_SECRET_KEY=sk_test_...      # clé secrète Stripe
-STRIPE_WEBHOOK_SECRET=whsec_...    # secret de signature du webhook
-FRONTEND_URL=https://...           # base des URLs de retour (success/cancel)
+STRIPE_MODE=production                 # sandbox | production (défaut: production)
+# Production
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+# Sandbox
+STRIPE_SANDBOX_SECRET_KEY=sk_test_...
+STRIPE_SANDBOX_WEBHOOK_SECRET=whsec_...
+FRONTEND_URL=https://...               # base des URLs de retour (success/cancel)
 ```
 
-Tester les webhooks en local :
+Tester les webhooks sandbox en local :
 
 ```bash
-stripe listen --forward-to localhost:3005/payment/webhook/stripe
-# copier le whsec_... affiché dans STRIPE_WEBHOOK_SECRET
+stripe listen --forward-to localhost:3005/payment/webhook/stripe-sandbox
+# copier le whsec_... affiché dans STRIPE_SANDBOX_WEBHOOK_SECRET, et STRIPE_MODE=sandbox
 ```
 
 ## Reste à brancher côté frontend

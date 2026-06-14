@@ -5,8 +5,9 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
+import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
-import { StripeService, type StripeEvent } from './stripe.service'
+import { StripeService, type StripeEvent, type StripeMode } from './stripe.service'
 import {
   OrgPlan,
   PaymentKind,
@@ -54,6 +55,7 @@ interface SubscriptionLike {
 
 interface PaymentIntentLike {
   id: string
+  metadata?: Record<string, string> | null
 }
 
 @Injectable()
@@ -244,6 +246,18 @@ export class SubscriptionService {
       user,
     )
 
+    // Id stable de la ligne Payment, propagé À LA FOIS sur la session ET sur le
+    // PaymentIntent. C'est l'ancre d'idempotence : que le crédit soit déclenché
+    // par `checkout.session.completed` ou par `payment_intent.succeeded`, les deux
+    // pointent vers la même ligne et le crédit n'est appliqué qu'une seule fois.
+    const paymentId = randomUUID()
+    const sharedMetadata = {
+      organisationId: orgId,
+      kind: PaymentKind.CREDIT_PURCHASE,
+      credits: String(dto.credits),
+      paymentId,
+    }
+
     const stripe = this.stripe.getClient()
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -265,18 +279,18 @@ export class SubscriptionService {
       cancel_url: this.buildReturnUrl(orgId, 'cancelled'),
       payment_intent_data: {
         description: `Achat de ${dto.credits} crédits Bedones`,
+        // Recopie les métadonnées sur le PaymentIntent pour que
+        // `payment_intent.succeeded` puisse créditer même sans la session.
+        metadata: sharedMetadata,
       },
-      metadata: {
-        organisationId: orgId,
-        kind: PaymentKind.CREDIT_PURCHASE,
-        credits: String(dto.credits),
-      },
+      metadata: sharedMetadata,
     })
 
     if (!session.url) throw new BadRequestException('Échec de création de la session de paiement')
 
     await this.prisma.payment.create({
       data: {
+        id: paymentId,
         organisationId: orgId,
         kind: PaymentKind.CREDIT_PURCHASE,
         status: PaymentStatus.PENDING,
@@ -308,21 +322,24 @@ export class SubscriptionService {
 
   // ─────────────────────────── Webhooks ───────────────────────────
 
-  async handleWebhookEvent(event: StripeEvent): Promise<void> {
-    this.logger.log(`Stripe webhook reçu: ${event.type}`)
+  async handleWebhookEvent(event: StripeEvent, mode: StripeMode): Promise<void> {
+    this.logger.log(`Stripe webhook reçu (${mode}): ${event.type}`)
     const object = event.data.object as unknown
     switch (event.type) {
       case 'checkout.session.completed':
-        await this.handleCheckoutCompleted(object as CheckoutSessionLike)
+        await this.handleCheckoutCompleted(object as CheckoutSessionLike, mode)
         break
       case 'invoice.paid':
-        await this.handleInvoicePaid(object as InvoiceLike)
+        await this.handleInvoicePaid(object as InvoiceLike, mode)
         break
       case 'customer.subscription.updated':
         await this.handleSubscriptionUpdated(object as SubscriptionLike)
         break
       case 'customer.subscription.deleted':
         await this.handleSubscriptionDeleted(object as SubscriptionLike)
+        break
+      case 'payment_intent.succeeded':
+        await this.handlePaymentIntentSucceeded(object as PaymentIntentLike)
         break
       case 'payment_intent.payment_failed':
         await this.handlePaymentIntentFailed(object as PaymentIntentLike)
@@ -332,7 +349,10 @@ export class SubscriptionService {
     }
   }
 
-  private async handleCheckoutCompleted(session: CheckoutSessionLike): Promise<void> {
+  private async handleCheckoutCompleted(
+    session: CheckoutSessionLike,
+    mode: StripeMode,
+  ): Promise<void> {
     const orgId = session.metadata?.organisationId
     const kind = session.metadata?.kind as PaymentKind | undefined
     if (!orgId || !kind) {
@@ -340,30 +360,22 @@ export class SubscriptionService {
       return
     }
 
-    // Idempotence : si le paiement est déjà COMPLETED, on ne refait rien.
+    if (kind === PaymentKind.CREDIT_PURCHASE) {
+      await this.applyCreditPurchase({
+        paymentId: session.metadata?.paymentId,
+        sessionId: session.id,
+        paymentIntentId: (session.payment_intent as string) ?? undefined,
+        organisationId: orgId,
+        credits: session.metadata?.credits ? Number(session.metadata.credits) : undefined,
+      })
+      return
+    }
+
+    // Idempotence souscription : si le paiement est déjà COMPLETED, rien à faire.
     const payment = await this.prisma.payment.findUnique({
       where: { stripeCheckoutSessionId: session.id },
     })
     if (payment?.status === PaymentStatus.COMPLETED) return
-
-    if (kind === PaymentKind.CREDIT_PURCHASE) {
-      const credits = Number(session.metadata?.credits ?? payment?.creditsPurchased ?? 0)
-      await this.prisma.$transaction([
-        this.prisma.payment.updateMany({
-          where: { stripeCheckoutSessionId: session.id },
-          data: {
-            status: PaymentStatus.COMPLETED,
-            stripePaymentIntentId: (session.payment_intent as string) ?? undefined,
-          },
-        }),
-        this.prisma.organisation.update({
-          where: { id: orgId },
-          data: { purchasedCredits: { increment: credits } },
-        }),
-      ])
-      this.logger.log(`+${credits} crédits achetés pour org ${orgId}`)
-      return
-    }
 
     // kind === SUBSCRIPTION
     const plan = (session.metadata?.plan as OrgPlan) ?? OrgPlan.PRO
@@ -374,7 +386,7 @@ export class SubscriptionService {
     let period: { start?: Date; end?: Date; priceId?: string } = {}
     if (stripeSubId) {
       try {
-        const stripeSub = await this.stripe.getClient().subscriptions.retrieve(stripeSubId)
+        const stripeSub = await this.stripe.getClient(mode).subscriptions.retrieve(stripeSubId)
         period = this.extractPeriod(stripeSub)
       } catch (err) {
         this.logger.warn(`Impossible de récupérer l'abonnement Stripe ${stripeSubId}: ${err}`)
@@ -423,7 +435,7 @@ export class SubscriptionService {
     this.logger.log(`Org ${orgId} souscrit au forfait ${plan} (${billingMonths} mois)`)
   }
 
-  private async handleInvoicePaid(invoice: InvoiceLike): Promise<void> {
+  private async handleInvoicePaid(invoice: InvoiceLike, mode: StripeMode): Promise<void> {
     const stripeSubId = this.getInvoiceSubscriptionId(invoice)
     if (!stripeSubId) return
 
@@ -438,7 +450,7 @@ export class SubscriptionService {
     // Met à jour la période courante depuis l'abonnement Stripe.
     let period: { start?: Date; end?: Date } = {}
     try {
-      const stripeSub = await this.stripe.getClient().subscriptions.retrieve(stripeSubId)
+      const stripeSub = await this.stripe.getClient(mode).subscriptions.retrieve(stripeSubId)
       period = this.extractPeriod(stripeSub)
     } catch {
       // best-effort
@@ -511,6 +523,87 @@ export class SubscriptionService {
       }),
     ])
     this.logger.log(`Abonnement terminé pour org ${sub.organisationId} — retour au forfait FREE`)
+  }
+
+  /**
+   * Filet de sécurité pour l'ACHAT DE CRÉDITS : crédite l'organisation même si
+   * `checkout.session.completed` n'arrive jamais (event désactivé, manqué…). Ne
+   * traite QUE les paiements de crédits ; les abonnements passent par
+   * `checkout.session.completed` + `invoice.paid`. Le crédit reste exactement
+   * une fois grâce à `applyCreditPurchase` (ancre d'idempotence sur la ligne
+   * Payment), donc aucun double crédit même si les deux events arrivent.
+   */
+  private async handlePaymentIntentSucceeded(pi: PaymentIntentLike): Promise<void> {
+    if (pi.metadata?.kind !== PaymentKind.CREDIT_PURCHASE) return
+    await this.applyCreditPurchase({
+      paymentId: pi.metadata?.paymentId,
+      paymentIntentId: pi.id,
+      organisationId: pi.metadata?.organisationId,
+      credits: pi.metadata?.credits ? Number(pi.metadata.credits) : undefined,
+    })
+  }
+
+  /**
+   * Applique un achat de crédits de façon ATOMIQUE et EXACTEMENT UNE FOIS.
+   *
+   * La ligne Payment sert d'ancre d'idempotence : on ne crédite que lors de la
+   * transition PENDING → COMPLETED, gérée par un `updateMany` filtré sur
+   * `status: PENDING`. Une seule transaction peut faire basculer la ligne (les
+   * autres voient `count = 0` et n'incrémentent rien), peu importe que le
+   * déclencheur soit `checkout.session.completed`, `payment_intent.succeeded`,
+   * ou un retry Stripe du même event.
+   */
+  private async applyCreditPurchase(args: {
+    paymentId?: string | null
+    sessionId?: string
+    paymentIntentId?: string
+    organisationId?: string
+    credits?: number
+  }): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      // Localise la ligne Payment : par id (le plus fiable), sinon par session,
+      // sinon par PaymentIntent déjà rattaché.
+      let payment = null
+      if (args.paymentId) {
+        payment = await tx.payment.findUnique({ where: { id: args.paymentId } })
+      } else if (args.sessionId) {
+        payment = await tx.payment.findUnique({
+          where: { stripeCheckoutSessionId: args.sessionId },
+        })
+      } else if (args.paymentIntentId) {
+        payment = await tx.payment.findFirst({
+          where: { stripePaymentIntentId: args.paymentIntentId },
+        })
+      }
+
+      if (!payment) {
+        this.logger.warn(
+          `applyCreditPurchase: aucune ligne Payment trouvée (paymentId=${args.paymentId}, session=${args.sessionId}, pi=${args.paymentIntentId})`,
+        )
+        return
+      }
+      if (payment.status === PaymentStatus.COMPLETED) return // déjà crédité
+
+      // Bascule atomique PENDING → COMPLETED : seul le gagnant de la course
+      // (count === 1) procède au crédit.
+      const flipped = await tx.payment.updateMany({
+        where: { id: payment.id, status: PaymentStatus.PENDING },
+        data: {
+          status: PaymentStatus.COMPLETED,
+          stripePaymentIntentId: args.paymentIntentId ?? payment.stripePaymentIntentId ?? undefined,
+        },
+      })
+      if (flipped.count !== 1) return
+
+      const credits = payment.creditsPurchased ?? args.credits ?? 0
+      if (credits > 0) {
+        await tx.organisation.update({
+          where: { id: payment.organisationId },
+          data: { purchasedCredits: { increment: credits } },
+        })
+      }
+      this.logger.log(`+${credits} crédits achetés pour org ${payment.organisationId}`)
+    })
   }
 
   private async handlePaymentIntentFailed(pi: PaymentIntentLike): Promise<void> {
