@@ -1,0 +1,540 @@
+/* =========================================================
+   Promotion creation wizard — design ported from Claude Design
+   (Bedones design system). Centralized classes for the complex
+   interactive elements of create-promotion-modal.tsx; all colors
+   come from the app's global --color-* tokens (styles.css).
+   ========================================================= */
+
+/* ---- shell ---- */
+.promo-wizard__progress {
+  height: 3px;
+  background: var(--color-border-subtle);
+}
+.promo-wizard__progress-bar {
+  height: 3px;
+  background: var(--color-text-primary);
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.promo-wizard__body {
+  display: flex;
+  min-height: 0;
+  max-height: 62vh;
+}
+.promo-wizard__rail {
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-border-subtle);
+  padding: 22px 18px;
+  background: var(--color-bg-page);
+  overflow-y: auto;
+}
+.promo-wizard__scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 22px 24px 26px;
+}
+.promo-wizard__mobile-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+/* ---- vertical stepper ---- */
+.promo-step {
+  display: flex;
+  gap: 13px;
+  cursor: pointer;
+}
+.promo-step__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.promo-step__dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  background: var(--color-bg-surface);
+  color: var(--color-text-tertiary);
+  border: 1px solid var(--color-border-default);
+}
+.promo-step__dot.is-done {
+  background: var(--color-text-primary);
+  color: #fff;
+  border-color: var(--color-text-primary);
+}
+.promo-step__dot.is-current {
+  background: var(--color-text-primary);
+  color: #fff;
+  border-color: var(--color-text-primary);
+}
+.promo-step__dot.is-error {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+.promo-step__line {
+  width: 1px;
+  flex: 1;
+  min-height: 14px;
+  background: var(--color-border-default);
+  margin: 4px 0;
+}
+.promo-step__line.is-done {
+  background: var(--color-text-primary);
+}
+.promo-step__text {
+  padding-bottom: 18px;
+}
+.promo-step__label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  line-height: 1.25;
+}
+.promo-step__label.is-active {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.promo-step__sub {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+.promo-step-mdot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--color-bg-muted);
+  cursor: pointer;
+}
+.promo-step-mdot.is-current,
+.promo-step-mdot.is-done {
+  background: var(--color-text-primary);
+}
+
+/* ---- section headers ---- */
+.promo-section__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.promo-section__desc {
+  font-size: 12.5px;
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.promo-section__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 4px;
+}
+.promo-section__eyebrow-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+  flex-shrink: 0;
+}
+.promo-section__eyebrow-icon.is-solid {
+  background: var(--color-text-primary);
+  color: #fff;
+}
+.promo-section__eyebrow-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* ---- field bits ---- */
+.promo-field__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 7px;
+}
+.promo-field__opt {
+  font-weight: 400;
+  color: var(--color-text-tertiary);
+}
+.promo-field__hint {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-top: 6px;
+}
+.promo-field__error {
+  font-size: 12px;
+  color: var(--color-danger);
+  margin-top: 6px;
+}
+
+/* ---- option cards (catalog / scope / reward) ---- */
+.promo-catalog-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+.promo-option-row {
+  display: flex;
+  gap: 10px;
+}
+.promo-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 15px;
+  border-radius: 12px;
+  cursor: pointer;
+  box-sizing: border-box;
+  width: 100%;
+  text-align: left;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  transition: all 0.15s;
+}
+.promo-option:hover {
+  border-color: rgba(17, 27, 33, 0.25);
+}
+.promo-option.is-selected {
+  border-color: var(--color-text-primary);
+  box-shadow: 0 0 0 1px var(--color-text-primary);
+}
+.promo-option--start {
+  align-items: flex-start;
+}
+.promo-option__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+}
+.promo-option.is-selected .promo-option__icon {
+  background: var(--color-text-primary);
+  color: #fff;
+}
+.promo-option__name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.3;
+}
+.promo-option__meta {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-top: 1px;
+}
+.promo-option__radio {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: #fff;
+}
+.promo-option.is-selected .promo-option__radio {
+  border-color: var(--color-text-primary);
+  background: var(--color-text-primary);
+}
+.promo-option__radio-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #fff;
+}
+
+/* reward type card (vertical) */
+.promo-reward-row {
+  display: flex;
+  gap: 10px;
+}
+.promo-reward {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  box-sizing: border-box;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  transition: all 0.15s;
+}
+.promo-reward:hover {
+  border-color: rgba(17, 27, 33, 0.25);
+}
+.promo-reward.is-selected {
+  border-color: var(--color-text-primary);
+  box-shadow: 0 0 0 1px var(--color-text-primary);
+}
+.promo-reward__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+}
+.promo-reward.is-selected .promo-reward__icon {
+  background: var(--color-text-primary);
+  color: #fff;
+}
+.promo-reward__label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.promo-reward__desc {
+  font-size: 11.5px;
+  color: var(--color-text-tertiary);
+}
+
+/* ---- product picker trigger + chips ---- */
+.promo-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px dashed var(--color-border-strong);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.promo-picker-trigger:hover {
+  border-color: var(--color-text-primary);
+}
+.promo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 11px;
+}
+.promo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 9px 6px 6px;
+  border-radius: 12px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+}
+.promo-chip__img {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-subtle);
+}
+.promo-chip__name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+.promo-chip__price {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-top: 1px;
+}
+.promo-chip__remove {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-bg-muted);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+
+/* ---- quick value chips ---- */
+.promo-quick {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+}
+.promo-quick.is-active {
+  border-color: var(--color-text-primary);
+  background: var(--color-text-primary);
+  color: #fff;
+}
+
+/* ---- condition rows ---- */
+.promo-cond-row {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* ---- recap ---- */
+.promo-recap {
+  border: 1px solid var(--color-border-default);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.promo-recap__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.promo-recap__row:last-child {
+  border-bottom: none;
+}
+.promo-recap__row--top {
+  align-items: flex-start;
+}
+.promo-recap__key {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.promo-recap__val {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-top: 2px;
+}
+.promo-recap__edit {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  flex-shrink: 0;
+}
+.promo-recap__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.promo-recap__chip {
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-secondary);
+}
+.promo-recap__settings {
+  margin-top: 14px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 14px;
+  padding: 4px 15px;
+}
+.promo-recap__errors {
+  border: 1px solid var(--color-danger-border);
+  background: var(--color-danger-bg);
+  border-radius: 12px;
+  padding: 13px 15px;
+  margin-bottom: 16px;
+}
+.promo-recap__errors-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-danger);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.promo-recap__errors-list {
+  margin: 8px 0 0;
+  padding-left: 22px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+
+/* ---- header status segmented (Actif / En pause) ---- */
+.promo-status-toggle.ant-segmented {
+  background: var(--color-bg-subtle);
+  padding: 3px;
+  border-radius: 10px;
+}
+.promo-status-toggle.ant-segmented .ant-segmented-item {
+  border-radius: 8px;
+  color: var(--color-text-tertiary);
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: none;
+}
+.promo-status-toggle.ant-segmented .ant-segmented-item-selected {
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-card);
+}
+.promo-status-toggle.ant-segmented .ant-segmented-thumb {
+  border-radius: 8px;
+}
+
+/* ---- responsive: stack grids on narrow modal ---- */
+@media (max-width: 640px) {
+  .promo-wizard__body {
+    flex-direction: column;
+    max-height: 64vh;
+  }
+  .promo-catalog-grid {
+    grid-template-columns: 1fr;
+  }
+  .promo-option-row {
+    flex-direction: column;
+  }
+  /* Pourcentage + Crédit on one row, Produits offerts full width below */
+  .promo-reward-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .promo-reward--full {
+    grid-column: 1 / -1;
+  }
+}
