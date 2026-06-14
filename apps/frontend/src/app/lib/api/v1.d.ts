@@ -3641,6 +3641,14 @@ export interface components {
             currency: string;
             creditsPurchased: Record<string, never> | null;
             description: Record<string, never> | null;
+            /** @enum {string} */
+            provider: "STRIPE" | "NOTCHPAY";
+            /** @description Marque de carte (snapshot) */
+            cardBrand: Record<string, never> | null;
+            /** @description 4 derniers chiffres de la carte (snapshot) */
+            cardLast4: Record<string, never> | null;
+            /** @description Numéro mobile money (snapshot) */
+            mobileNumber: Record<string, never> | null;
             createdAt: string;
         };
         CreateSubscriptionCheckoutDto: {

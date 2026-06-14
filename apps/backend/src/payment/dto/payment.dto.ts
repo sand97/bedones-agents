@@ -145,6 +145,18 @@ export class PaymentItemDto {
   @ApiProperty({ nullable: true })
   description: string | null
 
+  @ApiProperty({ enum: ['STRIPE', 'NOTCHPAY'] })
+  provider: string
+
+  @ApiProperty({ nullable: true, description: 'Marque de carte (snapshot)' })
+  cardBrand: string | null
+
+  @ApiProperty({ nullable: true, description: '4 derniers chiffres de la carte (snapshot)' })
+  cardLast4: string | null
+
+  @ApiProperty({ nullable: true, description: 'Numéro mobile money (snapshot)' })
+  mobileNumber: string | null
+
   @ApiProperty()
   createdAt: string
 }

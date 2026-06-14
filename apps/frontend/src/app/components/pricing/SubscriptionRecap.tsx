@@ -1,7 +1,13 @@
 import { $api } from '@app/lib/api/$api'
-import { Button, Card, Descriptions, Progress, Table, Tag } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
-import { getPlanLabel } from './constants'
+import { Button } from 'antd'
+import type { ReactNode } from 'react'
+import {
+  PLAN_CONTENT,
+  formatDisplayPrice,
+  getPlanLabel,
+  getTotalPrice,
+  type BillingDuration,
+} from './constants'
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api-moderator.bedones.local'
 
@@ -15,41 +21,178 @@ interface PaymentRow {
   currency: string
   creditsPurchased: number | null
   description: string | null
+  provider: string
+  cardBrand: string | null
+  cardLast4: string | null
+  mobileNumber: string | null
   createdAt: string
 }
 
-const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  ACTIVE: { label: 'Actif', color: 'green' },
-  INCOMPLETE: { label: 'En attente', color: 'gold' },
-  PAST_DUE: { label: 'Paiement en retard', color: 'orange' },
-  CANCELED: { label: 'Annulé', color: 'red' },
-  EXPIRED: { label: 'Expiré', color: 'default' },
+const PLAN_TAGLINE: Record<PlanKey, string> = {
+  free: 'Modération IA pour démarrer, sans engagement.',
+  pro: 'Modération IA illimitée, gestion WhatsApp Business et support prioritaire pour les équipes en croissance.',
+  business:
+    'Le maximum de puissance IA, statistiques avancées et automatisations pour les équipes établies.',
 }
 
-const PAYMENT_STATUS: Record<string, { label: string; color: string }> = {
-  COMPLETED: { label: 'Payé', color: 'green' },
-  PENDING: { label: 'En attente', color: 'gold' },
-  FAILED: { label: 'Échoué', color: 'red' },
-  REFUNDED: { label: 'Remboursé', color: 'blue' },
+const STATUS_STYLE: Record<string, { label: string; color: string; bg: string; dot: string }> = {
+  COMPLETED: { label: 'Payé', color: '#111b21', bg: '#f5f5f5', dot: '#22c55e' },
+  PENDING: { label: 'En attente', color: '#494949', bg: '#f5f5f5', dot: '#f59e0b' },
+  FAILED: { label: 'Échoué', color: '#ef4444', bg: '#fef2f2', dot: '#ef4444' },
+  REFUNDED: { label: 'Remboursé', color: '#8c8c8c', bg: '#f5f5f5', dot: '#bfbfbf' },
 }
 
-function formatDate(iso: string): string {
+const BRAND_COLOR: Record<string, string> = {
+  visa: '#1a1f71',
+  mastercard: '#eb001b',
+  amex: '#2e77bc',
+}
+
+function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
   })
 }
+function fmtAmount(amount: number, currency: string): string {
+  const v = amount.toFixed(2)
+  return currency === 'USD' ? `$${v}` : `${v} ${currency}`
+}
+function last4(num: string): string {
+  return num.replace(/\D/g, '').slice(-4)
+}
+
+// ── Icônes ──
+function CardMark({ color }: { color: string }) {
+  return (
+    <svg
+      width="19"
+      height="13"
+      viewBox="0 0 24 17"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flexShrink: 0 }}
+    >
+      <rect x="1" y="1" width="22" height="15" rx="2.5" />
+      <path d="M1 6h22" />
+      <path d="M5 11h3" />
+    </svg>
+  )
+}
+function MobileMark({ color }: { color: string }) {
+  return (
+    <svg
+      width="12"
+      height="16"
+      viewBox="0 0 16 22"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flexShrink: 0 }}
+    >
+      <rect x="1" y="1" width="14" height="20" rx="3" />
+      <path d="M6.5 17.5h3" />
+    </svg>
+  )
+}
+function RowIcon({ kind }: { kind: string }) {
+  if (kind === 'CREDIT_PURCHASE') {
+    return (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+      </svg>
+    )
+  }
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+    </svg>
+  )
+}
+const DownloadIcon = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.6"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+  </svg>
+)
+
+function methodOf(p: PaymentRow): { mark: ReactNode; label: string } {
+  if (p.cardLast4) {
+    const brand = (p.cardBrand ?? 'carte').toLowerCase()
+    const label = `${brand.charAt(0).toUpperCase()}${brand.slice(1)} ···· ${p.cardLast4}`
+    return { mark: <CardMark color={BRAND_COLOR[brand] ?? '#494949'} />, label }
+  }
+  if (p.mobileNumber) {
+    return {
+      mark: <MobileMark color="#494949" />,
+      label: `Mobile Money ···· ${last4(p.mobileNumber)}`,
+    }
+  }
+  return p.provider === 'NOTCHPAY'
+    ? { mark: <MobileMark color="#494949" />, label: 'Mobile Money' }
+    : { mark: <CardMark color="#494949" />, label: 'Carte' }
+}
+
+function exportCsv(rows: PaymentRow[]) {
+  const head = ['Date', 'Description', 'Méthode', 'Montant', 'Devise', 'Statut']
+  const lines = rows.map((p) => {
+    const m = methodOf(p)
+    const st = STATUS_STYLE[p.status]?.label ?? p.status
+    return [fmtDate(p.createdAt), p.description ?? '', m.label, p.amount.toFixed(2), p.currency, st]
+      .map((c) => `"${String(c).replace(/"/g, '""')}"`)
+      .join(',')
+  })
+  const blob = new Blob([[head.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'paiements-bedones.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 interface SubscriptionRecapProps {
   organisationId: string
-  onUpgrade: () => void
+  onShowFeatures: () => void
   onBuyCredits: () => void
 }
 
 export function SubscriptionRecap({
   organisationId,
-  onUpgrade,
+  onShowFeatures,
   onBuyCredits,
 }: SubscriptionRecapProps) {
   const subscriptionQuery = $api.useQuery('get', '/payment/org/{organisationId}/subscription', {
@@ -64,130 +207,252 @@ export function SubscriptionRecap({
 
   const sub = subscriptionQuery.data
   const plan = (sub?.plan ?? 'free') as PlanKey
-  const isFree = plan === 'free'
-  const used = creditsQuery.data?.used ?? 0
+  const planConfig = PLAN_CONTENT[plan]
+  const billingMonths = (sub?.billingMonths ?? 1) as BillingDuration
+  const monthlyPrice = planConfig.monthlyPrice
+  const periodPrice = getTotalPrice(monthlyPrice, billingMonths)
+
   const total = creditsQuery.data?.total ?? sub?.totalCredits ?? 0
-  const usedPct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
+  const used = creditsQuery.data?.used ?? 0
+  const remaining = Math.max(0, total - used)
+  const remainingPct = total > 0 ? Math.round((remaining / total) * 100) : 0
 
-  const paymentMethodLabel = (() => {
-    const m = sub?.paymentMethod
-    if (!m || !m.type) return '—'
-    if (m.type === 'CARD') return `Carte ${m.brand ?? ''} •••• ${m.last4 ?? '????'}`.trim()
-    return `Mobile money — ${m.phone ?? ''}`.trim()
-  })()
+  const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null
+  const daysLeft = periodEnd
+    ? Math.max(0, Math.ceil((periodEnd.getTime() - Date.now()) / 86_400_000))
+    : null
 
-  const columns: ColumnsType<PaymentRow> = [
-    { title: 'Date', dataIndex: 'createdAt', key: 'date', render: (v: string) => formatDate(v) },
-    {
-      title: 'Détail',
-      dataIndex: 'description',
-      key: 'description',
-      render: (v: string | null, row) =>
-        v ?? (row.kind === 'SUBSCRIPTION' ? 'Abonnement' : 'Achat de crédits'),
-    },
-    {
-      title: 'Montant',
-      dataIndex: 'amount',
-      key: 'amount',
-      render: (v: number, row) => `${v.toFixed(2)} ${row.currency}`,
-    },
-    {
-      title: 'Statut',
-      dataIndex: 'status',
-      key: 'status',
-      render: (v: string) => {
-        const s = PAYMENT_STATUS[v] ?? { label: v, color: 'default' }
-        return <Tag color={s.color}>{s.label}</Tag>
-      },
-    },
-    {
-      title: 'Facture',
-      key: 'invoice',
-      render: (_, row) =>
-        row.status === 'COMPLETED' ? (
-          <Button
-            type="link"
-            size="small"
-            href={`${API_URL}/payment/org/${organisationId}/payments/${row.id}/invoice`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Télécharger
-          </Button>
-        ) : (
-          <span className="text-text-soft">—</span>
-        ),
-    },
-  ]
-
-  const statusTag = sub?.status ? STATUS_LABEL[sub.status] : null
+  const payments = (paymentsQuery.data as PaymentRow[] | undefined) ?? []
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="Mon offre" loading={subscriptionQuery.isLoading}>
-          <Descriptions column={1} size="small">
-            <Descriptions.Item label="Forfait">
-              <span className="font-semibold">{getPlanLabel(plan)}</span>
-              {statusTag ? (
-                <Tag className="ml-2" color={statusTag.color}>
-                  {statusTag.label}
-                </Tag>
-              ) : null}
-            </Descriptions.Item>
-            {sub?.billingMonths ? (
-              <Descriptions.Item label="Facturation">{sub.billingMonths} mois</Descriptions.Item>
-            ) : null}
-            {sub?.currentPeriodEnd ? (
-              <Descriptions.Item
-                label={sub.cancelAtPeriodEnd ? 'Se termine le' : 'Prochain renouvellement'}
-              >
-                {formatDate(sub.currentPeriodEnd)}
-              </Descriptions.Item>
-            ) : null}
-            <Descriptions.Item label="Moyen de paiement">{paymentMethodLabel}</Descriptions.Item>
-          </Descriptions>
-          <div className="mt-4 flex gap-2">
-            {isFree ? (
-              <Button type="primary" onClick={onUpgrade}>
-                Améliorer mon offre
-              </Button>
-            ) : (
-              <>
-                <Button type="primary" onClick={onBuyCredits}>
-                  Acheter des crédits
-                </Button>
-                <Button onClick={onUpgrade}>Changer d'offre</Button>
-              </>
-            )}
+      <div className="sub-grid">
+        {/* ── Carte formule (sombre) ── */}
+        <div className="sub-plan-card">
+          <div className="flex items-center justify-between">
+            <span className="sub-eyebrow">Formule actuelle</span>
+            <span className="sub-badge">
+              <span className="sub-dot" />
+              {sub?.status === 'ACTIVE' ? 'Active' : (sub?.status ?? 'Inactive')}
+            </span>
           </div>
-        </Card>
 
-        <Card title="Crédits" loading={creditsQuery.isLoading}>
-          <div className="flex flex-col gap-2">
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-semibold">{used.toLocaleString('fr-FR')}</span>
-              <span className="text-text-secondary">/ {total.toLocaleString('fr-FR')} crédits</span>
-            </div>
-            <Progress percent={usedPct} status={usedPct >= 100 ? 'exception' : 'active'} />
-            <div className="flex justify-between text-sm text-text-secondary">
-              <span>Forfait : {(sub?.monthlyCredits ?? 0).toLocaleString('fr-FR')} / mois</span>
-              <span>Achetés : {(sub?.purchasedCredits ?? 0).toLocaleString('fr-FR')}</span>
-            </div>
+          <div className="mt-4 flex items-baseline gap-2.5">
+            <span className="sub-plan-name">{getPlanLabel(plan)}</span>
+            <span className="sub-plan-price">{formatDisplayPrice(monthlyPrice)} / mois</span>
           </div>
-        </Card>
+          <p className="sub-plan-desc mt-2">{PLAN_TAGLINE[plan]}</p>
+
+          <div className="mt-5 flex gap-2.5">
+            <Button className="sub-btn-light flex-1" onClick={onShowFeatures}>
+              Voir les fonctionnalités →
+            </Button>
+            <Button className="sub-btn-ghost" onClick={onShowFeatures}>
+              Changer
+            </Button>
+          </div>
+
+          {periodEnd ? (
+            <div className="sub-foot mt-auto">
+              <div className="sub-foot-icon">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <path d="M16 2v4M8 2v4M3 10h18" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="sub-foot-label">
+                  {sub?.cancelAtPeriodEnd ? 'Se termine' : 'Prochaine échéance'}
+                  {daysLeft != null ? ` · dans ${daysLeft} jours` : ''}
+                </div>
+                <div className="sub-foot-value">
+                  {fmtDate(sub!.currentPeriodEnd!)} · {formatDisplayPrice(periodPrice)}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {/* ── Carte crédits ── */}
+        <div className="sub-card">
+          <span className="sub-eyebrow">Crédits IA restants</span>
+          <div className="mt-3.5 flex items-baseline gap-2">
+            <span className="sub-credits-num">{remaining.toLocaleString('fr-FR')}</span>
+            <span className="text-sm text-text-soft">crédits</span>
+          </div>
+          <div className="mt-1.5 text-[12.5px] text-text-soft">
+            sur {total.toLocaleString('fr-FR')} ce mois
+            {periodEnd ? ` · renouvelés le ${fmtDate(sub!.currentPeriodEnd!)}` : ''}
+          </div>
+
+          <div className="sub-bar mt-4.5" style={{ marginTop: 18 }}>
+            <div className="sub-bar-fill" style={{ width: `${remainingPct}%` }} />
+          </div>
+          <div className="mt-2 flex justify-between text-xs text-text-soft">
+            <span>{used.toLocaleString('fr-FR')} utilisés</span>
+            <span className="sub-mono">{remainingPct} %</span>
+          </div>
+
+          <Button
+            type="primary"
+            className="mt-auto"
+            style={{ height: 42, borderRadius: 10 }}
+            block
+            onClick={onBuyCredits}
+          >
+            + Ajouter des crédits
+          </Button>
+          <p className="mt-2.5 text-center text-xs text-text-soft">
+            Les crédits ajoutés n'expirent pas.
+          </p>
+        </div>
       </div>
 
-      <Card title="Historique des paiements" loading={paymentsQuery.isLoading}>
-        <Table<PaymentRow>
-          rowKey="id"
-          size="small"
-          columns={columns}
-          dataSource={(paymentsQuery.data as PaymentRow[]) ?? []}
-          pagination={{ pageSize: 10, hideOnSinglePage: true }}
-          locale={{ emptyText: 'Aucun paiement' }}
-        />
-      </Card>
+      {/* ── Historique des paiements ── */}
+      <div className="sub-history">
+        <div className="flex items-center justify-between px-[22px] pb-4 pt-5">
+          <div>
+            <h2 className="text-base font-semibold">Historique des paiements</h2>
+            <p className="mt-0.5 text-[12.5px] text-text-soft">
+              Vos transactions Mobile Money et factures.
+            </p>
+          </div>
+          <Button
+            icon={DownloadIcon}
+            disabled={payments.length === 0}
+            onClick={() => exportCsv(payments)}
+          >
+            Exporter
+          </Button>
+        </div>
+
+        {/* Desktop : tableau */}
+        <div className="sub-pay-desktop">
+          <div className="sub-pay-cols sub-pay-head">
+            <span>Date</span>
+            <span>Description</span>
+            <span>Méthode</span>
+            <span className="text-right">Montant</span>
+            <span className="text-center">Statut</span>
+            <span className="text-right">Facture</span>
+          </div>
+          {payments.map((p) => {
+            const st = STATUS_STYLE[p.status] ?? STATUS_STYLE.PENDING
+            const m = methodOf(p)
+            return (
+              <div key={p.id} className="sub-pay-cols sub-pay-row">
+                <span className="sub-mono text-[13px] text-text-secondary">
+                  {fmtDate(p.createdAt)}
+                </span>
+                <div className="flex min-w-0 items-center gap-[11px]">
+                  <div className="sub-icon-box">
+                    <RowIcon kind={p.kind} />
+                  </div>
+                  <span className="truncate text-[13.5px] font-medium">
+                    {p.description ??
+                      (p.kind === 'SUBSCRIPTION' ? 'Abonnement' : 'Achat de crédits')}
+                  </span>
+                </div>
+                <div className="flex min-w-0 items-center gap-2">
+                  {m.mark}
+                  <span className="truncate text-[13px] text-text-secondary">{m.label}</span>
+                </div>
+                <span className="sub-mono text-right text-[13.5px] font-medium">
+                  {fmtAmount(p.amount, p.currency)}
+                </span>
+                <div className="flex justify-center">
+                  <span className="sub-status" style={{ background: st.bg, color: st.color }}>
+                    <span className="sub-status-dot" style={{ background: st.dot }} />
+                    {st.label}
+                  </span>
+                </div>
+                <div className="flex justify-end">
+                  {p.status === 'COMPLETED' ? (
+                    <Button
+                      className="sub-dl"
+                      icon={DownloadIcon}
+                      href={`${API_URL}/payment/org/${organisationId}/payments/${p.id}/invoice`}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Télécharger la facture"
+                    />
+                  ) : (
+                    <span className="text-text-soft">—</span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+          {payments.length === 0 ? (
+            <div className="px-[22px] py-8 text-center text-sm text-text-soft">Aucun paiement</div>
+          ) : null}
+        </div>
+
+        {/* Mobile : cartes */}
+        <div className="sub-pay-mobile">
+          {payments.map((p) => {
+            const st = STATUS_STYLE[p.status] ?? STATUS_STYLE.PENDING
+            const m = methodOf(p)
+            return (
+              <div key={p.id} className="sub-pay-card">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-[11px]">
+                    <div className="sub-icon-box">
+                      <RowIcon kind={p.kind} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold">
+                        {p.description ??
+                          (p.kind === 'SUBSCRIPTION' ? 'Abonnement' : 'Achat de crédits')}
+                      </div>
+                      <div className="sub-mono mt-0.5 text-xs text-text-soft">
+                        {fmtDate(p.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="sub-mono whitespace-nowrap text-sm font-semibold">
+                    {fmtAmount(p.amount, p.currency)}
+                  </span>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-2.5 border-t border-[#f5f5f5] pt-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {m.mark}
+                    <span className="truncate text-[13px] text-text-secondary">{m.label}</span>
+                  </div>
+                  <div className="flex flex-shrink-0 items-center gap-2.5">
+                    <span className="sub-status" style={{ background: st.bg, color: st.color }}>
+                      <span className="sub-status-dot" style={{ background: st.dot }} />
+                      {st.label}
+                    </span>
+                    {p.status === 'COMPLETED' ? (
+                      <Button
+                        className="sub-dl"
+                        icon={DownloadIcon}
+                        href={`${API_URL}/payment/org/${organisationId}/payments/${p.id}/invoice`}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Télécharger la facture"
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          {payments.length === 0 ? (
+            <div className="py-6 text-center text-sm text-text-soft">Aucun paiement</div>
+          ) : null}
+        </div>
+      </div>
     </div>
   )
 }

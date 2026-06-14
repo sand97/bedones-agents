@@ -9141,6 +9141,28 @@
             "type": "object",
             "nullable": true
           },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "STRIPE",
+              "NOTCHPAY"
+            ]
+          },
+          "cardBrand": {
+            "type": "object",
+            "nullable": true,
+            "description": "Marque de carte (snapshot)"
+          },
+          "cardLast4": {
+            "type": "object",
+            "nullable": true,
+            "description": "4 derniers chiffres de la carte (snapshot)"
+          },
+          "mobileNumber": {
+            "type": "object",
+            "nullable": true,
+            "description": "Numéro mobile money (snapshot)"
+          },
           "createdAt": {
             "type": "string"
           }
@@ -9153,6 +9175,10 @@
           "currency",
           "creditsPurchased",
           "description",
+          "provider",
+          "cardBrand",
+          "cardLast4",
+          "mobileNumber",
           "createdAt"
         ]
       },
