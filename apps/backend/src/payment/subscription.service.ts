@@ -76,14 +76,22 @@ export class SubscriptionService {
 
   async getStatus(userId: string, orgId: string): Promise<SubscriptionStatusResponseDto> {
     await this.assertMember(userId, orgId)
-    const org = await this.prisma.organisation.findUnique({
-      where: { id: orgId },
-      include: { subscription: true },
-    })
+    const [org, paymentsCount] = await Promise.all([
+      this.prisma.organisation.findUnique({
+        where: { id: orgId },
+        include: { subscription: true },
+      }),
+      this.prisma.payment.count({ where: { organisationId: orgId } }),
+    ])
     if (!org) throw new NotFoundException('Organisation introuvable')
 
     const monthlyCredits = PLAN_CATALOG[org.plan].monthlyCredits
     const sub = org.subscription
+
+    // Résumé du moyen de paiement pour le récap (carte vs mobile money).
+    let methodType: 'CARD' | 'MOBILE_MONEY' | null = null
+    if (sub?.provider === 'STRIPE' && (sub.cardLast4 || sub.cardBrand)) methodType = 'CARD'
+    else if (sub?.provider === 'NOTCHPAY' && sub.mobileNumber) methodType = 'MOBILE_MONEY'
 
     return {
       plan: planToApiKey(org.plan),
@@ -94,6 +102,14 @@ export class SubscriptionService {
       totalCredits: monthlyCredits + org.purchasedCredits,
       currentPeriodEnd: sub?.currentPeriodEnd?.toISOString() ?? null,
       cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
+      provider: sub?.provider ?? null,
+      paymentMethod: {
+        type: methodType,
+        brand: sub?.cardBrand ?? null,
+        last4: sub?.cardLast4 ?? null,
+        phone: sub?.mobileNumber ?? null,
+      },
+      hasPayments: paymentsCount > 0,
     }
   }
 
@@ -536,10 +552,14 @@ export class SubscriptionService {
     const stripeSubId = session.subscription as string | null
 
     let period: { start?: Date; end?: Date; priceId?: string } = {}
+    let card: { brand?: string; last4?: string } = {}
     if (stripeSubId) {
       try {
-        const stripeSub = await this.stripe.getClient(mode).subscriptions.retrieve(stripeSubId)
+        const stripeSub = await this.stripe
+          .getClient(mode)
+          .subscriptions.retrieve(stripeSubId, { expand: ['default_payment_method'] })
         period = this.extractPeriod(stripeSub)
+        card = this.extractCard(stripeSub)
       } catch (err) {
         this.logger.warn(`Impossible de récupérer l'abonnement Stripe ${stripeSubId}: ${err}`)
       }
@@ -560,6 +580,8 @@ export class SubscriptionService {
           currentPeriodStart: period.start,
           currentPeriodEnd: period.end,
           cancelAtPeriodEnd: false,
+          cardBrand: card.brand,
+          cardLast4: card.last4,
         },
         create: {
           organisationId: orgId,
@@ -573,6 +595,8 @@ export class SubscriptionService {
           stripePriceId: period.priceId,
           currentPeriodStart: period.start,
           currentPeriodEnd: period.end,
+          cardBrand: card.brand,
+          cardLast4: card.last4,
         },
       }),
       this.prisma.organisation.update({ where: { id: orgId }, data: { plan } }),
@@ -786,7 +810,11 @@ export class SubscriptionService {
    */
   async handleNotchpayWebhook(payload: {
     event?: string
-    data?: { reference?: string; status?: string }
+    data?: {
+      reference?: string
+      status?: string
+      customer?: { phone?: string | null } | string | null
+    }
   }): Promise<void> {
     const reference = payload.data?.reference
     const status = payload.data?.status ?? ''
@@ -809,7 +837,10 @@ export class SubscriptionService {
       await this.applyCreditPurchase({ paymentId: payment.id })
       return
     }
-    await this.activateOneShotSubscription(payment.id)
+    const customer = payload.data?.customer
+    const mobilePhone =
+      customer && typeof customer === 'object' ? (customer.phone ?? undefined) : undefined
+    await this.activateOneShotSubscription(payment.id, mobilePhone)
   }
 
   /**
@@ -817,7 +848,10 @@ export class SubscriptionService {
    * (`billingMonths`), sans renouvellement automatique. Atomique et
    * exactement-une-fois via la transition PENDING → COMPLETED de la ligne Payment.
    */
-  private async activateOneShotSubscription(paymentId: string): Promise<void> {
+  private async activateOneShotSubscription(
+    paymentId: string,
+    mobilePhone?: string,
+  ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({ where: { id: paymentId } })
       if (!payment || payment.status === PaymentStatus.COMPLETED) return
@@ -838,6 +872,17 @@ export class SubscriptionService {
       const periodEnd = new Date(now)
       periodEnd.setMonth(periodEnd.getMonth() + billingMonths)
 
+      // Numéro mobile utilisé : celui de la transaction si fourni, sinon celui
+      // du payeur (pour le récap "moyen de paiement").
+      let mobileNumber = mobilePhone
+      if (!mobileNumber && sub?.payerUserId) {
+        const payer = await tx.user.findUnique({
+          where: { id: sub.payerUserId },
+          select: { phone: true },
+        })
+        mobileNumber = payer?.phone ?? undefined
+      }
+
       await tx.subscription.upsert({
         where: { organisationId: payment.organisationId },
         update: {
@@ -850,6 +895,7 @@ export class SubscriptionService {
           currentPeriodStart: now,
           currentPeriodEnd: periodEnd,
           cancelAtPeriodEnd: false,
+          mobileNumber,
         },
         create: {
           organisationId: payment.organisationId,
@@ -861,6 +907,7 @@ export class SubscriptionService {
           autoRenew: false,
           currentPeriodStart: now,
           currentPeriodEnd: periodEnd,
+          mobileNumber,
         },
       })
       await tx.organisation.update({ where: { id: payment.organisationId }, data: { plan } })
@@ -960,6 +1007,18 @@ export class SubscriptionService {
       end: endTs ? new Date(endTs * 1000) : undefined,
       priceId: item?.price?.id,
     }
+  }
+
+  /** Marque + 4 derniers chiffres de la carte (default_payment_method étendu). */
+  private extractCard(stripeSub: unknown): { brand?: string; last4?: string } {
+    const sub = stripeSub as {
+      default_payment_method?: { card?: { brand?: string; last4?: string } } | string | null
+    }
+    const pm = sub.default_payment_method
+    if (pm && typeof pm === 'object' && pm.card) {
+      return { brand: pm.card.brand, last4: pm.card.last4 }
+    }
+    return {}
   }
 
   private getInvoiceSubscriptionId(invoice: unknown): string | null {

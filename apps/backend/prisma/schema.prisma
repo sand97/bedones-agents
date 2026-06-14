@@ -975,6 +975,11 @@ model Subscription {
   // Dernier rappel d'échéance envoyé (mobile money) — évite de re-notifier à
   // chaque tick du cron pour la même période.
   lastReminderSentAt DateTime?
+  // Résumé du moyen de paiement pour le récap côté app. Carte (Stripe) : marque
+  // + 4 derniers chiffres. Mobile money (NotchPay) : numéro utilisé.
+  cardBrand          String?
+  cardLast4          String?
+  mobileNumber       String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

@@ -59,6 +59,24 @@ export class CheckoutSessionResponseDto {
   url: string
 }
 
+export class PaymentMethodDto {
+  @ApiProperty({
+    enum: ['CARD', 'MOBILE_MONEY'],
+    nullable: true,
+    description: 'Type de moyen de paiement, ou null si aucun',
+  })
+  type: 'CARD' | 'MOBILE_MONEY' | null
+
+  @ApiProperty({ nullable: true, description: 'Marque de la carte (Stripe)' })
+  brand: string | null
+
+  @ApiProperty({ nullable: true, description: '4 derniers chiffres de la carte (Stripe)' })
+  last4: string | null
+
+  @ApiProperty({ nullable: true, description: 'Numéro mobile money utilisé (NotchPay)' })
+  phone: string | null
+}
+
 export class SubscriptionStatusResponseDto {
   @ApiProperty({ enum: ['free', 'pro', 'business'] })
   plan: 'free' | 'pro' | 'business'
@@ -87,6 +105,22 @@ export class SubscriptionStatusResponseDto {
 
   @ApiProperty({ description: 'Annulation programmée en fin de période' })
   cancelAtPeriodEnd: boolean
+
+  @ApiProperty({
+    enum: ['STRIPE', 'NOTCHPAY'],
+    nullable: true,
+    description: 'Prestataire de paiement',
+  })
+  provider: string | null
+
+  @ApiProperty({ type: PaymentMethodDto, description: 'Résumé du moyen de paiement' })
+  paymentMethod: PaymentMethodDto
+
+  @ApiProperty({
+    description:
+      "True si l'org a au moins un paiement enregistré → la page affiche le récap plutôt que le tutoriel/pricing",
+  })
+  hasPayments: boolean
 }
 
 export class PaymentItemDto {

@@ -134,6 +134,37 @@ intitulés des questions de ton Flow).
 > et le passage du `flow_token`. Tout est centralisé/configurable dans
 > `subscription-notification.service.ts` + `notification.config.ts`.
 
+## Récap d'abonnement (page /pricing quand l'org a déjà payé)
+
+`GET /payment/org/:id/subscription` renvoie de quoi afficher un **récap** au lieu du
+tutoriel/pricing quand l'org a déjà des paiements :
+
+- `hasPayments` — `true` si au moins un paiement existe → afficher le récap.
+- `plan`, `status`, `billingMonths`, `currentPeriodEnd`, `cancelAtPeriodEnd`.
+- `monthlyCredits`, `purchasedCredits`, `totalCredits` (+ `GET /stats/org/:id/credits`
+  pour `used`).
+- `provider` + `paymentMethod` `{ type, brand, last4, phone }` :
+  - **Carte (Stripe)** : `brand` + `last4` (récupérés via `default_payment_method`
+    étendu au webhook `checkout.session.completed`).
+  - **Mobile money (NotchPay)** : `phone` (numéro de la transaction, repli sur le
+    téléphone du payeur).
+- L'historique (« crédits passés » + abonnements) : `GET /payment/org/:id/payments`.
+
+### Factures PDF — recommandation (non implémenté)
+
+Pour générer des factures « HTML propres » côté Node, après comparaison :
+
+- **pdfmake** — pas de dépendance native, rapide (~50-80 ms), API déclarative
+  (JSON). **Recommandé par défaut** ici : factures propres et cohérentes sans
+  alourdir l'image Docker (le backend embarque déjà sharp/ffmpeg/tesseract).
+- **Puppeteer** — vrai rendu HTML/CSS (fidélité maximale) mais lourd (Chromium,
+  ~1.5-2.5 s, 150-200 Mo). À réserver si la fidélité pixel est requise.
+- **Gotenberg** (microservice HTML→PDF) — bon compromis « HTML facile » sans
+  embarquer Chromium dans le backend, cohérent avec l'archi multi-services
+  existante (whatsapp-connector, image-cropper).
+
+Décision à acter avant implémentation (ajout de dépendance / service).
+
 ## Modes Stripe (production / sandbox)
 
 Deux environnements Stripe coexistent, chacun avec ses clés et son secret webhook :
