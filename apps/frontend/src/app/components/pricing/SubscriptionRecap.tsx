@@ -166,24 +166,6 @@ function methodOf(p: PaymentRow): { mark: ReactNode; label: string } {
     : { mark: <CardMark color="#494949" />, label: 'Carte' }
 }
 
-function exportCsv(rows: PaymentRow[]) {
-  const head = ['Date', 'Description', 'Méthode', 'Montant', 'Devise', 'Statut']
-  const lines = rows.map((p) => {
-    const m = methodOf(p)
-    const st = STATUS_STYLE[p.status]?.label ?? p.status
-    return [fmtDate(p.createdAt), p.description ?? '', m.label, p.amount.toFixed(2), p.currency, st]
-      .map((c) => `"${String(c).replace(/"/g, '""')}"`)
-      .join(',')
-  })
-  const blob = new Blob([[head.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'paiements-bedones.csv'
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 interface SubscriptionRecapProps {
   organisationId: string
   onShowFeatures: () => void
@@ -319,20 +301,11 @@ export function SubscriptionRecap({
 
       {/* ── Historique des paiements ── */}
       <div className="sub-history">
-        <div className="flex items-center justify-between px-[22px] pb-4 pt-5">
-          <div>
-            <h2 className="text-base font-semibold">Historique des paiements</h2>
-            <p className="mt-0.5 text-[12.5px] text-text-soft">
-              Vos transactions Mobile Money et factures.
-            </p>
-          </div>
-          <Button
-            icon={DownloadIcon}
-            disabled={payments.length === 0}
-            onClick={() => exportCsv(payments)}
-          >
-            Exporter
-          </Button>
+        <div className="px-[22px] pb-4 pt-5">
+          <h2 className="text-base font-semibold">Historique des paiements</h2>
+          <p className="mt-0.5 text-[12.5px] text-text-soft">
+            Vos transactions Mobile Money et factures.
+          </p>
         </div>
 
         {/* Desktop : tableau */}
