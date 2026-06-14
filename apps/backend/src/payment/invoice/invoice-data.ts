@@ -12,7 +12,7 @@ export interface InvoiceData {
   invoiceNumber: string
   issueDate: string
   dueDate: string
-  seller: { name: string; address: string; email: string; taxId: string }
+  seller: { name: string; address: string; email: string; phone: string; taxId: string }
   client: { name: string; org: string; email: string; phone: string }
   currency: string
   items: InvoiceLineItem[]
@@ -26,10 +26,11 @@ export interface InvoiceData {
 
 // Émetteur (Bedones). Surchargeable par env pour s'adapter à l'entité légale.
 const SELLER = {
-  name: process.env.INVOICE_SELLER_NAME ?? 'Bedones SAS',
+  name: process.env.INVOICE_SELLER_NAME ?? 'Bedones',
   address: process.env.INVOICE_SELLER_ADDRESS ?? 'Akwa, Douala, Cameroun',
-  email: process.env.INVOICE_SELLER_EMAIL ?? 'facturation@bedones.com',
-  taxId: process.env.INVOICE_SELLER_TAX_ID ?? '',
+  email: process.env.INVOICE_SELLER_EMAIL ?? 'contact@bedones.com',
+  phone: process.env.INVOICE_SELLER_PHONE ?? '+237 6 90 07 28 84',
+  taxId: process.env.INVOICE_SELLER_TAX_ID ?? 'P049818395574U',
 }
 
 export function formatMoney(amount: number, currency: string): string {

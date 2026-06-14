@@ -108,7 +108,7 @@ export class InvoicePdfmakeService {
               { text: 'ÉMETTEUR', style: 'label' },
               { text: d.seller.name, bold: true },
               {
-                text: `${d.seller.address}\n${d.seller.email}\nN° contribuable : ${d.seller.taxId}`,
+                text: `${d.seller.address}\n${d.seller.email}\n${d.seller.phone}\nNUI : ${d.seller.taxId}`,
               },
             ],
             [

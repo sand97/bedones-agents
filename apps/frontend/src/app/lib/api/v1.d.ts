@@ -286,7 +286,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Upload and optimize a product image */
         post: operations["UploadController_uploadProductImage"];
         delete?: never;
         options?: never;
@@ -390,6 +389,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/social/posts/{postId}/agent-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SocialController_getPostAgentStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/social/posts/{postId}/agent-override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["SocialController_setPostAgentOverride"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/social/accounts/{accountId}/health": {
         parameters: {
             query?: never;
@@ -436,6 +467,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["SocialController_updateSettings"];
+        trace?: never;
+    };
+    "/social/accounts/{accountId}/disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SocialController_disconnectAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/social/accounts/{accountId}/user-stats/{fromId}": {
@@ -1110,6 +1157,38 @@ export interface paths {
         patch: operations["CatalogController_updateCollection"];
         trace?: never;
     };
+    "/catalog/{id}/image-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CatalogController_findImageTemplates"];
+        put?: never;
+        post: operations["CatalogController_createImageTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/{catalogId}/image-templates/{templateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["CatalogController_deleteImageTemplate"];
+        options?: never;
+        head?: never;
+        patch: operations["CatalogController_updateImageTemplate"];
+        trace?: never;
+    };
     "/catalog/{id}/analysis-progress": {
         parameters: {
             query?: never;
@@ -1153,6 +1232,22 @@ export interface paths {
         put?: never;
         post?: never;
         delete: operations["CatalogController_dissociatePhone"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/{id}/link-smb-phone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CatalogController_linkSmbPhone"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1496,6 +1591,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/catalog-migration/catalog/{catalogId}/last-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Last completed sync (number + date) for a catalogue, for the banner */
+        get: operations["CatalogMigrationController_lastSync"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/catalog-migration/{id}": {
         parameters: {
             query?: never;
@@ -1507,6 +1619,23 @@ export interface paths {
         get: operations["CatalogMigrationController_getOne"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog-migration/callback/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report extraction progress (called by the page script per product) */
+        post: operations["CatalogMigrationCallbackController_progress"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1604,6 +1733,22 @@ export interface paths {
         };
         get?: never;
         put: operations["AgentController_updateSocialAccounts"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/{id}/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["AgentController_updateModel"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2171,6 +2316,118 @@ export interface paths {
         patch: operations["LoyaltyController_updateCampaign"];
         trace?: never;
     };
+    "/payment/org/{organisationId}/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PaymentController_getSubscription"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payment/org/{organisationId}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PaymentController_listPayments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payment/org/{organisationId}/checkout/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PaymentController_createSubscriptionCheckout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payment/org/{organisationId}/checkout/credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PaymentController_createCreditCheckout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payment/org/{organisationId}/portal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PaymentController_createPortalSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payment/org/{organisationId}/churn-responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PaymentController_listChurnResponses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payment/org/{organisationId}/payments/{paymentId}/invoice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PaymentController_getInvoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/notification-preferences/org/{organisationId}": {
         parameters: {
             query?: never;
@@ -2197,6 +2454,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["NotificationPreferenceController_bulkUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notification-preferences/org/{organisationId}/ticket-status/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["NotificationPreferenceController_bulkUpdateTicketStatus"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2294,38 +2567,6 @@ export interface paths {
         put?: never;
         post: operations["StreamableHttpController_handlePostRequest"];
         delete: operations["StreamableHttpController_handleDeleteRequest"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/social/posts/{postId}/agent-status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["SocialController_getPostAgentStatus"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/social/posts/{postId}/agent-override": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["SocialController_setPostAgentOverride"];
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2588,11 +2829,29 @@ export interface components {
             message?: string;
             imageUrl?: string;
             permalinkUrl?: string;
+            /** @enum {string|null} */
+            aiOverride?: "FORCE_ON" | "FORCE_OFF" | null;
             totalComments: number;
             unreadComments: number;
             comments: components["schemas"]["CommentResponseDto"][];
+        };
+        PostAgentSummaryDto: {
+            id: string;
+            name?: string;
+            score: number;
+            /** @enum {string} */
+            status: "DRAFT" | "CONFIGURING" | "READY" | "ACTIVE" | "PAUSED";
+        };
+        PostAgentStatusDto: {
+            agent?: components["schemas"]["PostAgentSummaryDto"] | null;
             /** @enum {string|null} */
-            aiOverride?: "FORCE_ON" | "FORCE_OFF" | null;
+            override?: "FORCE_ON" | "FORCE_OFF" | null;
+            /** @description Whether the agent would currently reply to this post's comments */
+            isActive: boolean;
+        };
+        SetPostAgentOverrideDto: {
+            /** @enum {string} */
+            override: "FORCE_ON" | "FORCE_OFF";
         };
         SocialAccountLastErrorDto: {
             /** @description Provider/HTTP error code (e.g. 190, OAuthException) */
@@ -2821,6 +3080,8 @@ export interface components {
         };
         CreateProductDto: {
             name: string;
+            /** @description Code produit du marchand (retailer_id / SKU) */
+            retailerId: string;
             description?: string;
             imageUrl?: string;
             additionalImageUrls?: string[];
@@ -2835,6 +3096,8 @@ export interface components {
         };
         UpdateProductDto: {
             name?: string;
+            /** @description Code produit du marchand (retailer_id / SKU) */
+            retailerId?: string;
             description?: string;
             imageUrl?: string;
             additionalImageUrls?: string[];
@@ -2852,6 +3115,24 @@ export interface components {
         };
         UpdateCollectionDto: {
             name?: string;
+        };
+        CreateImageTemplateDto: {
+            name: string;
+            /** @description Format réseau social (ex: '1:1', '4:5', '9:16', '16:9') */
+            format: string;
+            /** @description Couleur d'accent (hex) */
+            accent?: string;
+            /** @description Définition du template (éléments, etc.) en JSON. */
+            definition: Record<string, never>;
+            /** @description Id du template statique d'origine (absent si créé de zéro). */
+            sourceKey?: string;
+        };
+        UpdateImageTemplateDto: {
+            name?: string;
+            format?: string;
+            accent?: string;
+            /** @description Définition du template en JSON. */
+            definition?: Record<string, never>;
         };
         AssociatePhoneDto: {
             phoneNumberId: string;
@@ -2938,6 +3219,10 @@ export interface components {
             /** @description Id of the connected SocialAccount the number belongs to, when known */
             sourceSocialAccountId?: string;
         };
+        ExtractionProgressDto: {
+            processed?: number;
+            total?: number;
+        };
         UploadImageDto: {
             /** @description Image as a data URL (data:image/...;base64,...) or raw base64 */
             image: string;
@@ -2956,8 +3241,14 @@ export interface components {
             imageUrl?: Record<string, never> | null;
             additionalImageUrls?: string[];
         };
+        SaveCatalogCollectionDto: {
+            name: string;
+            /** @description retailer_ids of the products in this collection */
+            retailerIds: string[];
+        };
         SaveCatalogDto: {
             products: components["schemas"]["SaveCatalogProductDto"][];
+            collections?: components["schemas"]["SaveCatalogCollectionDto"][];
         };
         CreateAgentDto: {
             organisationId: string;
@@ -2966,6 +3257,13 @@ export interface components {
         };
         UpdateAgentSocialAccountsDto: {
             socialAccountIds: string[];
+        };
+        UpdateAgentModelDto: {
+            /**
+             * @description Live-agent model tier.
+             * @enum {string}
+             */
+            tier: "flash" | "pro" | "ultra";
         };
         SendAgentMessageDto: {
             content: string;
@@ -2977,7 +3275,7 @@ export interface components {
             activateAds?: boolean;
             /** @description Respond on all new conversations created after activation. */
             activateNewConversations?: boolean;
-            /** @description Per-social-account test contacts (socialAccountId -> phone numbers or profile names). Mainly used to test the agent on a few contacts. */
+            /** @description Per-social-account test contacts (socialAccountId → phone numbers or profile names). Mainly used to test the agent on a few contacts. */
             contacts?: Record<string, never>;
         };
         FeedbackTurnDto: {
@@ -3032,7 +3330,17 @@ export interface components {
         };
         CreditUsageDto: {
             used: number;
+            /** @description Quota total = crédits du forfait + crédits achetés */
             total: number;
+            /**
+             * @description Forfait actif de l'organisation
+             * @enum {string}
+             */
+            plan: "free" | "pro" | "business";
+            /** @description Crédits de base inclus par le forfait chaque mois */
+            monthlyCredits: number;
+            /** @description Solde de crédits supplémentaires achetés */
+            purchasedCredits: number;
             /** @description Date ISO du début de la période de facturation (mois en cours) */
             periodStart: string;
             /** @description Date ISO de la fin de la période de facturation */
@@ -3065,18 +3373,33 @@ export interface components {
         };
         CreatePromotionDto: {
             organisationId: string;
+            /** @description Catalog the promotion targets */
+            catalogId?: string;
             name: string;
             description?: string;
+            /** @enum {string} */
+            status?: "DRAFT" | "ACTIVE" | "PAUSED" | "EXPIRED";
             /** @enum {string} */
             discountType?: "PERCENTAGE" | "FIXED_AMOUNT";
             discountValue?: number;
             code?: string;
             startDate?: string;
             endDate?: string;
+            /** @description Minimum order amount (FCFA) to be eligible */
+            minOrderAmount?: number;
+            /** @description Minimum number of articles in the order to be eligible */
+            minItemCount?: number;
+            /** @enum {string} */
+            rewardType?: "PRODUCTS" | "CREDIT" | "PERCENT";
+            rewardCredit?: number;
+            rewardPercent?: number;
+            rewardProductIds?: string[];
             productIds?: string[];
             stackable?: boolean;
         };
         UpdatePromotionDto: {
+            /** @description Catalog the promotion targets */
+            catalogId?: string;
             name?: string;
             description?: string;
             /** @enum {string} */
@@ -3087,6 +3410,15 @@ export interface components {
             endDate?: string;
             /** @enum {string} */
             status?: "DRAFT" | "ACTIVE" | "PAUSED" | "EXPIRED";
+            /** @description Minimum order amount (FCFA) to be eligible */
+            minOrderAmount?: number;
+            /** @description Minimum number of articles in the order to be eligible */
+            minItemCount?: number;
+            /** @enum {string} */
+            rewardType?: "PRODUCTS" | "CREDIT" | "PERCENT";
+            rewardCredit?: number;
+            rewardPercent?: number;
+            rewardProductIds?: string[];
             productIds?: string[];
             stackable?: boolean;
         };
@@ -3256,6 +3588,109 @@ export interface components {
             startDate?: string;
             endDate?: string;
         };
+        PaymentMethodDto: {
+            /**
+             * @description Type de moyen de paiement, ou null si aucun
+             * @enum {string|null}
+             */
+            type: "CARD" | "MOBILE_MONEY" | null;
+            /** @description Marque de la carte (Stripe) */
+            brand: Record<string, never> | null;
+            /** @description 4 derniers chiffres de la carte (Stripe) */
+            last4: Record<string, never> | null;
+            /** @description Numéro mobile money utilisé (NotchPay) */
+            phone: Record<string, never> | null;
+        };
+        SubscriptionStatusResponseDto: {
+            /** @enum {string} */
+            plan: "free" | "pro" | "business";
+            /**
+             * @description Statut de l'abonnement, ou null si aucun abonnement (forfait gratuit)
+             * @enum {string|null}
+             */
+            status: "INCOMPLETE" | "ACTIVE" | "PAST_DUE" | "CANCELED" | "EXPIRED" | null;
+            /** @description Cadence de facturation en mois */
+            billingMonths: Record<string, never> | null;
+            /** @description Crédits de base inclus par le forfait chaque mois */
+            monthlyCredits: number;
+            /** @description Solde de crédits supplémentaires achetés (non encore consommés) */
+            purchasedCredits: number;
+            /** @description Quota total disponible = crédits du forfait + crédits achetés */
+            totalCredits: number;
+            /** @description Fin de la période en cours (ISO), si abonnement */
+            currentPeriodEnd: Record<string, never> | null;
+            /** @description Annulation programmée en fin de période */
+            cancelAtPeriodEnd: boolean;
+            /**
+             * @description Prestataire de paiement
+             * @enum {string|null}
+             */
+            provider: "STRIPE" | "NOTCHPAY" | null;
+            /** @description Résumé du moyen de paiement */
+            paymentMethod: components["schemas"]["PaymentMethodDto"];
+            /** @description True si l'org a au moins un paiement enregistré → la page affiche le récap plutôt que le tutoriel/pricing */
+            hasPayments: boolean;
+        };
+        PaymentItemDto: {
+            id: string;
+            /** @enum {string} */
+            kind: "SUBSCRIPTION" | "CREDIT_PURCHASE";
+            /** @enum {string} */
+            status: "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
+            amount: number;
+            currency: string;
+            creditsPurchased: Record<string, never> | null;
+            description: Record<string, never> | null;
+            createdAt: string;
+        };
+        CreateSubscriptionCheckoutDto: {
+            /**
+             * @description Forfait payant à souscrire
+             * @enum {string}
+             */
+            plan: "pro" | "business";
+            /**
+             * @description Cadence de facturation en mois (1, 6 ou 12). 6 et 12 appliquent une remise.
+             * @enum {number}
+             */
+            billingMonths: 1 | 6 | 12;
+            /**
+             * @description Méthode de paiement. CARD = Stripe (récurrent), MOBILE_MONEY = NotchPay.
+             * @default CARD
+             * @enum {string}
+             */
+            method: "CARD" | "MOBILE_MONEY";
+        };
+        CheckoutSessionResponseDto: {
+            /** @description URL de paiement (Stripe Checkout ou NotchPay) vers laquelle rediriger */
+            url: string;
+        };
+        CreateCreditCheckoutDto: {
+            /**
+             * @description Nombre de crédits à acheter. Doit être un multiple de 1000.
+             * @example 1000
+             */
+            credits: number;
+            /**
+             * @description Méthode de paiement. CARD = Stripe, MOBILE_MONEY = NotchPay.
+             * @default CARD
+             * @enum {string}
+             */
+            method: "CARD" | "MOBILE_MONEY";
+        };
+        PortalSessionResponseDto: {
+            /** @description URL du portail de facturation Stripe */
+            url: string;
+        };
+        ChurnSurveyResponseDto: {
+            id: string;
+            phone: Record<string, never> | null;
+            /** @description Réponses du WhatsApp Flow (response_json parsé : flow_token + champs du formulaire) */
+            response: {
+                [key: string]: unknown;
+            };
+            createdAt: string;
+        };
         BulkUpdateNotificationPreferenceDto: {
             /** @description Organisation members user IDs to apply the change to */
             userIds: string[];
@@ -3263,26 +3698,20 @@ export interface components {
             /** @enum {string} */
             type: "COMMENT_TO_READ" | "COMMENT_AI_SUGGESTION" | "COMMENT_DAILY_SUMMARY" | "MESSAGE_TO_READ" | "MESSAGE_AI_SUGGESTION" | "MESSAGE_TICKET_CREATED" | "MESSAGE_TICKET_CLOSED" | "MESSAGE_DAILY_SUMMARY";
             enabled: boolean;
+            /** @description Ticket notifications only: restrict to these product collection ids. Empty/omitted = all collections. */
+            collectionIds?: string[];
+        };
+        BulkUpdateTicketStatusNotificationDto: {
+            /** @description Organisation members user IDs to apply the change to */
+            userIds: string[];
+            socialAccountId: string;
+            /** @description Ticket status the notification is attached to */
+            ticketStatusId: string;
+            enabled: boolean;
+            /** @description Restrict to these product collection ids. Empty/omitted = all collections. */
+            collectionIds?: string[];
         };
         SendTemplateBody: Record<string, never>;
-        PostAgentSummaryDto: {
-            id: string;
-            name?: string;
-            score: number;
-            /** @enum {string} */
-            status: "DRAFT" | "CONFIGURING" | "READY" | "ACTIVE" | "PAUSED";
-        };
-        PostAgentStatusDto: {
-            agent?: components["schemas"]["PostAgentSummaryDto"] | null;
-            /** @enum {string|null} */
-            override?: "FORCE_ON" | "FORCE_OFF" | null;
-            /** @description Whether the agent would currently reply to this post's comments */
-            isActive: boolean;
-        };
-        SetPostAgentOverrideDto: {
-            /** @enum {string} */
-            override: "FORCE_ON" | "FORCE_OFF";
-        };
     };
     responses: never;
     parameters: never;
@@ -3839,6 +4268,52 @@ export interface operations {
             };
         };
     };
+    SocialController_getPostAgentStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                postId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostAgentStatusDto"];
+                };
+            };
+        };
+    };
+    SocialController_setPostAgentOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                postId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPostAgentOverrideDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostAgentStatusDto"];
+                };
+            };
+        };
+    };
     SocialController_getAccountHealth: {
         parameters: {
             query?: never;
@@ -3905,6 +4380,26 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PageSettingsResponseDto"];
                 };
+            };
+        };
+    };
+    SocialController_disconnectAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Account disconnected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -4338,7 +4833,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        cleared: number;
+                        cleared?: number;
                     };
                 };
             };
@@ -5011,6 +5506,92 @@ export interface operations {
             };
         };
     };
+    CatalogController_findImageTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CatalogController_createImageTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateImageTemplateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CatalogController_deleteImageTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogId: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CatalogController_updateImageTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogId: string;
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateImageTemplateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CatalogController_getAnalysisProgress: {
         parameters: {
             query?: never;
@@ -5066,6 +5647,29 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CatalogController_linkSmbPhone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssociatePhoneDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5569,6 +6173,25 @@ export interface operations {
             };
         };
     };
+    CatalogMigrationController_lastSync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CatalogMigrationController_getOne: {
         parameters: {
             query?: never;
@@ -5581,6 +6204,27 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CatalogMigrationCallbackController_progress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtractionProgressDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5720,6 +6364,29 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UpdateAgentSocialAccountsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AgentController_updateModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentModelDto"];
             };
         };
         responses: {
@@ -6693,6 +7360,161 @@ export interface operations {
             };
         };
     };
+    PaymentController_getSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionStatusResponseDto"];
+                };
+            };
+        };
+    };
+    PaymentController_listPayments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentItemDto"][];
+                };
+            };
+        };
+    };
+    PaymentController_createSubscriptionCheckout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSubscriptionCheckoutDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutSessionResponseDto"];
+                };
+            };
+        };
+    };
+    PaymentController_createCreditCheckout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCreditCheckoutDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutSessionResponseDto"];
+                };
+            };
+        };
+    };
+    PaymentController_createPortalSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalSessionResponseDto"];
+                };
+            };
+        };
+    };
+    PaymentController_listChurnResponses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChurnSurveyResponseDto"][];
+                };
+            };
+        };
+    };
+    PaymentController_getInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisationId: string;
+                paymentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Facture PDF du paiement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     NotificationPreferenceController_getForOrg: {
         parameters: {
             query: {
@@ -6726,6 +7548,29 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["BulkUpdateNotificationPreferenceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationPreferenceController_bulkUpdateTicketStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUpdateTicketStatusNotificationDto"];
             };
         };
         responses: {
@@ -6877,52 +7722,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    SocialController_getPostAgentStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                postId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PostAgentStatusDto"];
-                };
-            };
-        };
-    };
-    SocialController_setPostAgentOverride: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                postId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetPostAgentOverrideDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PostAgentStatusDto"];
-                };
             };
         };
     };
