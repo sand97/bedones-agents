@@ -3,6 +3,7 @@ import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq'
 import { Queue, type Job } from 'bullmq'
 import { PAYMENT_QUEUE } from '../queue/queue.module'
 import { SubscriptionService } from './subscription.service'
+import { SubscriptionNotificationService } from './subscription-notification.service'
 
 // Cron quotidien (BullMQ repeatable) qui fait expirer les accès à durée fixe
 // (mobile money NotchPay, ou Stripe annulés) arrivés à échéance. Pattern calqué
@@ -16,6 +17,7 @@ export class PaymentProcessor extends WorkerHost implements OnModuleInit {
   constructor(
     @InjectQueue(PAYMENT_QUEUE) private queue: Queue,
     private subscriptionService: SubscriptionService,
+    private notifications: SubscriptionNotificationService,
   ) {
     super()
   }
@@ -26,6 +28,9 @@ export class PaymentProcessor extends WorkerHost implements OnModuleInit {
 
   async process(job: Job<unknown>): Promise<void> {
     if (job.name === EXPIRY_TICK) {
+      // 1) Rappels d'échéance (mobile money) AVANT expiration, 2) expiration des
+      // accès non renouvelés arrivés à terme.
+      await this.notifications.sendDueReminders()
       await this.subscriptionService.expireSubscriptions()
       return
     }

@@ -89,6 +89,51 @@ vers laquelle rediriger. L'application du forfait/des crédits se fait au **webh
   USD→XAF) est **configurable et à vérifier** avec le compte réel — voir
   `notchpay.service.ts` et les variables `NOTCHPAY_*`.
 
+## Notifications WhatsApp d'abonnement
+
+Envoyées depuis le numéro CORE Bedones (`CORE_WHATSAPP_NUMBER_ID` + `META_SYSTEM_USER`)
+via des templates Meta approuvés. Service : `subscription-notification.service.ts`.
+
+| Flux | Quand | Cible | Template (env) |
+|---|---|---|---|
+| **A. Rappel d'échéance** | J-`PAYMENT_REMINDER_DAYS_BEFORE` avant la fin, **mobile money** uniquement | payeur (fallback OWNER) | `payment_due_reminder` |
+| **B. Enquête de départ** | abonnement terminé (non-renouvellement mobile, ou annulation volontaire carte) | payeur / OWNER | `feedback_survey_form_1` (Flow) |
+| **C. Échec de paiement** | abonnement carte terminé pour échec de paiement (`cancellation_details.reason = payment_failure`) | payeur / OWNER | `payment_failed_4` |
+
+- Le rappel A part du **cron quotidien** (`PaymentProcessor`), une seule fois par
+  période (`Subscription.lastReminderSentAt`).
+- B/C réagissent à l'événement interne `subscription.ended` (émis par
+  `expireSubscriptions` et par le webhook Stripe `customer.subscription.deleted`).
+- Le destinataire est le **payeur** (`Subscription.payerUserId`), avec repli sur le
+  **OWNER** de l'org ayant un téléphone.
+
+### Réponses du WhatsApp Flow (enquête de départ B)
+
+Quand l'utilisateur soumet le Flow `feedback_survey_form_1`, Meta envoie au numéro
+CORE un message entrant **`interactive` de type `nfm_reply`** :
+
+```jsonc
+{ "messages": [ {
+  "type": "interactive",
+  "interactive": { "type": "nfm_reply", "nfm_reply": {
+    "name": "flow", "body": "Sent",
+    "response_json": "{\"flow_token\":\"churn:<orgId>\",\"q1\":\"...\"}"  // string JSON
+  } }
+} ] }
+```
+
+`webhook.service` extrait `response_json` et l'émet via `whatsapp.core.inbound`
+(`flowResponseJson`). Le service de notif le parse, retrouve l'org via le
+`flow_token` (préfixe `churn:`), et stocke la soumission dans
+`ChurnSurveyResponse`. **Affichage côté app** : `GET /payment/org/:id/churn-responses`
+renvoie ces réponses (le champ `response` = `response_json` parsé, à mapper sur les
+intitulés des questions de ton Flow).
+
+> ⚠️ À confirmer par un envoi réel : l'ordre exact des variables de corps des
+> templates, le type des boutons (URL **dynamique** vs statique ; bouton **Flow**),
+> et le passage du `flow_token`. Tout est centralisé/configurable dans
+> `subscription-notification.service.ts` + `notification.config.ts`.
+
 ## Modes Stripe (production / sandbox)
 
 Deux environnements Stripe coexistent, chacun avec ses clés et son secret webhook :

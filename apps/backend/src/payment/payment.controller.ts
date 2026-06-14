@@ -5,6 +5,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { SubscriptionService } from './subscription.service'
 import {
   CheckoutSessionResponseDto,
+  ChurnSurveyResponseDto,
   CreateCreditCheckoutDto,
   CreateSubscriptionCheckoutDto,
   PaymentItemDto,
@@ -65,5 +66,14 @@ export class PaymentController {
     @Param('organisationId') orgId: string,
   ): Promise<PortalSessionResponseDto> {
     return this.subscriptionService.createPortalSession(user.id, orgId)
+  }
+
+  @Get('org/:organisationId/churn-responses')
+  @ApiOkResponse({ type: [ChurnSurveyResponseDto] })
+  async listChurnResponses(
+    @CurrentUser() user: { id: string },
+    @Param('organisationId') orgId: string,
+  ): Promise<ChurnSurveyResponseDto[]> {
+    return this.subscriptionService.listChurnSurveyResponses(user.id, orgId)
   }
 }

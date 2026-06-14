@@ -119,3 +119,22 @@ export class PortalSessionResponseDto {
   @ApiProperty({ description: 'URL du portail de facturation Stripe' })
   url: string
 }
+
+export class ChurnSurveyResponseDto {
+  @ApiProperty()
+  id: string
+
+  @ApiProperty({ nullable: true })
+  phone: string | null
+
+  @ApiProperty({
+    description:
+      'Réponses du WhatsApp Flow (response_json parsé : flow_token + champs du formulaire)',
+    type: 'object',
+    additionalProperties: true,
+  })
+  response: Record<string, unknown>
+
+  @ApiProperty()
+  createdAt: string
+}

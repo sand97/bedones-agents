@@ -969,6 +969,12 @@ model Subscription {
   // automatiquement : un cron le fait expirer à currentPeriodEnd et l'utilisateur
   // doit re-payer manuellement (d'où les rappels WhatsApp avant échéance).
   autoRenew          Boolean   @default(true)
+  // User à l'origine du paiement (pour cibler les notifications WhatsApp). On se
+  // rabat sur le OWNER de l'organisation s'il est absent.
+  payerUserId        String?
+  // Dernier rappel d'échéance envoyé (mobile money) — évite de re-notifier à
+  // chaque tick du cron pour la même période.
+  lastReminderSentAt DateTime?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -1009,6 +1015,25 @@ model Payment {
   @@index([organisationId])
   @@index([subscriptionId])
   @@index([stripePaymentIntentId])
+}
+
+// ─── Réponses d'enquête WhatsApp Flow (offboarding / churn) ───
+// Stocke la réponse d'un WhatsApp Flow (template `feedback_survey_form_1` envoyé
+// quand un abonnement se termine). Meta renvoie la soumission dans un message
+// `interactive` de type `nfm_reply` dont `response_json` contient le `flow_token`
+// (qu'on utilise pour retrouver l'organisation) + les champs du formulaire.
+model ChurnSurveyResponse {
+  id             String   @id @default(uuid())
+  // Org retrouvée via le flow_token (peut être null si non corrélable).
+  organisationId String?
+  // Téléphone (wa_id) du répondant.
+  phone          String?
+  flowToken      String?
+  // Payload complet des réponses du Flow (response_json parsé).
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@index([organisationId])
 }
 
 // ─── Notification Preferences ───

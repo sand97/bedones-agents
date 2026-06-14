@@ -53,6 +53,7 @@ interface SubscriptionLike {
   id: string
   status: string
   cancel_at_period_end?: boolean | null
+  cancellation_details?: { reason?: string | null } | null
 }
 
 interface PaymentIntentLike {
@@ -112,6 +113,22 @@ export class SubscriptionService {
       creditsPurchased: p.creditsPurchased,
       description: p.description,
       createdAt: p.createdAt.toISOString(),
+    }))
+  }
+
+  /** Réponses des enquêtes de départ (WhatsApp Flow) reçues pour l'organisation. */
+  async listChurnSurveyResponses(userId: string, orgId: string) {
+    await this.assertMember(userId, orgId)
+    const rows = await this.prisma.churnSurveyResponse.findMany({
+      where: { organisationId: orgId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    })
+    return rows.map((r) => ({
+      id: r.id,
+      phone: r.phone,
+      response: r.response as Record<string, unknown>,
+      createdAt: r.createdAt.toISOString(),
     }))
   }
 
@@ -203,6 +220,8 @@ export class SubscriptionService {
         billingMonths,
         monthlyCredits: def.monthlyCredits,
         provider: 'STRIPE',
+        autoRenew: true,
+        payerUserId: userId,
         stripeCustomerId: customerId,
         status: org.subscription?.status === 'ACTIVE' ? org.subscription.status : 'INCOMPLETE',
       },
@@ -212,6 +231,7 @@ export class SubscriptionService {
         billingMonths,
         monthlyCredits: def.monthlyCredits,
         provider: 'STRIPE',
+        payerUserId: userId,
         status: 'INCOMPLETE',
         stripeCustomerId: customerId,
       },
@@ -370,6 +390,7 @@ export class SubscriptionService {
         monthlyCredits: def.monthlyCredits,
         provider: 'NOTCHPAY',
         autoRenew: false,
+        payerUserId: user.id,
         status: args.org.subscription?.status === 'ACTIVE' ? 'ACTIVE' : 'INCOMPLETE',
       },
       create: {
@@ -379,6 +400,7 @@ export class SubscriptionService {
         monthlyCredits: def.monthlyCredits,
         provider: 'NOTCHPAY',
         autoRenew: false,
+        payerUserId: user.id,
         status: 'INCOMPLETE',
       },
     })
@@ -653,6 +675,15 @@ export class SubscriptionService {
       }),
     ])
     this.logger.log(`Abonnement terminé pour org ${sub.organisationId} — retour au forfait FREE`)
+
+    // Échec de paiement (dunning Stripe épuisé) → flux C ; sinon départ volontaire → flux B.
+    const reason =
+      stripeSub.cancellation_details?.reason === 'payment_failure' ? 'payment_failure' : 'voluntary'
+    this.events.emit('subscription.ended', {
+      organisationId: sub.organisationId,
+      subscriptionId: sub.id,
+      reason,
+    })
   }
 
   /**
@@ -870,11 +901,11 @@ export class SubscriptionService {
           data: { plan: OrgPlan.FREE },
         }),
       ])
-      // Point d'intégration des notifications de fin d'abonnement (WhatsApp).
-      this.events.emit('subscription.expired', {
+      // Notification de fin d'abonnement (WhatsApp). Non-renouvellement mobile
+      // → enquête de départ (flux B).
+      this.events.emit('subscription.ended', {
         organisationId: sub.organisationId,
         subscriptionId: sub.id,
-        previousPlan: sub.plan,
         reason: 'period_ended',
       })
     }
