@@ -6640,6 +6640,8 @@ a {
 }
 .sub-btn-light.ant-btn:hover {
   opacity: 0.85;
+  color: #111b21 !important;
+  background: #fff !important;
 }
 .sub-btn-ghost.ant-btn {
   background: transparent !important;
@@ -6652,6 +6654,7 @@ a {
 .sub-btn-ghost.ant-btn:hover {
   background: rgba(255, 255, 255, 0.08) !important;
   border-color: rgba(255, 255, 255, 0.5) !important;
+  color: #fff !important;
 }
 
 /* Historique des paiements */
@@ -6684,6 +6687,9 @@ a {
 }
 .sub-pay-row:hover {
   background: #fafafa;
+}
+.sub-pay-desktop .sub-pay-row:last-child {
+  border-bottom: 0;
 }
 .sub-icon-box {
   width: 32px;
