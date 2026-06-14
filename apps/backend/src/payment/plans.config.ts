@@ -114,3 +114,30 @@ export function creditPaymentDescription(credits: number, lang: CheckoutLang): s
     ? `Achat de ${credits} crédits Bedones`
     : `Purchase of ${credits} Bedones credits`
 }
+
+// ─── Libellés des lignes Payment (historique interne), localisés ───
+
+export function paymentLineSubscription(
+  plan: OrgPlan,
+  billingMonths: number,
+  lang: CheckoutLang,
+  mobile = false,
+): string {
+  const label = planLabel(plan)
+  const suffix = mobile ? ' — Mobile money' : ''
+  return lang === 'fr'
+    ? `Souscription ${label} (${billingMonths} mois)${suffix}`
+    : `${label} subscription (${billingMonths} months)${suffix}`
+}
+
+export function paymentLineCredits(credits: number, lang: CheckoutLang, mobile = false): string {
+  const suffix = mobile ? ' — Mobile money' : ''
+  return lang === 'fr'
+    ? `Achat de ${credits} crédits${suffix}`
+    : `Purchase of ${credits} credits${suffix}`
+}
+
+export function paymentLineRenewal(plan: OrgPlan, lang: CheckoutLang): string {
+  const label = planLabel(plan)
+  return lang === 'fr' ? `Renouvellement forfait ${label}` : `${label} plan renewal`
+}

@@ -25,7 +25,9 @@ import {
   creditProductName,
   getCreditPurchasePriceUsd,
   getRecurringTotalUsd,
-  planLabel,
+  paymentLineCredits,
+  paymentLineRenewal,
+  paymentLineSubscription,
   planToApiKey,
   resolveCheckoutLang,
   subscriptionProductText,
@@ -256,7 +258,6 @@ export class SubscriptionService {
     )
 
     const stripe = this.stripe.getClient()
-    const label = planLabel(plan)
     const lang = resolveCheckoutLang(user.locale)
     const product = subscriptionProductText(plan, billingMonths, lang)
     const session = await stripe.checkout.sessions.create({
@@ -332,7 +333,7 @@ export class SubscriptionService {
         status: PaymentStatus.PENDING,
         amount: totalUsd,
         currency: 'USD',
-        description: `Souscription ${label} (${billingMonths} mois)`,
+        description: paymentLineSubscription(plan, billingMonths, lang),
         stripeCheckoutSessionId: session.id,
       },
     })
@@ -428,7 +429,7 @@ export class SubscriptionService {
         amount: priceUsd,
         currency: 'USD',
         creditsPurchased: dto.credits,
-        description: `Achat de ${dto.credits} crédits`,
+        description: paymentLineCredits(dto.credits, lang),
         stripeCheckoutSessionId: session.id,
       },
     })
@@ -515,7 +516,7 @@ export class SubscriptionService {
         status: PaymentStatus.PENDING,
         amount: totalUsd,
         currency: 'USD',
-        description: `Souscription ${planLabel(plan)} (${billingMonths} mois) — mobile money`,
+        description: paymentLineSubscription(plan, billingMonths, lang, true),
         notchpayReference: result.reference,
       },
     })
@@ -555,7 +556,7 @@ export class SubscriptionService {
         amount: priceUsd,
         currency: 'USD',
         creditsPurchased: credits,
-        description: `Achat de ${credits} crédits — mobile money`,
+        description: paymentLineCredits(credits, lang, true),
         notchpayReference: result.reference,
       },
     })
@@ -723,6 +724,13 @@ export class SubscriptionService {
         where: { stripeInvoiceId: invoice.id },
       })
       if (!existing) {
+        const payer = sub.payerUserId
+          ? await this.prisma.user.findUnique({
+              where: { id: sub.payerUserId },
+              select: { locale: true },
+            })
+          : null
+        const lang = resolveCheckoutLang(payer?.locale)
         await this.prisma.payment.create({
           data: {
             organisationId: sub.organisationId,
@@ -731,7 +739,7 @@ export class SubscriptionService {
             status: PaymentStatus.COMPLETED,
             amount: (invoice.amount_paid ?? 0) / 100,
             currency: (invoice.currency ?? 'usd').toUpperCase(),
-            description: `Renouvellement forfait ${planLabel(sub.plan)}`,
+            description: paymentLineRenewal(sub.plan, lang),
             stripeInvoiceId: invoice.id,
           },
         })
