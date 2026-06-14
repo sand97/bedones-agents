@@ -6,8 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { randomUUID } from 'crypto'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { PrismaService } from '../prisma/prisma.service'
 import { StripeService, type StripeEvent, type StripeMode } from './stripe.service'
+import { NotchpayService } from './notchpay.service'
 import {
   OrgPlan,
   PaymentKind,
@@ -65,6 +67,8 @@ export class SubscriptionService {
   constructor(
     private prisma: PrismaService,
     private stripe: StripeService,
+    private notchpay: NotchpayService,
+    private events: EventEmitter2,
   ) {}
 
   // ─────────────────────────── Lectures ───────────────────────────
@@ -129,6 +133,18 @@ export class SubscriptionService {
     const billingMonths = dto.billingMonths
     const def = PLAN_CATALOG[plan]
     const totalUsd = getRecurringTotalUsd(plan, billingMonths)
+
+    // Mobile money (NotchPay) : paiement ponctuel, accès à durée fixe.
+    if (dto.method === 'MOBILE_MONEY') {
+      return this.createNotchpaySubscriptionCheckout({
+        orgId,
+        user,
+        org,
+        plan,
+        billingMonths,
+        totalUsd,
+      })
+    }
 
     const customerId = await this.getOrCreateCustomer(
       orgId,
@@ -240,6 +256,12 @@ export class SubscriptionService {
     }
 
     const priceUsd = getCreditPurchasePriceUsd(org.plan, dto.credits)
+
+    // Mobile money (NotchPay) : achat ponctuel de crédits.
+    if (dto.method === 'MOBILE_MONEY') {
+      return this.createNotchpayCreditCheckout({ orgId, user, credits: dto.credits, priceUsd })
+    }
+
     const customerId = await this.getOrCreateCustomer(
       orgId,
       org.subscription?.stripeCustomerId,
@@ -318,6 +340,114 @@ export class SubscriptionService {
       return_url: this.buildReturnUrl(orgId, 'portal'),
     })
     return { url: session.url }
+  }
+
+  // ──────────────────── NotchPay (mobile money) ────────────────────
+
+  /**
+   * Souscription via NotchPay : paiement PONCTUEL couvrant `billingMonths` mois.
+   * Aucun renouvellement automatique (`autoRenew = false`) — l'accès expire à
+   * `currentPeriodEnd` et l'utilisateur est relancé par WhatsApp avant l'échéance.
+   */
+  private async createNotchpaySubscriptionCheckout(args: {
+    orgId: string
+    user: { id: string; email: string | null; name: string | null }
+    org: { subscription: { status: string } | null }
+    plan: OrgPlan
+    billingMonths: number
+    totalUsd: number
+  }): Promise<{ url: string }> {
+    const { orgId, user, plan, billingMonths, totalUsd } = args
+    const def = PLAN_CATALOG[plan]
+    const paymentId = randomUUID()
+
+    // Souscription INCOMPLETE (forfait inchangé tant que le paiement n'est pas confirmé).
+    await this.prisma.subscription.upsert({
+      where: { organisationId: orgId },
+      update: {
+        plan,
+        billingMonths,
+        monthlyCredits: def.monthlyCredits,
+        provider: 'NOTCHPAY',
+        autoRenew: false,
+        status: args.org.subscription?.status === 'ACTIVE' ? 'ACTIVE' : 'INCOMPLETE',
+      },
+      create: {
+        organisationId: orgId,
+        plan,
+        billingMonths,
+        monthlyCredits: def.monthlyCredits,
+        provider: 'NOTCHPAY',
+        autoRenew: false,
+        status: 'INCOMPLETE',
+      },
+    })
+
+    const result = await this.notchpay.initializePayment({
+      amount: this.notchpay.toProviderAmount(totalUsd),
+      currency: this.notchpay.currency,
+      email: user.email,
+      phone: null,
+      name: user.name,
+      description: `Souscription ${planLabel(plan)} (${billingMonths} mois)`,
+      reference: paymentId,
+      callbackUrl: this.buildReturnUrl(orgId, 'success'),
+    })
+
+    await this.prisma.payment.create({
+      data: {
+        id: paymentId,
+        organisationId: orgId,
+        kind: PaymentKind.SUBSCRIPTION,
+        provider: 'NOTCHPAY',
+        status: PaymentStatus.PENDING,
+        amount: totalUsd,
+        currency: 'USD',
+        description: `Souscription ${planLabel(plan)} (${billingMonths} mois) — mobile money`,
+        notchpayReference: result.reference,
+      },
+    })
+
+    return { url: result.authorizationUrl }
+  }
+
+  /** Achat ponctuel de crédits via NotchPay (mobile money). */
+  private async createNotchpayCreditCheckout(args: {
+    orgId: string
+    user: { id: string; email: string | null; name: string | null }
+    credits: number
+    priceUsd: number
+  }): Promise<{ url: string }> {
+    const { orgId, user, credits, priceUsd } = args
+    const paymentId = randomUUID()
+
+    const result = await this.notchpay.initializePayment({
+      amount: this.notchpay.toProviderAmount(priceUsd),
+      currency: this.notchpay.currency,
+      email: user.email,
+      phone: null,
+      name: user.name,
+      description: `Achat de ${credits} crédits Bedones`,
+      reference: paymentId,
+      callbackUrl: this.buildReturnUrl(orgId, 'success'),
+    })
+
+    await this.prisma.payment.create({
+      data: {
+        id: paymentId,
+        organisationId: orgId,
+        kind: PaymentKind.CREDIT_PURCHASE,
+        provider: 'NOTCHPAY',
+        status: PaymentStatus.PENDING,
+        amount: priceUsd,
+        currency: 'USD',
+        creditsPurchased: credits,
+        description: `Achat de ${credits} crédits — mobile money`,
+        notchpayReference: result.reference,
+      },
+    })
+
+    return { url: result.authorizationUrl }
   }
 
   // ─────────────────────────── Webhooks ───────────────────────────
@@ -614,6 +744,143 @@ export class SubscriptionService {
     if (updated.count > 0) {
       this.logger.warn(`Paiement échoué (payment_intent ${pi.id})`)
     }
+  }
+
+  // ──────────────── Webhook NotchPay (mobile money) ────────────────
+
+  /**
+   * Traite un webhook NotchPay (déjà vérifié côté contrôleur). On ne réagit
+   * qu'aux paiements aboutis ; la ligne Payment (retrouvée par sa référence)
+   * sert d'ancre d'idempotence pour ne créditer/activer qu'une seule fois.
+   */
+  async handleNotchpayWebhook(payload: {
+    event?: string
+    data?: { reference?: string; status?: string }
+  }): Promise<void> {
+    const reference = payload.data?.reference
+    const status = payload.data?.status ?? ''
+    const isComplete = payload.event === 'payment.complete' || status === 'complete'
+    if (!reference || !isComplete) {
+      this.logger.debug(`NotchPay webhook ignoré (event=${payload.event}, status=${status})`)
+      return
+    }
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { notchpayReference: reference },
+    })
+    if (!payment) {
+      this.logger.warn(`NotchPay webhook: aucune ligne Payment pour la référence ${reference}`)
+      return
+    }
+    if (payment.status === PaymentStatus.COMPLETED) return
+
+    if (payment.kind === PaymentKind.CREDIT_PURCHASE) {
+      await this.applyCreditPurchase({ paymentId: payment.id })
+      return
+    }
+    await this.activateOneShotSubscription(payment.id)
+  }
+
+  /**
+   * Active un forfait acheté en ONE-SHOT (NotchPay) : accès à durée fixe
+   * (`billingMonths`), sans renouvellement automatique. Atomique et
+   * exactement-une-fois via la transition PENDING → COMPLETED de la ligne Payment.
+   */
+  private async activateOneShotSubscription(paymentId: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.findUnique({ where: { id: paymentId } })
+      if (!payment || payment.status === PaymentStatus.COMPLETED) return
+
+      const flipped = await tx.payment.updateMany({
+        where: { id: paymentId, status: PaymentStatus.PENDING },
+        data: { status: PaymentStatus.COMPLETED },
+      })
+      if (flipped.count !== 1) return
+
+      const sub = await tx.subscription.findUnique({
+        where: { organisationId: payment.organisationId },
+      })
+      const plan = sub?.plan ?? OrgPlan.PRO
+      const billingMonths = sub?.billingMonths ?? 1
+      const def = PLAN_CATALOG[plan]
+      const now = new Date()
+      const periodEnd = new Date(now)
+      periodEnd.setMonth(periodEnd.getMonth() + billingMonths)
+
+      await tx.subscription.upsert({
+        where: { organisationId: payment.organisationId },
+        update: {
+          plan,
+          billingMonths,
+          monthlyCredits: def.monthlyCredits,
+          provider: 'NOTCHPAY',
+          status: SubscriptionStatus.ACTIVE,
+          autoRenew: false,
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+          cancelAtPeriodEnd: false,
+        },
+        create: {
+          organisationId: payment.organisationId,
+          plan,
+          billingMonths,
+          monthlyCredits: def.monthlyCredits,
+          provider: 'NOTCHPAY',
+          status: SubscriptionStatus.ACTIVE,
+          autoRenew: false,
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+        },
+      })
+      await tx.organisation.update({ where: { id: payment.organisationId }, data: { plan } })
+      await tx.payment.update({
+        where: { id: paymentId },
+        data: { subscriptionId: sub?.id },
+      })
+    })
+    this.logger.log(`Forfait mobile money activé (payment ${paymentId})`)
+  }
+
+  // ──────────────── Expiration des accès non renouvelés ────────────────
+
+  /**
+   * Fait expirer les souscriptions à durée fixe (NotchPay, ou Stripe annulées)
+   * dont la période est terminée : retour au forfait FREE + émission d'un
+   * événement `subscription.expired` (consommé par le service de notifications).
+   * À appeler périodiquement (cron quotidien).
+   */
+  async expireSubscriptions(now: Date = new Date()): Promise<{ expired: number }> {
+    const due = await this.prisma.subscription.findMany({
+      where: {
+        autoRenew: false,
+        status: SubscriptionStatus.ACTIVE,
+        currentPeriodEnd: { not: null, lt: now },
+      },
+      select: { id: true, organisationId: true, plan: true },
+    })
+
+    for (const sub of due) {
+      await this.prisma.$transaction([
+        this.prisma.subscription.update({
+          where: { id: sub.id },
+          data: { status: SubscriptionStatus.EXPIRED },
+        }),
+        this.prisma.organisation.update({
+          where: { id: sub.organisationId },
+          data: { plan: OrgPlan.FREE },
+        }),
+      ])
+      // Point d'intégration des notifications de fin d'abonnement (WhatsApp).
+      this.events.emit('subscription.expired', {
+        organisationId: sub.organisationId,
+        subscriptionId: sub.id,
+        previousPlan: sub.plan,
+        reason: 'period_ended',
+      })
+    }
+
+    if (due.length > 0) this.logger.log(`${due.length} souscription(s) expirée(s)`)
+    return { expired: due.length }
   }
 
   // ─────────────────────────── Helpers ───────────────────────────

@@ -2,6 +2,7 @@ import { Controller, Headers, HttpCode, Logger, Post, RawBody, Res } from '@nest
 import type { Response } from 'express'
 import { ApiExcludeEndpoint } from '@nestjs/swagger'
 import { StripeService, type StripeEvent, type StripeMode } from './stripe.service'
+import { NotchpayService } from './notchpay.service'
 import { SubscriptionService } from './subscription.service'
 
 /**
@@ -21,6 +22,7 @@ export class StripeWebhookController {
 
   constructor(
     private stripe: StripeService,
+    private notchpay: NotchpayService,
     private subscriptionService: SubscriptionService,
   ) {}
 
@@ -44,6 +46,33 @@ export class StripeWebhookController {
     @Res() res: Response,
   ) {
     return this.process('sandbox', rawBody, signature, res)
+  }
+
+  @Post('notchpay')
+  @ApiExcludeEndpoint()
+  @HttpCode(200)
+  async handleNotchpay(
+    @RawBody() rawBody: Buffer,
+    @Headers('x-notch-signature') signature: string,
+    @Res() res: Response,
+  ) {
+    if (!this.notchpay.verifyWebhookSignature(rawBody, signature)) {
+      this.logger.error('Signature webhook NotchPay invalide')
+      return res.status(400).send('Webhook Error: signature invalide')
+    }
+    let payload: { event?: string; data?: { reference?: string; status?: string } }
+    try {
+      payload = JSON.parse(rawBody.toString('utf8'))
+    } catch {
+      return res.status(400).send('Webhook Error: corps invalide')
+    }
+    try {
+      await this.subscriptionService.handleNotchpayWebhook(payload)
+      return res.json({ received: true })
+    } catch (err) {
+      this.logger.error(`Erreur de traitement du webhook NotchPay: ${err}`)
+      return res.status(500).json({ error: 'Webhook processing failed' })
+    }
   }
 
   private async process(mode: StripeMode, rawBody: Buffer, signature: string, res: Response) {

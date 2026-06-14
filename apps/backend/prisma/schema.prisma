@@ -957,12 +957,18 @@ model Subscription {
   stripeSubscriptionId String? @unique
   stripePriceId        String?
 
-  // Période de facturation courante (renseignée par les webhooks Stripe).
+  // Période de facturation courante (renseignée par les webhooks Stripe, ou
+  // calculée à l'activation pour les paiements mobile money NotchPay).
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
   // True quand l'utilisateur a demandé l'annulation : l'abonnement reste actif
   // jusqu'à currentPeriodEnd puis bascule en FREE.
   cancelAtPeriodEnd  Boolean   @default(false)
+  // True = renouvellement automatique géré par le prestataire (Stripe). False =
+  // accès one-shot à durée fixe (NotchPay / mobile money) qui N'EST PAS renouvelé
+  // automatiquement : un cron le fait expirer à currentPeriodEnd et l'utilisateur
+  // doit re-payer manuellement (d'où les rappels WhatsApp avant échéance).
+  autoRenew          Boolean   @default(true)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -993,6 +999,9 @@ model Payment {
   stripeCheckoutSessionId String? @unique
   stripePaymentIntentId   String?
   stripeInvoiceId         String? @unique
+
+  // Référence de transaction NotchPay (mobile money), unique pour l'idempotence.
+  notchpayReference String? @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

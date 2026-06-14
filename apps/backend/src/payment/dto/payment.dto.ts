@@ -1,6 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsIn, IsInt, IsPositive, Min } from 'class-validator'
+import { IsIn, IsInt, IsOptional, IsPositive, Min } from 'class-validator'
 import { ALLOWED_BILLING_MONTHS, CREDIT_PURCHASE_STEP } from '../plans.config'
+
+// Méthode de paiement choisie côté frontend (CheckoutModal). CARD passe par
+// Stripe (carte, abonnement récurrent) ; MOBILE_MONEY passe par NotchPay
+// (paiement ponctuel, accès à durée fixe sans renouvellement automatique).
+export const PAYMENT_METHODS = ['CARD', 'MOBILE_MONEY'] as const
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
 
 export class CreateSubscriptionCheckoutDto {
   @ApiProperty({ enum: ['pro', 'business'], description: 'Forfait payant à souscrire' })
@@ -13,6 +19,16 @@ export class CreateSubscriptionCheckoutDto {
   })
   @IsIn(ALLOWED_BILLING_MONTHS as unknown as number[])
   billingMonths: number
+
+  @ApiProperty({
+    enum: PAYMENT_METHODS,
+    required: false,
+    default: 'CARD',
+    description: 'Méthode de paiement. CARD = Stripe (récurrent), MOBILE_MONEY = NotchPay.',
+  })
+  @IsOptional()
+  @IsIn(PAYMENT_METHODS as unknown as string[])
+  method?: PaymentMethod
 }
 
 export class CreateCreditCheckoutDto {
@@ -24,10 +40,22 @@ export class CreateCreditCheckoutDto {
   @IsPositive()
   @Min(CREDIT_PURCHASE_STEP)
   credits: number
+
+  @ApiProperty({
+    enum: PAYMENT_METHODS,
+    required: false,
+    default: 'CARD',
+    description: 'Méthode de paiement. CARD = Stripe, MOBILE_MONEY = NotchPay.',
+  })
+  @IsOptional()
+  @IsIn(PAYMENT_METHODS as unknown as string[])
+  method?: PaymentMethod
 }
 
 export class CheckoutSessionResponseDto {
-  @ApiProperty({ description: 'URL de la session Stripe Checkout vers laquelle rediriger' })
+  @ApiProperty({
+    description: 'URL de paiement (Stripe Checkout ou NotchPay) vers laquelle rediriger',
+  })
   url: string
 }
 

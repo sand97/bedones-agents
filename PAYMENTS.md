@@ -55,10 +55,39 @@ Authentifiés (cookie de session). Les mutations exigent le rôle **OWNER** ou *
 | `POST` | `/payment/org/:organisationId/portal` | portail de facturation Stripe → `{ url }` |
 | `POST` | `/payment/webhook/stripe` | **webhook Stripe production** (pas d'auth, signature vérifiée) |
 | `POST` | `/payment/webhook/stripe-sandbox` | **webhook Stripe sandbox** (pas d'auth, signature vérifiée) |
+| `POST` | `/payment/webhook/notchpay` | **webhook NotchPay** mobile money (pas d'auth, signature vérifiée) |
 
 Le frontend redirige l'utilisateur vers l'`url` Stripe Checkout renvoyée. Le
 forfait/les crédits ne sont **appliqués qu'au webhook** (source de vérité), jamais
 côté client.
+
+## Prestataires & méthodes de paiement
+
+Le checkout accepte un `method` :
+
+- **`CARD` → Stripe** : abonnement **récurrent** (renouvellement automatique).
+- **`MOBILE_MONEY` → NotchPay** : paiement **ponctuel** (Orange Money / MTN MoMo).
+  La souscription mobile donne un **accès à durée fixe** (`billingMonths`),
+  `autoRenew = false`, **sans renouvellement automatique** : un cron quotidien la
+  fait expirer à `currentPeriodEnd` (retour en `FREE`) et l'utilisateur doit
+  re-payer manuellement — d'où les rappels WhatsApp avant échéance (à venir).
+
+Les deux méthodes renvoient une `url` de paiement (Stripe Checkout ou NotchPay)
+vers laquelle rediriger. L'application du forfait/des crédits se fait au **webhook**.
+
+### NotchPay (mobile money)
+
+- Endpoint webhook : **`POST /payment/webhook/notchpay`** (signature
+  `x-notch-signature` = HMAC-SHA256 du corps brut avec `NOTCHPAY_HASH`).
+- Activation au webhook `payment.complete` : crédite (CREDIT_PURCHASE) ou active
+  l'accès à durée fixe (SUBSCRIPTION). Idempotent via la transition
+  `PENDING → COMPLETED` de la ligne `Payment` (réf. = `notchpayReference`).
+- Cron d'expiration : `expireSubscriptions()` (BullMQ repeatable, `PAYMENT_EXPIRY_CRON`)
+  fait expirer les accès `autoRenew = false` arrivés à échéance et émet
+  l'événement `subscription.expired` (point d'intégration des notifications).
+- ⚠️ Le contrat d'API NotchPay (endpoints, signature, devise XAF + taux de change
+  USD→XAF) est **configurable et à vérifier** avec le compte réel — voir
+  `notchpay.service.ts` et les variables `NOTCHPAY_*`.
 
 ## Modes Stripe (production / sandbox)
 
