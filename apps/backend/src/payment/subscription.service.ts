@@ -1135,7 +1135,11 @@ export class SubscriptionService {
 
   private buildReturnUrl(orgId: string, outcome: 'success' | 'cancelled' | 'portal'): string {
     const base = (process.env.FRONTEND_URL || 'https://moderator.bedones.local').replace(/\/$/, '')
-    return `${base}/?org=${orgId}&payment=${outcome}`
+    // Retour vers la page Souscriptions de l'org (orgSlug = id). Le paramètre
+    // `payment` y déclenche l'écran de succès / le retour après annulation.
+    if (outcome === 'success') return `${base}/app/${orgId}/plan?payment=success`
+    if (outcome === 'cancelled') return `${base}/app/${orgId}/plan?payment=cancelled`
+    return `${base}/app/${orgId}/plan`
   }
 
   // ───────────────────── Contrôle d'accès ─────────────────────

@@ -18,6 +18,7 @@ import { PaymentMethodsSection } from '@app/components/pricing/PaymentMethodsSec
 import { PlanCard } from '@app/components/pricing/PlanCard'
 import { CheckoutModal } from '@app/components/pricing/CheckoutModal'
 import { SubscriptionRecap } from '@app/components/pricing/SubscriptionRecap'
+import { PaymentSuccess } from '@app/components/pricing/PaymentSuccess'
 import { BuyCreditsModal } from '@app/components/pricing/BuyCreditsModal'
 import {
   PaymentResultModal,
@@ -61,6 +62,14 @@ function PlanPage() {
   const [paymentMethod, setPaymentMethod] = useState<BillingPaymentMethod>('CARD')
   const [paymentResult, setPaymentResult] = useState<PaymentResultState | null>(null)
   const [isBuyCreditsOpen, setIsBuyCreditsOpen] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(
+    () => new URLSearchParams(window.location.search).get('payment') === 'success',
+  )
+
+  function dismissSuccess() {
+    setShowSuccess(false)
+    window.history.replaceState({}, '', `/app/${orgSlug}/plan`)
+  }
 
   const subscriptionQuery = $api.useQuery('get', '/payment/org/{organisationId}/subscription', {
     params: { path: { organisationId: orgSlug } },
@@ -104,6 +113,15 @@ function PlanPage() {
     } catch {
       message.error('Échec de la création du paiement. Réessayez.')
     }
+  }
+
+  if (showSuccess) {
+    return (
+      <>
+        <DashboardHeader title="Souscriptions" />
+        <PaymentSuccess organisationId={orgSlug} onContinue={dismissSuccess} />
+      </>
+    )
   }
 
   return (
