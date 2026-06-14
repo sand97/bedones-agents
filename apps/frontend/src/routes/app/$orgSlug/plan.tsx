@@ -200,6 +200,7 @@ function PlanPage() {
       <BuyCreditsModal
         open={isBuyCreditsOpen}
         organisationId={orgSlug}
+        plan={currentPlan}
         onClose={() => setIsBuyCreditsOpen(false)}
       />
     </>
