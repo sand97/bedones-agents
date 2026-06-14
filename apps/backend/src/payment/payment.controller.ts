@@ -1,0 +1,99 @@
+import { Body, Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common'
+import type { Response } from 'express'
+import { ApiBody, ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger'
+import { AuthGuard } from '../auth/auth.guard'
+import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { SubscriptionService } from './subscription.service'
+import {
+  CheckoutSessionResponseDto,
+  ChurnSurveyResponseDto,
+  CreateCreditCheckoutDto,
+  CreateSubscriptionCheckoutDto,
+  PaymentItemDto,
+  PortalSessionResponseDto,
+  SubscriptionStatusResponseDto,
+} from './dto/payment.dto'
+
+@ApiTags('Payment')
+@Controller('payment')
+@UseGuards(AuthGuard)
+export class PaymentController {
+  constructor(private subscriptionService: SubscriptionService) {}
+
+  @Get('org/:organisationId/subscription')
+  @ApiOkResponse({ type: SubscriptionStatusResponseDto })
+  async getSubscription(
+    @CurrentUser() user: { id: string },
+    @Param('organisationId') orgId: string,
+  ): Promise<SubscriptionStatusResponseDto> {
+    return this.subscriptionService.getStatus(user.id, orgId)
+  }
+
+  @Get('org/:organisationId/payments')
+  @ApiOkResponse({ type: [PaymentItemDto] })
+  async listPayments(
+    @CurrentUser() user: { id: string },
+    @Param('organisationId') orgId: string,
+  ): Promise<PaymentItemDto[]> {
+    return this.subscriptionService.listPayments(user.id, orgId)
+  }
+
+  @Post('org/:organisationId/checkout/subscription')
+  @ApiBody({ type: CreateSubscriptionCheckoutDto })
+  @ApiOkResponse({ type: CheckoutSessionResponseDto })
+  async createSubscriptionCheckout(
+    @CurrentUser() user: { id: string },
+    @Param('organisationId') orgId: string,
+    @Body() body: CreateSubscriptionCheckoutDto,
+  ): Promise<CheckoutSessionResponseDto> {
+    return this.subscriptionService.createSubscriptionCheckout(user.id, orgId, body)
+  }
+
+  @Post('org/:organisationId/checkout/credits')
+  @ApiBody({ type: CreateCreditCheckoutDto })
+  @ApiOkResponse({ type: CheckoutSessionResponseDto })
+  async createCreditCheckout(
+    @CurrentUser() user: { id: string },
+    @Param('organisationId') orgId: string,
+    @Body() body: CreateCreditCheckoutDto,
+  ): Promise<CheckoutSessionResponseDto> {
+    return this.subscriptionService.createCreditCheckout(user.id, orgId, body)
+  }
+
+  @Post('org/:organisationId/portal')
+  @ApiOkResponse({ type: PortalSessionResponseDto })
+  async createPortalSession(
+    @CurrentUser() user: { id: string },
+    @Param('organisationId') orgId: string,
+  ): Promise<PortalSessionResponseDto> {
+    return this.subscriptionService.createPortalSession(user.id, orgId)
+  }
+
+  @Get('org/:organisationId/churn-responses')
+  @ApiOkResponse({ type: [ChurnSurveyResponseDto] })
+  async listChurnResponses(
+    @CurrentUser() user: { id: string },
+    @Param('organisationId') orgId: string,
+  ): Promise<ChurnSurveyResponseDto[]> {
+    return this.subscriptionService.listChurnSurveyResponses(user.id, orgId)
+  }
+
+  @Get('org/:organisationId/payments/:paymentId/invoice')
+  @ApiProduces('application/pdf')
+  @ApiOkResponse({ description: 'Facture PDF du paiement' })
+  async getInvoice(
+    @CurrentUser() user: { id: string },
+    @Param('organisationId') orgId: string,
+    @Param('paymentId') paymentId: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.subscriptionService.generateInvoice(
+      user.id,
+      orgId,
+      paymentId,
+    )
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`)
+    res.send(buffer)
+  }
+}

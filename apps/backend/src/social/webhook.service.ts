@@ -1149,10 +1149,16 @@ export class WebhookService {
         if (isMessageField && coreNumberId && phoneNumberId === coreNumberId) {
           for (const msg of value.messages || []) {
             const reply = this.extractWhatsAppButtonReply(msg)
+            // Réponse d'un WhatsApp Flow (enquête de départ `feedback_survey_form_1`).
+            const flowResponse =
+              msg.interactive?.type === 'nfm_reply'
+                ? msg.interactive.nfm_reply?.response_json
+                : undefined
             this.eventEmitter.emit('whatsapp.core.inbound', {
               senderPhone: msg.from,
               buttonId: reply?.id,
               buttonTitle: reply?.title,
+              flowResponseJson: flowResponse,
             })
           }
           continue
@@ -3897,6 +3903,9 @@ interface WhatsAppMessage {
     type: string
     button_reply?: { id: string; title: string }
     list_reply?: { id: string; title: string; description?: string }
+    // Réponse d'un WhatsApp Flow (ex: enquête de départ). `response_json` est une
+    // chaîne JSON contenant `flow_token` + les champs soumis du formulaire.
+    nfm_reply?: { name?: string; body?: string; response_json?: string }
   }
   button?: { payload?: string; text?: string }
   reaction?: { message_id: string; emoji: string }

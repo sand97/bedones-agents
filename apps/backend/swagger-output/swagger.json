@@ -558,8 +558,7 @@
         },
         "tags": [
           "Upload"
-        ],
-        "summary": "Upload and optimize a product image"
+        ]
       }
     },
     "/social/connect/facebook": {
@@ -750,6 +749,76 @@
         ]
       }
     },
+    "/social/posts/{postId}/agent-status": {
+      "get": {
+        "operationId": "SocialController_getPostAgentStatus",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostAgentStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/posts/{postId}/agent-override": {
+      "put": {
+        "operationId": "SocialController_setPostAgentOverride",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPostAgentOverrideDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostAgentStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
     "/social/accounts/{accountId}/health": {
       "get": {
         "operationId": "SocialController_getAccountHealth",
@@ -860,6 +929,29 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/social/accounts/{accountId}/disconnect": {
+      "post": {
+        "operationId": "SocialController_disconnectAccount",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account disconnected"
           }
         },
         "tags": [
@@ -1421,6 +1513,39 @@
         "tags": [
           "Messaging"
         ]
+      },
+      "delete": {
+        "operationId": "MessagingController_clearConversationMessages",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cleared": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
       }
     },
     "/messaging/send": {
@@ -1680,6 +1805,74 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConversationAgentStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      }
+    },
+    "/messaging/conversations/{conversationId}/contact-notes": {
+      "get": {
+        "operationId": "MessagingController_getContactNotes",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactNotesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Messaging"
+        ]
+      },
+      "put": {
+        "operationId": "MessagingController_setContactNotes",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetContactNotesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactNotesResponseDto"
                 }
               }
             }
@@ -2288,6 +2481,130 @@
         ]
       }
     },
+    "/catalog/{id}/image-templates": {
+      "get": {
+        "operationId": "CatalogController_findImageTemplates",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "post": {
+        "operationId": "CatalogController_createImageTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateImageTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/catalog/{catalogId}/image-templates/{templateId}": {
+      "patch": {
+        "operationId": "CatalogController_updateImageTemplate",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "templateId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateImageTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "delete": {
+        "operationId": "CatalogController_deleteImageTemplate",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "templateId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
     "/catalog/{id}/analysis-progress": {
       "get": {
         "operationId": "CatalogController_getAnalysisProgress",
@@ -2367,6 +2684,39 @@
         ],
         "responses": {
           "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/catalog/{id}/link-smb-phone": {
+      "post": {
+        "operationId": "CatalogController_linkSmbPhone",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssociatePhoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
             "description": ""
           }
         },
@@ -3109,6 +3459,30 @@
         ]
       }
     },
+    "/catalog-migration/catalog/{catalogId}/last-sync": {
+      "get": {
+        "operationId": "CatalogMigrationController_lastSync",
+        "parameters": [
+          {
+            "name": "catalogId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Last completed sync (number + date) for a catalogue, for the banner",
+        "tags": [
+          "Catalog Migration"
+        ]
+      }
+    },
     "/catalog-migration/{id}": {
       "get": {
         "operationId": "CatalogMigrationController_getOne",
@@ -3130,6 +3504,31 @@
         "summary": "Status + live queue position of a migration",
         "tags": [
           "Catalog Migration"
+        ]
+      }
+    },
+    "/catalog-migration/callback/progress": {
+      "post": {
+        "operationId": "CatalogMigrationCallbackController_progress",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractionProgressDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Report extraction progress (called by the page script per product)",
+        "tags": [
+          "Catalog Migration Callback"
         ]
       }
     },
@@ -3293,6 +3692,39 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateAgentSocialAccountsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/agent/{id}/model": {
+      "put": {
+        "operationId": "AgentController_updateModel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentModelDto"
               }
             }
           }
@@ -4709,6 +5141,243 @@
         ]
       }
     },
+    "/payment/org/{organisationId}/subscription": {
+      "get": {
+        "operationId": "PaymentController_getSubscription",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Payment"
+        ]
+      }
+    },
+    "/payment/org/{organisationId}/payments": {
+      "get": {
+        "operationId": "PaymentController_listPayments",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentItemDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Payment"
+        ]
+      }
+    },
+    "/payment/org/{organisationId}/checkout/subscription": {
+      "post": {
+        "operationId": "PaymentController_createSubscriptionCheckout",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubscriptionCheckoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutSessionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Payment"
+        ]
+      }
+    },
+    "/payment/org/{organisationId}/checkout/credits": {
+      "post": {
+        "operationId": "PaymentController_createCreditCheckout",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCreditCheckoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutSessionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Payment"
+        ]
+      }
+    },
+    "/payment/org/{organisationId}/portal": {
+      "post": {
+        "operationId": "PaymentController_createPortalSession",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalSessionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Payment"
+        ]
+      }
+    },
+    "/payment/org/{organisationId}/churn-responses": {
+      "get": {
+        "operationId": "PaymentController_listChurnResponses",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChurnSurveyResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Payment"
+        ]
+      }
+    },
+    "/payment/org/{organisationId}/payments/{paymentId}/invoice": {
+      "get": {
+        "operationId": "PaymentController_getInvoice",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Facture PDF du paiement"
+          }
+        },
+        "tags": [
+          "Payment"
+        ]
+      }
+    },
     "/notification-preferences/org/{organisationId}": {
       "get": {
         "operationId": "NotificationPreferenceController_getForOrg",
@@ -4759,6 +5428,39 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/BulkUpdateNotificationPreferenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "NotificationPreference"
+        ]
+      }
+    },
+    "/notification-preferences/org/{organisationId}/ticket-status/bulk": {
+      "post": {
+        "operationId": "NotificationPreferenceController_bulkUpdateTicketStatus",
+        "parameters": [
+          {
+            "name": "organisationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpdateTicketStatusNotificationDto"
               }
             }
           }
@@ -4905,76 +5607,6 @@
         },
         "tags": [
           "StreamableHttp"
-        ]
-      }
-    },
-    "/social/posts/{postId}/agent-status": {
-      "get": {
-        "operationId": "SocialController_getPostAgentStatus",
-        "parameters": [
-          {
-            "name": "postId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PostAgentStatusDto"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Social"
-        ]
-      }
-    },
-    "/social/posts/{postId}/agent-override": {
-      "put": {
-        "operationId": "SocialController_setPostAgentOverride",
-        "parameters": [
-          {
-            "name": "postId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetPostAgentOverrideDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PostAgentStatusDto"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Social"
         ]
       }
     }
@@ -5885,6 +6517,14 @@
           "permalinkUrl": {
             "type": "string"
           },
+          "aiOverride": {
+            "type": "string",
+            "enum": [
+              "FORCE_ON",
+              "FORCE_OFF"
+            ],
+            "nullable": true
+          },
           "totalComments": {
             "type": "number"
           },
@@ -5896,14 +6536,6 @@
             "items": {
               "$ref": "#/components/schemas/CommentResponseDto"
             }
-          },
-          "aiOverride": {
-            "type": "string",
-            "enum": [
-              "FORCE_ON",
-              "FORCE_OFF"
-            ],
-            "nullable": true
           }
         },
         "required": [
@@ -5911,6 +6543,78 @@
           "totalComments",
           "unreadComments",
           "comments"
+        ]
+      },
+      "PostAgentSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "CONFIGURING",
+              "READY",
+              "ACTIVE",
+              "PAUSED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "score",
+          "status"
+        ]
+      },
+      "PostAgentStatusDto": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PostAgentSummaryDto"
+              }
+            ]
+          },
+          "override": {
+            "type": "string",
+            "enum": [
+              "FORCE_ON",
+              "FORCE_OFF"
+            ],
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the agent would currently reply to this post's comments"
+          }
+        },
+        "required": [
+          "isActive"
+        ]
+      },
+      "SetPostAgentOverrideDto": {
+        "type": "object",
+        "properties": {
+          "override": {
+            "type": "string",
+            "enum": [
+              "FORCE_ON",
+              "FORCE_OFF"
+            ]
+          }
+        },
+        "required": [
+          "override"
         ]
       },
       "SocialAccountLastErrorDto": {
@@ -6556,6 +7260,30 @@
           "override"
         ]
       },
+      "ContactNotesResponseDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Everything the AI knows about this customer — one durable fact per line."
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "SetContactNotesDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The edited customer knowledge — one durable fact per line. An empty value clears it."
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
       "CreateLabelDto": {
         "type": "object",
         "properties": {}
@@ -6610,6 +7338,10 @@
           "name": {
             "type": "string"
           },
+          "retailerId": {
+            "type": "string",
+            "description": "Code produit du marchand (retailer_id / SKU)"
+          },
           "description": {
             "type": "string"
           },
@@ -6648,7 +7380,8 @@
           }
         },
         "required": [
-          "name"
+          "name",
+          "retailerId"
         ]
       },
       "UpdateProductDto": {
@@ -6656,6 +7389,10 @@
         "properties": {
           "name": {
             "type": "string"
+          },
+          "retailerId": {
+            "type": "string",
+            "description": "Code produit du marchand (retailer_id / SKU)"
           },
           "description": {
             "type": "string"
@@ -6714,6 +7451,53 @@
         "properties": {
           "name": {
             "type": "string"
+          }
+        }
+      },
+      "CreateImageTemplateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "description": "Format réseau social (ex: '1:1', '4:5', '9:16', '16:9')"
+          },
+          "accent": {
+            "type": "string",
+            "description": "Couleur d'accent (hex)"
+          },
+          "definition": {
+            "type": "object",
+            "description": "Définition du template (éléments, etc.) en JSON."
+          },
+          "sourceKey": {
+            "type": "string",
+            "description": "Id du template statique d'origine (absent si créé de zéro)."
+          }
+        },
+        "required": [
+          "name",
+          "format",
+          "definition"
+        ]
+      },
+      "UpdateImageTemplateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "accent": {
+            "type": "string"
+          },
+          "definition": {
+            "type": "object",
+            "description": "Définition du template en JSON."
           }
         }
       },
@@ -6983,6 +7767,17 @@
           "sourcePhone"
         ]
       },
+      "ExtractionProgressDto": {
+        "type": "object",
+        "properties": {
+          "processed": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        }
+      },
       "UploadImageDto": {
         "type": "object",
         "properties": {
@@ -7046,6 +7841,25 @@
           "name"
         ]
       },
+      "SaveCatalogCollectionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "retailerIds": {
+            "description": "retailer_ids of the products in this collection",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "retailerIds"
+        ]
+      },
       "SaveCatalogDto": {
         "type": "object",
         "properties": {
@@ -7053,6 +7867,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SaveCatalogProductDto"
+            }
+          },
+          "collections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaveCatalogCollectionDto"
             }
           }
         },
@@ -7095,6 +7915,23 @@
           "socialAccountIds"
         ]
       },
+      "UpdateAgentModelDto": {
+        "type": "object",
+        "properties": {
+          "tier": {
+            "type": "string",
+            "enum": [
+              "flash",
+              "pro",
+              "ultra"
+            ],
+            "description": "Live-agent model tier."
+          }
+        },
+        "required": [
+          "tier"
+        ]
+      },
       "SendAgentMessageDto": {
         "type": "object",
         "properties": {
@@ -7123,7 +7960,7 @@
           },
           "contacts": {
             "type": "object",
-            "description": "Per-social-account test contacts (socialAccountId -> phone numbers or profile names). Mainly used to test the agent on a few contacts."
+            "description": "Per-social-account test contacts (socialAccountId → phone numbers or profile names). Mainly used to test the agent on a few contacts."
           }
         }
       },
@@ -7308,7 +8145,25 @@
             "type": "number"
           },
           "total": {
-            "type": "number"
+            "type": "number",
+            "description": "Quota total = crédits du forfait + crédits achetés"
+          },
+          "plan": {
+            "type": "string",
+            "enum": [
+              "free",
+              "pro",
+              "business"
+            ],
+            "description": "Forfait actif de l'organisation"
+          },
+          "monthlyCredits": {
+            "type": "number",
+            "description": "Crédits de base inclus par le forfait chaque mois"
+          },
+          "purchasedCredits": {
+            "type": "number",
+            "description": "Solde de crédits supplémentaires achetés"
           },
           "periodStart": {
             "type": "string",
@@ -7322,6 +8177,9 @@
         "required": [
           "used",
           "total",
+          "plan",
+          "monthlyCredits",
+          "purchasedCredits",
           "periodStart",
           "periodEnd"
         ]
@@ -7418,11 +8276,24 @@
           "organisationId": {
             "type": "string"
           },
+          "catalogId": {
+            "type": "string",
+            "description": "Catalog the promotion targets"
+          },
           "name": {
             "type": "string"
           },
           "description": {
             "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "PAUSED",
+              "EXPIRED"
+            ]
           },
           "discountType": {
             "type": "string",
@@ -7443,6 +8314,34 @@
           "endDate": {
             "type": "string"
           },
+          "minOrderAmount": {
+            "type": "number",
+            "description": "Minimum order amount (FCFA) to be eligible"
+          },
+          "minItemCount": {
+            "type": "number",
+            "description": "Minimum number of articles in the order to be eligible"
+          },
+          "rewardType": {
+            "type": "string",
+            "enum": [
+              "PRODUCTS",
+              "CREDIT",
+              "PERCENT"
+            ]
+          },
+          "rewardCredit": {
+            "type": "number"
+          },
+          "rewardPercent": {
+            "type": "number"
+          },
+          "rewardProductIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "productIds": {
             "type": "array",
             "items": {
@@ -7461,6 +8360,10 @@
       "UpdatePromotionDto": {
         "type": "object",
         "properties": {
+          "catalogId": {
+            "type": "string",
+            "description": "Catalog the promotion targets"
+          },
           "name": {
             "type": "string"
           },
@@ -7494,6 +8397,34 @@
               "PAUSED",
               "EXPIRED"
             ]
+          },
+          "minOrderAmount": {
+            "type": "number",
+            "description": "Minimum order amount (FCFA) to be eligible"
+          },
+          "minItemCount": {
+            "type": "number",
+            "description": "Minimum number of articles in the order to be eligible"
+          },
+          "rewardType": {
+            "type": "string",
+            "enum": [
+              "PRODUCTS",
+              "CREDIT",
+              "PERCENT"
+            ]
+          },
+          "rewardCredit": {
+            "type": "number"
+          },
+          "rewardPercent": {
+            "type": "number"
+          },
+          "rewardProductIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "productIds": {
             "type": "array",
@@ -8054,6 +8985,284 @@
           }
         }
       },
+      "PaymentMethodDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "CARD",
+              "MOBILE_MONEY"
+            ],
+            "nullable": true,
+            "description": "Type de moyen de paiement, ou null si aucun"
+          },
+          "brand": {
+            "type": "object",
+            "nullable": true,
+            "description": "Marque de la carte (Stripe)"
+          },
+          "last4": {
+            "type": "object",
+            "nullable": true,
+            "description": "4 derniers chiffres de la carte (Stripe)"
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true,
+            "description": "Numéro mobile money utilisé (NotchPay)"
+          }
+        },
+        "required": [
+          "type",
+          "brand",
+          "last4",
+          "phone"
+        ]
+      },
+      "SubscriptionStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "enum": [
+              "free",
+              "pro",
+              "business"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "INCOMPLETE",
+              "ACTIVE",
+              "PAST_DUE",
+              "CANCELED",
+              "EXPIRED"
+            ],
+            "nullable": true,
+            "description": "Statut de l'abonnement, ou null si aucun abonnement (forfait gratuit)"
+          },
+          "billingMonths": {
+            "type": "object",
+            "nullable": true,
+            "description": "Cadence de facturation en mois"
+          },
+          "monthlyCredits": {
+            "type": "number",
+            "description": "Crédits de base inclus par le forfait chaque mois"
+          },
+          "purchasedCredits": {
+            "type": "number",
+            "description": "Solde de crédits supplémentaires achetés (non encore consommés)"
+          },
+          "totalCredits": {
+            "type": "number",
+            "description": "Quota total disponible = crédits du forfait + crédits achetés"
+          },
+          "currentPeriodEnd": {
+            "type": "object",
+            "nullable": true,
+            "description": "Fin de la période en cours (ISO), si abonnement"
+          },
+          "cancelAtPeriodEnd": {
+            "type": "boolean",
+            "description": "Annulation programmée en fin de période"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "STRIPE",
+              "NOTCHPAY"
+            ],
+            "nullable": true,
+            "description": "Prestataire de paiement"
+          },
+          "paymentMethod": {
+            "description": "Résumé du moyen de paiement",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMethodDto"
+              }
+            ]
+          },
+          "hasPayments": {
+            "type": "boolean",
+            "description": "True si l'org a au moins un paiement enregistré → la page affiche le récap plutôt que le tutoriel/pricing"
+          }
+        },
+        "required": [
+          "plan",
+          "status",
+          "billingMonths",
+          "monthlyCredits",
+          "purchasedCredits",
+          "totalCredits",
+          "currentPeriodEnd",
+          "cancelAtPeriodEnd",
+          "provider",
+          "paymentMethod",
+          "hasPayments"
+        ]
+      },
+      "PaymentItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "SUBSCRIPTION",
+              "CREDIT_PURCHASE"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "COMPLETED",
+              "FAILED",
+              "REFUNDED"
+            ]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "creditsPurchased": {
+            "type": "object",
+            "nullable": true
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "amount",
+          "currency",
+          "creditsPurchased",
+          "description",
+          "createdAt"
+        ]
+      },
+      "CreateSubscriptionCheckoutDto": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "enum": [
+              "pro",
+              "business"
+            ],
+            "description": "Forfait payant à souscrire"
+          },
+          "billingMonths": {
+            "type": "number",
+            "enum": [
+              1,
+              6,
+              12
+            ],
+            "description": "Cadence de facturation en mois (1, 6 ou 12). 6 et 12 appliquent une remise."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "CARD",
+              "MOBILE_MONEY"
+            ],
+            "default": "CARD",
+            "description": "Méthode de paiement. CARD = Stripe (récurrent), MOBILE_MONEY = NotchPay."
+          }
+        },
+        "required": [
+          "plan",
+          "billingMonths"
+        ]
+      },
+      "CheckoutSessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL de paiement (Stripe Checkout ou NotchPay) vers laquelle rediriger"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "CreateCreditCheckoutDto": {
+        "type": "object",
+        "properties": {
+          "credits": {
+            "type": "number",
+            "description": "Nombre de crédits à acheter. Doit être un multiple de 1000.",
+            "example": 1000
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "CARD",
+              "MOBILE_MONEY"
+            ],
+            "default": "CARD",
+            "description": "Méthode de paiement. CARD = Stripe, MOBILE_MONEY = NotchPay."
+          }
+        },
+        "required": [
+          "credits"
+        ]
+      },
+      "PortalSessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL du portail de facturation Stripe"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "ChurnSurveyResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "response": {
+            "type": "object",
+            "description": "Réponses du WhatsApp Flow (response_json parsé : flow_token + champs du formulaire)",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "phone",
+          "response",
+          "createdAt"
+        ]
+      },
       "BulkUpdateNotificationPreferenceDto": {
         "type": "object",
         "properties": {
@@ -8082,6 +9291,13 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "collectionIds": {
+            "description": "Ticket notifications only: restrict to these product collection ids. Empty/omitted = all collections.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -8091,81 +9307,44 @@
           "enabled"
         ]
       },
+      "BulkUpdateTicketStatusNotificationDto": {
+        "type": "object",
+        "properties": {
+          "userIds": {
+            "description": "Organisation members user IDs to apply the change to",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "socialAccountId": {
+            "type": "string"
+          },
+          "ticketStatusId": {
+            "type": "string",
+            "description": "Ticket status the notification is attached to"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "collectionIds": {
+            "description": "Restrict to these product collection ids. Empty/omitted = all collections.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "userIds",
+          "socialAccountId",
+          "ticketStatusId",
+          "enabled"
+        ]
+      },
       "SendTemplateBody": {
         "type": "object",
         "properties": {}
-      },
-      "PostAgentSummaryDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "score": {
-            "type": "number"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "DRAFT",
-              "CONFIGURING",
-              "READY",
-              "ACTIVE",
-              "PAUSED"
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "score",
-          "status"
-        ]
-      },
-      "PostAgentStatusDto": {
-        "type": "object",
-        "properties": {
-          "agent": {
-            "nullable": true,
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PostAgentSummaryDto"
-              }
-            ]
-          },
-          "override": {
-            "type": "string",
-            "enum": [
-              "FORCE_ON",
-              "FORCE_OFF"
-            ],
-            "nullable": true
-          },
-          "isActive": {
-            "type": "boolean",
-            "description": "Whether the agent would currently reply to this post's comments"
-          }
-        },
-        "required": [
-          "isActive"
-        ]
-      },
-      "SetPostAgentOverrideDto": {
-        "type": "object",
-        "properties": {
-          "override": {
-            "type": "string",
-            "enum": [
-              "FORCE_ON",
-              "FORCE_OFF"
-            ]
-          }
-        },
-        "required": [
-          "override"
-        ]
       }
     }
   }

@@ -1,8 +1,9 @@
 import { DashboardHeader } from '@app/components/layout/dashboard-header'
-import { createFileRoute } from '@tanstack/react-router'
-import { Segmented } from 'antd'
+import { createFileRoute, useParams } from '@tanstack/react-router'
+import { App, Segmented } from 'antd'
 import { useState } from 'react'
 
+import { $api } from '@app/lib/api/$api'
 import {
   BILLING_OPTIONS,
   CREDIT_FACTS,
@@ -16,6 +17,8 @@ import { CreditFactCard } from '@app/components/pricing/CreditFactCard'
 import { PaymentMethodsSection } from '@app/components/pricing/PaymentMethodsSection'
 import { PlanCard } from '@app/components/pricing/PlanCard'
 import { CheckoutModal } from '@app/components/pricing/CheckoutModal'
+import { SubscriptionRecap } from '@app/components/pricing/SubscriptionRecap'
+import { BuyCreditsModal } from '@app/components/pricing/BuyCreditsModal'
 import {
   PaymentResultModal,
   type PaymentResultState,
@@ -50,13 +53,22 @@ function DiscountContent({ duration }: { duration: BillingDuration }) {
 }
 
 function PlanPage() {
+  const { message } = App.useApp()
+  const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
   const [duration, setDuration] = useState<BillingDuration>(6)
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false)
   const [selectedPlanKey, setSelectedPlanKey] = useState<BillingPlanKey | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<BillingPaymentMethod>('CARD')
   const [paymentResult, setPaymentResult] = useState<PaymentResultState | null>(null)
+  const [isBuyCreditsOpen, setIsBuyCreditsOpen] = useState(false)
 
-  const currentPlan: BillingPlanKey = 'free'
+  const subscriptionQuery = $api.useQuery('get', '/payment/org/{organisationId}/subscription', {
+    params: { path: { organisationId: orgSlug } },
+  })
+  const checkout = $api.useMutation('post', '/payment/org/{organisationId}/checkout/subscription')
+
+  const currentPlan = (subscriptionQuery.data?.plan ?? 'free') as BillingPlanKey
+  const hasPayments = subscriptionQuery.data?.hasPayments ?? false
   const mobileMoneyEnabled = true
 
   function openCheckoutModal(planKey: BillingPlanKey) {
@@ -81,9 +93,17 @@ function PlanPage() {
     setPaymentMethod(nextPaymentMethod)
   }
 
-  function handleCheckout() {
-    if (!selectedPlanKey) return
-    console.log('Checkout:', { duration, paymentMethod, planKey: selectedPlanKey })
+  async function handleCheckout() {
+    if (!selectedPlanKey || selectedPlanKey === 'free') return
+    try {
+      const res = await checkout.mutateAsync({
+        params: { path: { organisationId: orgSlug } },
+        body: { plan: selectedPlanKey, billingMonths: duration, method: paymentMethod },
+      })
+      if (res?.url) window.location.href = res.url
+    } catch {
+      message.error('Échec de la création du paiement. Réessayez.')
+    }
   }
 
   return (
@@ -91,6 +111,14 @@ function PlanPage() {
       <DashboardHeader title="Souscriptions" />
 
       <div className="w-full space-y-8 px-4 py-5 sm:px-6 sm:py-6">
+        {hasPayments ? (
+          <SubscriptionRecap
+            organisationId={orgSlug}
+            onUpgrade={() => setIsCheckoutModalOpen(false)}
+            onBuyCredits={() => setIsBuyCreditsOpen(true)}
+          />
+        ) : null}
+
         <div className="sticky top-10 z-10 -mx-4 mb-8 flex flex-col items-center gap-3 bg-bg-surface px-4 py-4 text-center md:relative md:top-0">
           <Segmented<BillingDuration>
             className="pricing-billing-toggle"
@@ -136,6 +164,12 @@ function PlanPage() {
         onPaymentMethodChange={handlePaymentMethodSelection}
         mobileMoneyEnabled={mobileMoneyEnabled}
         onCheckout={handleCheckout}
+      />
+
+      <BuyCreditsModal
+        open={isBuyCreditsOpen}
+        organisationId={orgSlug}
+        onClose={() => setIsBuyCreditsOpen(false)}
       />
     </>
   )

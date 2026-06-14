@@ -20,6 +20,7 @@ import { PromotionModule } from './promotion/promotion.module'
 import { LoyaltyModule } from './loyalty/loyalty.module'
 import { ImageProcessingModule } from './image-processing/image-processing.module'
 import { StatsModule } from './stats/stats.module'
+import { PaymentModule } from './payment/payment.module'
 import { NotificationPreferenceModule } from './notification-preference/notification-preference.module'
 import { WhatsappOptinModule } from './whatsapp-optin/whatsapp-optin.module'
 import { LlmModule } from './common/llm/llm.module'
@@ -58,6 +59,7 @@ import { PostHogModule } from './posthog/posthog.module'
     LoyaltyModule,
     ImageProcessingModule,
     StatsModule,
+    PaymentModule,
     NotificationPreferenceModule,
     WhatsappOptinModule,
     ContactLanguageModule,
