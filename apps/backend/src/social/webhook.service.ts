@@ -1416,6 +1416,13 @@ export class WebhookService {
       provider: 'WHATSAPP',
     })
 
+    // WhatsApp envoie un message de type `unsupported` pour les contenus que la
+    // Cloud API ne sait pas relayer (sondages, messages éphémères / view-once,
+    // types récents non pris en charge…). On le persiste pour qu'il reste visible
+    // dans le fil, mais on NE déclenche PAS l'agent : il n'a aucun contenu
+    // exploitable et ne doit donc pas répondre à ces messages.
+    if (msg.type === 'unsupported') return
+
     this.eventEmitter.emit('message.incoming', {
       conversationId: conversation.id,
       socialAccountId,
