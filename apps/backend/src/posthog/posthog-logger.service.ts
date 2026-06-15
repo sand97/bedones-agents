@@ -60,6 +60,13 @@ export class PostHogLoggerService extends ConsoleLogger {
       request_id: ctx?.requestId,
       path: ctx?.path,
       method: ctx?.method,
+      // Conversation correlation: set during webhook processing and on the agent
+      // worker → lets PostHog filter logs down to a single conversation (and tell
+      // webhook-ingestion logs apart from agent-run logs via `source`).
+      conversation_id: ctx?.conversationId,
+      social_account_id: ctx?.socialAccountId,
+      provider: ctx?.provider,
+      source: ctx?.source,
     }
     const groups = ctx?.organisationId ? { organisation: ctx.organisationId } : undefined
 

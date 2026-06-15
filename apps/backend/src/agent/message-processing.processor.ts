@@ -5,6 +5,7 @@ import { MESSAGE_PROCESSING_QUEUE } from '../queue/queue.module'
 import type { IncomingMessageEvent } from '../social/webhook.service'
 import { AgentMessageProcessorService } from './agent-message-processor.service'
 import { MessageRunCoordinator } from './message-run-coordinator'
+import { runWithContext } from '../posthog/request-context'
 
 export interface MessageProcessingJobData {
   event: IncomingMessageEvent
@@ -46,21 +47,36 @@ export class MessageProcessingProcessor extends WorkerHost {
 
     const { event, seq } = job.data
 
-    // Périmé avant même de commencer : un message plus récent du même contact est
-    // déjà arrivé. On n'engage aucune analyse LLM.
-    if (await this.coordinator.isSuperseded(event.conversationId, seq)) {
-      this.logger.log(
-        `Run #${seq} de la conversation ${event.conversationId} ignoré (déjà supplanté)`,
-      )
-      return
-    }
+    // Le job tourne dans un worker BullMQ : le scope AsyncLocalStorage du webhook
+    // qui a déclenché ce run n'existe plus ici. On en rouvre un, taggé avec la
+    // conversation, pour que TOUS les logs du run d'agent soient cherchables par
+    // conversation dans PostHog (et distinguables de l'ingestion via `source`).
+    return runWithContext(
+      {
+        conversationId: event.conversationId,
+        socialAccountId: event.socialAccountId,
+        provider: event.provider,
+        organisationId: event.orgId,
+        source: 'agent-message-processing',
+      },
+      async () => {
+        // Périmé avant même de commencer : un message plus récent du même contact est
+        // déjà arrivé. On n'engage aucune analyse LLM.
+        if (await this.coordinator.isSuperseded(event.conversationId, seq)) {
+          this.logger.log(
+            `Run #${seq} de la conversation ${event.conversationId} ignoré (déjà supplanté)`,
+          )
+          return
+        }
 
-    const controller = new AbortController()
-    const stopWatching = this.coordinator.watch(event.conversationId, seq, controller)
-    try {
-      await this.processor.processIncoming(event, controller.signal)
-    } finally {
-      stopWatching()
-    }
+        const controller = new AbortController()
+        const stopWatching = this.coordinator.watch(event.conversationId, seq, controller)
+        try {
+          await this.processor.processIncoming(event, controller.signal)
+        } finally {
+          stopWatching()
+        }
+      },
+    )
   }
 }

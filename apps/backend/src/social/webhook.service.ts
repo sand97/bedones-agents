@@ -11,6 +11,8 @@ import { CatalogService } from '../catalog/catalog.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
 import { SocialHealthService } from './social-health.service'
+import { PostHogService } from '../posthog/posthog.service'
+import { getRequestContext, setRequestContext } from '../posthog/request-context'
 
 /**
  * Provenance captured when a WhatsApp customer messages us straight from an organic
@@ -68,10 +70,56 @@ export class WebhookService {
     private eventsGateway: EventsGateway,
     private eventEmitter: EventEmitter2,
     private socialHealth: SocialHealthService,
+    private posthog: PostHogService,
   ) {
     this.facebookAppSecret = this.configService.getOrThrow<string>('FACEBOOK_APP_SECRET')
     this.instagramAppSecret = this.configService.getOrThrow<string>('INSTAGRAM_APP_SECRET')
     this.whatsappAppSecret = this.configService.getOrThrow<string>('FACEBOOK_APP_SECRET')
+  }
+
+  /**
+   * Tie the webhook currently being processed to the conversation it resolved to.
+   *
+   * Called from each handler the moment a conversation is known. It does two things:
+   *
+   *  1. Enriches the current AsyncLocalStorage scope so EVERY remaining log line of
+   *     this webhook's execution — and any synchronous `message.incoming` listener
+   *     (contact language, loyalty…) — carries `conversation_id` in PostHog.
+   *  2. Emits one `webhook_conversation` event per (webhook, conversation): lets
+   *     PostHog list every webhook a conversation ever received. The shared
+   *     `request_id` ties it back to the raw `webhook_received` event and to the
+   *     `backend_log` lines emitted during the same execution.
+   *
+   * Note: a single Meta webhook can fan out to several conversations; the context's
+   * `conversation_id` is therefore last-write-wins, but each call happens right
+   * before that conversation's own log lines, so attribution stays correct.
+   */
+  private trackConversationWebhook(params: {
+    conversationId: string
+    provider: IncomingMessageEvent['provider']
+    orgId: string
+    eventType: 'message' | 'echo' | 'reaction' | 'status'
+    socialAccountId?: string
+  }): void {
+    setRequestContext({
+      conversationId: params.conversationId,
+      socialAccountId: params.socialAccountId,
+      provider: params.provider,
+      organisationId: params.orgId,
+    })
+
+    this.posthog.capture({
+      distinctId: params.orgId,
+      event: 'webhook_conversation',
+      properties: {
+        conversation_id: params.conversationId,
+        provider: params.provider,
+        social_account_id: params.socialAccountId,
+        event_type: params.eventType,
+        request_id: getRequestContext()?.requestId,
+      },
+      groups: { organisation: params.orgId },
+    })
   }
 
   // ─── Signature verification ───
@@ -815,6 +863,14 @@ export class WebhookService {
     )
     if (!conversation) return
 
+    this.trackConversationWebhook({
+      conversationId: conversation.id,
+      provider: 'FACEBOOK',
+      orgId,
+      socialAccountId,
+      eventType: 'message',
+    })
+
     await this.markConversationFromAd(conversation.id, this.extractMetaAdReferral(messaging))
 
     this.logger.log(
@@ -975,6 +1031,14 @@ export class WebhookService {
     )
     if (!conversation) return
 
+    this.trackConversationWebhook({
+      conversationId: conversation.id,
+      provider: 'INSTAGRAM',
+      orgId,
+      socialAccountId,
+      eventType: 'message',
+    })
+
     await this.markConversationFromAd(conversation.id, this.extractMetaAdReferral(messaging))
 
     this.logger.log(
@@ -1054,6 +1118,13 @@ export class WebhookService {
       })
     }
 
+    this.trackConversationWebhook({
+      conversationId: targetMessage.conversationId,
+      provider,
+      orgId,
+      eventType: 'reaction',
+    })
+
     this.logger.log(
       `[${provider} Reaction] ${reaction.action} "${reaction.emoji || ''}" on message ${targetMsgId} by ${senderId}`,
     )
@@ -1108,6 +1179,13 @@ export class WebhookService {
         },
       })
     }
+
+    this.trackConversationWebhook({
+      conversationId: targetMessage.conversationId,
+      provider: 'WHATSAPP',
+      orgId,
+      eventType: 'reaction',
+    })
 
     this.logger.log(
       `[WhatsApp Reaction] ${emoji ? 'react' : 'unreact'} "${emoji}" on message ${targetMsgId} by ${senderId}`,
@@ -1391,6 +1469,14 @@ export class WebhookService {
     )
     if (!conversation) return
 
+    this.trackConversationWebhook({
+      conversationId: conversation.id,
+      provider: 'WHATSAPP',
+      orgId,
+      socialAccountId,
+      eventType: 'message',
+    })
+
     await this.markConversationFromAd(conversation.id, this.extractWhatsAppAdReferral(msg))
 
     // Organic post referral: the customer wrote from one of our posts. Persist the
@@ -1542,6 +1628,14 @@ export class WebhookService {
 
     if (!saved) return
 
+    this.trackConversationWebhook({
+      conversationId: saved.conversationId,
+      provider: 'WHATSAPP',
+      orgId,
+      socialAccountId,
+      eventType: 'echo',
+    })
+
     // Reply sent from the WhatsApp Business mobile app implies the owner
     // has read the inbound messages up to that point. Clear the badge.
     await this.markInboundMessagesAsRead(saved.conversationId, orgId, timestamp)
@@ -1618,6 +1712,13 @@ export class WebhookService {
     })
 
     if (!message) return
+
+    this.trackConversationWebhook({
+      conversationId: message.conversationId,
+      provider: 'WHATSAPP',
+      orgId,
+      eventType: 'status',
+    })
 
     // Read receipt on an inbound message → business owner read it from a
     // linked device (e.g. WhatsApp Business mobile app). Mark all earlier
@@ -2421,6 +2522,14 @@ export class WebhookService {
       participantUsername,
     )
     if (!conversation) return
+
+    this.trackConversationWebhook({
+      conversationId: conversation.id,
+      provider: 'TIKTOK',
+      orgId: socialAccount.organisationId,
+      socialAccountId: socialAccount.id,
+      eventType: 'message',
+    })
 
     await this.markConversationFromAd(conversation.id, this.extractTikTokAdReferral(content))
 
