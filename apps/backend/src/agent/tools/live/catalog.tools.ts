@@ -46,6 +46,11 @@ export function createCatalogTools(deps: {
   // small budget we stop searching and force the model to answer.
   const MAX_SEARCHES_PER_TURN = 4
   let searchCount = 0
+  // Same loop-breaker for the exact lookup: a model (e.g. Gemini) can otherwise
+  // re-call get_product on the same id every step until it blows the recursion
+  // limit and fails the whole turn. A small budget forces it to act on the result.
+  const MAX_GET_PRODUCT_PER_TURN = 4
+  let getProductCount = 0
 
   const searchProducts = tool(
     async ({ query, queryEn }) => {
@@ -110,6 +115,11 @@ export function createCatalogTools(deps: {
       const ids = Array.from(new Set(retailerIds.map((s) => s.trim()).filter(Boolean)))
       if (ids.length === 0) return 'Provide at least one retailer id.'
       if (deps.catalogIds.length === 0) return 'No catalogs linked to this agent.'
+
+      getProductCount++
+      if (getProductCount > MAX_GET_PRODUCT_PER_TURN) {
+        return `You have already looked up products by id ${MAX_GET_PRODUCT_PER_TURN} times this turn — do NOT call get_product again. Act on what the previous results showed: send the matching product(s) with send_products, or reply, then end your turn.`
+      }
 
       const found = await resolveExactByRetailerId(deps, ids)
       if (found.length === 0) {
