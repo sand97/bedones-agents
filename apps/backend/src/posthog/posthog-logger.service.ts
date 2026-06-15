@@ -1,22 +1,27 @@
 import { ConsoleLogger, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import type { LogAttributes } from '@opentelemetry/api-logs'
 import { PostHogService } from './posthog.service'
 import { getRequestContext } from './request-context'
+import { getOtelLogger, toSeverityNumber } from './otel-logs'
 
 type LogLevel = 'info' | 'warn' | 'error'
 
 /**
  * Drop-in replacement for the default Nest logger. Keeps the usual console
  * output (via `ConsoleLogger`) AND mirrors the application's own log lines to
- * PostHog so they become searchable in the PostHog UI:
+ * PostHog's **Logs** product via OpenTelemetry/OTLP (see `otel-logs.ts`), so
+ * they become searchable in PostHog → Logs:
  *
  * - `error(...)` with a real `Error` → PostHog **Error tracking** (captureException)
- * - `error(...)` / `warn(...)` text lines → `backend_log` events (level tagged)
+ *   AND an `error` log line.
+ * - `error(...)` / `warn(...)` text lines → OTLP log records (severity tagged).
  * - `log(...)` (info) → forwarded only when POSTHOG_CAPTURE_INFO_LOGS=true
- *   (off by default to keep event volume — and cost — under control)
+ *   (off by default to keep log volume — and cost — under control).
  *
- * Every forwarded line is enriched with the current request context (request id,
- * route, user) when available, thanks to the AsyncLocalStorage middleware.
+ * Every forwarded line is enriched with the current execution context (request
+ * id, route, and conversation/contact/social-account/org/provider when known) as
+ * log attributes, thanks to the AsyncLocalStorage context (`request-context.ts`).
  */
 @Injectable()
 export class PostHogLoggerService extends ConsoleLogger {
@@ -53,31 +58,39 @@ export class PostHogLoggerService extends ConsoleLogger {
     const distinctId = ctx?.userId || 'backend-server'
     const text = typeof message === 'string' ? message : safeStringify(message)
 
-    const properties: Record<string, unknown> = {
-      level,
-      message: text,
-      logger_context: context,
-      request_id: ctx?.requestId,
-      path: ctx?.path,
-      method: ctx?.method,
-      // Conversation correlation: set during webhook processing and on the agent
-      // worker → lets PostHog filter logs down to a single conversation (and tell
-      // webhook-ingestion logs apart from agent-run logs via `source`).
-      conversation_id: ctx?.conversationId,
-      social_account_id: ctx?.socialAccountId,
-      provider: ctx?.provider,
-      source: ctx?.source,
+    // Searchable log attributes in PostHog → Logs. These are what let you pinpoint
+    // a single conversation by cross-referencing org / contact / social account /
+    // provider, and tell webhook-ingestion logs apart from agent-run logs (`source`).
+    // `put` skips empty values so we never ship undefined/null attributes.
+    const attributes: LogAttributes = {}
+    const put = (key: string, value: unknown): void => {
+      if (value !== undefined && value !== null && value !== '') attributes[key] = value as never
     }
-    const groups = ctx?.organisationId ? { organisation: ctx.organisationId } : undefined
+    put('logger_context', context)
+    put('request_id', ctx?.requestId)
+    put('path', ctx?.path)
+    put('method', ctx?.method)
+    put('conversation_id', ctx?.conversationId)
+    put('contact_id', ctx?.contactId)
+    put('social_account_id', ctx?.socialAccountId)
+    put('organisation_id', ctx?.organisationId)
+    put('provider', ctx?.provider)
+    put('source', ctx?.source)
 
-    // A real Error → Error tracking (richer: stack, grouping). Otherwise a plain
-    // log event so it is still searchable.
+    // A real Error → Error tracking (richer: stack, grouping). The line still goes
+    // to Logs below so it also appears in the conversation timeline.
     if (level === 'error' && error) {
-      this.posthog.captureException(error, distinctId, properties)
-      return
+      this.posthog.captureException(error, distinctId, { level, message: text, ...attributes })
     }
 
-    this.posthog.capture({ distinctId, event: 'backend_log', properties, groups })
+    // → PostHog **Logs** product, via OTLP (see otel-logs.ts). This is the
+    // searchable-by-conversation surface; `capture()` would land in Events instead.
+    getOtelLogger()?.emit({
+      severityNumber: toSeverityNumber(level),
+      severityText: level,
+      body: text,
+      attributes,
+    })
   }
 
   /** Extract the Nest "context" (last string param) and any Error from the params. */

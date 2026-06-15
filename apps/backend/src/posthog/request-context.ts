@@ -22,11 +22,13 @@ export interface RequestContext {
   /**
    * Conversation the current execution is about. Set during webhook processing
    * (once the inbound message resolves a conversation) and on the agent worker,
-   * so every `backend_log` line becomes searchable by conversation in PostHog.
+   * so every log line becomes searchable by conversation in PostHog → Logs.
    */
   conversationId?: string
   /** Social account / channel the execution relates to. */
   socialAccountId?: string
+  /** End customer (platform sender / participant id) the execution is about. */
+  contactId?: string
   /** Channel provider (WHATSAPP, INSTAGRAM, FACEBOOK, TIKTOK) when known. */
   provider?: string
   /**

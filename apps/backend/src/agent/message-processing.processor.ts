@@ -54,6 +54,7 @@ export class MessageProcessingProcessor extends WorkerHost {
     return runWithContext(
       {
         conversationId: event.conversationId,
+        contactId: event.message.senderId,
         socialAccountId: event.socialAccountId,
         provider: event.provider,
         organisationId: event.orgId,

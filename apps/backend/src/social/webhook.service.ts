@@ -11,8 +11,7 @@ import { CatalogService } from '../catalog/catalog.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
 import { SocialHealthService } from './social-health.service'
-import { PostHogService } from '../posthog/posthog.service'
-import { getRequestContext, setRequestContext } from '../posthog/request-context'
+import { setRequestContext } from '../posthog/request-context'
 
 /**
  * Provenance captured when a WhatsApp customer messages us straight from an organic
@@ -70,7 +69,6 @@ export class WebhookService {
     private eventsGateway: EventsGateway,
     private eventEmitter: EventEmitter2,
     private socialHealth: SocialHealthService,
-    private posthog: PostHogService,
   ) {
     this.facebookAppSecret = this.configService.getOrThrow<string>('FACEBOOK_APP_SECRET')
     this.instagramAppSecret = this.configService.getOrThrow<string>('INSTAGRAM_APP_SECRET')
@@ -84,11 +82,14 @@ export class WebhookService {
    *
    *  1. Enriches the current AsyncLocalStorage scope so EVERY remaining log line of
    *     this webhook's execution — and any synchronous `message.incoming` listener
-   *     (contact language, loyalty…) — carries `conversation_id` in PostHog.
-   *  2. Emits one `webhook_conversation` event per (webhook, conversation): lets
-   *     PostHog list every webhook a conversation ever received. The shared
-   *     `request_id` ties it back to the raw `webhook_received` event and to the
-   *     `backend_log` lines emitted during the same execution.
+   *     (contact language, loyalty…) — is stamped, in PostHog → Logs, with the
+   *     `conversation_id` / `contact_id` / `social_account_id` / `organisation_id`
+   *     / `provider` attributes. Those attributes are what let you pinpoint a
+   *     single conversation by cross-referencing any of them.
+   *  2. Writes one structured marker log line per (webhook, conversation). Filter
+   *     PostHog → Logs by `conversation_id` (or search `[webhook:`) to see every
+   *     webhook a conversation received; each line shares the execution's
+   *     `request_id`, tying it to the rest of that webhook's logs.
    *
    * Note: a single Meta webhook can fan out to several conversations; the context's
    * `conversation_id` is therefore last-write-wins, but each call happens right
@@ -99,27 +100,20 @@ export class WebhookService {
     provider: IncomingMessageEvent['provider']
     orgId: string
     eventType: 'message' | 'echo' | 'reaction' | 'status'
+    contactId?: string
     socialAccountId?: string
   }): void {
     setRequestContext({
       conversationId: params.conversationId,
+      contactId: params.contactId,
       socialAccountId: params.socialAccountId,
       provider: params.provider,
       organisationId: params.orgId,
     })
 
-    this.posthog.capture({
-      distinctId: params.orgId,
-      event: 'webhook_conversation',
-      properties: {
-        conversation_id: params.conversationId,
-        provider: params.provider,
-        social_account_id: params.socialAccountId,
-        event_type: params.eventType,
-        request_id: getRequestContext()?.requestId,
-      },
-      groups: { organisation: params.orgId },
-    })
+    this.logger.log(
+      `[webhook:${params.provider}] ${params.eventType} → conversation ${params.conversationId}`,
+    )
   }
 
   // ─── Signature verification ───
@@ -867,6 +861,7 @@ export class WebhookService {
       conversationId: conversation.id,
       provider: 'FACEBOOK',
       orgId,
+      contactId: senderId,
       socialAccountId,
       eventType: 'message',
     })
@@ -1035,6 +1030,7 @@ export class WebhookService {
       conversationId: conversation.id,
       provider: 'INSTAGRAM',
       orgId,
+      contactId: senderId,
       socialAccountId,
       eventType: 'message',
     })
@@ -1122,6 +1118,7 @@ export class WebhookService {
       conversationId: targetMessage.conversationId,
       provider,
       orgId,
+      contactId: senderId,
       eventType: 'reaction',
     })
 
@@ -1184,6 +1181,7 @@ export class WebhookService {
       conversationId: targetMessage.conversationId,
       provider: 'WHATSAPP',
       orgId,
+      contactId: senderId,
       eventType: 'reaction',
     })
 
@@ -1473,6 +1471,7 @@ export class WebhookService {
       conversationId: conversation.id,
       provider: 'WHATSAPP',
       orgId,
+      contactId: senderId,
       socialAccountId,
       eventType: 'message',
     })
@@ -1632,6 +1631,7 @@ export class WebhookService {
       conversationId: saved.conversationId,
       provider: 'WHATSAPP',
       orgId,
+      contactId: recipientId,
       socialAccountId,
       eventType: 'echo',
     })
@@ -1717,6 +1717,7 @@ export class WebhookService {
       conversationId: message.conversationId,
       provider: 'WHATSAPP',
       orgId,
+      contactId: status.recipient_id,
       eventType: 'status',
     })
 
@@ -2527,6 +2528,7 @@ export class WebhookService {
       conversationId: conversation.id,
       provider: 'TIKTOK',
       orgId: socialAccount.organisationId,
+      contactId: participantId,
       socialAccountId: socialAccount.id,
       eventType: 'message',
     })

@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PostHog } from 'posthog-node'
+import { initOtelLogs, shutdownOtelLogs } from './otel-logs'
 
 export interface CaptureParams {
   distinctId: string
@@ -41,7 +42,18 @@ export class PostHogService implements OnApplicationShutdown {
       flushAt: 20,
       flushInterval: 10_000,
     })
-    this.logger.log(`PostHog enabled (host=${host})`)
+
+    // Application logs go to the PostHog **Logs** product via OTLP (separate
+    // surface from events — see otel-logs.ts). Same token & host as the events
+    // client. PostHogLoggerService emits the actual records.
+    initOtelLogs({
+      token: apiKey,
+      host,
+      serviceName: config.get<string>('OTEL_SERVICE_NAME') || 'bedones-backend',
+      environment: config.get<string>('NODE_ENV'),
+    })
+
+    this.logger.log(`PostHog enabled (host=${host}, logs→OTLP)`)
   }
 
   /** Raw client for advanced integrations (LangChain LLM observability handler). */
@@ -78,6 +90,8 @@ export class PostHogService implements OnApplicationShutdown {
   }
 
   async onApplicationShutdown(): Promise<void> {
+    // Flush buffered OTLP logs first so a graceful shutdown doesn't drop them.
+    await shutdownOtelLogs()
     if (!this.client) return
     try {
       await this.client.shutdown()
