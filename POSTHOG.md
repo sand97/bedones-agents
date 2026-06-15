@@ -52,8 +52,23 @@ Voir `apps/backend/.env.example` et `apps/frontend/.env.example`.
 - **Observabilité LLM** (agent LangChain / LangGraph, Gemini + OpenAI) : le
   `LlmFactoryService` attache le `LangChainCallbackHandler` de `@posthog/ai`.
   Chaque appel LLM est tracé (tokens, **coût**, latence, prompts/réponses,
-  erreurs) et taggé par `feature` (`agent-context`, `agent-live-response`, …).
-  Visible dans **PostHog → LLM analytics**.
+  erreurs). On ne se limite **pas au budget** : chaque génération est attribuée
+  via le helper `buildLlmTrace()` (`common/llm/llm-trace.ts`) qui pose une
+  convention unique sur tous les call sites :
+  - **`distinctId` = id de l'organisation** ⇒ l'insight *Generative AI users*
+    compte de vrais comptes, plus un seul `backend-agent`. Repli sur
+    `backend:<feature>` quand aucune org n'est en contexte (tâches internes).
+  - **`groups.organisation`** = id de l'org ⇒ même clé de group que le reste des
+    events (analytics par org bout-en-bout).
+  - **`traceId`** par run ⇒ tous les appels modèle d'un même tour d'agent (tool
+    calls + fallback de provider inclus) sont regroupés en **une seule trace**.
+  - **`properties`** : `feature` (`agent-live-response`, `agent-context`,
+    `ticket-agent`, `agent-feedback`, `contact-language`,
+    `product-context-analyze`, `comment-moderation`, `error-explanation`) +
+    `conversationId`, `contactId`, `agentId`, `socialAccountId`, `provider`,
+    `tier`, `catalogId` quand ils sont disponibles ⇒ filtrage fin dans l'UI.
+
+  Visible dans **PostHog → LLM analytics** (Traces, Users, Generations, coût).
 
 ### Frontend (`apps/frontend/src/app/contexts/posthog-provider.tsx`)
 
@@ -96,14 +111,11 @@ Voir `apps/backend/.env.example` et `apps/frontend/.env.example`.
 ## 5. Suggestions (debug & marketing) pour plus tard
 
 Déjà branché : product analytics, session replay, error tracking, LLM
-observability, logs serveur, **reverse proxy** (anti ad-blockers). Pistes
-complémentaires utiles :
+observability (traces + users + coût, attribués par org — voir §3), logs
+serveur, **reverse proxy** (anti ad-blockers). Pistes complémentaires utiles :
 
 - **Feature flags** : déploiements progressifs / kill-switch d'une feature
   agent. `posthog-js/react` expose déjà `useFeatureFlagEnabled`.
 - **Surveys** : NPS / feedback in-app ciblé (ex. après N tickets traités).
-- **Attribution per-org plus fine** sur les traces LLM : passer
-  `trace: { distinctId, traceId }` à `createChatModel(...)` depuis l'agent pour
-  rattacher chaque génération à une organisation / conversation précise.
 - **Group analytics organisation** : enrichir les groupes (plan, taille) pour
   des dashboards d'usage B2B.

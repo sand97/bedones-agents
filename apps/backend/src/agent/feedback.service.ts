@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 import { PrismaService } from '../prisma/prisma.service'
 import { LlmFactoryService } from '../common/llm/llm-factory.service'
+import { buildLlmTrace } from '../common/llm/llm-trace'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import type { AgentFeedbackResponseDto } from './dto/feedback.dto'
 
@@ -84,6 +85,7 @@ export class AgentFeedbackService {
                       select: {
                         id: true,
                         context: true,
+                        organisationId: true,
                       },
                     },
                   },
@@ -130,7 +132,14 @@ export class AgentFeedbackService {
       )
       .join('\n')
 
-    const model = this.llmFactory.createStructuredChatModel('thinking', feedbackOutputSchema)
+    const model = this.llmFactory.createStructuredChatModel('thinking', feedbackOutputSchema, {
+      trace: buildLlmTrace({
+        feature: 'agent-feedback',
+        organisationId: agent.organisationId,
+        conversationId: message.conversationId,
+        agentId: agent.id,
+      }),
+    })
 
     let result: FeedbackOutput
     try {

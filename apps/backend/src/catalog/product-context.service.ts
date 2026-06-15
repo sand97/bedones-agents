@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { PrismaService } from '../prisma/prisma.service'
 import { LlmFactoryService } from '../common/llm/llm-factory.service'
+import { buildLlmTrace } from '../common/llm/llm-trace'
 import { CatalogService } from './catalog.service'
 
 export interface AnalyzeContextResult {
@@ -105,9 +106,19 @@ export class ProductContextService {
 
     const snapshots = await this.buildSnapshots(catalogId, params)
     const agentContext = await this.resolveAgentContext(catalogId)
+    const organisationId = (
+      await this.prisma.catalog.findUnique({
+        where: { id: catalogId },
+        select: { organisationId: true },
+      })
+    )?.organisationId
 
     try {
-      const model = this.llm.createChatModel('flash', { temperature: 0.4, maxOutputTokens: 1024 })
+      const model = this.llm.createChatModel('flash', {
+        temperature: 0.4,
+        maxOutputTokens: 1024,
+        trace: buildLlmTrace({ feature: 'product-context-analyze', organisationId, catalogId }),
+      })
       const systemPrompt = `Tu aides un commerçant à rédiger du **contexte additionnel** sur ses produits/collections. Ce contexte alimente un assistant IA qui répond à ses clients.
 
 Réponds STRICTEMENT en JSON sous la forme :

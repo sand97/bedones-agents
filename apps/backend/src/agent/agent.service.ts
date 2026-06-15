@@ -8,6 +8,7 @@ import { AgentPromptsService } from './prompts/agent-prompts.service'
 import { AgentDbToolsService } from './tools/agent-db-tools.service'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { LlmFactoryService, LIVE_MODEL_TIERS } from '../common/llm/llm-factory.service'
+import { buildLlmTrace } from '../common/llm/llm-trace'
 import { ProductImageIndexingService } from '../image-processing/product-image-indexing.service'
 import { CATALOG_INDEXING_QUEUE } from '../queue/queue.module'
 import type { CatalogIndexingJobData } from '../image-processing/catalog-indexing.processor'
@@ -244,7 +245,7 @@ export class AgentService {
       })
 
       // Call LLM
-      const model = this.createModel()
+      const model = this.createModel(organisationId, agentId)
       const result = await model.invoke([new SystemMessage(prompt), new HumanMessage(content)])
 
       // Parse response
@@ -378,7 +379,7 @@ export class AgentService {
       score: agent.score,
     })
 
-    const model = this.createModel()
+    const model = this.createModel(organisationId, agentId)
     const result = await model.invoke([
       new SystemMessage(prompt),
       new HumanMessage("Effectue l'évaluation initiale de cet agent avec les données fournies."),
@@ -457,7 +458,7 @@ export class AgentService {
         }
 
         const prompt = this.prompts.buildCatalogAnalysisPrompt(products.slice(0, 50))
-        const model = this.createModel()
+        const model = this.createModel(organisationId, agentId)
         const result = await model.invoke([new HumanMessage(prompt)])
         const description = typeof result.content === 'string' ? result.content : ''
 
@@ -627,9 +628,9 @@ export class AgentService {
    * initial evaluation). Uses the "thinking" tier: most capable reasoning model with
    * extended thinking enabled. Gemini primary, OpenAI fallback.
    */
-  private createModel() {
+  private createModel(organisationId: string, agentId: string) {
     return this.llmFactory.createChatModel('thinking', {
-      trace: { properties: { feature: 'agent-context' } },
+      trace: buildLlmTrace({ feature: 'agent-context', organisationId, agentId }),
     })
   }
 

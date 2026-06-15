@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 import { PrismaService } from '../prisma/prisma.service'
 import { LlmFactoryService } from '../common/llm/llm-factory.service'
+import { buildLlmTrace } from '../common/llm/llm-trace'
 import type { SocialProvider } from 'generated/prisma/enums'
 
 /**
@@ -123,6 +124,7 @@ export class ErrorExplanationService {
       const model = this.llmFactory.createStructuredChatModel('flash', ExplanationSchema, {
         temperature: 0.2,
         maxOutputTokens: 400,
+        trace: buildLlmTrace({ feature: 'error-explanation', provider: params.provider }),
       })
 
       const system =
