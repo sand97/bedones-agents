@@ -59,7 +59,7 @@ export function createProductMessagingTools(deps: {
         // One product → keep the message on the card. Several individual cards
         // (`product` format) → send the message once as its own text first, then
         // the cards with no body, otherwise the same text repeats on every card.
-        // (carousel/product_list already carry a single shared body, untouched.)
+        // (product_list already carries a single shared body, untouched.)
         const trimmedBody = bodyText?.trim()
         const textFirst = format === 'product' && productIds.length > 1 && !!trimmedBody
         if (textFirst && trimmedBody) {
@@ -96,9 +96,9 @@ export function createProductMessagingTools(deps: {
             'Internal catalog ID. Omit it when the agent has a single catalog (it is inferred automatically). This is NOT a product/retailer id.',
           ),
         format: z
-          .enum(['product', 'product_list', 'carousel', 'catalog_message'])
+          .enum(['product', 'product_list', 'catalog_message'])
           .describe(
-            'Message format. Defaults: "product" for 1-3 items (sent as individual product cards), "carousel" for 4-10 items (swipeable cards, hard cap 10), "product_list" for >10 items (sectioned list, up to 30). "catalog_message" shows a catalog CTA with optional thumbnail.',
+            'Message format. Defaults: "product" for 1-3 items (sent as individual product cards), "product_list" for 4+ items (sectioned list, up to 30; headerText required). "catalog_message" shows a catalog CTA with optional thumbnail. Carousels are intentionally disabled — the customer cannot pick a product from them.',
           ),
         headerText: z
           .string()

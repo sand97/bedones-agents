@@ -81,6 +81,34 @@ export class ImageProductMatchingService {
       ocrText = await this.ocrService.extractText(input.imageBuffer)
       keywords = this.extractWords(ocrText)
 
+      // Step 1b: Exact product-code match. Product images very often print the
+      // merchant SKU / retailer_id (e.g. "#S180KAKI"). When OCR catches it, an
+      // exact lookup identifies the product with CERTAINTY — far better than the
+      // fuzzy image/text similarity below, which returns look-alikes and nudges
+      // the agent into "proposing alternatives". Special characters (the leading
+      // "#", dots…) are stripped first so they can't break the lookup.
+      const codeCandidates = this.extractRetailerCodeCandidates(ocrText)
+      if (codeCandidates.length > 0 && this.qdrantService.isConfigured()) {
+        try {
+          for (const catalogId of input.catalogIds) {
+            const hit = await this.qdrantService.findByRetailerIds(catalogId, codeCandidates)
+            if (hit) {
+              matchedProducts = [this.toMatchedProduct(hit.productId, hit.metadata)]
+              searchMethod = 'ocr_keywords'
+              confidence = 1
+              similarity = 1
+              break
+            }
+          }
+        } catch (error: unknown) {
+          // Never let the code lookup break the pipeline — fall through to the
+          // similarity search below.
+          this.logger.warn(
+            `Retailer-code lookup failed, falling back to similarity: ${error instanceof Error ? error.message : error}`,
+          )
+        }
+      }
+
       // Step 2: Smart crop for image similarity
       if (!matchedProducts.length) {
         imageForSimilarity = await this.smartCropService.cropOpenCV(input.imageBuffer)
@@ -209,6 +237,40 @@ export class ImageProductMatchingService {
     )
   }
 
+  /**
+   * Pull plausible product-code candidates out of OCR text. Retailer SKUs printed
+   * on product images look like "S180KAKI" (often prefixed with "#"). We:
+   *  - split on whitespace/newlines,
+   *  - strip every non-alphanumeric character (this removes the "#", dots, …),
+   *  - keep tokens that mix letters AND digits (the SKU shape) — which drops
+   *    prices ("60000"), currencies ("XAF") and plain words ("DISCUTABLE").
+   * A token explicitly prefixed with "#" is always kept (strong code signal).
+   * Each candidate is returned in its original, upper- and lower-case forms so the
+   * exact Qdrant match works regardless of how the SKU was stored / OCR-cased.
+   * False positives are harmless: they simply match no retailer_id.
+   */
+  private extractRetailerCodeCandidates(ocrText: string): string[] {
+    if (!ocrText) return []
+    const candidates = new Set<string>()
+
+    for (const raw of ocrText.split(/\s+/)) {
+      const hashPrefixed = raw.trim().startsWith('#')
+      const cleaned = raw.replace(/[^a-zA-Z0-9]/g, '')
+      if (cleaned.length < 4 || cleaned.length > 30) continue
+
+      const hasLetter = /[a-zA-Z]/.test(cleaned)
+      const hasDigit = /[0-9]/.test(cleaned)
+      // A SKU mixes letters and digits; a leading "#" marks it as a code anyway.
+      if (!hashPrefixed && !(hasLetter && hasDigit)) continue
+
+      candidates.add(cleaned)
+      candidates.add(cleaned.toUpperCase())
+      candidates.add(cleaned.toLowerCase())
+    }
+
+    return [...candidates]
+  }
+
   private buildImageContextBlock(data: {
     searchMethod: ImageSearchMethod
     matchedProducts: MatchedProduct[]
@@ -218,14 +280,30 @@ export class ImageProductMatchingService {
   }): string {
     const confidencePercent =
       typeof data.confidence === 'number' ? `${(data.confidence * 100).toFixed(1)}%` : 'N/A'
+    // The id handed to send_products MUST be the merchant retailer_id — WhatsApp
+    // rejects the internal Qdrant product_id ("product not found for
+    // product_retailer_id …"). Fall back to the product_id only when no
+    // retailer_id is indexed (mirrors catalog.tools send-id resolution).
+    const sendId = (p: MatchedProduct) => p.retailer_id || p.id
+
+    // Exact code match: the customer literally sent the product (its SKU). The
+    // choice is made — confirm availability and advance the sale; do NOT resend
+    // the card or propose look-alikes/other colors (those come later, at the end).
+    if (data.searchMethod === 'ocr_keywords' && data.matchedProducts.length > 0) {
+      const primary = data.matchedProducts[0]
+      return [
+        '[IMAGE_CONTEXT]',
+        'search_method=ocr_keywords',
+        'match=exact_product_code',
+        `primary_retailer_id=${sendId(primary)}`,
+        `primary_product_name=${primary.name}`,
+        'confidence=100%',
+        "instruction=Produit identifie avec CERTITUDE par son code. Ne renvoie PAS la fiche produit et ne propose AUCUNE alternative ni autre coloris maintenant. Confirme simplement au client que ce produit est disponible, puis fais avancer la vente (demande la taille, la quantite, la livraison...). Tu pourras proposer d'autres coloris uniquement a la fin, une fois la commande en cours.",
+      ].join('\n')
+    }
 
     if (data.matchedProducts.length > 0) {
       const primary = data.matchedProducts[0]
-      // The id handed to send_products MUST be the merchant retailer_id — WhatsApp
-      // rejects the internal Qdrant product_id ("product not found for
-      // product_retailer_id …"). Fall back to the product_id only when no
-      // retailer_id is indexed (mirrors catalog.tools send-id resolution).
-      const sendId = (p: MatchedProduct) => p.retailer_id || p.id
       const productsLine = data.matchedProducts.map((p) => `${p.name} (${sendId(p)})`).join(' | ')
 
       return [
