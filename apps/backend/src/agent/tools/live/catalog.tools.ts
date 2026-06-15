@@ -5,6 +5,7 @@ import type {
   CatalogSearchService,
   ProductSearchResult,
 } from '../../../image-processing/catalog-search.service'
+import { groupByContent } from '../../product-context.util'
 
 export function createCatalogTools(deps: {
   catalogSearchService: CatalogSearchService
@@ -149,14 +150,15 @@ function formatSearchResults(
     return `${SEARCH_RESULT_INTRO}\nproductID,score,name,price,currency\n${lines.join('\n')}`
   }
 
-  // One short label per distinct context content, in order of first appearance.
-  const labelByContent = new Map<string, string>()
-  for (const p of products) {
-    const content = contextByProductId.get(p.id)
-    if (content && !labelByContent.has(content)) {
-      labelByContent.set(content, String.fromCharCode(65 + labelByContent.size))
-    }
-  }
+  // Group products by identical context (a context shared by several products is
+  // listed once), labelling each group A, B, … so every row points to its one.
+  const groups = groupByContent(
+    products.flatMap((p) => {
+      const content = contextByProductId.get(p.id)
+      return content ? [{ item: p, content }] : []
+    }),
+  )
+  const labelByContent = new Map(groups.map((g, i) => [g.content, String.fromCharCode(65 + i)]))
 
   const lines = products.map((p) => {
     const content = contextByProductId.get(p.id)
@@ -164,12 +166,9 @@ function formatSearchResults(
     return `${cells(p)},${ctx}`
   })
 
-  const contextBlocks = [...labelByContent].map(([content, label]) => {
-    const ids = products
-      .filter((p) => contextByProductId.get(p.id) === content)
-      .map(sendIdOf)
-      .join(', ')
-    return `[${label}] applies to ${ids}:\n${content}`
+  const contextBlocks = groups.map((g, i) => {
+    const ids = g.items.map(sendIdOf).join(', ')
+    return `[${String.fromCharCode(65 + i)}] applies to ${ids}:\n${g.content}`
   })
 
   return (
