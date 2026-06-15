@@ -6,6 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { Prisma } from 'generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { EncryptionService } from '../auth/encryption.service'
@@ -173,6 +174,7 @@ export class MessagingService {
     private productImageSyncService: ProductImageSyncService,
     private eventsGateway: EventsGateway,
     private socialHealth: SocialHealthService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   // ─── Get conversations for a social account ───
@@ -1130,6 +1132,14 @@ export class MessagingService {
       where: { id: conversationId },
       data: { aiOverride: override },
     })
+
+    // Désactivation de l'agent sur ce contact : annuler immédiatement tout
+    // traitement en cours ou en attente pour cette conversation (run LLM en vol
+    // + jobs en debounce), sur toutes les instances. Découplé via event pour ne
+    // pas créer de dépendance SocialModule → AgentModule.
+    if (override === 'FORCE_OFF') {
+      this.eventEmitter.emit('conversation.ai.disabled', { conversationId })
+    }
 
     return this.getAgentStatusForConversation(userId, conversationId)
   }
