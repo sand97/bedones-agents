@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useDebouncedValue } from '@app/hooks/use-debounced-value'
-import { createFileRoute, useParams } from '@tanstack/react-router'
+import { createFileRoute, useParams, useNavigate, useSearch } from '@tanstack/react-router'
 import { buildShareMeta } from '@app/lib/share-meta'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Table, Input, DatePicker, Button, Modal, App } from 'antd'
@@ -42,6 +42,10 @@ import {
 
 dayjs.locale('fr')
 
+/** View modes encoded in the URL so a ticket can be opened directly from a link. */
+const TICKET_VIEW_MODES = ['preview', 'edit'] as const
+type TicketViewMode = (typeof TICKET_VIEW_MODES)[number]
+
 export const Route = createFileRoute('/app/$orgSlug/tickets')({
   head: () =>
     buildShareMeta({
@@ -50,6 +54,12 @@ export const Route = createFileRoute('/app/$orgSlug/tickets')({
       image: '/og/tickets.png',
     }),
   component: TicketsPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    ticket: (search.ticket as string) || undefined,
+    mode: TICKET_VIEW_MODES.includes(search.mode as TicketViewMode)
+      ? (search.mode as TicketViewMode)
+      : undefined,
+  }),
 })
 
 const { RangePicker } = DatePicker
@@ -68,8 +78,22 @@ function TicketsPage() {
     { key: 'URGENT', label: t('tickets.priority_urgent'), color: '#f5222d' },
   ]
   const { orgSlug } = useParams({ strict: false }) as { orgSlug: string }
+  const search = useSearch({ from: '/app/$orgSlug/tickets' })
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { isDesktop } = useLayout()
+
+  // Reflect the open ticket (and its mode) in the URL so it can be copied and
+  // shared — a partner opening the link lands directly on the preview/edit view.
+  const updateSearch = useCallback(
+    (updates: { ticket?: string; mode?: TicketViewMode }) => {
+      navigate({
+        search: (prev: Record<string, unknown>) => ({ ...prev, ...updates }) as never,
+        replace: true,
+      })
+    },
+    [navigate],
+  )
   const [searchText, setSearchText] = useState('')
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([])
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
@@ -109,6 +133,21 @@ function TicketsPage() {
       }),
     enabled: !!orgSlug,
   })
+
+  // When a ticket is referenced in the URL but isn't on the current list page,
+  // fetch it on its own so deep links always resolve to the right ticket.
+  const ticketFromList = useMemo(
+    () => (data?.tickets ?? []).find((tk) => tk.id === search.ticket),
+    [data?.tickets, search.ticket],
+  )
+
+  const urlTicketQuery = useQuery({
+    queryKey: ['ticket', search.ticket],
+    queryFn: () => ticketApi.get(search.ticket as string),
+    enabled: !!search.ticket && !ticketFromList,
+  })
+
+  const urlTicket = ticketFromList ?? urlTicketQuery.data ?? null
 
   const statusesQuery = useQuery({
     queryKey: ['ticket-statuses', orgSlug],
@@ -250,11 +289,15 @@ function TicketsPage() {
     }
   }
 
-  const handleEdit = (ticket: Ticket) => {
-    setEditingTicket({ ...ticket, metadata: ticket.metadata ?? undefined })
-    setDrawerTicket(null)
-    setCreateOpen(true)
-  }
+  const handleEdit = useCallback(
+    (ticket: Ticket) => {
+      setEditingTicket({ ...ticket, metadata: ticket.metadata ?? undefined })
+      setDrawerTicket(null)
+      setCreateOpen(true)
+      updateSearch({ ticket: ticket.id, mode: 'edit' })
+    },
+    [updateSearch],
+  )
 
   const handleDelete = (ticket: Ticket) => {
     Modal.confirm({
@@ -271,6 +314,7 @@ function TicketsPage() {
     setCreateOpen(false)
     setEditingTicket(null)
     setSelectedArticles([])
+    updateSearch({ ticket: undefined, mode: undefined })
   }
 
   // ─── Computed data ───
@@ -331,9 +375,32 @@ function TicketsPage() {
       ? `${t('tickets.priority')} (${selectedPriorities.length})`
       : t('tickets.priority')
 
-  const openDrawer = (entry: Ticket) => {
-    setDrawerTicket(entry)
-  }
+  const openDrawer = useCallback(
+    (entry: Ticket) => {
+      setEditingTicket(null)
+      setCreateOpen(false)
+      setDrawerTicket(entry)
+      updateSearch({ ticket: entry.id, mode: 'preview' })
+    },
+    [updateSearch],
+  )
+
+  // Open the matching view when the URL points at a ticket (deep link / shared
+  // link). A ref tracks the applied state so closing — which clears the URL —
+  // never re-triggers an open.
+  const appliedViewRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!search.ticket) {
+      appliedViewRef.current = null
+      return
+    }
+    const key = `${search.ticket}:${search.mode ?? 'preview'}`
+    if (appliedViewRef.current === key) return
+    if (!urlTicket) return // wait until the ticket is available
+    appliedViewRef.current = key
+    if (search.mode === 'edit') handleEdit(urlTicket)
+    else openDrawer(urlTicket)
+  }, [search.ticket, search.mode, urlTicket, handleEdit, openDrawer])
 
   const columns = useTicketColumns({
     onViewDetails: openDrawer,
@@ -457,7 +524,10 @@ function TicketsPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ticket={drawerTicket as any}
         open={!!drawerTicket}
-        onClose={() => setDrawerTicket(null)}
+        onClose={() => {
+          setDrawerTicket(null)
+          updateSearch({ ticket: undefined, mode: undefined })
+        }}
         onEdit={() => {
           if (drawerTicket) handleEdit(drawerTicket)
         }}
