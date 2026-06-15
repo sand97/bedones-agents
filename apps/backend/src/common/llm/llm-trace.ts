@@ -8,10 +8,15 @@ import type { LlmTraceContext } from './llm-factory.service'
  * consistent convention across the whole backend so PostHog → LLM analytics gets
  * far more than just cost:
  *
- * - `distinctId` = the organisation id when known, so the "Generative AI users"
- *   insight counts real orgs instead of a single `backend-agent`. Falls back to
- *   a stable `backend:<feature>` bucket so internal/background features stay
- *   separable when no org is in scope.
+ * - `distinctId` = the conversation when known. A conversation is exactly one
+ *   (socialAccount, contact) pair — `Conversation @@unique[socialAccountId,
+ *   participantId]` — i.e. one customer on one channel, and it groups all the
+ *   messages of an exchange (and therefore all the AI replies). So keying the
+ *   "Generative AI user" on `conversationId` makes one user = one real
+ *   conversation, and it lines up with the `conversation_id` used in Logs.
+ *   Falls back to the organisation id for conversation-less tasks (onboarding,
+ *   catalog analysis, error explanation), then a stable `backend:<feature>`
+ *   bucket so internal/background features stay separable.
  * - `groups.organisation` = the organisation id, matching the group key already
  *   used everywhere else (see POSTHOG.md) for coherent end-to-end per-org rollups.
  * - `traceId` groups every model call of one logical run (a whole agent turn —
@@ -65,9 +70,15 @@ export function buildLlmTrace(input: LlmTraceInput): LlmTraceContext {
   if (input.properties) Object.assign(properties, input.properties)
 
   const organisationId = input.organisationId || undefined
+  const conversationId = input.conversationId || undefined
 
   return {
-    distinctId: organisationId ?? `backend:${input.feature}`,
+    // A PostHog LLM "user" = a unique conversation = one (socialAccount, contact)
+    // pair (see the interface docs). Every message + AI reply of the same
+    // exchange therefore rolls up to one user. Conversation-less tasks fall back
+    // to the org, then a per-feature bucket. The organisation stays available as
+    // a group for org-level rollups regardless.
+    distinctId: conversationId ?? organisationId ?? `backend:${input.feature}`,
     traceId: input.traceId ?? randomUUID(),
     groups: organisationId ? { organisation: organisationId } : undefined,
     properties,
