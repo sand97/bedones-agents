@@ -345,6 +345,9 @@ function AgentsPage() {
     mutationFn: (agentId: string) => agentApi.deactivate(agentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents', orgSlug] })
+      // Close the activation modal when the agent was disabled from inside it
+      // (deselecting every scope). Harmless when triggered from elsewhere.
+      setActivateOpen(false)
     },
   })
 
@@ -707,8 +710,9 @@ function AgentsPage() {
           open={activateOpen}
           onClose={() => setActivateOpen(false)}
           onSubmit={(data) => activateMutation.mutate(data)}
+          onDeactivate={() => deactivateMutation.mutate(selectedAgent.id)}
           agent={selectedAgent}
-          loading={activateMutation.isPending}
+          loading={activateMutation.isPending || deactivateMutation.isPending}
           onChangeModelTier={(tier) => updateModelMutation.mutate(tier)}
           modelTierSaving={updateModelMutation.isPending}
         />

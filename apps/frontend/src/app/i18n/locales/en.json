@@ -994,6 +994,8 @@
     "activate_banner_btn": "Activate",
     "activate_modal_title": "Activate agent",
     "activate_modal_submit": "Activate",
+    "activate_modal_disable": "Disable agent",
+    "activate_modal_disable_hint": "Nothing selected — saving will disable the agent.",
     "activate_how_question": "Choose when your agent should reply automatically:",
     "activate_mode_placeholder": "Choose an activation mode",
     "activate_mode_contacts": "For specific contacts",

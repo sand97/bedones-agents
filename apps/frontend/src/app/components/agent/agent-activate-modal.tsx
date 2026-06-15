@@ -14,6 +14,8 @@ interface AgentActivateModalProps {
     activateNewConversations?: boolean
     contacts?: Record<string, string[]>
   }) => void
+  /** Disable (pause) the agent — used when every scope is deselected. */
+  onDeactivate?: () => void
   agent: Agent
   loading?: boolean
   /** Persist a new live-agent model tier immediately (independent of submit). */
@@ -61,6 +63,7 @@ export function AgentActivateModal({
   open,
   onClose,
   onSubmit,
+  onDeactivate,
   agent,
   loading,
   onChangeModelTier,
@@ -156,14 +159,24 @@ export function AgentActivateModal({
 
   const hasAnyContact = Object.values(contacts).some((arr) => arr.some((c) => c.trim().length > 0))
 
-  const canSubmit = () => {
-    if (activateAll) return true
-    if (activateAds || activateNew) return true
-    if (contactsEnabled && hasAnyContact) return true
-    return false
-  }
+  // A real activation needs at least one scope. When nothing is checked at all,
+  // submitting simply disables (pauses) the agent.
+  const isActivation =
+    activateAll || activateAds || activateNew || (contactsEnabled && hasAnyContact)
+  const nothingSelected = !activateAll && !activateAds && !activateNew && !contactsEnabled
+  const isActive = agent.status === 'ACTIVE'
+  // Deselecting everything on an active agent turns it off via onDeactivate.
+  const willDisable = nothingSelected && isActive && !!onDeactivate
+
+  // The only blocked state is a half-filled one (e.g. "specific contacts"
+  // checked but no contact entered yet).
+  const canSubmit = isActivation || willDisable
 
   const handleSubmit = () => {
+    if (!isActivation) {
+      onDeactivate?.()
+      return
+    }
     onSubmit({
       activateAll,
       activateAds: activateAll ? false : activateAds,
@@ -186,11 +199,16 @@ export function AgentActivateModal({
         <Button
           key="submit"
           type="primary"
+          danger={willDisable}
           onClick={handleSubmit}
-          disabled={!canSubmit()}
+          disabled={!canSubmit}
           loading={loading}
         >
-          {agent.status === 'ACTIVE' ? t('common.save') : t('agent.activate_modal_submit')}
+          {willDisable
+            ? t('agent.activate_modal_disable')
+            : isActive
+              ? t('common.save')
+              : t('agent.activate_modal_submit')}
         </Button>,
       ]}
       width={520}
@@ -327,6 +345,10 @@ export function AgentActivateModal({
             ))}
           </div>
         </OptionRow>
+
+        {willDisable && (
+          <span className="text-xs text-text-muted">{t('agent.activate_modal_disable_hint')}</span>
+        )}
       </div>
     </Modal>
   )
