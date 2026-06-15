@@ -117,6 +117,7 @@ export async function buildLiveAgentTools(ctx: LiveAgentToolContext) {
     ...(hasCatalog
       ? createCatalogTools({
           catalogSearchService: ctx.catalogSearchService,
+          prisma: ctx.prisma,
           catalogIds: ctx.catalogIds,
           productCatalogIndex,
         })
