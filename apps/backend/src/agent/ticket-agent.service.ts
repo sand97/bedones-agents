@@ -6,6 +6,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 import { PrismaService } from '../prisma/prisma.service'
 import { LlmFactoryService } from '../common/llm/llm-factory.service'
+import { buildLlmTrace } from '../common/llm/llm-trace'
 import { EventsGateway } from '../gateway/events.gateway'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import { TICKET_AGENT_QUEUE } from '../queue/queue.module'
@@ -205,7 +206,17 @@ export class TicketAgentService {
       contactNotes,
     })
 
-    const model = this.llmFactory.createStructuredChatModel('thinking', decisionSchema)
+    const model = this.llmFactory.createStructuredChatModel('thinking', decisionSchema, {
+      trace: buildLlmTrace({
+        feature: 'ticket-agent',
+        organisationId,
+        conversationId,
+        agentId,
+        contactId: conversation.participantId,
+        socialAccountId: conversation.socialAccountId,
+        provider: conversation.socialAccount.provider,
+      }),
+    })
 
     let decision: TicketDecision
     try {

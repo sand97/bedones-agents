@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { PrismaService } from '../prisma/prisma.service'
 import { CONTACT_LANGUAGE_QUEUE } from '../queue/queue.module'
 import { LlmFactoryService } from '../common/llm/llm-factory.service'
+import { buildLlmTrace } from '../common/llm/llm-trace'
 import type { IncomingMessageEvent } from '../social/webhook.service'
 
 export type ContactLanguageJobName = 'detect-contact-language'
@@ -75,7 +76,11 @@ export class ContactLanguageService {
   async detectConversationLanguage(conversationId: string): Promise<void> {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
-      select: { languageCode: true, languageSource: true },
+      select: {
+        languageCode: true,
+        languageSource: true,
+        socialAccount: { select: { organisationId: true } },
+      },
     })
     if (!conversation) return
     if (conversation.languageCode || conversation.languageSource === 'MANUAL') return
@@ -92,6 +97,11 @@ export class ContactLanguageService {
       const detector = this.llmFactory.createStructuredChatModel('flash', LanguageDetectionSchema, {
         temperature: 0,
         maxOutputTokens: 80,
+        trace: buildLlmTrace({
+          feature: 'contact-language',
+          organisationId: conversation.socialAccount?.organisationId,
+          conversationId,
+        }),
       })
       const result = await detector.invoke([
         {

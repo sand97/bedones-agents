@@ -7,6 +7,7 @@ import {
   LIVE_MODEL_TIERS,
   type LiveModelTier,
 } from '../common/llm/llm-factory.service'
+import { buildLlmTrace } from '../common/llm/llm-trace'
 
 import { PrismaService } from '../prisma/prisma.service'
 import { EventsGateway } from '../gateway/events.gateway'
@@ -346,9 +347,20 @@ export class AgentMessageProcessorService {
         recursionLimit: callLimit * 2 + 1,
         // Trace at invoke time so the model passed to createReactAgent keeps
         // its `bindTools` method (a wrapped/traced Runnable would hide it).
-        callbacks: this.llmFactory.buildTraceCallbacks({
-          properties: { feature: 'agent-live-response' },
-        }),
+        // Attribute the whole turn to the org/contact/conversation so PostHog
+        // tracks users & traces, not just cost.
+        callbacks: this.llmFactory.buildTraceCallbacks(
+          buildLlmTrace({
+            feature: 'agent-live-response',
+            organisationId: agent.organisationId,
+            conversationId: event.conversationId,
+            contactId: event.message.senderId,
+            agentId: agent.id,
+            socialAccountId: event.socialAccountId,
+            provider: event.provider,
+            tier,
+          }),
+        ),
         toolContext: {
           prisma: this.prisma,
           messagingService: this.messagingService,

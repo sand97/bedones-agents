@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { LlmFactoryService } from '../common/llm/llm-factory.service'
+import { buildLlmTrace } from '../common/llm/llm-trace'
 
 export interface AIAnalysisResult {
   action: 'none' | 'hide' | 'delete' | 'reply'
@@ -65,7 +66,15 @@ export class AIService {
    * Comment moderation / auto-reply uses the "flash" tier (lightweight model).
    * Gemini primary + OpenAI fallback is handled by the factory via withFallbacks.
    */
-  async analyzeComment(context: CommentContext): Promise<AIAnalysisResult> {
+  async analyzeComment(
+    context: CommentContext,
+    meta?: {
+      organisationId?: string
+      socialAccountId?: string
+      provider?: string
+      commentId?: string
+    },
+  ): Promise<AIAnalysisResult> {
     const systemPrompt = this.buildSystemPrompt(context.pageSettings)
     const userMessage = this.buildUserMessage(
       context.comment,
@@ -79,6 +88,13 @@ export class AIService {
       const model = this.llmFactory.createChatModel('flash', {
         temperature: 0.7,
         maxOutputTokens: 1024,
+        trace: buildLlmTrace({
+          feature: 'comment-moderation',
+          organisationId: meta?.organisationId,
+          socialAccountId: meta?.socialAccountId,
+          provider: meta?.provider,
+          properties: meta?.commentId ? { commentId: meta.commentId } : undefined,
+        }),
       })
       const response = await model.invoke(messages)
       const content =

@@ -2998,21 +2998,24 @@ export class WebhookService {
         accessToken,
       })
 
-      const result = await this.aiService.analyzeComment({
-        comment,
-        post,
-        thread,
-        products,
-        pageSettings: {
-          undesiredCommentsAction: settings.undesiredCommentsAction,
-          spamAction: settings.spamAction,
-          customInstructions: settings.customInstructions,
-          faqRules: settings.faqRules.map((r) => ({
-            question: r.question,
-            answer: r.answer,
-          })),
+      const result = await this.aiService.analyzeComment(
+        {
+          comment,
+          post,
+          thread,
+          products,
+          pageSettings: {
+            undesiredCommentsAction: settings.undesiredCommentsAction,
+            spamAction: settings.spamAction,
+            customInstructions: settings.customInstructions,
+            faqRules: settings.faqRules.map((r) => ({
+              question: r.question,
+              answer: r.answer,
+            })),
+          },
         },
-      })
+        { organisationId: orgId, socialAccountId, provider, commentId },
+      )
 
       this.logger.log(`[AI] Comment ${commentId}: action=${result.action}, reason=${result.reason}`)
 
