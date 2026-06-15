@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
+import { InjectQueue } from '@nestjs/bullmq'
+import type { Queue } from 'bullmq'
 import { ConfigService } from '@nestjs/config'
 import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
 import {
@@ -25,7 +27,21 @@ import { describeMessageForAgent } from './message-history.util'
 import { createSingleReplyGuard } from './tools/live/turn-guard'
 import { TicketAgentService } from './ticket-agent.service'
 import { contactMatchesConversation } from '../social/contact-match.util'
-import { ConversationRunRegistry } from './conversation-run-registry'
+import { MESSAGE_PROCESSING_QUEUE } from '../queue/queue.module'
+import { MessageRunCoordinator } from './message-run-coordinator'
+import type {
+  MessageProcessingJobData,
+  MessageProcessingJobName,
+} from './message-processing.processor'
+
+/**
+ * Délai d'attente avant de traiter un message (debounce par contact). Un client
+ * envoie souvent plusieurs messages d'affilée (ex : une rafale d'images) : on
+ * laisse passer ce délai pour que tous arrivent en base, puis seul le DERNIER
+ * job du contact est traité (les précédents sont supplantés). Évite de lancer
+ * l'agent sur un message incomplet et de le faire planter.
+ */
+const BURST_DEBOUNCE_MS = 5_000
 
 @Injectable()
 export class AgentMessageProcessorService {
@@ -43,19 +59,48 @@ export class AgentMessageProcessorService {
     private readonly creditService: CreditService,
     private readonly llmFactory: LlmFactoryService,
     private readonly ticketAgent: TicketAgentService,
-    private readonly runRegistry: ConversationRunRegistry,
+    @InjectQueue(MESSAGE_PROCESSING_QUEUE) private readonly queue: Queue,
+    private readonly coordinator: MessageRunCoordinator,
   ) {}
 
+  /**
+   * Producteur de la file par contact. On NE traite PAS le message ici : on
+   * réserve son numéro de séquence (ce qui rend caduc tout run antérieur encore
+   * en vol pour ce contact, sur n'importe quelle instance) puis on l'enfile. Le
+   * worker {@link MessageProcessingProcessor} fait l'analyse, et l'abandonne si un
+   * message plus récent arrive entre temps.
+   */
   @OnEvent('message.incoming', { async: true })
   async handleIncomingMessage(event: IncomingMessageEvent): Promise<void> {
-    // Un nouveau message rend caduque toute réponse encore en cours d'analyse
-    // pour ce contact : on annule le run précédent (LLM compris) dès l'arrivée,
-    // y compris quand ce message-ci ne sera finalement pas traité par l'IA
-    // (ex : reprise par un humain). Le run le plus récent — s'il y en a un —
-    // sera redémarré proprement dans processMessage.
-    this.runRegistry.cancel(event.conversationId, 'new-message')
     try {
-      await this.maybeProcess(event)
+      const seq = await this.coordinator.claim(event.conversationId)
+      await this.queue.add(
+        'process' satisfies MessageProcessingJobName,
+        { event, seq } satisfies MessageProcessingJobData,
+        {
+          removeOnComplete: true,
+          removeOnFail: 100,
+          // Debounce des rafales : on attend que le client finisse d'envoyer ses
+          // messages groupés. Pendant ce délai, chaque nouveau message supplante
+          // le précédent ; à l'expiration, seul le dernier job sera traité.
+          delay: BURST_DEBOUNCE_MS,
+        },
+      )
+    } catch (error: unknown) {
+      this.logger.error(
+        `Failed to enqueue incoming message: ${error instanceof Error ? error.message : error}`,
+      )
+    }
+  }
+
+  /**
+   * Point d'entrée du worker : applique les règles d'activation puis lance le run
+   * d'agent avec le `signal` d'annulation fourni par la file (annulé dès qu'un
+   * message plus récent du même contact arrive).
+   */
+  async processIncoming(event: IncomingMessageEvent, signal: AbortSignal): Promise<void> {
+    try {
+      await this.maybeProcess(event, signal)
     } catch (error: unknown) {
       this.logger.error(
         `Error processing incoming message: ${error instanceof Error ? error.message : error}`,
@@ -63,7 +108,7 @@ export class AgentMessageProcessorService {
     }
   }
 
-  private async maybeProcess(event: IncomingMessageEvent): Promise<void> {
+  private async maybeProcess(event: IncomingMessageEvent, signal: AbortSignal): Promise<void> {
     // Find agent linked to this social account
     const agentLink = await this.prisma.agentSocialAccount.findUnique({
       where: { socialAccountId: event.socialAccountId },
@@ -104,7 +149,7 @@ export class AgentMessageProcessorService {
     if (conversation.aiOverride === 'FORCE_ON') {
       // Require agent to be at least READY (score gate enforced via status transitions)
       if (agentLink.agent.status === 'DRAFT' || agentLink.agent.status === 'CONFIGURING') return
-      await this.processMessage(event, agentLink.agent)
+      await this.processMessage(event, agentLink.agent, signal)
       return
     }
 
@@ -114,7 +159,7 @@ export class AgentMessageProcessorService {
     if (!this.isActivatedForConversation(agentLink, conversation)) return
 
     // Process the message
-    await this.processMessage(event, agentLink.agent)
+    await this.processMessage(event, agentLink.agent, signal)
   }
 
   /**
@@ -175,40 +220,12 @@ export class AgentMessageProcessorService {
         }
       }[]
     },
+    signal: AbortSignal,
   ): Promise<void> {
     this.logger.log(
       `Processing message for agent ${agent.id} on ${event.provider} (conversation: ${event.conversationId})`,
     )
 
-    // « File d'attente » par contact : on démarre le run pour cette conversation,
-    // ce qui annule immédiatement tout run précédent encore en vol (analyse LLM
-    // comprise). Le signal est propagé jusqu'à l'agent pour interrompre l'analyse
-    // si un message encore plus récent arrive ensuite.
-    const signal = this.runRegistry.begin(event.conversationId)
-
-    try {
-      await this.runAgentTurn(event, agent, signal)
-    } finally {
-      this.runRegistry.end(event.conversationId, signal)
-    }
-  }
-
-  private async runAgentTurn(
-    event: IncomingMessageEvent,
-    agent: {
-      id: string
-      context: string | null
-      organisationId: string
-      status: string
-      liveModelTier: string
-      socialAccounts: {
-        socialAccount: {
-          catalogs: { catalog: { id: string; providerId: string | null } }[]
-        }
-      }[]
-    },
-    signal: AbortSignal,
-  ): Promise<void> {
     // We've decided to reply → surface the typing indicator immediately, before the
     // (potentially slow) history backfill / image processing below. A periodic
     // refresh keeps it alive while the agent reflects (see typingInterval).

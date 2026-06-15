@@ -12,6 +12,7 @@ export const CATALOG_MIGRATION_QUEUE = 'catalog-migration'
 export const MESSAGE_HISTORY_SYNC_QUEUE = 'message-history-sync'
 export const TICKET_AGENT_QUEUE = 'ticket-agent'
 export const PAYMENT_QUEUE = 'payment'
+export const MESSAGE_PROCESSING_QUEUE = 'message-processing'
 
 const catalogQueue = BullModule.registerQueue({
   name: CATALOG_INDEXING_QUEUE,
@@ -32,6 +33,16 @@ const catalogMigrationQueue = BullModule.registerQueue({ name: CATALOG_MIGRATION
 const messageHistorySyncQueue = BullModule.registerQueue({ name: MESSAGE_HISTORY_SYNC_QUEUE })
 const ticketAgentQueue = BullModule.registerQueue({ name: TICKET_AGENT_QUEUE })
 const paymentQueue = BullModule.registerQueue({ name: PAYMENT_QUEUE })
+// File de traitement des messages entrants, sérialisée/annulable par contact.
+// Jobs éphémères : seul le job le plus récent par contact compte (les anciens
+// sont annulés en vol), inutile de les conserver.
+const messageProcessingQueue = BullModule.registerQueue({
+  name: MESSAGE_PROCESSING_QUEUE,
+  defaultJobOptions: {
+    removeOnComplete: true,
+    removeOnFail: 100,
+  },
+})
 
 @Module({
   imports: [
@@ -60,6 +71,7 @@ const paymentQueue = BullModule.registerQueue({ name: PAYMENT_QUEUE })
     messageHistorySyncQueue,
     ticketAgentQueue,
     paymentQueue,
+    messageProcessingQueue,
   ],
   exports: [
     catalogQueue,
@@ -72,6 +84,7 @@ const paymentQueue = BullModule.registerQueue({ name: PAYMENT_QUEUE })
     messageHistorySyncQueue,
     ticketAgentQueue,
     paymentQueue,
+    messageProcessingQueue,
   ],
 })
 export class QueueModule {}

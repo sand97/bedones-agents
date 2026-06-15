@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common'
 import { BullModule } from '@nestjs/bullmq'
 import { AuthModule } from '../auth/auth.module'
 import { ImageProcessingModule } from '../image-processing/image-processing.module'
-import { QueueModule, TICKET_AGENT_QUEUE } from '../queue/queue.module'
+import { QueueModule, TICKET_AGENT_QUEUE, MESSAGE_PROCESSING_QUEUE } from '../queue/queue.module'
 import { SocialModule } from '../social/social.module'
 import { StatsModule } from '../stats/stats.module'
 import { AgentController } from './agent.controller'
@@ -11,7 +11,8 @@ import { AgentGateway } from './agent.gateway'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import { AgentDbToolsService } from './tools/agent-db-tools.service'
 import { AgentMessageProcessorService } from './agent-message-processor.service'
-import { ConversationRunRegistry } from './conversation-run-registry'
+import { MessageRunCoordinator } from './message-run-coordinator'
+import { MessageProcessingProcessor } from './message-processing.processor'
 import { AgentFeedbackService } from './feedback.service'
 import { TicketAgentService } from './ticket-agent.service'
 import { TicketAgentProcessor } from './ticket-agent.processor'
@@ -24,6 +25,7 @@ import { TicketAgentProcessor } from './ticket-agent.processor'
     SocialModule,
     StatsModule,
     BullModule.registerQueue({ name: TICKET_AGENT_QUEUE }),
+    BullModule.registerQueue({ name: MESSAGE_PROCESSING_QUEUE }),
   ],
   controllers: [AgentController],
   providers: [
@@ -32,7 +34,8 @@ import { TicketAgentProcessor } from './ticket-agent.processor'
     AgentPromptsService,
     AgentDbToolsService,
     AgentMessageProcessorService,
-    ConversationRunRegistry,
+    MessageRunCoordinator,
+    MessageProcessingProcessor,
     AgentFeedbackService,
     TicketAgentService,
     TicketAgentProcessor,
