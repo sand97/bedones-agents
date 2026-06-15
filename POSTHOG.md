@@ -86,9 +86,14 @@ Voir `apps/backend/.env.example` et `apps/frontend/.env.example`.
   erreurs). On ne se limite **pas au budget** : chaque génération est attribuée
   via le helper `buildLlmTrace()` (`common/llm/llm-trace.ts`) qui pose une
   convention unique sur tous les call sites :
-  - **`distinctId` = id de l'organisation** ⇒ l'insight *Generative AI users*
-    compte de vrais comptes, plus un seul `backend-agent`. Repli sur
-    `backend:<feature>` quand aucune org n'est en contexte (tâches internes).
+  - **`distinctId` = la conversation** (son `conversationId`) ⇒ dans *Generative
+    AI users*, **1 user = 1 conversation unique**. Une conversation est exactement
+    une paire `(socialAccount, contact)` (`Conversation @@unique[socialAccountId,
+    participantId]`) et regroupe tous les messages d'un échange — donc toutes les
+    réponses d'IA d'un même client sur un même canal remontent à un seul user
+    (et c'est le même id que `conversation_id` côté Logs). Repli sur l'**id de
+    l'organisation** pour les tâches hors conversation (onboarding, analyse
+    catalogue, error-explanation), puis `backend:<feature>`.
   - **`groups.organisation`** = id de l'org ⇒ même clé de group que le reste des
     events (analytics par org bout-en-bout).
   - **`traceId`** par run ⇒ tous les appels modèle d'un même tour d'agent (tool
