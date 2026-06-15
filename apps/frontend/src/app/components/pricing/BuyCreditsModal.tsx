@@ -1,14 +1,15 @@
-import { ArrowRightOutlined, CreditCardOutlined, MobileOutlined } from '@ant-design/icons'
+import {
+  ArrowRightOutlined,
+  CreditCardOutlined,
+  MinusOutlined,
+  MobileOutlined,
+  PlusOutlined,
+} from '@ant-design/icons'
 import { $api } from '@app/lib/api/$api'
 import { App, Button, InputNumber, Modal } from 'antd'
 import { useState } from 'react'
 import { PaymentChoiceCard } from './PaymentChoiceCard'
-import {
-  PLAN_CONTENT,
-  formatCreditsAmount,
-  formatDisplayPrice,
-  type BillingPlanKey,
-} from './constants'
+import { PLAN_CONTENT, formatDisplayPrice, type BillingPlanKey } from './constants'
 
 type PaymentMethod = 'CARD' | 'MOBILE_MONEY'
 
@@ -92,20 +93,29 @@ export function BuyCreditsModal({
             </span>
           </div>
 
-          <div>
+          <div className="flex items-center gap-3">
+            <Button
+              size="large"
+              shape="circle"
+              icon={<MinusOutlined />}
+              disabled={credits <= STEP}
+              onClick={() => setCredits((c) => Math.max(STEP, c - STEP))}
+            />
             <InputNumber
               size="large"
+              disabled
               min={STEP}
               step={STEP}
               value={credits}
-              onChange={(v) => setCredits(v ?? STEP)}
               formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-              parser={(v) => Number((v ?? '').replace(/\s/g, ''))}
-              className="w-full"
+              className="flex-1"
             />
-            <p className="mt-3 mb-0 text-lg font-normal text-text-secondary">
-              {formatCreditsAmount(credits)} crédits · par paliers de {formatCreditsAmount(STEP)}
-            </p>
+            <Button
+              size="large"
+              shape="circle"
+              icon={<PlusOutlined />}
+              onClick={() => setCredits((c) => c + STEP)}
+            />
           </div>
         </div>
 
