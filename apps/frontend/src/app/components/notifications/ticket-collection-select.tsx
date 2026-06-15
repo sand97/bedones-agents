@@ -16,6 +16,8 @@ interface TicketCollectionSelectProps {
   type: NotificationType
   /** Current enabled state — persisted alongside the collections. */
   enabled: boolean
+  /** The filter is only editable while the notification is enabled. */
+  active?: boolean
   /** Currently selected collection ids (empty = all). */
   value: string[]
 }
@@ -32,6 +34,7 @@ export function TicketCollectionSelect({
   userIds,
   type,
   enabled,
+  active = true,
   value,
 }: TicketCollectionSelectProps) {
   const { t } = useTranslation()
@@ -48,12 +51,12 @@ export function TicketCollectionSelect({
 
   return (
     <Select
+      className="notif-modal__collection-select"
       mode="multiple"
       size="small"
-      style={{ minWidth: 170, maxWidth: 220 }}
       placeholder={t('notifications.all_collections')}
       loading={collectionsQuery.isLoading}
-      disabled={mutation.isPending}
+      disabled={!active || mutation.isPending}
       options={options}
       value={local}
       maxTagCount="responsive"

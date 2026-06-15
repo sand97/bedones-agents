@@ -3168,6 +3168,33 @@ a {
   color: var(--color-danger-hover);
 }
 
+/* Ticket-creation collection filter — sized to match the action buttons
+   (compact height, 8px radius) instead of the tall default input. */
+.notif-modal__collection-select {
+  margin-top: 8px;
+  width: 100%;
+  max-width: 280px;
+  font-size: 12px;
+}
+
+.notif-modal__collection-select.ant-select-multiple .ant-select-selector {
+  min-height: 30px !important;
+  padding-block: 2px !important;
+  padding-inline: 8px !important;
+  border-radius: 8px !important;
+}
+
+.notif-modal__collection-select .ant-select-selection-item {
+  height: 22px;
+  line-height: 20px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.notif-modal__collection-select .ant-select-selection-placeholder {
+  font-size: 12px;
+}
+
 /* Reusable "danger zone" card — disconnect / delete actions */
 .danger-card {
   background: var(--color-danger-bg) !important;
