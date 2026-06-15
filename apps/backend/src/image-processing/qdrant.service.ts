@@ -192,6 +192,39 @@ export class QdrantService implements OnModuleInit {
     }
   }
 
+  /**
+   * Exact lookup by merchant retailer_id (the SKU printed on product images,
+   * e.g. "S180KAKI"). Used when OCR reads a product code off an incoming image:
+   * an exact match identifies the product with CERTAINTY, instead of relying on
+   * fuzzy image/text similarity (which returns look-alikes). Pass several
+   * candidates (e.g. case variants) — the first point whose retailer_id equals
+   * any of them wins. Returns null when nothing matches.
+   */
+  async findByRetailerIds(catalogId: string, retailerIds: string[]): Promise<SearchHit | null> {
+    if (!this.isConfigured() || !this.client || retailerIds.length === 0) return null
+    const name = this.collectionName(catalogId)
+
+    try {
+      const res = await this.client.scroll(name, {
+        filter: { must: [{ key: 'retailer_id', match: { any: retailerIds } }] },
+        limit: 1,
+        with_payload: true,
+        with_vector: false,
+      })
+      const point = res.points?.[0]
+      if (!point) return null
+      const payload = (point.payload || {}) as Record<string, unknown>
+      return {
+        productId: typeof payload.product_id === 'string' ? payload.product_id : String(point.id),
+        score: 1,
+        metadata: payload,
+      }
+    } catch (error) {
+      if (this.isCollectionNotFoundError(error)) return null
+      throw error
+    }
+  }
+
   // ─── Indexing (upsert a full product point) ───
 
   async upsertProduct(
