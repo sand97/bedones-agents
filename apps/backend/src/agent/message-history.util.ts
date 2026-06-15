@@ -55,3 +55,23 @@ export function describeMessageForAgent(
   if (text) return text
   return mediaType ? `[${mediaType}]` : ''
 }
+
+/**
+ * Extract the structured product references a stored message carries in its
+ * `metadata` — the exact retailer ids of products the page SENT (catalog / list
+ * cards) or the customer ORDERED (cart). Free text is intentionally ignored: only
+ * these exact ids are reliable enough to re-attach a product's merchant context.
+ */
+export function extractProductRefs(
+  metadata: unknown,
+): Array<{ retailerId: string; name?: string }> {
+  const meta = metadata && typeof metadata === 'object' ? (metadata as DescribableMeta) : null
+  const items = Array.isArray(meta?.items) ? meta.items : []
+  const refs: Array<{ retailerId: string; name?: string }> = []
+  for (const it of items) {
+    if (typeof it.productRetailerId === 'string' && it.productRetailerId) {
+      refs.push({ retailerId: it.productRetailerId, name: it.name ?? undefined })
+    }
+  }
+  return refs
+}

@@ -196,6 +196,12 @@ ${context}
     canSendProducts?: boolean
     canSendButtons?: boolean
     contactNotes?: Array<{ category?: string | null; content: string }>
+    /** Merchant context of products already shown/ordered in this conversation,
+     *  grouped so a context shared by several products appears once. */
+    conversationProductContext?: Array<{
+      content: string
+      products: Array<{ name: string; retailerId: string }>
+    }>
     postOrigin?: {
       headline?: string | null
       body?: string | null
@@ -214,6 +220,7 @@ ${context}
       canSendProducts,
       canSendButtons,
       contactNotes,
+      conversationProductContext,
       postOrigin,
     } = input
     const nowIso = new Date().toISOString()
@@ -224,6 +231,23 @@ ${context}
       contactNotes && contactNotes.length > 0
         ? `\n\n## What we already know about this customer\nReuse this instead of asking again:\n${contactNotes
             .map((n) => `- ${n.category ? `[${n.category}] ` : ''}${n.content}`)
+            .join('\n')}\n`
+        : ''
+
+    // Re-inject the merchant context of products already shown/ordered in this
+    // conversation. The per-turn search_products injection only helps the turn
+    // that searches; a follow-up like "vous avez quelle taille ?" often does not
+    // trigger a new search, and the rebuilt history carries no tool results — so
+    // without this the agent answers blind to the product's rules.
+    const conversationProductContextBlock =
+      conversationProductContext && conversationProductContext.length > 0
+        ? `\n\n## Context of products already in this conversation\nThese products were already shown, ordered or referenced here. Before answering about any of them (sizes, advice, constraints) you MUST follow its context below and NEVER contradict it — even if you do not run a new search this turn. Propose only what it states (e.g. the exact sizes listed); never invent sizes or variants.\n${conversationProductContext
+            .map(
+              (g) =>
+                `- ${g.products
+                  .map((p) => `${p.name} (${p.retailerId})`)
+                  .join(', ')}:\n  ${g.content.replace(/\n/g, '\n  ')}`,
+            )
             .join('\n')}\n`
         : ''
 
@@ -261,7 +285,7 @@ Current datetime (ISO 8601, UTC): ${nowIso}
 
 ## Platform
 This conversation is on: ${provider}
-${postOriginContext}${contactNotesContext}${labelsContext}${productSendRules}${buttonRules}
+${postOriginContext}${contactNotesContext}${conversationProductContextBlock}${labelsContext}${productSendRules}${buttonRules}
 
 # Role: AI Business Assistant
 

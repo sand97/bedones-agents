@@ -225,6 +225,41 @@ export class QdrantService implements OnModuleInit {
     }
   }
 
+  /**
+   * Batch variant of {@link findByRetailerIds}: map each merchant retailer_id to
+   * its internal product_id for a catalog. Conversations carry products only by
+   * their retailer_id (sent cards, orders), but the merchant context is keyed by
+   * product_id — this bridges the two. Unknown retailer_ids are simply absent.
+   */
+  async findProductIdsByRetailerIds(
+    catalogId: string,
+    retailerIds: string[],
+  ): Promise<Map<string, string>> {
+    const out = new Map<string, string>()
+    if (!this.isConfigured() || !this.client || retailerIds.length === 0) return out
+    const name = this.collectionName(catalogId)
+
+    try {
+      const res = await this.client.scroll(name, {
+        filter: { must: [{ key: 'retailer_id', match: { any: retailerIds } }] },
+        limit: Math.min(retailerIds.length, 256),
+        with_payload: ['retailer_id', 'product_id'],
+        with_vector: false,
+      })
+      for (const point of res.points || []) {
+        const payload = (point.payload || {}) as Record<string, unknown>
+        const retailerId = payload.retailer_id
+        const productId =
+          typeof payload.product_id === 'string' ? payload.product_id : String(point.id)
+        if (typeof retailerId === 'string' && retailerId) out.set(retailerId, productId)
+      }
+    } catch (error) {
+      if (this.isCollectionNotFoundError(error)) return out
+      throw error
+    }
+    return out
+  }
+
   // ─── Indexing (upsert a full product point) ───
 
   async upsertProduct(

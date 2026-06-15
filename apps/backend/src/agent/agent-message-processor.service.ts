@@ -17,13 +17,15 @@ import { MessagingService } from '../social/messaging.service'
 import { CatalogSearchService } from '../image-processing/catalog-search.service'
 import { ImageProductMatchingService } from '../image-processing/image-product-matching.service'
 import { ReferralProductMatchingService } from '../image-processing/referral-product-matching.service'
+import { QdrantService } from '../image-processing/qdrant.service'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import type { IncomingMessageEvent } from '../social/webhook.service'
 import { CreditService } from '../stats/credit.service'
 import type { CreditMediaType } from '../../generated/prisma/client'
 
 import { runLiveAgent } from './run-live-agent'
-import { describeMessageForAgent } from './message-history.util'
+import { describeMessageForAgent, extractProductRefs } from './message-history.util'
+import { groupByContent } from './product-context.util'
 import { createSingleReplyGuard } from './tools/live/turn-guard'
 import { TicketAgentService } from './ticket-agent.service'
 import { contactMatchesConversation } from '../social/contact-match.util'
@@ -55,6 +57,7 @@ export class AgentMessageProcessorService {
     private readonly catalogSearchService: CatalogSearchService,
     private readonly imageProductMatchingService: ImageProductMatchingService,
     private readonly referralProductMatchingService: ReferralProductMatchingService,
+    private readonly qdrantService: QdrantService,
     private readonly prompts: AgentPromptsService,
     private readonly creditService: CreditService,
     private readonly llmFactory: LlmFactoryService,
@@ -339,6 +342,14 @@ export class AgentMessageProcessorService {
     // can answer "more info on this?" without re-asking. Best-effort — never blocks a reply.
     const postOrigin = await this.buildPostOrigin(event, agent.organisationId)
 
+    // Re-inject the merchant context of products already in this conversation so
+    // a follow-up that does NOT trigger a new search still respects each
+    // product's rules (available sizes, advice…). Best-effort — never blocks.
+    const conversationProductContext = await this.buildConversationProductContext(
+      event.conversationId,
+      catalogIds,
+    )
+
     const systemPrompt = this.prompts.buildLiveAgentSystemPrompt({
       agentContext: agent.context || '',
       labels,
@@ -346,6 +357,7 @@ export class AgentMessageProcessorService {
       canSendProducts,
       canSendButtons,
       contactNotes,
+      conversationProductContext,
       postOrigin,
     })
 
@@ -517,6 +529,89 @@ export class AgentMessageProcessorService {
       product: match
         ? { name: match.name, price: match.price, currency: match.currency, source: match.source }
         : null,
+    }
+  }
+
+  /**
+   * Build the grouped merchant context of products ALREADY referenced in this
+   * conversation (sent product cards, orders). Conversations carry products only
+   * by retailer_id, so we resolve retailer_id → product_id via Qdrant, load the
+   * ProductContext (keyed by product_id) and group products sharing the same
+   * context. Best-effort: any failure yields no block, never an error.
+   */
+  private async buildConversationProductContext(
+    conversationId: string,
+    catalogIds: string[],
+  ): Promise<
+    Array<{ content: string; products: Array<{ name: string; retailerId: string }> }> | undefined
+  > {
+    if (catalogIds.length === 0) return undefined
+
+    try {
+      // Last 40 messages — covers the active part of the conversation.
+      const recent = await this.prisma.directMessage.findMany({
+        where: { conversationId },
+        orderBy: { createdTime: 'desc' },
+        take: 40,
+        select: { metadata: true },
+      })
+
+      // Unique retailer ids referenced (exact structured ids only), keep a name.
+      const nameByRetailerId = new Map<string, string>()
+      for (const m of recent) {
+        for (const ref of extractProductRefs(m.metadata)) {
+          if (!nameByRetailerId.has(ref.retailerId)) {
+            nameByRetailerId.set(ref.retailerId, ref.name ?? ref.retailerId)
+          }
+        }
+      }
+      if (nameByRetailerId.size === 0) return undefined
+
+      const retailerIds = [...nameByRetailerId.keys()]
+
+      // retailer_id → { product_id, catalogId }; first catalog that knows it wins.
+      const resolved = new Map<string, { productId: string; catalogId: string }>()
+      for (const catalogId of catalogIds) {
+        const pending = retailerIds.filter((id) => !resolved.has(id))
+        if (pending.length === 0) break
+        const map = await this.qdrantService.findProductIdsByRetailerIds(catalogId, pending)
+        for (const [retailerId, productId] of map) {
+          if (!resolved.has(retailerId)) resolved.set(retailerId, { productId, catalogId })
+        }
+      }
+      if (resolved.size === 0) return undefined
+
+      // Curated context for those products (keyed by product_id).
+      const contexts = await this.prisma.productContext.findMany({
+        where: {
+          OR: [...resolved.values()].map((r) => ({
+            catalogId: r.catalogId,
+            providerProductId: r.productId,
+          })),
+        },
+        select: { providerProductId: true, content: true },
+      })
+      const contentByProductId = new Map<string, string>()
+      for (const c of contexts) {
+        const content = c.content?.trim()
+        if (content) contentByProductId.set(c.providerProductId, content)
+      }
+      if (contentByProductId.size === 0) return undefined
+
+      // Group products that share the same context (written once).
+      const entries = [...resolved].flatMap(([retailerId, r]) => {
+        const content = contentByProductId.get(r.productId)
+        if (!content) return []
+        return [
+          { item: { name: nameByRetailerId.get(retailerId) ?? retailerId, retailerId }, content },
+        ]
+      })
+      return groupByContent(entries).map((g) => ({ content: g.content, products: g.items }))
+    } catch (error) {
+      this.logger.warn(
+        `Conversation product context build failed: ${error instanceof Error ? error.message : error}`,
+      )
+      return undefined
     }
   }
 
