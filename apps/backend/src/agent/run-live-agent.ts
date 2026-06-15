@@ -66,6 +66,12 @@ export interface LiveAgentToolContext {
     organisationId: string
     note?: string
   }) => Promise<void> | void
+  /**
+   * Annule le run quand un message plus récent du même contact arrive. Propagé
+   * aux outils d'envoi (reply/buttons/products) pour qu'un run périmé ne livre
+   * jamais de réponse, et à l'appel LLM pour interrompre l'analyse en cours.
+   */
+  signal?: AbortSignal
 }
 
 /**
@@ -106,6 +112,7 @@ export async function buildLiveAgentTools(ctx: LiveAgentToolContext) {
       messagingService: ctx.messagingService,
       conversationId: ctx.conversationId,
       replyGuard,
+      signal: ctx.signal,
     }),
     ...(hasCatalog
       ? createCatalogTools({
@@ -141,6 +148,7 @@ export async function buildLiveAgentTools(ctx: LiveAgentToolContext) {
           messagingService: ctx.messagingService,
           conversationId: ctx.conversationId,
           replyGuard,
+          signal: ctx.signal,
         })
       : []),
     ...(ctx.canSendProducts
@@ -150,6 +158,7 @@ export async function buildLiveAgentTools(ctx: LiveAgentToolContext) {
           catalogProviderMap: ctx.catalogProviderMap,
           productCatalogIndex,
           replyGuard,
+          signal: ctx.signal,
         })
       : []),
   ]
@@ -164,6 +173,12 @@ export interface RunLiveAgentInput {
   toolContext: LiveAgentToolContext
   recursionLimit: number
   callbacks?: BaseCallbackHandler[]
+  /**
+   * Annule le run (LLM compris) quand un message plus récent du même contact
+   * arrive avant que ce run n'ait livré sa réponse. Évite les doubles réponses
+   * sur une même conversation.
+   */
+  signal?: AbortSignal
 }
 
 /**
@@ -176,7 +191,13 @@ export async function runLiveAgent(input: RunLiveAgentInput): Promise<{ messages
   // instance is handed to buildLiveAgentTools, so the customer-facing tools and
   // the hook share one source of truth for "has the reply been delivered?".
   const replyGuard = input.toolContext.replyGuard ?? createSingleReplyGuard()
-  const tools = await buildLiveAgentTools({ ...input.toolContext, replyGuard })
+  const tools = await buildLiveAgentTools({
+    ...input.toolContext,
+    replyGuard,
+    // Le signal du run prime : les outils d'envoi doivent voir la même annulation
+    // que l'appel LLM, même si l'appelant ne l'a pas mis dans le toolContext.
+    signal: input.signal ?? input.toolContext.signal,
+  })
 
   const agentExecutor = createReactAgent({
     llm: input.model,
@@ -219,6 +240,8 @@ export async function runLiveAgent(input: RunLiveAgentInput): Promise<{ messages
     {
       recursionLimit: input.recursionLimit,
       callbacks: input.callbacks ?? [],
+      // Propagé jusqu'aux appels LLM : un abort interrompt l'analyse en cours.
+      signal: input.signal,
     },
   )
 

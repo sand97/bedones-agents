@@ -4,6 +4,7 @@ import type { MessagingService } from '../../../social/messaging.service'
 import {
   type SingleReplyGuard,
   REPLY_ALREADY_SENT_NOTICE,
+  RUN_CANCELLED_NOTICE,
   claimReply,
   releaseReply,
 } from './turn-guard'
@@ -15,9 +16,12 @@ export function createProductMessagingTools(deps: {
   /** Shared product→catalog index populated by search_products. */
   productCatalogIndex?: Map<string, string>
   replyGuard?: SingleReplyGuard
+  /** Annulé quand un message plus récent du même contact arrive : on n'envoie plus rien. */
+  signal?: AbortSignal
 }) {
   const sendProducts = tool(
     async ({ productIds, catalogId, format, headerText, bodyText }) => {
+      if (deps.signal?.aborted) return RUN_CANCELLED_NOTICE
       if (deps.replyGuard?.sent) return REPLY_ALREADY_SENT_NOTICE
 
       const catalogKeys = Object.keys(deps.catalogProviderMap)

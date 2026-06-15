@@ -5,6 +5,7 @@ import { MAX_BUTTONS } from '../../../social/button-format.util'
 import {
   type SingleReplyGuard,
   REPLY_ALREADY_SENT_NOTICE,
+  RUN_CANCELLED_NOTICE,
   claimReply,
   releaseReply,
 } from './turn-guard'
@@ -13,9 +14,12 @@ export function createButtonMessagingTools(deps: {
   messagingService: MessagingService
   conversationId: string
   replyGuard?: SingleReplyGuard
+  /** Annulé quand un message plus récent du même contact arrive : on n'envoie plus rien. */
+  signal?: AbortSignal
 }) {
   const sendButtons = tool(
     async ({ body, buttons }) => {
+      if (deps.signal?.aborted) return RUN_CANCELLED_NOTICE
       // Claim synchronously (before any await) so a parallel reply_to_message in
       // the same batch is suppressed, not doubled.
       if (!claimReply(deps.replyGuard)) return REPLY_ALREADY_SENT_NOTICE
