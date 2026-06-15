@@ -12,7 +12,8 @@ import type { EventsGateway } from '../../gateway/events.gateway'
 import { runLiveAgent } from '../../agent/run-live-agent'
 import { CapturingMessagingDouble } from '../../agent/dry-run/capturing-messaging.double'
 import { createDryRunPrisma } from '../../agent/dry-run/dry-run-prisma'
-import { buildAgentRunTrace } from '../../agent/dry-run/extract-trace'
+import { buildAgentRunTrace, reconstructReply } from '../../agent/dry-run/extract-trace'
+import { ToolCallTracer } from '../../agent/dry-run/tool-call-tracer'
 import { debugOrgId } from '../debug-context'
 import { DRY_RUN_AGENT, withTitle } from '../annotations'
 import { chatWithAgentSchema } from './debug-tool-schemas'
@@ -34,7 +35,7 @@ export class DebugAgentTools {
     name: 'chat_with_agent',
     annotations: withTitle("Parler à l'agent (dry-run)", DRY_RUN_AGENT),
     description:
-      "Run this organisation's live agent on a customer message in DRY-RUN mode and return the FULL trace: every tool call (name + args + result), the customer-facing reply that WOULD have been sent, and the DB writes that WOULD have happened. Uses the real LLM, real catalog search (Qdrant) and the real database (read-only) — but delivers nothing to WhatsApp and commits no write. The exact production agent code path runs, so this faithfully reproduces hallucinations.",
+      "Run this organisation's live agent on a customer message in DRY-RUN mode and return the FULL trace: every tool call (name + args + result), the customer-facing reply that WOULD have been sent, and the DB writes that WOULD have happened. Uses the real LLM, real catalog search (Qdrant) and the real database (read-only) — but delivers nothing to WhatsApp and commits no write. The exact production agent code path runs, so this faithfully reproduces hallucinations. Even when the run fails (e.g. the recursion limit), the partial tool-call trace, sends and writes captured so far are still returned for diagnosis.",
     parameters: chatWithAgentSchema,
   })
   async chatWithAgent(args: z.infer<typeof chatWithAgentSchema>) {
@@ -143,6 +144,8 @@ export class DebugAgentTools {
     // Dry-run seams: capture sends, intercept writes, no PostHog tracing.
     const messaging = new CapturingMessagingDouble()
     const { prisma: dryRunPrisma, writes } = createDryRunPrisma(this.prisma)
+    // Records tool calls live so the trace survives a thrown run (recursion limit).
+    const toolTracer = new ToolCallTracer()
     const startedAt = Date.now()
 
     try {
@@ -152,7 +155,7 @@ export class DebugAgentTools {
         userMessageContent: args.message,
         model,
         recursionLimit: callLimit * 2 + 1,
-        callbacks: [],
+        callbacks: [toolTracer],
         toolContext: {
           prisma: dryRunPrisma,
           messagingService: messaging.asMessagingService(),
@@ -182,11 +185,16 @@ export class DebugAgentTools {
         ...trace,
       }
     } catch (error: unknown) {
+      // The run threw (often the LangGraph recursion limit) so there is no final
+      // message list — but the tool tracer captured the calls as they ran. Return
+      // them, the sends and the writes so a failed turn is still diagnosable.
       return {
         error: `Agent run failed: ${error instanceof Error ? error.message : String(error)}`,
         model: describeModel(model),
         durationMs: Date.now() - startedAt,
+        toolCalls: toolTracer.calls,
         capturedSends: messaging.sends,
+        finalReplyText: reconstructReply(messaging.sends),
         simulatedDbWrites: writes,
       }
     }
