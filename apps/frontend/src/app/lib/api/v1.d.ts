@@ -3052,6 +3052,8 @@ export interface components {
             override?: "FORCE_ON" | "FORCE_OFF" | null;
             /** @description Whether the agent would process a new message on this conversation */
             isActive: boolean;
+            /** @description Whether the agent's global activation rules cover this conversation, IGNORING any per-conversation override. When true while isActive is false, the agent is active globally but was manually turned off on this conversation. */
+            scopeActive: boolean;
         };
         SetConversationAgentOverrideDto: {
             /** @enum {string} */

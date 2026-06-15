@@ -1,6 +1,15 @@
 import { useMemo, useRef, useEffect, useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Avatar, Popover, Popconfirm, Button, Spin, Tooltip, message as antdMessage } from 'antd'
+import {
+  Avatar,
+  Popover,
+  Popconfirm,
+  Button,
+  Spin,
+  Tooltip,
+  Alert,
+  message as antdMessage,
+} from 'antd'
 import {
   Play,
   Pause,
@@ -989,109 +998,135 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
   }
 
   return (
-    <div className="flex items-center gap-3 border-b border-border-subtle px-4 py-2.5">
-      <Avatar
-        src={conversation.contact.avatarUrl}
-        size={36}
-        className="flex-shrink-0"
-        style={{
-          backgroundColor: getAvatarColor(conversation.contact.id || conversation.contact.name),
-        }}
-      >
-        {conversation.contact.name[0]}
-      </Avatar>
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-semibold text-text-primary">{conversation.contact.name}</div>
-        {conversation.contact.username && (
-          <div className="text-xs text-text-muted">{conversation.contact.username}</div>
-        )}
-        {!conversation.contact.username && conversation.contact.phone && (
-          <div className="text-xs text-text-muted">{conversation.contact.phone}</div>
-        )}
-      </div>
-
-      {hasHeaderActions && (
-        <Popover
-          content={
-            <div className="w-56">
-              {(conversation.contact.phone || conversation.contact.username) && (
-                <Button
-                  type="text"
-                  block
-                  onClick={handleCopy}
-                  icon={
-                    copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />
-                  }
-                  className="py-2.5!"
-                >
-                  {copied
-                    ? t('common.copied')
-                    : conversation.contact.phone
-                      ? t('chat.copy_phone', { phone: conversation.contact.phone })
-                      : conversation.contact.username}
-                </Button>
-              )}
-              {isAgentReady && (
-                <Button
-                  type="text"
-                  block
-                  danger={isActive}
-                  onClick={handleToggleAgent}
-                  loading={setOverrideMutation.isPending}
-                  icon={isActive ? <BotOff size={14} /> : <Sparkles size={14} />}
-                  className="py-2.5!"
-                >
-                  {isActive ? t('chat.deactivate_agent') : t('chat.activate_agent')}
-                </Button>
-              )}
-              <Button
-                type="text"
-                block
-                onClick={() => {
-                  setKnowledgeOpen(true)
-                  setOptionsOpen(false)
-                }}
-                icon={<BookUser size={14} />}
-                className="py-2.5!"
-              >
-                {t('chat.knowledge_menu')}
-              </Button>
-              {isAdmin && (
-                <Popconfirm
-                  title={t('chat.clear_conversation_confirm')}
-                  okText={t('chat.clear_conversation')}
-                  cancelText={t('promotions.cancel')}
-                  okButtonProps={{ danger: true, loading: clearMutation.isPending }}
-                  onConfirm={handleClearConversation}
-                  placement="left"
-                >
-                  <Button type="text" block danger icon={<Trash2 size={14} />} className="py-2.5!">
-                    {t('chat.clear_conversation')}
-                  </Button>
-                </Popconfirm>
-              )}
-            </div>
-          }
-          trigger="click"
-          open={optionsOpen}
-          onOpenChange={setOptionsOpen}
-          placement="bottomRight"
-          overlayClassName="org-switcher-popover"
-          arrow={false}
+    <div className="flex flex-col">
+      <div className="flex items-center gap-3 border-b border-border-subtle px-4 py-2.5">
+        <Avatar
+          src={conversation.contact.avatarUrl}
+          size={36}
+          className="flex-shrink-0"
+          style={{
+            backgroundColor: getAvatarColor(conversation.contact.id || conversation.contact.name),
+          }}
         >
-          <Button
-            type="text"
-            icon={<OptionsIcon width={18} height={18} />}
-            className="flex-shrink-0"
-          />
-        </Popover>
+          {conversation.contact.name[0]}
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold text-text-primary">{conversation.contact.name}</div>
+          {conversation.contact.username && (
+            <div className="text-xs text-text-muted">{conversation.contact.username}</div>
+          )}
+          {!conversation.contact.username && conversation.contact.phone && (
+            <div className="text-xs text-text-muted">{conversation.contact.phone}</div>
+          )}
+        </div>
+
+        {hasHeaderActions && (
+          <Popover
+            content={
+              <div className="w-56">
+                {(conversation.contact.phone || conversation.contact.username) && (
+                  <Button
+                    type="text"
+                    block
+                    onClick={handleCopy}
+                    icon={
+                      copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />
+                    }
+                    className="py-2.5!"
+                  >
+                    {copied
+                      ? t('common.copied')
+                      : conversation.contact.phone
+                        ? t('chat.copy_phone', { phone: conversation.contact.phone })
+                        : conversation.contact.username}
+                  </Button>
+                )}
+                {isAgentReady && (
+                  <Button
+                    type="text"
+                    block
+                    danger={isActive}
+                    onClick={handleToggleAgent}
+                    loading={setOverrideMutation.isPending}
+                    icon={isActive ? <BotOff size={14} /> : <Sparkles size={14} />}
+                    className="py-2.5!"
+                  >
+                    {isActive ? t('chat.deactivate_agent') : t('chat.activate_agent')}
+                  </Button>
+                )}
+                <Button
+                  type="text"
+                  block
+                  onClick={() => {
+                    setKnowledgeOpen(true)
+                    setOptionsOpen(false)
+                  }}
+                  icon={<BookUser size={14} />}
+                  className="py-2.5!"
+                >
+                  {t('chat.knowledge_menu')}
+                </Button>
+                {isAdmin && (
+                  <Popconfirm
+                    title={t('chat.clear_conversation_confirm')}
+                    okText={t('chat.clear_conversation')}
+                    cancelText={t('promotions.cancel')}
+                    okButtonProps={{ danger: true, loading: clearMutation.isPending }}
+                    onConfirm={handleClearConversation}
+                    placement="left"
+                  >
+                    <Button
+                      type="text"
+                      block
+                      danger
+                      icon={<Trash2 size={14} />}
+                      className="py-2.5!"
+                    >
+                      {t('chat.clear_conversation')}
+                    </Button>
+                  </Popconfirm>
+                )}
+              </div>
+            }
+            trigger="click"
+            open={optionsOpen}
+            onOpenChange={setOptionsOpen}
+            placement="bottomRight"
+            overlayClassName="org-switcher-popover"
+            arrow={false}
+          >
+            <Button
+              type="text"
+              icon={<OptionsIcon width={18} height={18} />}
+              className="flex-shrink-0"
+            />
+          </Popover>
+        )}
+        <CustomerKnowledgeModal
+          conversationId={conversation.id}
+          open={knowledgeOpen}
+          onClose={() => setKnowledgeOpen(false)}
+          canEdit={isAdmin}
+        />
+      </div>
+      {agentStatus?.override === 'FORCE_OFF' && agentStatus?.scopeActive === true && (
+        <Alert
+          banner
+          type="info"
+          showIcon
+          message={t('chat.agent_manually_off_notice')}
+          action={
+            <Button
+              size="small"
+              type="link"
+              onClick={handleToggleAgent}
+              loading={setOverrideMutation.isPending}
+            >
+              {t('chat.reactivate_agent')}
+            </Button>
+          }
+        />
       )}
-      <CustomerKnowledgeModal
-        conversationId={conversation.id}
-        open={knowledgeOpen}
-        onClose={() => setKnowledgeOpen(false)}
-        canEdit={isAdmin}
-      />
     </div>
   )
 }

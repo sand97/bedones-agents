@@ -425,6 +425,8 @@
     "agent_activated": "Agent activé sur cette conversation",
     "agent_deactivated": "Agent désactivé sur cette conversation",
     "agent_toggle_error": "Impossible de modifier l'état de l'agent",
+    "agent_manually_off_notice": "L'agent est activé globalement, mais il a été désactivé manuellement sur cette conversation : il ne répondra pas ici.",
+    "reactivate_agent": "Réactiver ici",
     "type_message": "Tapez un message...",
     "search": "Rechercher un contact, un message...",
     "new_messages": "Nouveaux messages",

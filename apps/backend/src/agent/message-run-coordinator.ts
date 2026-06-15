@@ -69,6 +69,27 @@ export class MessageRunCoordinator {
   }
 
   /**
+   * Annule tout traitement pour ce contact, sans enfiler de nouveau message.
+   * Utilisé quand l'agent est désactivé depuis l'UI : on pousse un numéro de
+   * séquence supérieur à tous les jobs existants du contact, si bien que
+   *  - le run en cours s'auto-annule (son `watch()` voit la supersession) ;
+   *  - les jobs encore en attente (delay de rafale) seront ignorés à leur réveil.
+   * Un futur message ré-activé obtiendra un numéro encore plus grand : aucun
+   * effet de bord sur la reprise.
+   */
+  async cancelContact(conversationId: string): Promise<void> {
+    const client = await this.queue.client
+    const seq = await client.incr(MessageRunCoordinator.SEQ_KEY)
+    await client.set(
+      this.latestKey(conversationId),
+      String(seq),
+      'EX',
+      MessageRunCoordinator.LATEST_TTL_SECONDS,
+    )
+    this.logger.log(`Traitements annulés pour la conversation ${conversationId} (agent désactivé)`)
+  }
+
+  /**
    * Surveille la supersession en tâche de fond et annule le run (LLM compris) dès
    * qu'un message plus récent arrive pour ce contact, sur n'importe quelle
    * instance. Renvoie une fonction de nettoyage à appeler dans un `finally`.

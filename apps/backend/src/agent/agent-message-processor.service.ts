@@ -94,6 +94,24 @@ export class AgentMessageProcessorService {
   }
 
   /**
+   * Agent désactivé sur une conversation depuis l'UI (PUT agent-override →
+   * FORCE_OFF) : on annule tout traitement en cours ou en attente pour ce contact,
+   * sur toutes les instances. Émis par MessagingService.setConversationAgentOverride.
+   */
+  @OnEvent('conversation.ai.disabled', { async: true })
+  async handleConversationAiDisabled(payload: { conversationId: string }): Promise<void> {
+    try {
+      await this.coordinator.cancelContact(payload.conversationId)
+    } catch (error: unknown) {
+      this.logger.error(
+        `Failed to cancel runs for disabled conversation ${payload.conversationId}: ${
+          error instanceof Error ? error.message : error
+        }`,
+      )
+    }
+  }
+
+  /**
    * Point d'entrée du worker : applique les règles d'activation puis lance le run
    * d'agent avec le `signal` d'annulation fourni par la file (annulé dès qu'un
    * message plus récent du même contact arrive).

@@ -268,6 +268,12 @@ export class ConversationAgentStatusDto {
     description: 'Whether the agent would process a new message on this conversation',
   })
   isActive: boolean
+
+  @ApiProperty({
+    description:
+      "Whether the agent's global activation rules cover this conversation, IGNORING any per-conversation override. When true while isActive is false, the agent is active globally but was manually turned off on this conversation.",
+  })
+  scopeActive: boolean
 }
 
 export class SetConversationAgentOverrideDto {
