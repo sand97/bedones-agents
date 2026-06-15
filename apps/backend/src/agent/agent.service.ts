@@ -559,6 +559,7 @@ export class AgentService {
         aiActivateAll: false,
         aiActivateAds: false,
         aiActivateNewConversations: false,
+        aiActivationContacts: [],
       },
     })
 
