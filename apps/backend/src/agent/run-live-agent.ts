@@ -1,4 +1,9 @@
-import { HumanMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
+import {
+  HumanMessage,
+  SystemMessage,
+  isAIMessage,
+  type BaseMessage,
+} from '@langchain/core/messages'
 import type { BaseCallbackHandler } from '@langchain/core/callbacks/base'
 import type { ChatGoogleGenerativeAI } from '@langchain/google-genai'
 import type { ChatOpenAI } from '@langchain/openai'
@@ -21,6 +26,15 @@ import { createSingleReplyGuard, type SingleReplyGuard } from './tools/live/turn
 
 const _require = createRequire(__filename)
 const { createReactAgent } = _require('@langchain/langgraph/prebuilt')
+
+/**
+ * Tools that deliver a message to the customer. The turn-guard already lets at
+ * most ONE of these run per turn; the post-model hook in runLiveAgent uses this
+ * set to END the turn after that one send, so a model that ignores the "end your
+ * turn now" notice can't keep emitting blocked sends until it trips the
+ * recursion limit and fails the whole turn.
+ */
+const CUSTOMER_FACING_TOOLS = new Set(['reply_to_message', 'send_products', 'send_buttons'])
 
 /**
  * Injectable seams for the live agent's tools. Production passes the real
@@ -158,11 +172,40 @@ export interface RunLiveAgentInput {
  * the captured tool sends and the tool-call trace from these messages.
  */
 export async function runLiveAgent(input: RunLiveAgentInput): Promise<{ messages: BaseMessage[] }> {
-  const tools = await buildLiveAgentTools(input.toolContext)
+  // Own the single-reply guard so the post-model hook can observe it. The SAME
+  // instance is handed to buildLiveAgentTools, so the customer-facing tools and
+  // the hook share one source of truth for "has the reply been delivered?".
+  const replyGuard = input.toolContext.replyGuard ?? createSingleReplyGuard()
+  const tools = await buildLiveAgentTools({ ...input.toolContext, replyGuard })
 
   const agentExecutor = createReactAgent({
     llm: input.model,
     tools,
+    // Hard stop. Once the turn's single customer-facing message has been
+    // delivered, drop any further customer-facing tool calls the model emits so
+    // the react agent routes to END instead of looping on blocked re-sends.
+    // Some models (e.g. Gemini) ignore the "end your turn now" notice and keep
+    // calling reply/send tools until they exhaust the recursion limit and the
+    // whole turn fails. The hook is a no-op until the reply is actually sent,
+    // and it keeps internal tools (save_contact_note, request_ticket…) intact.
+    postModelHook: (state: { messages: BaseMessage[] }) => {
+      if (!replyGuard.sent) return {}
+      for (let i = state.messages.length - 1; i >= 0; i -= 1) {
+        const m = state.messages[i]
+        if (!isAIMessage(m)) continue
+        const calls = m.tool_calls ?? []
+        const kept = calls.filter((c) => !CUSTOMER_FACING_TOOLS.has(c.name))
+        if (kept.length !== calls.length) {
+          // Mutate in place: the conditional edge after this hook re-reads this
+          // same message's tool_calls, so removing the customer-facing call(s)
+          // makes it route to END (or to the remaining internal tools).
+          m.tool_calls = kept
+          m.additional_kwargs = { ...m.additional_kwargs, tool_calls: undefined }
+        }
+        break
+      }
+      return {}
+    },
   })
 
   const result = await agentExecutor.invoke(
