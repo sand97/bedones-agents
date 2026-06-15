@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { BullModule } from '@nestjs/bullmq'
 import { AuthModule } from '../auth/auth.module'
+import { CatalogModule } from '../catalog/catalog.module'
 import { ImageProcessingModule } from '../image-processing/image-processing.module'
 import { QueueModule, TICKET_AGENT_QUEUE, MESSAGE_PROCESSING_QUEUE } from '../queue/queue.module'
 import { SocialModule } from '../social/social.module'
@@ -20,6 +21,7 @@ import { TicketAgentProcessor } from './ticket-agent.processor'
 @Module({
   imports: [
     AuthModule,
+    CatalogModule,
     ImageProcessingModule,
     QueueModule,
     SocialModule,

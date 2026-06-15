@@ -21,6 +21,7 @@ import { QdrantService } from '../image-processing/qdrant.service'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import type { IncomingMessageEvent } from '../social/webhook.service'
 import { CreditService } from '../stats/credit.service'
+import { CatalogService } from '../catalog/catalog.service'
 import type { CreditMediaType } from '../../generated/prisma/client'
 
 import { runLiveAgent } from './run-live-agent'
@@ -62,6 +63,7 @@ export class AgentMessageProcessorService {
     private readonly creditService: CreditService,
     private readonly llmFactory: LlmFactoryService,
     private readonly ticketAgent: TicketAgentService,
+    private readonly catalogService: CatalogService,
     @InjectQueue(MESSAGE_PROCESSING_QUEUE) private readonly queue: Queue,
     private readonly coordinator: MessageRunCoordinator,
   ) {}
@@ -472,6 +474,7 @@ export class AgentMessageProcessorService {
           organisationId: agent.organisationId,
           catalogIds,
           catalogProviderMap,
+          catalogService: this.catalogService,
           canSendButtons,
           canSendProducts,
           replyGuard,
@@ -545,6 +548,7 @@ export class AgentMessageProcessorService {
           name: string
           price?: number
           currency?: string
+          retailerId?: string
           source: 'post-link' | 'semantic'
         } | null
       }
@@ -570,7 +574,13 @@ export class AgentMessageProcessorService {
       headline: referral.headline,
       body: referral.body,
       product: match
-        ? { name: match.name, price: match.price, currency: match.currency, source: match.source }
+        ? {
+            name: match.name,
+            price: match.price,
+            currency: match.currency,
+            retailerId: match.retailerId,
+            source: match.source,
+          }
         : null,
     }
   }

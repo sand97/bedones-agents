@@ -15,7 +15,7 @@ import type { MessagingService } from '../social/messaging.service'
 import type { CatalogSearchService } from '../image-processing/catalog-search.service'
 
 import { createCommunicationTools } from './tools/live/communication.tools'
-import { createCatalogTools } from './tools/live/catalog.tools'
+import { createCatalogTools, type MetaProductLookup } from './tools/live/catalog.tools'
 import { createMessageTools } from './tools/live/message.tools'
 import { createTicketTools } from './tools/live/ticket.tools'
 import { createPromotionTools } from './tools/live/promotion.tools'
@@ -54,6 +54,9 @@ export interface LiveAgentToolContext {
   catalogIds: string[]
   /** internal catalog id → Meta provider catalog id */
   catalogProviderMap: Record<string, string>
+  /** Meta Commerce exact lookup (source of truth) for get_product. Omitted in
+   *  dry-run/debug → the tool falls back to the exact Qdrant lookup. */
+  catalogService?: MetaProductLookup
   canSendButtons: boolean
   canSendProducts: boolean
   /** Shared single-reply guard. When provided, the caller can observe when the
@@ -119,6 +122,8 @@ export async function buildLiveAgentTools(ctx: LiveAgentToolContext) {
           catalogSearchService: ctx.catalogSearchService,
           prisma: ctx.prisma,
           catalogIds: ctx.catalogIds,
+          catalogProviderMap: ctx.catalogProviderMap,
+          catalogService: ctx.catalogService,
           productCatalogIndex,
         })
       : []),

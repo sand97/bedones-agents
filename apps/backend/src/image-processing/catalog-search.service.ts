@@ -71,6 +71,47 @@ export class CatalogSearchService {
     }
   }
 
+  /**
+   * EXACT lookup by merchant retailer_id — NOT semantic. Filters the index on
+   * `retailer_id` (Meta enforces it unique per catalog), so each id resolves to
+   * THE single product the customer means, never a list of look-alikes. Use this
+   * when the product is already known (post referral, a typed code, an
+   * [IMAGE_CONTEXT] match, or a product already shown) instead of searchProducts,
+   * which returns near-matches. Unknown retailer ids are simply absent.
+   */
+  async getProductsByRetailerIds(
+    catalogIds: string[],
+    retailerIds: string[],
+  ): Promise<ProductSearchResult[]> {
+    const ids = Array.from(new Set(retailerIds.map((s) => s.trim()).filter(Boolean)))
+    if (ids.length === 0 || catalogIds.length === 0) return []
+    if (!this.qdrantService.isConfigured()) return []
+
+    const byRetailer = new Map<string, ProductSearchResult>()
+    for (const catalogId of catalogIds) {
+      for (const id of ids) {
+        if (byRetailer.has(id)) continue // first catalog that has it wins
+        const hit = await this.qdrantService.findByRetailerIds(catalogId, [id]).catch(() => null)
+        if (!hit) continue
+        const md = hit.metadata
+        byRetailer.set(id, {
+          id: hit.productId,
+          catalogId,
+          retailerId: (md.retailer_id as string) || id,
+          name: (md.product_name as string) || (md.name as string) || '',
+          description: (md.description as string) || undefined,
+          price: (md.price as number) || undefined,
+          currency: (md.currency as string) || undefined,
+          availability: (md.availability as string) || undefined,
+          collectionName: (md.collectionName as string) || undefined,
+          similarity: 1,
+          rankingScore: 1,
+        })
+      }
+    }
+    return [...byRetailer.values()]
+  }
+
   private async searchVector(
     catalogIds: string[],
     query: string,
@@ -273,7 +314,10 @@ export class CatalogSearchService {
       .slice(0, limit)
   }
 
-  private mergeHits(primaryHits: CatalogSearchHit[], englishHits: CatalogSearchHit[]): CatalogSearchHit[] {
+  private mergeHits(
+    primaryHits: CatalogSearchHit[],
+    englishHits: CatalogSearchHit[],
+  ): CatalogSearchHit[] {
     const merged = new Map<string, CatalogSearchHit>()
 
     for (const hit of primaryHits) {
