@@ -90,6 +90,13 @@ export const indexProductsSchema = z.object({
     .describe('Max products to index this call (default 200).'),
 })
 
+export const reindexCatalogSchema = z.object({
+  catalogId: z
+    .string()
+    .optional()
+    .describe("Catalog to re-sync from Meta (this org). Defaults to the org's first catalog."),
+})
+
 export const readTableSchema = z.object({
   table: z.string().describe('Table to read — call list_tables to see the allowed set.'),
   where: z

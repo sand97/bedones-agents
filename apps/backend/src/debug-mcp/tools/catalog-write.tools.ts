@@ -5,9 +5,10 @@ import { z } from 'zod'
 import { PrismaService } from '../../prisma/prisma.service'
 import { QdrantService } from '../../image-processing/qdrant.service'
 import { GeminiEmbeddingService } from '../../image-processing/gemini-embedding.service'
+import { ProductImageIndexingService } from '../../image-processing/product-image-indexing.service'
 import { debugOrgId } from '../debug-context'
 import { WRITE, WRITE_EXTERNAL, withTitle } from '../annotations'
-import { addProductsSchema, indexProductsSchema } from './debug-tool-schemas'
+import { addProductsSchema, indexProductsSchema, reindexCatalogSchema } from './debug-tool-schemas'
 
 const SYNTHETIC_CATEGORIES = [
   'Vestes',
@@ -25,6 +26,7 @@ export class DebugCatalogTools {
     private readonly prisma: PrismaService,
     private readonly qdrant: QdrantService,
     private readonly embeddings: GeminiEmbeddingService,
+    private readonly indexing: ProductImageIndexingService,
   ) {}
 
   private resolveCatalog(org: string, catalogId?: string) {
@@ -164,6 +166,47 @@ export class DebugCatalogTools {
       indexed,
       failed,
       note: 'Payload includes `currency` (omitted by the production indexing pipeline).',
+    }
+  }
+
+  @Tool({
+    name: 'reindex_catalog',
+    annotations: withTitle('Réindexer le catalogue depuis Meta (purge Qdrant)', WRITE_EXTERNAL),
+    description:
+      'Re-sync this catalog from the live Meta (Facebook) catalog: re-fetch its products, (re)index them into Qdrant, and DELETE every Qdrant point that is no longer in Meta. Use this to purge stale or test points (e.g. debug load-test products, or leftovers from a previous catalog) so search_products and the agent only ever see real catalog products. Meta is the source of truth: if Meta returns no product, nothing is deleted.',
+    parameters: reindexCatalogSchema,
+  })
+  async reindexCatalog(args: z.infer<typeof reindexCatalogSchema>) {
+    const org = debugOrgId()
+    if (!this.qdrant.isConfigured()) {
+      return { error: 'Qdrant not configured (QDRANT_URL unset).' }
+    }
+
+    const cat = await this.resolveCatalog(org, args.catalogId)
+    if (!cat) return { error: 'No catalog found for this organisation.' }
+
+    const countPoints = async (): Promise<number | null> => {
+      try {
+        return (await this.qdrant.getIndexedProducts(cat.id)).size
+      } catch {
+        return null
+      }
+    }
+
+    const qdrantPointsBefore = await countPoints()
+    const result = await this.indexing.syncCatalog(cat.id, org)
+    const qdrantPointsAfter = await countPoints()
+
+    return {
+      catalogId: cat.id,
+      catalogName: cat.name,
+      qdrantPointsBefore,
+      qdrantPointsAfter,
+      removedFromQdrant:
+        qdrantPointsBefore !== null && qdrantPointsAfter !== null
+          ? Math.max(0, qdrantPointsBefore - qdrantPointsAfter)
+          : null,
+      ...result,
     }
   }
 }

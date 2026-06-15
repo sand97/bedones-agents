@@ -15,7 +15,8 @@ Il est verrouillé sur UNE seule organisation (DEBUG_MCP_ORG_ID) — impossible 
 Outils:
 - chat_with_agent: fait tourner l'agent live sur un message en DRY-RUN (rien n'est envoyé ni écrit) et renvoie la trace complète (tool calls, résultats, réponse, écritures simulées).
 - list_tables / read_table / list_products: lecture seule de tables scopées à l'org (champs sensibles masqués).
-- qdrant_list_indexed / qdrant_get_point: inspection du contenu indexé dans Qdrant.`
+- qdrant_list_indexed / qdrant_get_point: inspection du contenu indexé dans Qdrant.
+- reindex_catalog: re-synchronise le catalogue depuis Meta et SUPPRIME de Qdrant tout point absent de Meta (purge des produits de test / obsolètes).`
 
 /**
  * A SECOND, isolated MCP server mounted at /debug-mcp, with its OWN tool
