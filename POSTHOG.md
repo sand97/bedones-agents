@@ -21,9 +21,10 @@ peut varier par environnement).
 
 | Variable | App | Rôle |
 |---|---|---|
-| `POSTHOG_PROJECT_TOKEN` | backend | Clé projet. Vide ⇒ PostHog désactivé (no-op). |
-| `POSTHOG_HOST` | backend | `https://us.i.posthog.com` (région US). |
-| `POSTHOG_CAPTURE_INFO_LOGS` | backend | `true` pour aussi remonter les logs `info` (défaut `false`). |
+| `POSTHOG_PROJECT_TOKEN` | backend | Clé projet. Vide ⇒ PostHog désactivé (no-op) : ni events, ni logs. |
+| `POSTHOG_HOST` | backend | `https://us.i.posthog.com` (région US). Sert aussi d'endpoint logs OTLP (`$POSTHOG_HOST/i/v1/logs`). |
+| `POSTHOG_CAPTURE_INFO_LOGS` | backend | `true` pour aussi remonter les logs `info` vers **Logs** (défaut `false`). **À activer** pour voir le déroulé complet d'une conversation (les logs webhook/agent sont en `info`). |
+| `OTEL_SERVICE_NAME` | backend | `service.name` dans PostHog → Logs (défaut `bedones-backend`). |
 | `VITE_POSTHOG_KEY` | frontend | Même valeur que `POSTHOG_PROJECT_TOKEN`. Vide ⇒ désactivé. |
 | `VITE_POSTHOG_HOST` | frontend | Domaine du **reverse proxy managé** (`https://post-moderator.bedones.com`) — anti ad-blockers. |
 
@@ -35,18 +36,48 @@ Voir `apps/backend/.env.example` et `apps/frontend/.env.example`.
 
 - **Webhooks entrants** → event `webhook_received` (Facebook, Instagram,
   WhatsApp, TikTok, catalog, catalog-migration). Inclut `provider`, `status`,
-  `duration_ms` et un **résumé sans PII** du payload (`object`, `entry_count`,
-  `fields`). Le contenu détaillé reste dans les logs applicatifs.
+  `duration_ms`, `request_id` et un **résumé sans PII** du payload (`object`,
+  `entry_count`, `fields`). Émis par le middleware HTTP au `res.finish` : c'est
+  l'event « brut » d'arrivée, **avant** que le payload soit résolu en conversation.
+- **Webhook ↔ conversation** → une fois la conversation résolue pendant le
+  traitement (message, écho, réaction, accusé de réception),
+  `WebhookService.trackConversationWebhook()` (1) enrichit le contexte
+  d'exécution (cf. *Logs applicatifs* ci-dessous) puis (2) écrit une ligne de log
+  repère `[webhook:<provider>] <event_type> → conversation <id>`. ⇒ dans
+  **PostHog → Logs**, filtrer par l'attribut `conversation_id` (ou rechercher
+  `[webhook:`) montre **tous les webhooks reçus sur une conversation donnée**,
+  chacun partageant le `request_id` du reste des logs de son exécution.
 - **Appels API** → event `api_request` (route, méthode, statut, latence,
   `request_id`, user). Émis par un **middleware** `res.on('finish')`
   (`posthog-http.middleware.ts`) → couvre **toutes** les réponses, y compris les
   401/403/404/500 (un interceptor Nest, lui, tourne après les guards et raterait
   les requêtes rejetées par l'auth).
-- **Logs applicatifs** → le logger Nest est remplacé par `PostHogLoggerService` :
-  - `this.logger.error(..., error)` avec une vraie `Error` ⇒ **Error tracking**.
-  - les lignes `error` / `warn` (et `info` si activé) ⇒ event `backend_log`.
-  - Chaque log est enrichi du contexte de requête (`request_id`, route, user)
-    grâce à un `AsyncLocalStorage` (`request-context.ts`).
+- **Logs applicatifs** → le logger Nest est remplacé par `PostHogLoggerService`,
+  qui envoie chaque ligne vers le **produit Logs** de PostHog (⚠️ **pas** la
+  surface Events : le produit Logs n'est alimenté que par **OpenTelemetry/OTLP**
+  sur `…/i/v1/logs` — un `posthog.capture()` n'y apparaît jamais). Pipeline
+  logs-only dans `otel-logs.ts` (un `LoggerProvider` + `BatchLogRecordProcessor` +
+  `OTLPLogExporter`, sans auto-instrumentation NodeSDK).
+  - `this.logger.error(..., error)` avec une vraie `Error` ⇒ **Error tracking**
+    (stack + grouping) **et** une ligne de log `error`.
+  - `error` / `warn` (et `info` si `POSTHOG_CAPTURE_INFO_LOGS=true`) ⇒ un log
+    OTLP (`severity_text`, `body` = message, `service.name`).
+  - **Attributs cherchables** stampés sur chaque log depuis l'`AsyncLocalStorage`
+    (`request-context.ts`) : `request_id`, `path`, `method`, `logger_context`,
+    `source`, et surtout `conversation_id`, `contact_id`, `social_account_id`,
+    `organisation_id`, `provider`. ⇒ on retrouve une conversation précise en
+    recoupant n'importe lequel de ces axes dans **PostHog → Logs**.
+  - **Corrélation conversation** : pendant le traitement d'un webhook, dès que la
+    conversation est connue, `setRequestContext()` ajoute `conversation_id` /
+    `contact_id` / `social_account_id` / `provider` au contexte ⇒ **toutes** les
+    lignes du reste de l'exécution (y compris les listeners synchrones
+    `message.incoming` : langue du contact, fidélité) portent ces attributs.
+  - **Run d'agent (worker BullMQ)** : le run live tourne sur la file
+    `message-processing`, hors du scope HTTP du webhook. Le worker rouvre donc un
+    scope via `runWithContext()` (`conversation_id`, `contact_id`, `provider`,
+    `social_account_id`, `source = 'agent-message-processing'`, `request_id`
+    propre au run) ⇒ les logs du run d'agent sont eux aussi cherchables par
+    conversation, et distinguables de l'ingestion via l'attribut `source`.
 - **Exceptions** : les 500 non gérés sont loggués par le filtre d'exception Nest
   par défaut ⇒ remontés en **Error tracking** via `PostHogLoggerService`.
 - **Observabilité LLM** (agent LangChain / LangGraph, Gemini + OpenAI) : le
@@ -105,8 +136,22 @@ Voir `apps/backend/.env.example` et `apps/frontend/.env.example`.
   latence agent ; taux d'erreur des appels modèle.
 - **Funnel onboarding** : `$pageview` `/auth/login` → `/create-organisation` →
   premier `/app/$orgSlug/dashboard`.
-- **Logs** : recherche plein-texte sur `backend_log.message`, filtrée par
-  `logger_context` ou `request_id` (corrélation log ↔ requête ↔ user).
+- **Debug d'une conversation** (le cas d'usage qui motive toute cette section) —
+  tout se passe dans **PostHog → Logs** (produit Logs, pas Events), service
+  `bedones-backend`. Penser à `POSTHOG_CAPTURE_INFO_LOGS=true` pour le déroulé
+  complet (les logs webhook/agent sont en `info`) :
+  1. **Cibler la conversation** : filtrer les logs par attribut `conversation_id`
+     (ou recouper `organisation_id` / `contact_id` / `social_account_id` /
+     `provider` quand on n'a pas l'id sous la main).
+  2. **Tous les webhooks reçus sur la conversation** : dans ces résultats,
+     rechercher `[webhook:` → une ligne par webhook (`message` / `echo` /
+     `reaction` / `status`), chacune avec son `request_id`.
+  3. **Les logs liés à l'exécution d'un webhook précis** : filtrer par le
+     `request_id` de la ligne repère ⇒ uniquement les logs de CETTE exécution.
+  4. **Séparer ingestion et run d'agent** : filtrer par l'attribut `source`
+     (`agent-message-processing` = le run live déclenché par le webhook).
+     Combiné aux **LLM traces** (déjà taggées `conversationId`), on a la
+     conversation de bout en bout : webhook → ingestion → run d'agent → appels modèle.
 
 ## 5. Suggestions (debug & marketing) pour plus tard
 

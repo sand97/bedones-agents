@@ -9,7 +9,9 @@ import type { NextFunction, Request, Response } from 'express'
  * request object everywhere.
  *
  * The store is a mutable object: it is created in the middleware (before auth
- * runs) and enriched later by the analytics interceptor once `req.user` is known.
+ * runs) and enriched later — by the analytics interceptor once `req.user` is
+ * known, and by webhook processing once the conversation is resolved (see
+ * {@link setRequestContext}).
  */
 export interface RequestContext {
   requestId: string
@@ -17,12 +19,57 @@ export interface RequestContext {
   path?: string
   userId?: string
   organisationId?: string
+  /**
+   * Conversation the current execution is about. Set during webhook processing
+   * (once the inbound message resolves a conversation) and on the agent worker,
+   * so every log line becomes searchable by conversation in PostHog → Logs.
+   */
+  conversationId?: string
+  /** Social account / channel the execution relates to. */
+  socialAccountId?: string
+  /** End customer (platform sender / participant id) the execution is about. */
+  contactId?: string
+  /** Channel provider (WHATSAPP, INSTAGRAM, FACEBOOK, TIKTOK) when known. */
+  provider?: string
+  /**
+   * Logical origin of the execution: `http` (default — an inbound HTTP request),
+   * `agent-message-processing` (the BullMQ worker that runs the live agent), … —
+   * lets PostHog tell webhook ingestion logs apart from the agent-run logs that
+   * the same conversation triggered.
+   */
+  source?: string
 }
 
 const storage = new AsyncLocalStorage<RequestContext>()
 
 export function getRequestContext(): RequestContext | undefined {
   return storage.getStore()
+}
+
+/**
+ * Merge fields into the CURRENT context (no-op when called outside a scope).
+ * Used to enrich the context mid-flight once deeper code resolves something it
+ * could not know up front — e.g. the conversation an inbound webhook is about.
+ * Undefined values are ignored so a later call never clobbers an earlier one.
+ */
+export function setRequestContext(patch: Partial<RequestContext>): void {
+  const store = storage.getStore()
+  if (!store) return
+  const target = store as unknown as Record<string, unknown>
+  for (const [key, value] of Object.entries(patch)) {
+    if (value !== undefined) target[key] = value
+  }
+}
+
+/**
+ * Open a FRESH context scope for work that runs OUTSIDE an HTTP request — BullMQ
+ * workers, scheduled tasks, event handlers. A `requestId` is generated when not
+ * provided so every execution stays correlatable in PostHog (its logs share one
+ * id). Mirrors what {@link requestContextMiddleware} does for HTTP requests.
+ */
+export function runWithContext<T>(seed: Partial<RequestContext>, fn: () => T): T {
+  const context: RequestContext = { ...seed, requestId: seed.requestId || randomUUID() }
+  return storage.run(context, fn)
 }
 
 /**
