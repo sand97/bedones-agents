@@ -25,6 +25,7 @@ import { describeMessageForAgent } from './message-history.util'
 import { createSingleReplyGuard } from './tools/live/turn-guard'
 import { TicketAgentService } from './ticket-agent.service'
 import { contactMatchesConversation } from '../social/contact-match.util'
+import { ConversationRunRegistry } from './conversation-run-registry'
 
 @Injectable()
 export class AgentMessageProcessorService {
@@ -42,10 +43,17 @@ export class AgentMessageProcessorService {
     private readonly creditService: CreditService,
     private readonly llmFactory: LlmFactoryService,
     private readonly ticketAgent: TicketAgentService,
+    private readonly runRegistry: ConversationRunRegistry,
   ) {}
 
   @OnEvent('message.incoming', { async: true })
   async handleIncomingMessage(event: IncomingMessageEvent): Promise<void> {
+    // Un nouveau message rend caduque toute réponse encore en cours d'analyse
+    // pour ce contact : on annule le run précédent (LLM compris) dès l'arrivée,
+    // y compris quand ce message-ci ne sera finalement pas traité par l'IA
+    // (ex : reprise par un humain). Le run le plus récent — s'il y en a un —
+    // sera redémarré proprement dans processMessage.
+    this.runRegistry.cancel(event.conversationId, 'new-message')
     try {
       await this.maybeProcess(event)
     } catch (error: unknown) {
@@ -172,6 +180,35 @@ export class AgentMessageProcessorService {
       `Processing message for agent ${agent.id} on ${event.provider} (conversation: ${event.conversationId})`,
     )
 
+    // « File d'attente » par contact : on démarre le run pour cette conversation,
+    // ce qui annule immédiatement tout run précédent encore en vol (analyse LLM
+    // comprise). Le signal est propagé jusqu'à l'agent pour interrompre l'analyse
+    // si un message encore plus récent arrive ensuite.
+    const signal = this.runRegistry.begin(event.conversationId)
+
+    try {
+      await this.runAgentTurn(event, agent, signal)
+    } finally {
+      this.runRegistry.end(event.conversationId, signal)
+    }
+  }
+
+  private async runAgentTurn(
+    event: IncomingMessageEvent,
+    agent: {
+      id: string
+      context: string | null
+      organisationId: string
+      status: string
+      liveModelTier: string
+      socialAccounts: {
+        socialAccount: {
+          catalogs: { catalog: { id: string; providerId: string | null } }[]
+        }
+      }[]
+    },
+    signal: AbortSignal,
+  ): Promise<void> {
     // We've decided to reply → surface the typing indicator immediately, before the
     // (potentially slow) history backfill / image processing below. A periodic
     // refresh keeps it alive while the agent reflects (see typingInterval).
@@ -328,13 +365,24 @@ export class AgentMessageProcessorService {
     // the customer after the reply was already sent.
     const replyGuard = createSingleReplyGuard()
     const typingInterval = setInterval(() => {
-      if (replyGuard.sent) {
+      // Stop dès que la réponse est partie OU que le run a été annulé par un
+      // message plus récent — sinon on ré-afficherait "en train d'écrire" pour
+      // un traitement qui n'aboutira jamais.
+      if (replyGuard.sent || signal.aborted) {
         clearInterval(typingInterval)
         return
       }
       void this.messagingService.sendTypingIndicator(event.conversationId)
     }, 18_000)
     void this.messagingService.sendTypingIndicator(event.conversationId)
+
+    // Un message plus récent a pu arriver pendant le backfill / le traitement
+    // d'image ci-dessus : ne pas lancer l'analyse LLM d'un run déjà périmé.
+    if (signal.aborted) {
+      clearInterval(typingInterval)
+      this.logger.log(`Run annulé avant analyse pour la conversation ${event.conversationId}`)
+      return
+    }
 
     try {
       // Shared core (also used by the debug MCP and the e2e harness) so the tool
@@ -344,6 +392,7 @@ export class AgentMessageProcessorService {
         history: historyMessages,
         userMessageContent,
         model,
+        signal,
         recursionLimit: callLimit * 2 + 1,
         // Trace at invoke time so the model passed to createReactAgent keeps
         // its `bindTools` method (a wrapped/traced Runnable would hide it).
@@ -381,7 +430,17 @@ export class AgentMessageProcessorService {
 
       this.logger.log(`Agent ${agent.id} processed message successfully`)
     } catch (error: unknown) {
-      this.logger.error(`Agent execution failed: ${error instanceof Error ? error.message : error}`)
+      // Annulation volontaire (message plus récent du même contact) : ce n'est
+      // pas une erreur, le run a été abandonné avant d'envoyer une réponse.
+      if (signal.aborted) {
+        this.logger.log(
+          `Analyse IA annulée pour la conversation ${event.conversationId} (message plus récent)`,
+        )
+      } else {
+        this.logger.error(
+          `Agent execution failed: ${error instanceof Error ? error.message : error}`,
+        )
+      }
     } finally {
       clearInterval(typingInterval)
     }

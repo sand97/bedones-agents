@@ -11,6 +11,7 @@ import { AgentGateway } from './agent.gateway'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import { AgentDbToolsService } from './tools/agent-db-tools.service'
 import { AgentMessageProcessorService } from './agent-message-processor.service'
+import { ConversationRunRegistry } from './conversation-run-registry'
 import { AgentFeedbackService } from './feedback.service'
 import { TicketAgentService } from './ticket-agent.service'
 import { TicketAgentProcessor } from './ticket-agent.processor'
@@ -31,6 +32,7 @@ import { TicketAgentProcessor } from './ticket-agent.processor'
     AgentPromptsService,
     AgentDbToolsService,
     AgentMessageProcessorService,
+    ConversationRunRegistry,
     AgentFeedbackService,
     TicketAgentService,
     TicketAgentProcessor,

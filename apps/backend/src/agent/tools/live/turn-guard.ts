@@ -40,3 +40,11 @@ export function releaseReply(guard?: SingleReplyGuard): void {
 /** Returned to the model when it tries to send a second message in one turn. */
 export const REPLY_ALREADY_SENT_NOTICE =
   'A reply has already been sent to the customer this turn. Do NOT send another message — end your turn now.'
+
+/**
+ * Returned to the model when this turn has been cancelled by a newer message from
+ * the same contact: the customer-facing send is dropped so the superseded run can
+ * never deliver a (now stale) reply. Prevents two messages on the same conversation.
+ */
+export const RUN_CANCELLED_NOTICE =
+  'This turn was cancelled because the customer sent a newer message. Do NOT send anything — end your turn now.'

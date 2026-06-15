@@ -4,6 +4,7 @@ import type { MessagingService } from '../../../social/messaging.service'
 import {
   type SingleReplyGuard,
   REPLY_ALREADY_SENT_NOTICE,
+  RUN_CANCELLED_NOTICE,
   claimReply,
   releaseReply,
 } from './turn-guard'
@@ -12,6 +13,8 @@ export function createCommunicationTools(deps: {
   messagingService: MessagingService
   conversationId: string
   replyGuard?: SingleReplyGuard
+  /** Annulé quand un message plus récent du même contact arrive : on n'envoie plus rien. */
+  signal?: AbortSignal
 }) {
   const replyToMessage = tool(
     async ({ message }) => {
@@ -19,6 +22,7 @@ export function createCommunicationTools(deps: {
       // (parallel) tool batch claims the turn first — a plain text reply must
       // never pre-empt the product/button message the model sent alongside it.
       await Promise.resolve()
+      if (deps.signal?.aborted) return RUN_CANCELLED_NOTICE
       if (!claimReply(deps.replyGuard)) return REPLY_ALREADY_SENT_NOTICE
       try {
         await deps.messagingService.sendMessageAsAgent(deps.conversationId, message)
