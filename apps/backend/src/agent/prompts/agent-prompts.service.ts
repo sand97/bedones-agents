@@ -209,6 +209,7 @@ ${context}
         name: string
         price?: number
         currency?: string
+        retailerId?: string
         source: 'post-link' | 'semantic'
       } | null
     } | null
@@ -241,7 +242,7 @@ ${context}
     // without this the agent answers blind to the product's rules.
     const conversationProductContextBlock =
       conversationProductContext && conversationProductContext.length > 0
-        ? `\n\n## Context of products already in this conversation\nThese products were already shown, ordered or referenced here. Before answering about any of them (sizes, advice, constraints) you MUST follow its context below and NEVER contradict it — even if you do not run a new search this turn. Propose only what it states (e.g. the exact sizes listed); never invent sizes or variants.\n${conversationProductContext
+        ? `\n\n## Context of products already in this conversation\nThese products were already shown, ordered or referenced here — the customer ALREADY knows them. Do NOT call send_products to re-show one of them just because it is mentioned again: the customer has already seen its card. Skip re-sending and move the sale forward (size, quantity, delivery, payment) toward an order/ticket. Re-send a product card ONLY if the customer explicitly asks to see it again, or if you are showing a genuinely NEW product not in this list. When you do need one of these again, fetch it by its retailer id with get_product (NOT search_products) so you send that exact product, then send_products it.\nBefore answering about any of them (sizes, advice, constraints) you MUST follow its context below and NEVER contradict it — even if you do not run a new search this turn. Propose only what it states (e.g. the exact sizes listed); never invent sizes or variants.\n${conversationProductContext
             .map(
               (g) =>
                 `- ${g.products
@@ -315,9 +316,11 @@ Stay within a business-only context.
 - Do not ask for information already in conversation history.
 
 ## Product and Catalog Rules — Catalog Truth (ABSOLUTE, NON-NEGOTIABLE)
-A product is real ONLY if backed by one of two sources: (a) a search_products result you received in the CURRENT turn, or (b) an [IMAGE_CONTEXT] block where our image tool matched it (match=exact_product_code). EVERY product, model, variant, colour, size, category or alternative you name, propose, imply, promise or send MUST come — verbatim — from one of those. Otherwise treat it as NON-EXISTENT: never mention it, never offer to show it, never invent a price. This is the single biggest source of mistakes — respect it absolutely.
-- Search BEFORE you speak about products. Before claiming we have OR don't have something, and before proposing anything, you MUST call search_products and read the result (unless an [IMAGE_CONTEXT] match already identifies the product). Never answer "on faith".
-- When the customer has ALREADY identified one specific product — they sent its photo or its code and our image tool matched it (an [IMAGE_CONTEXT] block with match=exact_product_code, or a clearly stated reference) — treat the choice as MADE. Do NOT resend that product's card, do NOT run search_products for "similar" items, and do NOT show alternatives or other colours. Simply confirm it is available and move the sale forward (ask for size, quantity, delivery…). Offer other colours or models ONLY at the very end, once the order is underway: "Nous avons d'autres coloris disponibles, souhaitez-vous les voir ?".
+A product is real ONLY if backed by one of these sources: (a) a search_products result you received in the CURRENT turn, (b) a get_product result (exact lookup by retailer id), or (c) an [IMAGE_CONTEXT] block where our image tool matched it (match=exact_product_code). EVERY product, model, variant, colour, size, category or alternative you name, propose, imply, promise or send MUST come — verbatim — from one of those. Otherwise treat it as NON-EXISTENT: never mention it, never offer to show it, never invent a price. This is the single biggest source of mistakes — respect it absolutely.
+- Two ways to get a product, pick the right one. When you ALREADY know which exact product the customer means — its retailer id is known from the post they came from, a code they typed, an [IMAGE_CONTEXT] match, or a product already shown in this conversation — call get_product with that retailer id and send THAT product. Do NOT use search_products for an already-identified product: semantic search returns colour/style look-alikes and makes you send the wrong list. Use search_products ONLY to DISCOVER a product the customer has not yet pinned down (a need, a category, a description).
+- Search BEFORE you speak about products. Before claiming we have OR don't have something, and before proposing anything, you MUST call search_products or get_product and read the result (unless an [IMAGE_CONTEXT] match already identifies the product). Never answer "on faith".
+- When the customer has ALREADY identified one specific product — they sent its photo or its code and our image tool matched it (an [IMAGE_CONTEXT] block with match=exact_product_code, or a clearly stated reference), OR it is a product already shown / referenced in this conversation (see "Context of products already in this conversation") — treat the choice as MADE. Do NOT resend that product's card, do NOT run search_products for "similar" items, and do NOT show alternatives or other colours. Simply confirm it is available and move the sale forward (ask for size, quantity, delivery…). Offer other colours or models ONLY at the very end, once the order is underway: "Nous avons d'autres coloris disponibles, souhaitez-vous les voir ?".
+- Do NOT loop the customer by re-sending the same products over and over. A product already shown in this conversation is known to the customer — referencing it again is NOT a reason to send_products again. Keep advancing the process (collect what's missing, confirm, then request_ticket) instead of re-showing what they have already seen.
 - NEVER state or imply a specific product, variant, colour, cheaper option or "other model" exists until a search (or [IMAGE_CONTEXT] match) confirms it. Forbidden on faith: "we also have…", "nous avons aussi…", "other options in your budget". And NEVER use "Souhaitez-vous voir d'autres styles / articles ?" as a consolation pivot when the requested item was not found — say plainly it is not available and STOP. Any offer to show more must be followed by a search_products before you actually show anything; show only what it returns.
 - When the customer asks for a variant (a women's version, another colour, a cheaper one, a complement…): run a search_products for that EXACT variant. Propose it ONLY if it appears in the result; otherwise say plainly it is not available.
 - When nothing viable exists, never invent. If search finds nothing (e.g. nothing within the customer's budget), do NOT make up products, prices or unrelated items. You may stay on a product they already showed interest in and reinforce its value: quality and durability make a good piece a better investment than re-buying a cheap one every year.
@@ -325,6 +328,11 @@ A product is real ONLY if backed by one of two sources: (a) a search_products re
 - RESPECT each product's CONTEXT. A search_products result may attach a context to a product (a "ctx" column pointing to a context block listed under the rows): these are the merchant's specific rules for THAT product — available sizes, how to advise, constraints. When a product has a context you MUST follow it and NEVER contradict it: propose ONLY the options it states (e.g. the exact sizes it lists), apply its instructions, and never invent sizes, variants or facts it does not give. Each product can have a different context — always read the one tied to the product you are talking about.
 - Do not call search_products for greetings, smalltalk or vague openers — first get a concrete product, category or need from the customer. Prefer a clarifying question when the need is unclear. Keep product messages short and say briefly why they are relevant.
 - Record a confirmed-but-pending plan, NEVER an imaginary one. Only AFTER search_products returned a REAL product may you save_contact_note with the plan AND its exact retailer id from that result — e.g. "Proposer la veste noire (S180NOIR) si le client veut voir d'autres vestes." The id must be one search_products actually gave you (ids look like "S180KAKI", never a made-up UUID). If a product type does not exist in the catalog (e.g. no shoes), do NOT write any plan or note about it at all.
+
+## Closing & Tickets (move forward, don't loop)
+- Your job is to ADVANCE the sale, not to keep re-presenting products. Once the customer has shown a clear intent (wants to order, book, reserve, or asks how to buy), call request_ticket so the order/lead is tracked — do not wait for everything to be perfect, the ticket process collects and dedupes the details afterwards.
+- As soon as a product is chosen and the customer wants it, stop showing products and drive toward the order: gather only what is still missing (size/variant, quantity, delivery address, payment) one step at a time, then request_ticket.
+- Never restart the discovery loop (re-searching or re-sending products already seen) when the customer is ready to proceed — that just stalls them. Prefer one decisive step toward the order over another product showcase.
 
 ## Labels
 - Use available labels to classify conversations.
@@ -362,6 +370,7 @@ Always respond in the user's language.`
       name: string
       price?: number
       currency?: string
+      retailerId?: string
       source: 'post-link' | 'semantic'
     } | null
   }): string {
@@ -383,7 +392,13 @@ Always respond in the user's language.`
         product.source === 'post-link'
           ? 'This post is linked to this catalog product:'
           : 'This post most likely refers to this catalog product:'
-      lines.push(`${lead} ${product.name}${price}. Use send_products to show it when relevant.`)
+      // When we know the exact retailer id, the product is ALREADY identified:
+      // tell the agent to fetch THAT product by id (get_product) and send it,
+      // instead of running a semantic search that returns colour/style look-alikes.
+      const idHint = product.retailerId
+        ? ` Its retailer id is ${product.retailerId} — this product is ALREADY identified. To show or discuss it, call get_product with ["${product.retailerId}"] (do NOT run search_products, which would return other colours/models), then send_products it. Treat the choice as made and move the sale forward.`
+        : ' Use send_products to show it when relevant.'
+      lines.push(`${lead} ${product.name}${price}.${idHint}`)
     }
 
     return `${lines.join('\n')}\n`

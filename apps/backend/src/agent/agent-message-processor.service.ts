@@ -21,6 +21,7 @@ import { QdrantService } from '../image-processing/qdrant.service'
 import { AgentPromptsService } from './prompts/agent-prompts.service'
 import type { IncomingMessageEvent } from '../social/webhook.service'
 import { CreditService } from '../stats/credit.service'
+import { CatalogService } from '../catalog/catalog.service'
 import type { CreditMediaType } from '../../generated/prisma/client'
 
 import { runLiveAgent } from './run-live-agent'
@@ -62,6 +63,7 @@ export class AgentMessageProcessorService {
     private readonly creditService: CreditService,
     private readonly llmFactory: LlmFactoryService,
     private readonly ticketAgent: TicketAgentService,
+    private readonly catalogService: CatalogService,
     @InjectQueue(MESSAGE_PROCESSING_QUEUE) private readonly queue: Queue,
     private readonly coordinator: MessageRunCoordinator,
   ) {}
@@ -289,11 +291,22 @@ export class AgentMessageProcessorService {
       }
     }
 
+    // Live model tier is per-agent (admin-selectable). Unknown/legacy values fall
+    // back to flash so a bad value can never break the agent. Resolved here (and
+    // not only at model-build time) because the conversation-history depth depends
+    // on the tier (a more capable tier gets a longer memory window).
+    const tier: LiveModelTier = (LIVE_MODEL_TIERS as readonly string[]).includes(
+      agent.liveModelTier,
+    )
+      ? (agent.liveModelTier as LiveModelTier)
+      : 'flash'
+    const historyLimit = this.resolveHistoryLimit(tier)
+
     // Get conversation history
     const recentMessages = await this.prisma.directMessage.findMany({
       where: { conversationId: event.conversationId },
       orderBy: { createdTime: 'desc' },
-      take: 20,
+      take: historyLimit,
       select: {
         message: true,
         isFromPage: true,
@@ -394,13 +407,6 @@ export class AgentMessageProcessorService {
         return new HumanMessage(content)
       })
 
-    // Live model tier is per-agent (admin-selectable). Unknown/legacy values fall
-    // back to flash so a bad value can never break the agent.
-    const tier: LiveModelTier = (LIVE_MODEL_TIERS as readonly string[]).includes(
-      agent.liveModelTier,
-    )
-      ? (agent.liveModelTier as LiveModelTier)
-      : 'flash'
     const model = this.createModel(tier)
 
     const callLimit = this.config.get<number>('AGENT_MODEL_CALL_LIMIT') || 6
@@ -468,6 +474,7 @@ export class AgentMessageProcessorService {
           organisationId: agent.organisationId,
           catalogIds,
           catalogProviderMap,
+          catalogService: this.catalogService,
           canSendButtons,
           canSendProducts,
           replyGuard,
@@ -491,6 +498,27 @@ export class AgentMessageProcessorService {
     } finally {
       clearInterval(typingInterval)
     }
+  }
+
+  /**
+   * How many of the conversation's most recent messages are loaded into the
+   * agent's context window. Defaults to 40 and is tunable per live tier so a more
+   * capable offer (flash → pro → ultra) can carry a longer memory:
+   *   AGENT_HISTORY_LIMIT          (global default, fallback 40)
+   *   AGENT_HISTORY_LIMIT_FLASH    (overrides the default for the flash tier)
+   *   AGENT_HISTORY_LIMIT_PRO      (overrides the default for the pro tier)
+   *   AGENT_HISTORY_LIMIT_ULTRA    (overrides the default for the ultra tier)
+   * A non-numeric / non-positive value falls back to the default (40).
+   */
+  private resolveHistoryLimit(tier: LiveModelTier): number {
+    const DEFAULT_HISTORY_LIMIT = 40
+    const parse = (raw: unknown): number | null => {
+      const n = Number(raw)
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : null
+    }
+    const fallback = parse(this.config.get('AGENT_HISTORY_LIMIT')) ?? DEFAULT_HISTORY_LIMIT
+    const perTier = parse(this.config.get(`AGENT_HISTORY_LIMIT_${tier.toUpperCase()}`))
+    return perTier ?? fallback
   }
 
   /**
@@ -520,6 +548,7 @@ export class AgentMessageProcessorService {
           name: string
           price?: number
           currency?: string
+          retailerId?: string
           source: 'post-link' | 'semantic'
         } | null
       }
@@ -545,7 +574,13 @@ export class AgentMessageProcessorService {
       headline: referral.headline,
       body: referral.body,
       product: match
-        ? { name: match.name, price: match.price, currency: match.currency, source: match.source }
+        ? {
+            name: match.name,
+            price: match.price,
+            currency: match.currency,
+            retailerId: match.retailerId,
+            source: match.source,
+          }
         : null,
     }
   }
