@@ -12,6 +12,17 @@ function renderInline(text: string): ReactNode[] {
   })
 }
 
+/**
+ * Inline variant of {@link MarkdownLite}: renders the same `**bold**` subset
+ * but collapses every line break into a single space so the content stays on a
+ * single line. Used by truncated previews (table cells, list cards) where the
+ * markdown markers should be interpreted but newlines must not break the layout.
+ */
+export function MarkdownLiteInline({ text, className }: { text: string; className?: string }) {
+  const inline = text.replace(/\s*[\r\n]+\s*/g, ' ').trim()
+  return <span className={className}>{renderInline(inline)}</span>
+}
+
 export function MarkdownLite({ text, className }: { text: string; className?: string }) {
   const lines = text.replace(/\r\n/g, '\n').split('\n')
   return (

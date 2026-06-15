@@ -2,6 +2,7 @@ import { Button, Descriptions, Tag } from 'antd'
 import { Eye } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { StatusTag } from '@app/components/shared/status-tag'
+import { MarkdownLiteInline } from '@app/components/shared/markdown-lite'
 import { formatDateTime } from '@app/lib/format'
 import { ContactCell } from './contact-cell'
 import type { Ticket } from '@app/lib/api/agent-api'
@@ -27,7 +28,12 @@ export function TicketDescriptionCard({ entry, onViewDetails }: TicketDescriptio
       <div className="catalog-card__header">
         <div className="min-w-0 flex-1">
           <div className="font-medium text-text-primary">{entry.title}</div>
-          <div className="truncate text-xs text-text-muted">{entry.description}</div>
+          {entry.description && (
+            <MarkdownLiteInline
+              text={entry.description}
+              className="block truncate text-xs text-text-muted"
+            />
+          )}
         </div>
       </div>
       <Descriptions

@@ -4,6 +4,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { Eye, Pencil, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { StatusTag } from '@app/components/shared/status-tag'
+import { MarkdownLiteInline } from '@app/components/shared/markdown-lite'
 import { formatDateTime } from '@app/lib/format'
 import { ContactCell } from './contact-cell'
 import type { Ticket } from '@app/lib/api/agent-api'
@@ -41,7 +42,12 @@ export function useTicketColumns(
         render: (_: unknown, record: Ticket) => (
           <div className="min-w-0">
             <div className="truncate text-sm font-medium text-text-primary">{record.title}</div>
-            <div className="truncate text-xs text-text-muted">{record.description}</div>
+            {record.description && (
+              <MarkdownLiteInline
+                text={record.description}
+                className="block truncate text-xs text-text-muted"
+              />
+            )}
           </div>
         ),
       },
