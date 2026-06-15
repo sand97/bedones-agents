@@ -619,17 +619,6 @@ function Row({
         </div>
         <div className="notif-modal__row-sub">{optionSub}</div>
       </div>
-      {isTicketType && page.catalogId && members[0] && (
-        <TicketCollectionSelect
-          organisationId={organisationId}
-          catalogId={page.catalogId}
-          socialAccountId={page.id}
-          userIds={members.map((m) => m.id)}
-          type={type}
-          enabled={memberPref?.enabled ?? true}
-          value={memberPref?.collectionIds ?? []}
-        />
-      )}
       <ActionsRow
         status={status}
         members={members}
@@ -645,6 +634,18 @@ function Row({
         pageLabel={pageLabel}
         networkLabel={networkLabel}
       />
+      {isTicketType && page.catalogId && members[0] && (
+        <TicketCollectionSelect
+          organisationId={organisationId}
+          catalogId={page.catalogId}
+          socialAccountId={page.id}
+          userIds={members.map((m) => m.id)}
+          type={type}
+          enabled={memberPref?.enabled ?? true}
+          active={status === 'on'}
+          value={memberPref?.collectionIds ?? []}
+        />
+      )}
     </div>
   )
 }
