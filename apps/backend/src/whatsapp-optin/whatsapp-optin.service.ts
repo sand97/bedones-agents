@@ -3,12 +3,14 @@ import { InjectQueue } from '@nestjs/bullmq'
 import { OnEvent } from '@nestjs/event-emitter'
 import { Queue } from 'bullmq'
 import { PrismaService } from '../prisma/prisma.service'
+import { PostHogService } from '../posthog/posthog.service'
 import { WHATSAPP_OPTIN_QUEUE } from '../queue/queue.module'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
 import {
   OPTIN_WINDOW_MS,
   hourInTz,
   optinConfig,
+  type OptinTrigger,
   type SendTemplateJobData,
 } from './whatsapp-optin.config'
 
@@ -39,6 +41,7 @@ export class WhatsappOptinService {
 
   constructor(
     private prisma: PrismaService,
+    private readonly posthog: PostHogService,
     @InjectQueue(WHATSAPP_OPTIN_QUEUE) private queue: Queue,
   ) {}
 
@@ -64,40 +67,147 @@ export class WhatsappOptinService {
   @OnEvent('whatsapp.core.inbound')
   async onInboundEvent(payload: { senderPhone: string; buttonId?: string; buttonTitle?: string }) {
     try {
-      const refusal = isRefusal(payload.buttonId, payload.buttonTitle)
-
-      const normalized = normalizePhone(payload.senderPhone)
-      const user = await this.prisma.user.findFirst({
-        where: {
-          OR: [{ phone: payload.senderPhone }, { phone: `+${normalized}` }, { phone: normalized }],
-        },
-        select: { id: true },
-      })
+      const user = await this.findUserByPhone(payload.senderPhone)
       if (!user) return
 
-      if (refusal) {
-        this.logger.log(`[WA opt-in] user ${user.id} declined the daily opt-in`)
+      const isButtonReply = !!(payload.buttonId || payload.buttonTitle)
+
+      // A plain (non-button) message is NOT a consent answer. It only re-enters
+      // the loop: if the member's last opt-in reply is stale we re-ask. The
+      // rolling 24h window is opened *only* by an explicit opt-in button tap.
+      if (!isButtonReply) {
+        await this.maybeReask(user.id)
         return
       }
 
-      // Pick the most recently sent template across this user's org windows.
+      // The opt-in template was answered. Quick Reply payloads are static, so we
+      // attribute the answer to the org of the most recently sent template.
       const last = await this.prisma.whatsAppOptInWindow.findFirst({
         where: { userId: user.id, lastTemplateSentAt: { not: null } },
         orderBy: { lastTemplateSentAt: 'desc' },
         select: { organisationId: true },
       })
+
+      if (isRefusal(payload.buttonId, payload.buttonTitle)) {
+        this.logger.log(`[WA opt-in] user ${user.id} declined the opt-in`)
+        this.posthog.capture({
+          distinctId: user.id,
+          event: 'whatsapp_optin_declined',
+          properties: { organisationId: last?.organisationId ?? null },
+          groups: last ? { organisation: last.organisationId } : undefined,
+        })
+        return
+      }
+
       if (!last) {
         this.logger.warn(
-          `[WA opt-in] inbound from user ${user.id} but no recent template — ignoring`,
+          `[WA opt-in] opt-in reply from user ${user.id} but no recent template — ignoring`,
         )
         return
       }
 
+      // Record the reply date (lastInboundAt) and open the rolling 24h window.
       await this.recordInbound(user.id, last.organisationId)
       this.logger.log(`[WA opt-in] window opened for user ${user.id} / org ${last.organisationId}`)
+      this.posthog.capture({
+        distinctId: user.id,
+        event: 'whatsapp_optin_accepted',
+        properties: { organisationId: last.organisationId },
+        groups: { organisation: last.organisationId },
+      })
     } catch (err) {
       this.logger.error(`[WA opt-in] inbound handler failed: ${(err as Error).message}`)
     }
+  }
+
+  private findUserByPhone(senderPhone: string): Promise<{ id: string } | null> {
+    const normalized = normalizePhone(senderPhone)
+    return this.prisma.user.findFirst({
+      where: {
+        OR: [{ phone: senderPhone }, { phone: `+${normalized}` }, { phone: normalized }],
+      },
+      select: { id: true },
+    })
+  }
+
+  /**
+   * Re-entry into the opt-in loop from an inbound message. For each org the
+   * member is still eligible for, if their last opt-in reply (lastInboundAt) is
+   * older than `reaskHours` — and we haven't just asked (lastTemplateSentAt
+   * cooldown) — we re-send the opt-in template so they can refresh their 24h
+   * window without going through the dashboard.
+   */
+  private async maybeReask(userId: string): Promise<void> {
+    const { reaskHours } = optinConfig()
+    const thresholdMs = reaskHours * 60 * 60 * 1000
+    const now = Date.now()
+
+    const orgIds = await this.eligibleOrgIdsForUser(userId)
+    for (const organisationId of orgIds) {
+      const w = await this.prisma.whatsAppOptInWindow.findUnique({
+        where: { userId_organisationId: { userId, organisationId } },
+        select: { lastInboundAt: true, lastTemplateSentAt: true },
+      })
+      const consentStale = !w?.lastInboundAt || now - w.lastInboundAt.getTime() > thresholdMs
+      const askedRecently =
+        !!w?.lastTemplateSentAt && now - w.lastTemplateSentAt.getTime() < thresholdMs
+      if (!consentStale || askedRecently) continue
+
+      const hoursSinceConsent = w?.lastInboundAt
+        ? Math.round((now - w.lastInboundAt.getTime()) / 3_600_000)
+        : null
+      this.logger.log(`[WA opt-in] re-ask for user ${userId} / org ${organisationId}`)
+      this.posthog.capture({
+        distinctId: userId,
+        event: 'whatsapp_optin_reask_triggered',
+        properties: { organisationId, hoursSinceConsent },
+        groups: { organisation: organisationId },
+      })
+      await this.requestOptIn(userId, organisationId, 'reask')
+    }
+  }
+
+  /** Orgs where the member is active, has a phone, and enabled ≥1 notification. */
+  private async eligibleOrgIdsForUser(userId: string): Promise<string[]> {
+    const memberships = await this.prisma.organisationMember.findMany({
+      where: { userId, status: 'ACTIVE', user: { phone: { not: null } } },
+      select: { organisationId: true },
+    })
+    if (memberships.length === 0) return []
+    const memberOrgIds = memberships.map((m) => m.organisationId)
+
+    const [prefs, subs] = await Promise.all([
+      this.prisma.notificationPreference.findMany({
+        where: { userId, enabled: true, socialAccount: { organisationId: { in: memberOrgIds } } },
+        select: { socialAccount: { select: { organisationId: true } } },
+      }),
+      this.prisma.ticketStatusNotification.findMany({
+        where: { userId, enabled: true, socialAccount: { organisationId: { in: memberOrgIds } } },
+        select: { socialAccount: { select: { organisationId: true } } },
+      }),
+    ])
+
+    const set = new Set<string>()
+    for (const p of prefs) if (p.socialAccount) set.add(p.socialAccount.organisationId)
+    for (const s of subs) if (s.socialAccount) set.add(s.socialAccount.organisationId)
+    return [...set]
+  }
+
+  /**
+   * Enqueue an opt-in template send (retried by BullMQ). Used when a member
+   * enables a notification from the dashboard and for the inbound re-ask. For
+   * the dashboard trigger we skip members whose window is already open (already
+   * consented) so we don't ask twice.
+   */
+  async requestOptIn(userId: string, organisationId: string, trigger: OptinTrigger): Promise<void> {
+    if (trigger === 'dashboard' && (await this.isWindowOpen(userId, organisationId))) return
+    const data: SendTemplateJobData = { userId, organisationId, trigger }
+    await this.queue.add('send-template', data, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 30_000 },
+      removeOnComplete: true,
+      removeOnFail: 200,
+    })
   }
 
   /** Refresh the rolling 24-hour window for a (user, org) pair. */
@@ -219,10 +329,20 @@ export class WhatsappOptinService {
 
   // ─── Send template via CORE number ───────────────────────────────────
 
-  async sendOptInTemplate(userId: string, organisationId: string): Promise<void> {
+  async sendOptInTemplate(
+    userId: string,
+    organisationId: string,
+    trigger: OptinTrigger = 'cron',
+  ): Promise<void> {
     const cfg = optinConfig()
     if (!cfg.corePhoneNumberId || !cfg.coreAccessToken) {
       this.logger.warn('[WA opt-in] CORE_WHATSAPP_NUMBER_ID/META_SYSTEM_USER not set; skipping')
+      this.posthog.capture({
+        distinctId: userId,
+        event: 'whatsapp_optin_template_skipped',
+        properties: { organisationId, trigger, reason: 'not_configured' },
+        groups: { organisation: organisationId },
+      })
       return
     }
 
@@ -273,6 +393,12 @@ export class WhatsappOptinService {
       this.logger.error(
         `[WA opt-in] template send failed (${res.status}) user=${userId} org=${organisationId}: ${JSON.stringify(json)}`,
       )
+      this.posthog.capture({
+        distinctId: userId,
+        event: 'whatsapp_optin_template_failed',
+        properties: { organisationId, trigger, status: res.status, error: JSON.stringify(json) },
+        groups: { organisation: organisationId },
+      })
       throw new Error(`Template send failed: ${res.status}`)
     }
 
@@ -288,6 +414,12 @@ export class WhatsappOptinService {
     })
 
     this.logger.log(`[WA opt-in] template sent to ${userId} (org ${organisationId}, ${lang})`)
+    this.posthog.capture({
+      distinctId: userId,
+      event: 'whatsapp_optin_template_sent',
+      properties: { organisationId, trigger, lang, template: cfg.templateName },
+      groups: { organisation: organisationId },
+    })
   }
 
   // ─── Notification dispatch ───────────────────────────────────────────
@@ -301,16 +433,25 @@ export class WhatsappOptinService {
     organisationId: string,
     text: string,
   ): Promise<boolean> {
-    if (!(await this.isWindowOpen(userId, organisationId))) return false
+    if (!(await this.isWindowOpen(userId, organisationId))) {
+      this.captureNotif(userId, organisationId, 'dropped', 'window_closed')
+      return false
+    }
 
     const cfg = optinConfig()
-    if (!cfg.corePhoneNumberId || !cfg.coreAccessToken) return false
+    if (!cfg.corePhoneNumberId || !cfg.coreAccessToken) {
+      this.captureNotif(userId, organisationId, 'dropped', 'not_configured')
+      return false
+    }
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { phone: true },
     })
-    if (!user?.phone) return false
+    if (!user?.phone) {
+      this.captureNotif(userId, organisationId, 'dropped', 'no_phone')
+      return false
+    }
 
     const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${cfg.corePhoneNumberId}/messages`
     const res = await fetch(url, {
@@ -331,8 +472,29 @@ export class WhatsappOptinService {
       this.logger.error(
         `[WA opt-in] notif send failed (${res.status}) user=${userId} org=${organisationId}: ${JSON.stringify(json)}`,
       )
+      this.captureNotif(userId, organisationId, 'dropped', `meta_error_${res.status}`)
       return false
     }
+    this.captureNotif(userId, organisationId, 'sent')
     return true
+  }
+
+  /**
+   * PostHog trace for every free-form notification attempt. This is what makes
+   * the otherwise-silent drops visible — in particular `reason: window_closed`,
+   * the most common cause of "I enabled notifications but received nothing".
+   */
+  private captureNotif(
+    userId: string,
+    organisationId: string,
+    outcome: 'sent' | 'dropped',
+    reason?: string,
+  ): void {
+    this.posthog.capture({
+      distinctId: userId,
+      event: outcome === 'sent' ? 'whatsapp_notification_sent' : 'whatsapp_notification_dropped',
+      properties: { organisationId, ...(reason ? { reason } : {}) },
+      groups: { organisation: organisationId },
+    })
   }
 }
