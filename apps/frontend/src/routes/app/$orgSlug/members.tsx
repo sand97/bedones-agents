@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { buildShareMeta } from '@app/lib/share-meta'
 import { useTranslation } from 'react-i18next'
@@ -29,6 +29,9 @@ export const Route = createFileRoute('/app/$orgSlug/members')({
       description: 'Cliquez pour voir l’équipe de cette organisation',
       image: '/og/members.png',
     }),
+  validateSearch: (search: Record<string, unknown>): { notif?: boolean } => ({
+    notif: search.notif === true || search.notif === '1' || search.notif === 'true' || undefined,
+  }),
   component: MembersPage,
 })
 
@@ -58,6 +61,12 @@ function MembersPage() {
   const [copied, setCopied] = useState(false)
   const [notifPrefsMembers, setNotifPrefsMembers] = useState<Member[]>([])
 
+  const { notif } = Route.useSearch()
+  const navigate = Route.useNavigate()
+  const meQuery = $api.useQuery('get', '/auth/me')
+  const currentUserId = meQuery.data?.user?.id
+  const notifAutoOpenedRef = useRef(false)
+
   const membersQuery = $api.useQuery('get', '/organisations/{orgId}/members', {
     params: { path: { orgId: orgSlug } },
   })
@@ -72,6 +81,18 @@ function MembersPage() {
       ),
     [membersQuery.data],
   )
+
+  // Deep link from the WhatsApp "window opened" message (?notif=1): auto-open the
+  // notification settings modal for the current member, then drop the param.
+  useEffect(() => {
+    if (!notif || notifAutoOpenedRef.current) return
+    if (!currentUserId || members.length === 0) return
+    const me = members.find((m) => m.userId === currentUserId)
+    if (!me) return
+    notifAutoOpenedRef.current = true
+    setNotifPrefsMembers([me])
+    navigate({ search: (prev) => ({ ...prev, notif: undefined }), replace: true })
+  }, [notif, currentUserId, members, navigate])
 
   const invalidateMembers = useCallback(() => {
     queryClient.invalidateQueries({

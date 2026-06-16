@@ -70,51 +70,23 @@ export class WhatsappOptinService {
       const user = await this.findUserByPhone(payload.senderPhone)
       if (!user) return
 
-      const isButtonReply = !!(payload.buttonId || payload.buttonTitle)
-
-      // A plain (non-button) message is NOT a consent answer. It only re-enters
-      // the loop: if the member's last opt-in reply is stale we re-ask. The
-      // rolling 24h window is opened *only* by an explicit opt-in button tap.
-      if (!isButtonReply) {
-        await this.maybeReask(user.id)
-        return
-      }
-
-      // The opt-in template was answered. Quick Reply payloads are static, so we
-      // attribute the answer to the org of the most recently sent template.
-      const last = await this.prisma.whatsAppOptInWindow.findFirst({
-        where: { userId: user.id, lastTemplateSentAt: { not: null } },
-        orderBy: { lastTemplateSentAt: 'desc' },
-        select: { organisationId: true },
-      })
-
+      // Explicit "No"/"Non" on the opt-in template = refusal: open nothing.
       if (isRefusal(payload.buttonId, payload.buttonTitle)) {
+        const org = await this.lastTemplateOrg(user.id)
         this.logger.log(`[WA opt-in] user ${user.id} declined the opt-in`)
         this.posthog.capture({
           distinctId: user.id,
           event: 'whatsapp_optin_declined',
-          properties: { organisationId: last?.organisationId ?? null },
-          groups: last ? { organisation: last.organisationId } : undefined,
+          properties: { organisationId: org ?? null },
+          groups: org ? { organisation: org } : undefined,
         })
         return
       }
 
-      if (!last) {
-        this.logger.warn(
-          `[WA opt-in] opt-in reply from user ${user.id} but no recent template — ignoring`,
-        )
-        return
-      }
-
-      // Record the reply date (lastInboundAt) and open the rolling 24h window.
-      await this.recordInbound(user.id, last.organisationId)
-      this.logger.log(`[WA opt-in] window opened for user ${user.id} / org ${last.organisationId}`)
-      this.posthog.capture({
-        distinctId: user.id,
-        event: 'whatsapp_optin_accepted',
-        properties: { organisationId: last.organisationId },
-        groups: { organisation: last.organisationId },
-      })
+      // Any other inbound — the "Yes" opt-in tap OR a plain message — means the
+      // member just (re)opened their 24h WhatsApp window by contacting us. Mirror
+      // it on our side and, if it was closed, confirm + link to their settings.
+      await this.openWindowAndInform(user.id)
     } catch (err) {
       this.logger.error(`[WA opt-in] inbound handler failed: ${(err as Error).message}`)
     }
@@ -130,41 +102,111 @@ export class WhatsappOptinService {
     })
   }
 
+  private async lastTemplateOrg(userId: string): Promise<string | null> {
+    const last = await this.prisma.whatsAppOptInWindow.findFirst({
+      where: { userId, lastTemplateSentAt: { not: null } },
+      orderBy: { lastTemplateSentAt: 'desc' },
+      select: { organisationId: true },
+    })
+    return last?.organisationId ?? null
+  }
+
   /**
-   * Re-entry into the opt-in loop from an inbound message. For each org the
-   * member is still eligible for, if their last opt-in reply (lastInboundAt) is
-   * older than `reaskHours` — and we haven't just asked (lastTemplateSentAt
-   * cooldown) — we re-send the opt-in template so they can refresh their 24h
-   * window without going through the dashboard.
+   * The member contacted the CORE number, so their 24h WhatsApp window is open.
+   * Mirror it on our side for the org we can attribute the contact to — the org
+   * of the last opt-in template if the member is still eligible for it, else the
+   * first org they're eligible for. If that window was previously closed, send a
+   * one-off confirmation with a CTA button deep-linking to their notification
+   * settings (instead of re-asking with the opt-in template).
    */
-  private async maybeReask(userId: string): Promise<void> {
-    const { reaskHours } = optinConfig()
-    const thresholdMs = reaskHours * 60 * 60 * 1000
-    const now = Date.now()
+  private async openWindowAndInform(userId: string): Promise<void> {
+    const eligible = await this.eligibleOrgIdsForUser(userId)
+    if (eligible.length === 0) return
 
-    const orgIds = await this.eligibleOrgIdsForUser(userId)
-    for (const organisationId of orgIds) {
-      const w = await this.prisma.whatsAppOptInWindow.findUnique({
-        where: { userId_organisationId: { userId, organisationId } },
-        select: { lastInboundAt: true, lastTemplateSentAt: true },
-      })
-      const consentStale = !w?.lastInboundAt || now - w.lastInboundAt.getTime() > thresholdMs
-      const askedRecently =
-        !!w?.lastTemplateSentAt && now - w.lastTemplateSentAt.getTime() < thresholdMs
-      if (!consentStale || askedRecently) continue
+    const lastOrg = await this.lastTemplateOrg(userId)
+    const organisationId = lastOrg && eligible.includes(lastOrg) ? lastOrg : eligible[0]
 
-      const hoursSinceConsent = w?.lastInboundAt
-        ? Math.round((now - w.lastInboundAt.getTime()) / 3_600_000)
-        : null
-      this.logger.log(`[WA opt-in] re-ask for user ${userId} / org ${organisationId}`)
+    const wasOpen = await this.isWindowOpen(userId, organisationId)
+    await this.recordInbound(userId, organisationId)
+    this.logger.log(`[WA opt-in] window opened for user ${userId} / org ${organisationId}`)
+    this.posthog.capture({
+      distinctId: userId,
+      event: 'whatsapp_optin_window_opened',
+      properties: { organisationId, alreadyOpen: wasOpen },
+      groups: { organisation: organisationId },
+    })
+
+    // Only inform on the closed → open transition so we don't spam a member who
+    // keeps messaging within an already-open window.
+    if (!wasOpen) await this.sendWindowOpenedInfo(userId, organisationId)
+  }
+
+  /**
+   * Free-form confirmation sent inside the open window: "you'll get notifications
+   * for the next 24h" + a CTA URL button that deep-links to the member's
+   * notification settings modal on the dashboard.
+   */
+  private async sendWindowOpenedInfo(userId: string, organisationId: string): Promise<void> {
+    const cfg = optinConfig()
+    if (!cfg.corePhoneNumberId || !cfg.coreAccessToken) return
+
+    const [user, org] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: userId }, select: { phone: true } }),
+      this.prisma.organisation.findUnique({
+        where: { id: organisationId },
+        select: { name: true },
+      }),
+    ])
+    if (!user?.phone || !org) return
+
+    const settingsUrl = `${cfg.frontendUrl}/app/${organisationId}/members?notif=1`
+    const bodyText =
+      `🔔 C'est noté ! Pendant les prochaines 24h, vous recevrez ici les notifications ` +
+      `de ${org.name}. Gérez vos préférences avec le bouton ci-dessous.`
+
+    const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${cfg.corePhoneNumberId}/messages`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cfg.coreAccessToken}`,
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: user.phone.replace('+', ''),
+        type: 'interactive',
+        interactive: {
+          type: 'cta_url',
+          body: { text: bodyText },
+          action: {
+            name: 'cta_url',
+            parameters: { display_text: 'Mes notifications', url: settingsUrl },
+          },
+        },
+      }),
+    })
+
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      this.logger.error(
+        `[WA opt-in] window-info send failed (${res.status}) user=${userId} org=${organisationId}: ${JSON.stringify(json)}`,
+      )
       this.posthog.capture({
         distinctId: userId,
-        event: 'whatsapp_optin_reask_triggered',
-        properties: { organisationId, hoursSinceConsent },
+        event: 'whatsapp_window_info_failed',
+        properties: { organisationId, status: res.status, error: JSON.stringify(json) },
         groups: { organisation: organisationId },
       })
-      await this.requestOptIn(userId, organisationId, 'reask')
+      return
     }
+
+    this.logger.log(`[WA opt-in] window-info sent to ${userId} (org ${organisationId})`)
+    this.posthog.capture({
+      distinctId: userId,
+      event: 'whatsapp_window_info_sent',
+      properties: { organisationId },
+      groups: { organisation: organisationId },
+    })
   }
 
   /** Orgs where the member is active, has a phone, and enabled ≥1 notification. */
