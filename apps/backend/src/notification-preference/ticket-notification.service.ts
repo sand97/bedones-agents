@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
 import { PrismaService } from '../prisma/prisma.service'
 import { PostHogService } from '../posthog/posthog.service'
-import { WhatsappOptinService } from '../whatsapp-optin/whatsapp-optin.service'
+import { WhatsappOptinService, type WaNotification } from '../whatsapp-optin/whatsapp-optin.service'
 import { CatalogService } from '../catalog/catalog.service'
 
 /** Emitted on the ticket create path. */
@@ -22,6 +22,7 @@ type LoadedTicket = {
   organisationId: string
   socialAccountId: string | null
   title: string
+  description: string | null
   contactName: string | null
   metadata: unknown
   socialAccount: { catalogs: { catalog: { providerId: string | null } }[] } | null
@@ -83,11 +84,10 @@ export class TicketNotificationService {
     )
     if (recipients.length === 0) return
 
-    const who = ticket.contactName ? ` — ${ticket.contactName}` : ''
     await this.dispatch(
       recipients,
       ticket.organisationId,
-      `🎫 Nouveau ticket : ${ticket.title}${who}`,
+      this.buildCreatedMessage(ticket),
       'created',
       ticketId,
       ticketCollections.length,
@@ -119,7 +119,7 @@ export class TicketNotificationService {
     await this.dispatch(
       recipients,
       ticket.organisationId,
-      `🔔 Ticket « ${ticket.title} » → ${status.name}${who}`,
+      { kind: 'text', text: `🔔 Ticket « ${ticket.title} » → ${status.name}${who}` },
       `status:${status.name}`,
       ticketId,
       ticketCollections.length,
@@ -136,6 +136,7 @@ export class TicketNotificationService {
         organisationId: true,
         socialAccountId: true,
         title: true,
+        description: true,
         contactName: true,
         metadata: true,
         socialAccount: {
@@ -148,14 +149,14 @@ export class TicketNotificationService {
   private async dispatch(
     recipients: string[],
     organisationId: string,
-    text: string,
+    message: WaNotification,
     kind: string,
     ticketId: string,
     collectionsCount: number,
   ): Promise<void> {
     let sent = 0
     for (const userId of recipients) {
-      if (await this.optin.dispatchNotification(userId, organisationId, text)) sent++
+      if (await this.optin.dispatchNotification(userId, organisationId, message)) sent++
     }
     this.logger.log(
       `[TicketNotif] ${kind} ${ticketId}: ${sent}/${recipients.length} delivered (collections=${collectionsCount})`,
@@ -173,6 +174,62 @@ export class TicketNotificationService {
       },
       groups: { organisation: organisationId },
     })
+  }
+
+  /**
+   * Rich "new ticket" notification: a WhatsApp interactive (cta_url) message with
+   * a "Nouveau ticket" header, the frozen products + description in the body, the
+   * ticket title/contact in the footer, and a button deep-linking to the ticket.
+   */
+  private buildCreatedMessage(ticket: LoadedTicket): WaNotification {
+    const articles = this.parseArticles(ticket.metadata)
+    const description = ticket.description?.trim()
+
+    const sections: string[] = []
+    if (articles.length > 0) {
+      sections.push('Produits :\n' + articles.map((a) => `• ${a.name} x ${a.quantity}`).join('\n'))
+    }
+    if (description) sections.push(description)
+    // The body must be non-empty; fall back to the title when there's nothing else.
+    const bodyText = (sections.join('\n————————————————\n') || ticket.title).slice(0, 1024)
+
+    const footer = `${ticket.title}${ticket.contactName ? ` — ${ticket.contactName}` : ''}`.slice(
+      0,
+      60,
+    )
+    const ticketUrl = `${this.frontendUrl()}/app/${ticket.organisationId}/tickets?ticket=${ticket.id}`
+
+    return {
+      kind: 'interactive',
+      interactive: {
+        type: 'cta_url',
+        header: { type: 'text', text: 'Nouveau ticket' },
+        body: { text: bodyText },
+        footer: { text: footer },
+        action: {
+          name: 'cta_url',
+          parameters: { display_text: 'Voir le ticket', url: ticketUrl },
+        },
+      },
+    }
+  }
+
+  /** Frozen ticket articles → display name + quantity for the notification body. */
+  private parseArticles(metadata: unknown): Array<{ name: string; quantity: number }> {
+    const meta = (metadata ?? null) as {
+      articles?: Array<{ name?: unknown; quantity?: unknown }>
+    } | null
+    if (!Array.isArray(meta?.articles)) return []
+    return meta.articles
+      .map((a) => ({
+        name: typeof a?.name === 'string' ? a.name.trim() : '',
+        quantity: typeof a?.quantity === 'number' && a.quantity > 0 ? a.quantity : 1,
+      }))
+      .filter((a) => a.name.length > 0)
+  }
+
+  private frontendUrl(): string {
+    return (process.env.FRONTEND_URL ?? 'https://moderator.bedones.com').replace(/\/$/, '')
   }
 
   /** Collections (Meta product_set ids) the ticket's frozen articles belong to. */
