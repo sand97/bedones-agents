@@ -31,6 +31,20 @@ function resolveReturnTo(raw?: string): string | null {
   }
 }
 
+/**
+ * Validate an in-app `return_to` so it can only point back inside our own SPA
+ * (no open redirect). Used when the API auth middleware bounces a logged-out
+ * user here after they clicked an app link — we send them back afterwards.
+ */
+function resolveInternalPath(raw?: string): string | null {
+  if (!raw || !raw.startsWith('/')) return null
+  // Reject protocol-relative ("//host") and backslash tricks ("/\host").
+  if (raw.startsWith('//') || raw.startsWith('/\\')) return null
+  // Never bounce back to an auth page — that would loop.
+  if (raw.startsWith('/auth')) return null
+  return raw
+}
+
 /** Send the user to the right place after authentication (see resolvePostAuthRoute). */
 function navigateAfterAuth(
   navigate: ReturnType<typeof useNavigate>,
@@ -42,6 +56,14 @@ function navigateAfterAuth(
   const target = resolveReturnTo(returnTo)
   if (target) {
     window.location.href = target
+    return
+  }
+
+  // An in-app deep link the user was bounced from (see api/client auth
+  // middleware): full-page nav so the path + query load cleanly, now authed.
+  const internal = resolveInternalPath(returnTo)
+  if (internal) {
+    window.location.href = internal
     return
   }
 
