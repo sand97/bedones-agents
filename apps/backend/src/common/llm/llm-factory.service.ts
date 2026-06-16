@@ -155,12 +155,22 @@ export class LlmFactoryService {
     tier: LlmTier,
     options: LlmFactoryOptions = {},
   ): ChatGoogleGenerativeAI | ChatOpenAI {
+    // Cap the output window for the live agent. Without a cap the provider falls
+    // back to its model maximum (~65k tokens for gemini-3-flash), so a single
+    // degenerate/looping generation can bill tens of thousands of tokens in one
+    // turn (observed in PostHog: 65k completion tokens ≈ $0.20 on a turn that
+    // should cost ~$0.003). A caller-supplied limit still wins.
+    const capped: LlmFactoryOptions = {
+      ...options,
+      maxOutputTokens: options.maxOutputTokens ?? this.liveAgentMaxOutputTokens(tier),
+    }
+
     let model: ChatGoogleGenerativeAI | ChatOpenAI | null
-    if (options.provider === 'openai') model = this.buildOpenAI(tier, options)
-    else if (options.provider === 'gemini') model = this.buildGemini(tier, options)
+    if (capped.provider === 'openai') model = this.buildOpenAI(tier, capped)
+    else if (capped.provider === 'gemini') model = this.buildGemini(tier, capped)
     else if (this.defaultProvider() === 'openai')
-      model = this.buildOpenAI(tier, options) ?? this.buildGemini(tier, options)
-    else model = this.buildGemini(tier, options) ?? this.buildOpenAI(tier, options)
+      model = this.buildOpenAI(tier, capped) ?? this.buildGemini(tier, capped)
+    else model = this.buildGemini(tier, capped) ?? this.buildOpenAI(tier, capped)
 
     if (!model) {
       throw new Error(
@@ -168,6 +178,37 @@ export class LlmFactoryService {
       )
     }
     return model
+  }
+
+  /**
+   * Output-token ceiling for the live agent's tool-calling model, per tier.
+   *
+   * Without a cap the provider falls back to its model maximum (~65k tokens for
+   * gemini-3-flash), so one degenerate/looping generation can bill tens of
+   * thousands of tokens for a single turn (observed: 65k completion tokens ≈
+   * $0.20 on a turn that otherwise costs ~$0.003). A customer reply is short, so
+   * flash needs little; the thinking-enabled tiers (pro/ultra) get more headroom
+   * because their reasoning tokens count against this same budget.
+   *
+   * Env-overridable, mirroring AGENT_HISTORY_LIMIT:
+   *   AGENT_MAX_OUTPUT_TOKENS                   (global default for every tier)
+   *   AGENT_MAX_OUTPUT_TOKENS_FLASH|PRO|ULTRA   (per-tier override)
+   * A non-numeric / non-positive value is ignored and the default applies.
+   */
+  private liveAgentMaxOutputTokens(tier: LlmTier): number {
+    const TIER_DEFAULTS: Record<LlmTier, number> = {
+      flash: 2048,
+      pro: 8192,
+      ultra: 16384,
+      thinking: 16384,
+    }
+    const parse = (raw: unknown): number | null => {
+      const n = Number(raw)
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : null
+    }
+    const perTier = parse(this.config.get(`AGENT_MAX_OUTPUT_TOKENS_${tier.toUpperCase()}`))
+    const globalCap = parse(this.config.get('AGENT_MAX_OUTPUT_TOKENS'))
+    return perTier ?? globalCap ?? TIER_DEFAULTS[tier]
   }
 
   /**
