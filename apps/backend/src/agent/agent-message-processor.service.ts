@@ -314,6 +314,11 @@ export class AgentMessageProcessorService {
         mediaType: true,
         mediaUrl: true,
         metadata: true,
+        // The message a customer quoted (e.g. tapped "reply" on a product card).
+        // Needed so we can describe the referenced product to the agent.
+        replyTo: {
+          select: { message: true, mediaType: true, metadata: true },
+        },
       },
     })
 
@@ -327,6 +332,20 @@ export class AgentMessageProcessorService {
         recentMessages[0].message,
         recentMessages[0].mediaType,
         recentMessages[0].metadata,
+      )
+    }
+
+    // The customer replied to (quoted) a previous message — most often a product
+    // card ("celle-ci", "la même couleur", "je veux ça taille 58"). Surface the
+    // quoted product (with its retailer id) so the agent knows what they mean
+    // instead of asking in a loop. Images go through their own pipeline below.
+    const quotedMessage = recentMessages[0]?.replyTo
+    if (quotedMessage && event.message.mediaType !== 'image') {
+      userMessageContent = describeMessageForAgent(
+        userMessageContent,
+        event.message.mediaType ?? null,
+        null,
+        quotedMessage,
       )
     }
 
@@ -397,7 +416,7 @@ export class AgentMessageProcessorService {
       .reverse()
       .slice(0, -1) // Exclude the last message (current)
       .map((m) => {
-        const content = describeMessageForAgent(m.message, m.mediaType, m.metadata)
+        const content = describeMessageForAgent(m.message, m.mediaType, m.metadata, m.replyTo)
         // Previous page/agent replies must be AI messages, not system messages:
         // the model (Gemini) requires the single system message to be first, and
         // interleaved system messages trigger "System message should be the first one".
