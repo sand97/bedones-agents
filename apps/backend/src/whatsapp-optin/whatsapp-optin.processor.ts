@@ -24,8 +24,8 @@ export class WhatsappOptinProcessor extends WorkerHost implements OnModuleInit {
       return
     }
     if (name === 'send-template') {
-      const { userId, organisationId } = job.data as SendTemplateJobData
-      await this.optin.sendOptInTemplate(userId, organisationId)
+      const { userId, organisationId, trigger } = job.data as SendTemplateJobData
+      await this.optin.sendOptInTemplate(userId, organisationId, trigger ?? 'cron')
       return
     }
     this.logger.warn(`[WA opt-in] unknown job name: ${String(name)}`)

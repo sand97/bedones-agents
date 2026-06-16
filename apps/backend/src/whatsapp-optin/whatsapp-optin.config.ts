@@ -30,13 +30,20 @@ export const optinConfig = () => ({
   templateName: process.env.WHATSAPP_OPTIN_TEMPLATE_NAME ?? 'accept_notification',
   tickCron: process.env.WHATSAPP_OPTIN_TICK_CRON ?? '0 * * * *',
   localHour: Number(process.env.WHATSAPP_OPTIN_LOCAL_HOUR ?? '8'),
+  // Frontend base URL for the deep link in the "window opened" confirmation
+  // message (CTA button → the member's notification settings modal).
+  frontendUrl: (process.env.FRONTEND_URL ?? 'https://moderator.bedones.com').replace(/\/$/, ''),
 })
 
 export type OptinJobName = 'tick-hourly' | 'send-template'
 
+/** What caused an opt-in template to be sent — surfaced as a PostHog property. */
+export type OptinTrigger = 'cron' | 'dashboard'
+
 export interface SendTemplateJobData {
   userId: string
   organisationId: string
+  trigger?: OptinTrigger
 }
 
 /**

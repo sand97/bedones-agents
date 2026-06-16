@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
 import { PrismaService } from '../prisma/prisma.service'
+import { PostHogService } from '../posthog/posthog.service'
 import { WhatsappOptinService } from '../whatsapp-optin/whatsapp-optin.service'
 import { CatalogService } from '../catalog/catalog.service'
 
@@ -42,6 +43,7 @@ export class TicketNotificationService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly posthog: PostHogService,
     private readonly optin: WhatsappOptinService,
     private readonly catalog: CatalogService,
   ) {}
@@ -158,6 +160,19 @@ export class TicketNotificationService {
     this.logger.log(
       `[TicketNotif] ${kind} ${ticketId}: ${sent}/${recipients.length} delivered (collections=${collectionsCount})`,
     )
+    this.posthog.capture({
+      distinctId: organisationId,
+      event: 'ticket_notification_dispatched',
+      properties: {
+        organisationId,
+        ticketId,
+        kind,
+        sent,
+        recipients: recipients.length,
+        collections: collectionsCount,
+      },
+      groups: { organisation: organisationId },
+    })
   }
 
   /** Collections (Meta product_set ids) the ticket's frozen articles belong to. */

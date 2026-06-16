@@ -2,10 +2,12 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { I18nContext } from 'nestjs-i18n'
 import { PrismaService } from '../prisma/prisma.service'
+import { WhatsappOptinService } from '../whatsapp-optin/whatsapp-optin.service'
 import {
   BulkUpdateNotificationPreferenceDto,
   BulkUpdateTicketStatusNotificationDto,
@@ -29,7 +31,35 @@ const MESSAGE_TYPES: NotificationTypeValue[] = [
 
 @Injectable()
 export class NotificationPreferenceService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(NotificationPreferenceService.name)
+
+  constructor(
+    private prisma: PrismaService,
+    private readonly optin: WhatsappOptinService,
+  ) {}
+
+  /**
+   * Enabling a notification from the dashboard makes the member eligible, so we
+   * kick off the WhatsApp opt-in template right away — they can open their 24h
+   * window without waiting for the daily cron. Fire-and-forget: a queue/Redis
+   * hiccup must never make saving the preference fail (the cron is the
+   * fallback).
+   */
+  private requestOptInForEnabled(userIds: string[], organisationId: string): void {
+    void Promise.all(
+      userIds.map((userId) =>
+        this.optin
+          .requestOptIn(userId, organisationId, 'dashboard')
+          .catch((err) =>
+            this.logger.warn(
+              `[NotifPref] opt-in request failed for user ${userId} / org ${organisationId}: ${
+                err instanceof Error ? err.message : err
+              }`,
+            ),
+          ),
+      ),
+    )
+  }
 
   async getForOrg(currentUserId: string, organisationId: string, rawUserIds?: string) {
     await this.assertMembership(currentUserId, organisationId)
@@ -161,6 +191,8 @@ export class NotificationPreferenceService {
       ),
     )
 
+    if (dto.enabled) this.requestOptInForEnabled(dto.userIds, organisationId)
+
     return this.prisma.notificationPreference.findMany({
       where: {
         userId: { in: dto.userIds },
@@ -212,6 +244,8 @@ export class NotificationPreferenceService {
         }),
       ),
     )
+
+    if (dto.enabled) this.requestOptInForEnabled(dto.userIds, organisationId)
 
     return this.prisma.ticketStatusNotification.findMany({
       where: {
