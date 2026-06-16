@@ -157,6 +157,11 @@ function mapApiConversation(
     participantName: string
     participantUsername?: string | null
     participantAvatar?: string | null
+    // True when participantName came from the WhatsApp Business address-book sync
+    // (smb_app_state_sync) — an authoritative contact name. When false/absent the
+    // name is just the self-set WhatsApp profile pseudo. Returned by the API at
+    // runtime but not declared in the generated Swagger type.
+    contactNameSynced?: boolean | null
     lastMessageText?: string | null
     lastMessageAt?: string | null
     unreadCount: number
@@ -181,16 +186,38 @@ function mapApiConversation(
 ): Conversation {
   const isWhatsApp = provider === 'whatsapp'
   const isTikTok = provider === 'tiktok'
+  const phone = isWhatsApp && conv.participantId ? `+${conv.participantId}` : ''
+  // On WhatsApp, participantName is only a meaningful contact name when it came
+  // from the business address-book sync (contactNameSynced). Otherwise it's just
+  // the self-set profile pseudo, so we surface the phone number as the primary
+  // label — easier to find a contact in the list — and demote the pseudo to the
+  // secondary line.
+  const whatsAppPseudoOnly = isWhatsApp && !conv.contactNameSynced && !!phone
+
+  // Secondary line under the name. For a pseudo-only WhatsApp contact it's the
+  // demoted profile pseudo (skipped when empty or just the bare number); for
+  // TikTok it stays the @handle.
+  let username: string | undefined
+  if (whatsAppPseudoOnly) {
+    username =
+      conv.participantName && conv.participantName !== conv.participantId
+        ? conv.participantName
+        : undefined
+  } else if (
+    isTikTok &&
+    conv.participantUsername &&
+    conv.participantUsername !== conv.participantName
+  ) {
+    username = `@${conv.participantUsername}`
+  }
+
   return {
     id: conv.id,
     contact: {
       id: conv.participantId,
-      name: conv.participantName,
-      phone: isWhatsApp && conv.participantId ? `+${conv.participantId}` : isTikTok ? '' : '',
-      username:
-        isTikTok && conv.participantUsername && conv.participantUsername !== conv.participantName
-          ? `@${conv.participantUsername}`
-          : undefined,
+      name: whatsAppPseudoOnly ? phone : conv.participantName,
+      phone,
+      username,
       avatarUrl: conv.participantAvatar ?? undefined,
     },
     messages: messages.map((m) => {
