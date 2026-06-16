@@ -35,6 +35,11 @@ function isRefusal(buttonId?: string, buttonTitle?: string): boolean {
   return REFUSAL_TOKENS.has(norm(buttonId)) || REFUSAL_TOKENS.has(norm(buttonTitle))
 }
 
+/** A free-form notification payload sent inside an open opt-in window. */
+export type WaNotification =
+  | { kind: 'text'; text: string }
+  | { kind: 'interactive'; interactive: Record<string, unknown> }
+
 @Injectable()
 export class WhatsappOptinService {
   private readonly logger = new Logger(WhatsappOptinService.name)
@@ -481,7 +486,7 @@ export class WhatsappOptinService {
   async dispatchNotification(
     userId: string,
     organisationId: string,
-    text: string,
+    message: WaNotification,
   ): Promise<boolean> {
     if (!(await this.isWindowOpen(userId, organisationId))) {
       this.captureNotif(userId, organisationId, 'dropped', 'window_closed')
@@ -503,6 +508,17 @@ export class WhatsappOptinService {
       return false
     }
 
+    const to = user.phone.replace('+', '')
+    const payload =
+      message.kind === 'text'
+        ? { messaging_product: 'whatsapp', to, type: 'text', text: { body: message.text } }
+        : {
+            messaging_product: 'whatsapp',
+            to,
+            type: 'interactive',
+            interactive: message.interactive,
+          }
+
     const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${cfg.corePhoneNumberId}/messages`
     const res = await fetch(url, {
       method: 'POST',
@@ -510,12 +526,7 @@ export class WhatsappOptinService {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${cfg.coreAccessToken}`,
       },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: user.phone.replace('+', ''),
-        type: 'text',
-        text: { body: text },
-      }),
+      body: JSON.stringify(payload),
     })
     if (!res.ok) {
       const json = await res.json().catch(() => ({}))
