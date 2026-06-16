@@ -335,18 +335,43 @@ export class AgentMessageProcessorService {
       )
     }
 
-    // The customer replied to (quoted) a previous message — most often a product
-    // card ("celle-ci", "la même couleur", "je veux ça taille 58"). Surface the
-    // quoted product (with its retailer id) so the agent knows what they mean
-    // instead of asking in a loop. Images go through their own pipeline below.
+    // The customer is referring to a previous product ("celle-ci", "la même
+    // couleur", "je veux ça taille 58"). Surface that product — with its retailer
+    // id — so the agent knows what they mean instead of asking in a loop. Two
+    // sources, in priority:
+    //   1. WhatsApp's explicit `referred_product` (stored as metadata.referredProduct
+    //      by the webhook): the exact retailer id, reliable even when we never
+    //      stored the quoted message ourselves.
+    //   2. Otherwise the quoted message resolved via context.id (replyTo).
+    // Images go through their own pipeline below.
+    const currentMeta =
+      recentMessages[0]?.metadata && typeof recentMessages[0].metadata === 'object'
+        ? (recentMessages[0].metadata as { referredProduct?: { retailerId?: string } })
+        : null
+    const referredRetailerId = currentMeta?.referredProduct?.retailerId
     const quotedMessage = recentMessages[0]?.replyTo
-    if (quotedMessage && event.message.mediaType !== 'image') {
-      userMessageContent = describeMessageForAgent(
-        userMessageContent,
-        event.message.mediaType ?? null,
-        null,
-        quotedMessage,
-      )
+    if (event.message.mediaType !== 'image' && (referredRetailerId || quotedMessage)) {
+      let quotedText: string | null = null
+      if (referredRetailerId) {
+        // Enrich the id with a human-readable name from the quoted card when we have it.
+        const name = quotedMessage
+          ? extractProductRefs(quotedMessage.metadata).find(
+              (r) => r.retailerId === referredRetailerId,
+            )?.name
+          : undefined
+        quotedText = name ? `${name} (${referredRetailerId})` : `produit ${referredRetailerId}`
+      } else if (quotedMessage) {
+        quotedText = describeMessageForAgent(
+          quotedMessage.message,
+          quotedMessage.mediaType,
+          quotedMessage.metadata,
+        )
+      }
+      if (quotedText) {
+        userMessageContent = userMessageContent
+          ? `${userMessageContent} [en réponse à : ${quotedText}]`
+          : `[en réponse à : ${quotedText}]`
+      }
     }
 
     // Handle image messages via product matching pipeline
