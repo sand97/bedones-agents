@@ -1,3 +1,5 @@
+import countryCodes from '@app/data/CountryCodes.json'
+
 /**
  * Lightweight per-country phone display formatting.
  *
@@ -64,4 +66,39 @@ export function formatPhoneNumber(digits: string, countryIsoCode?: string | null
     out.push(clean.slice(cursor))
   }
   return out.join(' ')
+}
+
+interface CountryDialEntry {
+  name: string
+  dial_code: string
+  code: string
+}
+
+// Dial codes sorted longest-first so longer codes win over shorter prefixes
+// when greedily matching the start of a number.
+const DIAL_CODES_BY_LENGTH = (countryCodes as CountryDialEntry[])
+  .slice()
+  .sort((a, b) => b.dial_code.length - a.dial_code.length)
+
+/**
+ * Format a full international number for display, e.g.
+ * "+237657888690" → "+237 657 88 86 90".
+ *
+ * Detects the country dial code (longest match first) from CountryCodes.json,
+ * then groups the local part per-country via {@link formatPhoneNumber}. Numbers
+ * whose dial code isn't recognised fall back to default grouping. Accepts values
+ * with or without a leading "+" and tolerates existing spaces.
+ */
+export function formatInternationalPhone(value?: string | null): string {
+  if (!value) return ''
+  const digits = value.replace(/[^0-9]/g, '')
+  if (!digits) return ''
+
+  const match = DIAL_CODES_BY_LENGTH.find((c) => `+${digits}`.startsWith(c.dial_code))
+  if (!match) return `+${formatPhoneNumber(digits)}`
+
+  const dialDigits = match.dial_code.replace(/[^0-9]/g, '')
+  const local = digits.slice(dialDigits.length)
+  const localFormatted = formatPhoneNumber(local, match.code)
+  return localFormatted ? `${match.dial_code} ${localFormatted}` : match.dial_code
 }

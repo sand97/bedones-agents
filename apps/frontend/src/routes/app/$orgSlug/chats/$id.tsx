@@ -49,6 +49,7 @@ import { useTikTokBusinessCheck } from '@app/hooks/use-tiktok-business-check'
 import { TikTokBusinessGuideModal } from '@app/components/tiktok/tiktok-business-guide-modal'
 import { getStoredChatAccount, setStoredChatAccount } from '@app/lib/chat-account-storage'
 import { readCatalogMigrationDraft } from '@app/lib/catalog-migration-draft'
+import { formatInternationalPhone } from '@app/lib/phone-format'
 import type { Conversation, Message } from '@app/components/whatsapp/mock-data'
 
 export const Route = createFileRoute('/app/$orgSlug/chats/$id')({
@@ -215,7 +216,9 @@ function mapApiConversation(
     id: conv.id,
     contact: {
       id: conv.participantId,
-      name: whatsAppPseudoOnly ? phone : conv.participantName,
+      // Pseudo-only WhatsApp: show the country-formatted number as the primary
+      // label. `phone` stays raw (digits) for copy/search.
+      name: whatsAppPseudoOnly ? formatInternationalPhone(phone) : conv.participantName,
       phone,
       username,
       avatarUrl: conv.participantAvatar ?? undefined,

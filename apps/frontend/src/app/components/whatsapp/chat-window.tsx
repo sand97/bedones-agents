@@ -32,6 +32,7 @@ import dayjs from 'dayjs'
 import { DoubleCheckIcon, SingleCheckIcon, OptionsIcon } from '@app/components/icons/social-icons'
 import { $api } from '@app/lib/api/$api'
 import { getAvatarColor } from '@app/lib/avatar-color'
+import { formatInternationalPhone } from '@app/lib/phone-format'
 import type { Conversation, Message } from './mock-data'
 import { TicketCard } from './ticket-card'
 import { TicketDrawer, type RealTicket } from './ticket-drawer'
@@ -1017,8 +1018,11 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
           )}
           {!conversation.contact.username &&
             conversation.contact.phone &&
-            conversation.contact.phone !== conversation.contact.name && (
-              <div className="text-xs text-text-muted">{conversation.contact.phone}</div>
+            conversation.contact.phone.replace(/\D/g, '') !==
+              conversation.contact.name.replace(/\D/g, '') && (
+              <div className="text-xs text-text-muted">
+                {formatInternationalPhone(conversation.contact.phone)}
+              </div>
             )}
         </div>
 
@@ -1039,7 +1043,9 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
                     {copied
                       ? t('common.copied')
                       : conversation.contact.phone
-                        ? t('chat.copy_phone', { phone: conversation.contact.phone })
+                        ? t('chat.copy_phone', {
+                            phone: formatInternationalPhone(conversation.contact.phone),
+                          })
                         : conversation.contact.username}
                   </Button>
                 )}
