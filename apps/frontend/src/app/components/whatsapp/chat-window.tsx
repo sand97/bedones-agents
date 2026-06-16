@@ -1015,9 +1015,11 @@ function ChatHeader({ conversation }: { conversation: Conversation }) {
           {conversation.contact.username && (
             <div className="text-xs text-text-muted">{conversation.contact.username}</div>
           )}
-          {!conversation.contact.username && conversation.contact.phone && (
-            <div className="text-xs text-text-muted">{conversation.contact.phone}</div>
-          )}
+          {!conversation.contact.username &&
+            conversation.contact.phone &&
+            conversation.contact.phone !== conversation.contact.name && (
+              <div className="text-xs text-text-muted">{conversation.contact.phone}</div>
+            )}
         </div>
 
         {hasHeaderActions && (
