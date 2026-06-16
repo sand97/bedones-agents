@@ -1338,6 +1338,22 @@ export class WebhookService {
       replyToMid = msg.context.id
     }
 
+    // Product enquiry: WhatsApp tells us directly which catalog product the
+    // customer is referring to (e.g. they tapped a product → "Message" and wrote
+    // "celle-ci"). Persist it so the agent can cite the exact product even when we
+    // never stored the quoted message ourselves. When absent, we still fall back to
+    // resolving the quoted message by `context.id` (see agent message processor).
+    const referredProduct = msg.context?.referred_product
+    if (referredProduct?.product_retailer_id) {
+      metadata = {
+        ...(metadata ?? {}),
+        referredProduct: {
+          retailerId: referredProduct.product_retailer_id,
+          catalogId: referredProduct.catalog_id ?? null,
+        },
+      }
+    }
+
     if (msg.type === 'reaction') {
       await this.handleWhatsAppReaction(msg, senderId, orgId)
       return
@@ -4030,7 +4046,13 @@ interface WhatsAppMessage {
   }
   button?: { payload?: string; text?: string }
   reaction?: { message_id: string; emoji: string }
-  context?: { id?: string; from?: string }
+  context?: {
+    id?: string
+    from?: string
+    // Product enquiry: the customer messaged ABOUT a specific catalog product
+    // (tapped a product card → "Message"). WhatsApp gives us the product directly.
+    referred_product?: { catalog_id?: string; product_retailer_id?: string }
+  }
   // Present when the message originates from an ad (Click-to-WhatsApp) or an organic
   // post the customer tapped to message us from.
   referral?: {

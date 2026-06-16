@@ -60,12 +60,15 @@ export function createProductMessagingTools(deps: {
       if (!claimReply(deps.replyGuard)) return REPLY_ALREADY_SENT_NOTICE
 
       try {
-        // One product → keep the message on the card. Several individual cards
-        // (`product` format) → send the message once as its own text first, then
-        // the cards with no body, otherwise the same text repeats on every card.
+        // `product` format → always send the accompanying text as its OWN text
+        // message first, then the card(s) with no body. WhatsApp does not reliably
+        // render the Single Product Message `body` field, so a single-product send
+        // that relied on it would silently drop the agent's message; and for several
+        // cards a per-card body would just repeat. A standalone text message is
+        // delivered reliably in both cases.
         // (product_list already carries a single shared body, untouched.)
         const trimmedBody = bodyText?.trim()
-        const textFirst = format === 'product' && productIds.length > 1 && !!trimmedBody
+        const textFirst = format === 'product' && !!trimmedBody
         if (textFirst && trimmedBody) {
           await deps.messagingService.sendMessageAsAgent(deps.conversationId, trimmedBody)
         }

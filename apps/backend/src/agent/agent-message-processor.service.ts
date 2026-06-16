@@ -314,6 +314,11 @@ export class AgentMessageProcessorService {
         mediaType: true,
         mediaUrl: true,
         metadata: true,
+        // The message a customer quoted (e.g. tapped "reply" on a product card).
+        // Needed so we can describe the referenced product to the agent.
+        replyTo: {
+          select: { message: true, mediaType: true, metadata: true },
+        },
       },
     })
 
@@ -328,6 +333,45 @@ export class AgentMessageProcessorService {
         recentMessages[0].mediaType,
         recentMessages[0].metadata,
       )
+    }
+
+    // The customer is referring to a previous product ("celle-ci", "la même
+    // couleur", "je veux ça taille 58"). Surface that product — with its retailer
+    // id — so the agent knows what they mean instead of asking in a loop. Two
+    // sources, in priority:
+    //   1. WhatsApp's explicit `referred_product` (stored as metadata.referredProduct
+    //      by the webhook): the exact retailer id, reliable even when we never
+    //      stored the quoted message ourselves.
+    //   2. Otherwise the quoted message resolved via context.id (replyTo).
+    // Images go through their own pipeline below.
+    const currentMeta =
+      recentMessages[0]?.metadata && typeof recentMessages[0].metadata === 'object'
+        ? (recentMessages[0].metadata as { referredProduct?: { retailerId?: string } })
+        : null
+    const referredRetailerId = currentMeta?.referredProduct?.retailerId
+    const quotedMessage = recentMessages[0]?.replyTo
+    if (event.message.mediaType !== 'image' && (referredRetailerId || quotedMessage)) {
+      let quotedText: string | null = null
+      if (referredRetailerId) {
+        // Enrich the id with a human-readable name from the quoted card when we have it.
+        const name = quotedMessage
+          ? extractProductRefs(quotedMessage.metadata).find(
+              (r) => r.retailerId === referredRetailerId,
+            )?.name
+          : undefined
+        quotedText = name ? `${name} (${referredRetailerId})` : `produit ${referredRetailerId}`
+      } else if (quotedMessage) {
+        quotedText = describeMessageForAgent(
+          quotedMessage.message,
+          quotedMessage.mediaType,
+          quotedMessage.metadata,
+        )
+      }
+      if (quotedText) {
+        userMessageContent = userMessageContent
+          ? `${userMessageContent} [en réponse à : ${quotedText}]`
+          : `[en réponse à : ${quotedText}]`
+      }
     }
 
     // Handle image messages via product matching pipeline
@@ -397,7 +441,7 @@ export class AgentMessageProcessorService {
       .reverse()
       .slice(0, -1) // Exclude the last message (current)
       .map((m) => {
-        const content = describeMessageForAgent(m.message, m.mediaType, m.metadata)
+        const content = describeMessageForAgent(m.message, m.mediaType, m.metadata, m.replyTo)
         // Previous page/agent replies must be AI messages, not system messages:
         // the model (Gemini) requires the single system message to be first, and
         // interleaved system messages trigger "System message should be the first one".

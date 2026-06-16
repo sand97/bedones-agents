@@ -19,7 +19,34 @@ interface DescribableMeta {
   currency?: string | null
 }
 
+/** A message the current one is replying to (WhatsApp quote / context). */
+export interface QuotedMessage {
+  message: string | null
+  mediaType: string | null
+  metadata: unknown
+}
+
 export function describeMessageForAgent(
+  message: string | null,
+  mediaType: string | null,
+  metadata: unknown,
+  quoted?: QuotedMessage | null,
+): string {
+  const base = describeMessageBody(message, mediaType, metadata)
+  // When the customer quotes a previous message (e.g. taps "reply" on a product
+  // card and writes "celle-ci" / "la même couleur"), the bare text is meaningless
+  // without the quoted product. Surface it — with its retailer id — so the agent
+  // knows EXACTLY which product is referenced instead of asking again in a loop.
+  if (quoted) {
+    const quotedText = describeMessageBody(quoted.message, quoted.mediaType, quoted.metadata)
+    if (quotedText) {
+      return base ? `${base} [en réponse à : ${quotedText}]` : `[en réponse à : ${quotedText}]`
+    }
+  }
+  return base
+}
+
+function describeMessageBody(
   message: string | null,
   mediaType: string | null,
   metadata: unknown,
@@ -45,9 +72,19 @@ export function describeMessageForAgent(
     return `${text ? `${text} ` : ''}[Commande reçue: ${lines.join(', ')}${total}]`
   }
 
-  // Products the page sent (catalog / carousel / list): name them too.
+  // Products the page sent (catalog / carousel / list): name them AND carry their
+  // retailer id. Without the id the agent cannot re-send the exact product or
+  // re-attach its merchant context when the customer refers back to it.
   if (items.length > 0) {
-    const names = items.map((it) => it.name || it.productRetailerId).filter(Boolean)
+    const names = items
+      .map((it) =>
+        it.name
+          ? it.productRetailerId
+            ? `${it.name} (${it.productRetailerId})`
+            : it.name
+          : it.productRetailerId,
+      )
+      .filter(Boolean)
     const label = text || '[Produits envoyés]'
     return names.length > 0 ? `${label} (produits : ${names.join(', ')})` : label
   }
