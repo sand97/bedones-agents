@@ -85,8 +85,11 @@ export class WhatsappOptinService {
 
       // Any other inbound — the "Yes" opt-in tap OR a plain message — means the
       // member just (re)opened their 24h WhatsApp window by contacting us. Mirror
-      // it on our side and, if it was closed, confirm + link to their settings.
-      await this.openWindowAndInform(user.id)
+      // it on our side, then confirm + link to their settings. An explicit opt-in
+      // acceptance (a non-refusal button reply) ALWAYS gets the confirmation; a
+      // plain message only triggers it on the closed → open transition.
+      const isOptInAcceptance = !!(payload.buttonId || payload.buttonTitle)
+      await this.openWindowAndInform(user.id, isOptInAcceptance)
     } catch (err) {
       this.logger.error(`[WA opt-in] inbound handler failed: ${(err as Error).message}`)
     }
@@ -115,11 +118,11 @@ export class WhatsappOptinService {
    * The member contacted the CORE number, so their 24h WhatsApp window is open.
    * Mirror it on our side for the org we can attribute the contact to — the org
    * of the last opt-in template if the member is still eligible for it, else the
-   * first org they're eligible for. If that window was previously closed, send a
-   * one-off confirmation with a CTA button deep-linking to their notification
-   * settings (instead of re-asking with the opt-in template).
+   * first org they're eligible for. Then send the confirmation with a CTA button
+   * deep-linking to their notification settings: always on an explicit opt-in
+   * acceptance (`forceInform`), and on a closed → open transition otherwise.
    */
-  private async openWindowAndInform(userId: string): Promise<void> {
+  private async openWindowAndInform(userId: string, forceInform = false): Promise<void> {
     const eligible = await this.eligibleOrgIdsForUser(userId)
     if (eligible.length === 0) return
 
@@ -132,13 +135,18 @@ export class WhatsappOptinService {
     this.posthog.capture({
       distinctId: userId,
       event: 'whatsapp_optin_window_opened',
-      properties: { organisationId, alreadyOpen: wasOpen },
+      properties: {
+        organisationId,
+        alreadyOpen: wasOpen,
+        via: forceInform ? 'optin_accept' : 'inbound_message',
+      },
       groups: { organisation: organisationId },
     })
 
-    // Only inform on the closed → open transition so we don't spam a member who
-    // keeps messaging within an already-open window.
-    if (!wasOpen) await this.sendWindowOpenedInfo(userId, organisationId)
+    // Confirm on an explicit opt-in acceptance (forceInform), or — for a plain
+    // message — only on the closed → open transition so we don't spam a member
+    // who keeps messaging within an already-open window.
+    if (forceInform || !wasOpen) await this.sendWindowOpenedInfo(userId, organisationId)
   }
 
   /**
