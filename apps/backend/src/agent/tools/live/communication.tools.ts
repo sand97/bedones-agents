@@ -7,6 +7,7 @@ import {
   RUN_CANCELLED_NOTICE,
   claimReply,
   releaseReply,
+  endTurnAfterSend,
 } from './turn-guard'
 
 export function createCommunicationTools(deps: {
@@ -17,7 +18,7 @@ export function createCommunicationTools(deps: {
   signal?: AbortSignal
 }) {
   const replyToMessage = tool(
-    async ({ message }) => {
+    async ({ message }, config) => {
       // Yield once so a richer send_products / send_buttons emitted in the SAME
       // (parallel) tool batch claims the turn first — a plain text reply must
       // never pre-empt the product/button message the model sent alongside it.
@@ -26,7 +27,8 @@ export function createCommunicationTools(deps: {
       if (!claimReply(deps.replyGuard)) return REPLY_ALREADY_SENT_NOTICE
       try {
         await deps.messagingService.sendMessageAsAgent(deps.conversationId, message)
-        return `Message sent: "${message.substring(0, 50)}..."`
+        // Reply delivered → end the turn now (no second, wasted LLM call).
+        return endTurnAfterSend(`Message sent: "${message.substring(0, 50)}..."`, config)
       } catch (error: unknown) {
         releaseReply(deps.replyGuard)
         return `Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`
