@@ -52,6 +52,13 @@ export interface ImageProductMatchingResult {
 export class ImageProductMatchingService {
   private readonly logger = new Logger(ImageProductMatchingService.name)
   private static readonly MAX_PRODUCTS_IN_CONTEXT = 5
+  /**
+   * Above this top-match score, the image match is reliable enough to skip the
+   * explicit "is this the right product?" question — re-asking only stalls a sure
+   * match. The agent confirms IMPLICITLY and advances the sale; below it, it asks
+   * the customer to confirm. Env-overridable via IMAGE_IMPLICIT_CONFIRM_CONFIDENCE.
+   */
+  private static readonly DEFAULT_IMPLICIT_CONFIRM_CONFIDENCE = 0.85
 
   constructor(
     private readonly ocrService: OcrService,
@@ -271,6 +278,18 @@ export class ImageProductMatchingService {
     return [...candidates]
   }
 
+  /**
+   * Top-match score above which the agent confirms the image match implicitly
+   * instead of asking the customer. Defaults to 0.85, overridable via env
+   * IMAGE_IMPLICIT_CONFIRM_CONFIDENCE (a value in [0,1]); invalid values fall back.
+   */
+  private implicitConfirmConfidence(): number {
+    const raw = Number(process.env.IMAGE_IMPLICIT_CONFIRM_CONFIDENCE)
+    return Number.isFinite(raw) && raw > 0 && raw <= 1
+      ? raw
+      : ImageProductMatchingService.DEFAULT_IMPLICIT_CONFIRM_CONFIDENCE
+  }
+
   private buildImageContextBlock(data: {
     searchMethod: ImageSearchMethod
     matchedProducts: MatchedProduct[]
@@ -306,6 +325,23 @@ export class ImageProductMatchingService {
       const primary = data.matchedProducts[0]
       const productsLine = data.matchedProducts.map((p) => `${p.name} (${sendId(p)})`).join(' | ')
 
+      // Above the confidence gate, the match is reliable enough to skip the
+      // explicit "is this the right product?" question (it only stalls the sale):
+      // confirm IMPLICITLY and advance. Below it, ask the customer to confirm.
+      const highConfidence =
+        typeof data.confidence === 'number' && data.confidence >= this.implicitConfirmConfidence()
+
+      // To fetch/send the card, the agent MUST call get_product first: it is the
+      // exact retailer-id lookup that resolves the catalog (so send_products can
+      // actually send) and refreshes price from Meta. Calling send_products with a
+      // bare retailer id that no get_product/search_products resolved first fails
+      // to resolve the catalog — that is why a direct send "could not find" the
+      // product. send_products is OPTIONAL here (the customer already sent the
+      // photo, so they know the product): only show the card if it helps.
+      const instruction = highConfidence
+        ? "instruction=Produit identifie avec une FORTE confiance. NE redemande PAS au client de confirmer : pars du principe que c'est bien ce produit, confirme-le IMPLICITEMENT (ex: « Oui, il s'agit bien de notre Costume ceremonial bleu ») puis fais AVANCER la vente (demande la taille, la quantite, la livraison...). Le produit est deja identifie : PAS besoin de search_products. Pour (re)envoyer la fiche, appelle d'abord get_product avec le retailer_id puis send_products — jamais send_products seul avec un id non resolu, ni le product_id interne."
+        : "instruction=Confiance moderee : demande au client de confirmer en UNE phrase courte que c'est bien ce produit. Pour recuperer ou envoyer la fiche, appelle d'abord get_product avec le retailer_id (lookup exact qui resout le catalogue) PUIS send_products — jamais send_products seul avec un id non resolu, ni le product_id interne."
+
       return [
         '[IMAGE_CONTEXT]',
         `search_method=${data.searchMethod}`,
@@ -314,7 +350,7 @@ export class ImageProductMatchingService {
         `primary_retailer_id=${sendId(primary)}`,
         `primary_product_name=${primary.name}`,
         `confidence=${confidencePercent}`,
-        'instruction=Confirme avec le contact si ce produit correspond bien a son image. Pour envoyer la fiche produit, appelle send_products avec ce(s) retailer_id entre parentheses, jamais le product_id interne.',
+        instruction,
       ].join('\n')
     }
 
