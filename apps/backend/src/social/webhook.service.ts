@@ -1517,12 +1517,16 @@ export class WebhookService {
       provider: 'WHATSAPP',
     })
 
-    // WhatsApp envoie un message de type `unsupported` pour les contenus que la
-    // Cloud API ne sait pas relayer (sondages, messages éphémères / view-once,
-    // types récents non pris en charge…). On le persiste pour qu'il reste visible
-    // dans le fil, mais on NE déclenche PAS l'agent : il n'a aucun contenu
-    // exploitable et ne doit donc pas répondre à ces messages.
-    if (msg.type === 'unsupported') return
+    // WhatsApp envoie des messages « techniques » qui ne portent aucun contenu
+    // client exploitable : on les persiste pour qu'ils restent visibles dans le
+    // fil, mais on NE déclenche PAS l'agent (il n'aurait rien à quoi répondre) :
+    //   - `unsupported` : contenus que la Cloud API ne sait pas relayer (sondages,
+    //     messages éphémères / view-once, types récents non pris en charge…) ;
+    //   - `system` : notifications de compte (le client a changé de numéro ou de
+    //     code de sécurité) — c'est le message stocké sous la forme « [system] ».
+    // Les changements de statut (sent/delivered/read) passent, eux, par
+    // handleWhatsAppStatus et n'émettent jamais `message.incoming`.
+    if (msg.type === 'unsupported' || msg.type === 'system') return
 
     this.eventEmitter.emit('message.incoming', {
       conversationId: conversation.id,
