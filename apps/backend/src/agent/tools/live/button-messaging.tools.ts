@@ -8,6 +8,7 @@ import {
   RUN_CANCELLED_NOTICE,
   claimReply,
   releaseReply,
+  endTurnAfterSend,
 } from './turn-guard'
 
 export function createButtonMessagingTools(deps: {
@@ -18,7 +19,7 @@ export function createButtonMessagingTools(deps: {
   signal?: AbortSignal
 }) {
   const sendButtons = tool(
-    async ({ body, buttons }) => {
+    async ({ body, buttons }, config) => {
       if (deps.signal?.aborted) return RUN_CANCELLED_NOTICE
       // Claim synchronously (before any await) so a parallel reply_to_message in
       // the same batch is suppressed, not doubled.
@@ -29,7 +30,11 @@ export function createButtonMessagingTools(deps: {
           body,
           buttons,
         )
-        return `Proposal sent with ${buttons.length} button(s): ${buttons.map((b) => b.label).join(', ')}`
+        // Buttons delivered → end the turn now (no second, wasted LLM call).
+        return endTurnAfterSend(
+          `Proposal sent with ${buttons.length} button(s): ${buttons.map((b) => b.label).join(', ')}`,
+          config,
+        )
       } catch (error: unknown) {
         releaseReply(deps.replyGuard)
         return `Failed to send buttons: ${error instanceof Error ? error.message : 'Unknown error'}`

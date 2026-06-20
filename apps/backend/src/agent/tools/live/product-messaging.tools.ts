@@ -7,6 +7,7 @@ import {
   RUN_CANCELLED_NOTICE,
   claimReply,
   releaseReply,
+  endTurnAfterSend,
 } from './turn-guard'
 
 export function createProductMessagingTools(deps: {
@@ -20,7 +21,7 @@ export function createProductMessagingTools(deps: {
   signal?: AbortSignal
 }) {
   const sendProducts = tool(
-    async ({ productIds, catalogId, format, headerText, bodyText }) => {
+    async ({ productIds, catalogId, format, headerText, bodyText }, config) => {
       if (deps.signal?.aborted) return RUN_CANCELLED_NOTICE
       if (deps.replyGuard?.sent) return REPLY_ALREADY_SENT_NOTICE
 
@@ -80,7 +81,11 @@ export function createProductMessagingTools(deps: {
           headerText,
           textFirst ? undefined : bodyText,
         )
-        return `Successfully sent ${productIds.length} product(s) as ${format} message.`
+        // Products delivered → end the turn now (no second, wasted LLM call).
+        return endTurnAfterSend(
+          `Successfully sent ${productIds.length} product(s) as ${format} message.`,
+          config,
+        )
       } catch (error: unknown) {
         releaseReply(deps.replyGuard)
         return `Failed to send products: ${error instanceof Error ? error.message : 'Unknown error'}`
