@@ -24,6 +24,15 @@ export const LIVE_MODEL_TIERS = ['flash', 'pro', 'ultra'] as const
 export type LiveModelTier = (typeof LIVE_MODEL_TIERS)[number]
 
 /**
+ * LLM providers the platform can talk to. `xiaomi` is Xiaomi's MiMo API, which
+ * is OpenAI-compatible (we reach it through ChatOpenAI + a custom baseURL).
+ * The chosen primary provider runs first and the others act as automatic
+ * fallbacks, so any one can be the default without a code change.
+ */
+export type LlmProvider = 'gemini' | 'openai' | 'xiaomi'
+export const LLM_PROVIDERS: readonly LlmProvider[] = ['gemini', 'openai', 'xiaomi'] as const
+
+/**
  * Optional PostHog LLM-observability context. When provided, the LLM call is
  * traced in PostHog (tokens, cost, latency, prompts/responses, errors) and
  * attributed to the given person/organisation.
@@ -40,8 +49,8 @@ export interface LlmTraceContext {
 export interface LlmFactoryOptions {
   temperature?: number
   maxOutputTokens?: number
-  /** Force a specific provider. Default: LLM_DEFAULT_PROVIDER (Gemini unless set to "openai"). */
-  provider?: 'gemini' | 'openai'
+  /** Force a specific provider. Default: LLM_DEFAULT_PROVIDER (Gemini unless overridden). */
+  provider?: LlmProvider
   /** Override the model id. Default: the tier's env default. */
   model?: string
   /** Enable PostHog LLM observability for calls made with the returned model. */
@@ -52,9 +61,10 @@ export type ChatModel = Runnable<BaseLanguageModelInput, AIMessageChunk>
 export type StructuredChatModel<T> = Runnable<BaseLanguageModelInput, T>
 
 /**
- * Builds a chat model with one provider as primary and the other as fallback.
- * Gemini is primary by default; set LLM_DEFAULT_PROVIDER=openai to make ChatGPT
- * primary instead.
+ * Builds a chat model with one provider as primary and the others as automatic
+ * fallbacks. Gemini is primary by default; set LLM_DEFAULT_PROVIDER to `openai`
+ * (ChatGPT) or `xiaomi` (Xiaomi MiMo) to switch the whole platform — the live
+ * agent included — without a code change.
  *
  * Tiers:
  * - `thinking`: most capable reasoning model with extended thinking — internal,
@@ -64,8 +74,11 @@ export type StructuredChatModel<T> = Runnable<BaseLanguageModelInput, T>
  * - `ultra`: the most capable model (≈ thinking) for live responses.
  *
  * Env vars (with stable defaults):
- *   LLM_DEFAULT_PROVIDER    (default: gemini; set to "openai" to make ChatGPT primary)
- *   GEMINI_API_KEY, OPENAI_API_KEY (legacy: OPENIA_API_KEY)
+ *   LLM_DEFAULT_PROVIDER    (default: gemini; "openai" or "xiaomi" to switch primary)
+ *   LLM_PROVIDER_THINKING   (provider for agent config/onboarding; default: LLM_DEFAULT_PROVIDER)
+ *   LLM_PROVIDER_LIVE       (provider for live message replies; default: LLM_DEFAULT_PROVIDER)
+ *   GEMINI_API_KEY, OPENAI_API_KEY (legacy: OPENIA_API_KEY), XIAOMI_API_KEY
+ *   XIAOMI_BASE_URL         (OpenAI-compatible MiMo endpoint, default below)
  *   GEMINI_MODEL_THINKING   (default: gemini-3.1-pro-preview)
  *   GEMINI_MODEL_FLASH      (default: gemini-3-flash-preview)
  *   GEMINI_MODEL_PRO        (default: gemini-3-flash-preview, reasoning on)
@@ -74,6 +87,10 @@ export type StructuredChatModel<T> = Runnable<BaseLanguageModelInput, T>
  *   OPENAI_MODEL_FLASH      (default: gpt-5-mini)
  *   OPENAI_MODEL_PRO        (default: gpt-5-mini, reasoning on)
  *   OPENAI_MODEL_ULTRA      (default: gpt-5)
+ *   XIAOMI_MODEL_THINKING   (default: mimo-v2.5-pro)
+ *   XIAOMI_MODEL_FLASH      (default: mimo-v2.5)
+ *   XIAOMI_MODEL_PRO        (default: mimo-v2.5-pro)
+ *   XIAOMI_MODEL_ULTRA      (default: mimo-v2.5-pro)
  *   GEMINI_THINKING_BUDGET  (default: 0 = off for flash, -1 = dynamic otherwise)
  *   OPENAI_REASONING_EFFORT (default: medium; applied to every tier except flash)
  */
@@ -87,21 +104,18 @@ export class LlmFactoryService {
   ) {}
 
   createChatModel(tier: LlmTier, options: LlmFactoryOptions = {}): ChatModel {
-    const gemini = this.buildGemini(tier, options)
-    const openai = this.buildOpenAI(tier, options)
+    const built = this.orderedProviders(tier, options.provider)
+      .map((p) => this.buildProvider(p, tier, options))
+      .filter((m): m is ChatGoogleGenerativeAI | ChatOpenAI => m !== null)
 
-    const openaiFirst = this.defaultProvider() === 'openai'
-    const primary = openaiFirst ? openai : gemini
-    const fallback = openaiFirst ? gemini : openai
+    const [primary, ...fallbacks] = built
+    const model: ChatModel | null = primary
+      ? fallbacks.length
+        ? primary.withFallbacks(fallbacks)
+        : primary
+      : null
 
-    const model: ChatModel | null =
-      primary && fallback ? primary.withFallbacks([fallback]) : (primary ?? fallback)
-
-    if (!model) {
-      throw new Error(
-        'No LLM API key configured. Set GEMINI_API_KEY and/or OPENAI_API_KEY in your env.',
-      )
-    }
+    if (!model) throw this.noProviderError()
 
     return this.withPosthogTracing(model, options.trace)
   }
@@ -116,30 +130,19 @@ export class LlmFactoryService {
     schema: ZodV4Like<T>,
     options: LlmFactoryOptions = {},
   ): StructuredChatModel<T> {
-    const gemini = this.buildGemini(tier, options)
-    const openai = this.buildOpenAI(tier, options)
+    const structured = this.orderedProviders(tier, options.provider)
+      .map((p) => this.buildProvider(p, tier, options))
+      .filter((m): m is ChatGoogleGenerativeAI | ChatOpenAI => m !== null)
+      .map((m) => m.withStructuredOutput(schema) as StructuredChatModel<T>)
 
-    const geminiStructured = gemini
-      ? (gemini.withStructuredOutput(schema) as StructuredChatModel<T>)
+    const [primary, ...fallbacks] = structured
+    const model: StructuredChatModel<T> | null = primary
+      ? fallbacks.length
+        ? (primary.withFallbacks(fallbacks) as StructuredChatModel<T>)
+        : primary
       : null
-    const openaiStructured = openai
-      ? (openai.withStructuredOutput(schema) as StructuredChatModel<T>)
-      : null
 
-    const openaiFirst = this.defaultProvider() === 'openai'
-    const primary = openaiFirst ? openaiStructured : geminiStructured
-    const fallback = openaiFirst ? geminiStructured : openaiStructured
-
-    const model: StructuredChatModel<T> | null =
-      primary && fallback
-        ? (primary.withFallbacks([fallback]) as StructuredChatModel<T>)
-        : (primary ?? fallback)
-
-    if (!model) {
-      throw new Error(
-        'No LLM API key configured. Set GEMINI_API_KEY and/or OPENAI_API_KEY in your env.',
-      )
-    }
+    if (!model) throw this.noProviderError()
 
     return this.withPosthogTracing(model, options.trace)
   }
@@ -165,18 +168,16 @@ export class LlmFactoryService {
       maxOutputTokens: options.maxOutputTokens ?? this.liveAgentMaxOutputTokens(tier),
     }
 
-    let model: ChatGoogleGenerativeAI | ChatOpenAI | null
-    if (capped.provider === 'openai') model = this.buildOpenAI(tier, capped)
-    else if (capped.provider === 'gemini') model = this.buildGemini(tier, capped)
-    else if (this.defaultProvider() === 'openai')
-      model = this.buildOpenAI(tier, capped) ?? this.buildGemini(tier, capped)
-    else model = this.buildGemini(tier, capped) ?? this.buildOpenAI(tier, capped)
-
-    if (!model) {
-      throw new Error(
-        'No LLM API key configured for the requested provider. Set GEMINI_API_KEY and/or OPENAI_API_KEY in your env.',
-      )
+    // First provider with a configured key wins, preferring the forced/default
+    // one. The live agent has no fallback chain here, so a single concrete model
+    // is returned (bindTools must stay reachable).
+    let model: ChatGoogleGenerativeAI | ChatOpenAI | null = null
+    for (const provider of this.orderedProviders(tier, capped.provider)) {
+      model = this.buildProvider(provider, tier, capped)
+      if (model) break
     }
+
+    if (!model) throw this.noProviderError()
     return model
   }
 
@@ -253,16 +254,60 @@ export class LlmFactoryService {
     return model.withConfig({ callbacks: [handler as BaseCallbackHandler] }) as Runnable<I, O>
   }
 
+  /** Parses an env value into a known provider, or undefined if unset/invalid. */
+  private parseProvider(raw: string | undefined): LlmProvider | undefined {
+    const v = raw?.trim().toLowerCase()
+    return (LLM_PROVIDERS as readonly string[]).includes(v ?? '') ? (v as LlmProvider) : undefined
+  }
+
   /**
-   * Default provider used when the caller doesn't force one. Switchable via env
-   * `LLM_DEFAULT_PROVIDER` (`gemini` | `openai`); defaults to Gemini. Lets ops
-   * flip the whole platform (the live agent included) from Gemini to ChatGPT
-   * without a code change.
+   * Default provider used when the caller doesn't force one. Resolved **per use
+   * case** so config and live replies can run on different providers (e.g. keep
+   * Gemini for onboarding/context analysis but answer customers on the much
+   * cheaper Xiaomi MiMo):
+   *   - `thinking` tier (agent configuration: onboarding, catalog analysis,
+   *     feedback, ticket decisions) → `LLM_PROVIDER_THINKING`
+   *   - `flash`/`pro`/`ultra` tiers (live message responses) → `LLM_PROVIDER_LIVE`
+   * Each falls back to the global `LLM_DEFAULT_PROVIDER`, which defaults to
+   * Gemini. All accept `gemini` | `openai` | `xiaomi`.
    */
-  private defaultProvider(): 'gemini' | 'openai' {
-    return this.config.get<string>('LLM_DEFAULT_PROVIDER')?.trim().toLowerCase() === 'openai'
-      ? 'openai'
-      : 'gemini'
+  private defaultProvider(tier?: LlmTier): LlmProvider {
+    const global = this.parseProvider(this.config.get<string>('LLM_DEFAULT_PROVIDER')) ?? 'gemini'
+    if (!tier) return global
+    const perUseCaseKey = tier === 'thinking' ? 'LLM_PROVIDER_THINKING' : 'LLM_PROVIDER_LIVE'
+    return this.parseProvider(this.config.get<string>(perUseCaseKey)) ?? global
+  }
+
+  /**
+   * Providers ordered primary-first: the forced one (or the per-use-case env
+   * default for the tier) leads, the rest follow as fallbacks in their declared
+   * order. Drives both the fallback chains and the single-model tool-calling path.
+   */
+  private orderedProviders(tier: LlmTier, forced?: LlmProvider): LlmProvider[] {
+    const primary = forced ?? this.defaultProvider(tier)
+    return [primary, ...LLM_PROVIDERS.filter((p) => p !== primary)]
+  }
+
+  /** Builds the concrete chat model for a provider, or null if no key is set. */
+  private buildProvider(
+    provider: LlmProvider,
+    tier: LlmTier,
+    options: LlmFactoryOptions,
+  ): ChatGoogleGenerativeAI | ChatOpenAI | null {
+    switch (provider) {
+      case 'openai':
+        return this.buildOpenAI(tier, options)
+      case 'xiaomi':
+        return this.buildXiaomi(tier, options)
+      default:
+        return this.buildGemini(tier, options)
+    }
+  }
+
+  private noProviderError(): Error {
+    return new Error(
+      'No LLM API key configured. Set GEMINI_API_KEY, OPENAI_API_KEY and/or XIAOMI_API_KEY in your env.',
+    )
   }
 
   /** Concrete Gemini model id for a tier (env-overridable). */
@@ -292,6 +337,21 @@ export class LlmFactoryService {
         return c('OPENAI_MODEL_PRO', 'gpt-5-mini')
       default:
         return c('OPENAI_MODEL_FLASH', 'gpt-5-mini')
+    }
+  }
+
+  /** Concrete Xiaomi MiMo model id for a tier (env-overridable). */
+  private xiaomiModelFor(tier: LlmTier): string {
+    const c = (key: string, def: string) => this.config.get<string>(key) || def
+    switch (tier) {
+      case 'thinking':
+        return c('XIAOMI_MODEL_THINKING', 'mimo-v2.5-pro')
+      case 'ultra':
+        return c('XIAOMI_MODEL_ULTRA', 'mimo-v2.5-pro')
+      case 'pro':
+        return c('XIAOMI_MODEL_PRO', 'mimo-v2.5-pro')
+      default:
+        return c('XIAOMI_MODEL_FLASH', 'mimo-v2.5')
     }
   }
 
@@ -345,6 +405,33 @@ export class LlmFactoryService {
       temperature: supportsTemperature ? (options.temperature ?? 0.3) : undefined,
       maxTokens: options.maxOutputTokens,
       reasoning: tier !== 'flash' ? { effort: reasoningEffort } : undefined,
+    })
+  }
+
+  /**
+   * Xiaomi MiMo. The MiMo API is OpenAI-compatible, so we reuse ChatOpenAI and
+   * just point it at the MiMo endpoint via `XIAOMI_BASE_URL`. We deliberately do
+   * NOT send OpenAI's `reasoning` param (it's provider-specific and a non-OpenAI
+   * endpoint may reject it); temperature/maxTokens are standard and kept.
+   */
+  private buildXiaomi(tier: LlmTier, options: LlmFactoryOptions): ChatOpenAI | null {
+    const apiKey = this.config.get<string>('XIAOMI_API_KEY')
+    if (!apiKey) return null
+
+    // MiMo's OpenAI-compatible endpoint (per the MiMo API docs). The platform
+    // also exposes an Anthropic-compatible one at /anthropic, but we go through
+    // ChatOpenAI so we use /v1.
+    const baseURL =
+      this.config.get<string>('XIAOMI_BASE_URL')?.trim() || 'https://api.xiaomimimo.com/v1'
+
+    const model = options.model ?? this.xiaomiModelFor(tier)
+
+    return new ChatOpenAI({
+      apiKey,
+      model,
+      temperature: options.temperature ?? 0.3,
+      maxTokens: options.maxOutputTokens,
+      configuration: { baseURL },
     })
   }
 }
