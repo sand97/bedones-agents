@@ -5,7 +5,13 @@
 /apps/frontend/node_modules/
 /apps/frontend/.tanstack/
 /.idea/
-/.claude/
+# Ignorer .claude/ SAUF la config de hook versionnée : en environnement remote
+# éphémère (repo recloné à chaque session), seul ce qui est commité persiste.
+/.claude/*
+!/.claude/settings.json
+!/.claude/hooks/
+/.claude/hooks/*
+!/.claude/hooks/verify-pr.sh
 /apps/backend/.env
 /apps/frontend/.env
 /apps/frontend/dist/
