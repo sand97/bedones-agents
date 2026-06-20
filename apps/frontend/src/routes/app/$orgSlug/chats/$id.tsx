@@ -319,6 +319,7 @@ function mapApiConversation(
         localId,
         status,
         imageUrl: m.mediaType === 'image' ? (m.mediaUrl ?? undefined) : undefined,
+        imageCaption: m.mediaType === 'image' ? m.message || undefined : undefined,
         audioUrl: m.mediaType === 'audio' ? (m.mediaUrl ?? undefined) : undefined,
         videoUrl: m.mediaType === 'video' ? (m.mediaUrl ?? undefined) : undefined,
         videoThumbnail: m.mediaType === 'video' ? (m.mediaUrl ?? undefined) : undefined,
