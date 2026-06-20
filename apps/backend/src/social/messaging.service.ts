@@ -661,6 +661,10 @@ export class MessagingService {
   async sendMessageAsAgent(
     conversationId: string,
     message: string,
+    /** Optional structured metadata stored on the saved message (e.g.
+     *  `{ aboutProducts: [{ retailerId }] }` so a text reply keeps the products
+     *  it discussed in the conversation's product context). */
+    metadata?: Record<string, unknown>,
   ): Promise<{ id: string; message: string }> {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
@@ -747,6 +751,7 @@ export class MessagingService {
         isRead: true,
         deliveryStatus: provider === 'WHATSAPP' ? 'sent' : null,
         createdTime: new Date(),
+        metadata: (metadata as Prisma.InputJsonValue | undefined) ?? Prisma.JsonNull,
       },
     })
 

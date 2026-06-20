@@ -17,6 +17,13 @@ interface DescribableMeta {
   items?: DescribableItem[]
   total?: number
   currency?: string | null
+  /**
+   * Products an agent text message is ABOUT — it discussed/confirmed/asked about
+   * them without sending a card. Set by reply_to_message so the conversation can
+   * re-attach their merchant context (sizes, rules) on later turns, even though
+   * no product card was sent.
+   */
+  aboutProducts?: Array<{ retailerId?: string; name?: string | null }>
 }
 
 /** A message the current one is replying to (WhatsApp quote / context). */
@@ -96,18 +103,24 @@ function describeMessageBody(
 /**
  * Extract the structured product references a stored message carries in its
  * `metadata` — the exact retailer ids of products the page SENT (catalog / list
- * cards) or the customer ORDERED (cart). Free text is intentionally ignored: only
- * these exact ids are reliable enough to re-attach a product's merchant context.
+ * cards), the customer ORDERED (cart), or that an agent text reply was explicitly
+ * ABOUT (`aboutProducts`). Free text is intentionally ignored: only these exact
+ * ids are reliable enough to re-attach a product's merchant context.
  */
 export function extractProductRefs(
   metadata: unknown,
 ): Array<{ retailerId: string; name?: string }> {
   const meta = metadata && typeof metadata === 'object' ? (metadata as DescribableMeta) : null
-  const items = Array.isArray(meta?.items) ? meta.items : []
   const refs: Array<{ retailerId: string; name?: string }> = []
-  for (const it of items) {
+  for (const it of Array.isArray(meta?.items) ? meta.items : []) {
     if (typeof it.productRetailerId === 'string' && it.productRetailerId) {
       refs.push({ retailerId: it.productRetailerId, name: it.name ?? undefined })
+    }
+  }
+  // Products an agent reply flagged as its subject without sending a card.
+  for (const a of Array.isArray(meta?.aboutProducts) ? meta.aboutProducts : []) {
+    if (typeof a.retailerId === 'string' && a.retailerId) {
+      refs.push({ retailerId: a.retailerId, name: a.name ?? undefined })
     }
   }
   return refs
