@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { createFileRoute, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { buildShareMeta } from '@app/lib/share-meta'
 import { useTranslation } from 'react-i18next'
@@ -27,6 +27,10 @@ import {
   buildInstagramOAuthUrl,
   buildTikTokOAuthUrl,
 } from '@app/lib/auth-redirect'
+import {
+  getStoredCommentsAccount,
+  setStoredCommentsAccount,
+} from '@app/lib/comments-account-storage'
 
 export const Route = createFileRoute('/app/$orgSlug/comments/$id')({
   head: () =>
@@ -187,9 +191,6 @@ function CommentsPage() {
 
   const hasSelectedPost = !!search.post
 
-  // The selected account comes from URL search param
-  const currentAccountId = search.account || null
-
   const [configOpen, setConfigOpen] = useState(false)
   const [configJustConnected, setConfigJustConnected] = useState(false)
   const [connecting, setConnecting] = useState(false)
@@ -208,7 +209,23 @@ function CommentsPage() {
     [accountsQuery.data, config?.provider],
   )
 
-  // Auto-select first account if none in URL
+  // The selected account: the URL wins (when it points to a still-connected
+  // account), then the last one viewed for this channel (persisted in
+  // localStorage, like the chats page), then the first account.
+  const urlAccountId = search.account || undefined
+  const currentAccountId = useMemo(() => {
+    if (urlAccountId && accounts.some((a) => a.id === urlAccountId)) return urlAccountId
+    const stored = getStoredCommentsAccount(id)
+    if (stored && accounts.some((a) => a.id === stored)) return stored
+    return accounts[0]?.id || null
+  }, [urlAccountId, accounts, id])
+
+  // Persist the active account per channel so navigating away & back restores it.
+  useEffect(() => {
+    if (currentAccountId) setStoredCommentsAccount(id, currentAccountId)
+  }, [id, currentAccountId])
+
+  // Write the selected account into the URL
   const setAccountInUrl = useCallback(
     (accountId: string) => {
       navigate({
@@ -220,13 +237,10 @@ function CommentsPage() {
     [navigate],
   )
 
-  // Auto-select on first load, or re-select when the current account vanished
-  // (e.g. it was just disconnected).
-  if (
-    accounts.length > 0 &&
-    (!currentAccountId || !accounts.some((a) => a.id === currentAccountId))
-  ) {
-    setAccountInUrl(accounts[0].id)
+  // If the URL points to an account that no longer exists (e.g. it was just
+  // disconnected), drop the stale param so the resolved account takes over.
+  if (urlAccountId && currentAccountId && !accounts.some((a) => a.id === urlAccountId)) {
+    setAccountInUrl(currentAccountId)
   }
 
   // ─── Posts query ───
