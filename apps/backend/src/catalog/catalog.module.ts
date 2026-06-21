@@ -7,9 +7,10 @@ import { ProductContextController } from './product-context.controller'
 import { ProductContextService } from './product-context.service'
 import { SocialHealthModule } from '../social/social-health.module'
 import { QueueModule } from '../queue/queue.module'
+import { UploadModule } from '../upload/upload.module'
 
 @Module({
-  imports: [AuthModule, SocialHealthModule, QueueModule],
+  imports: [AuthModule, SocialHealthModule, QueueModule, UploadModule],
   controllers: [CatalogController, CatalogWebhookController, ProductContextController],
   providers: [CatalogService, ProductContextService],
   exports: [CatalogService, ProductContextService],

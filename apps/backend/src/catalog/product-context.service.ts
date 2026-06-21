@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { LlmFactoryService } from '../common/llm/llm-factory.service'
 import { buildLlmTrace } from '../common/llm/llm-trace'
 import { CatalogService } from './catalog.service'
+import { UploadService } from '../upload/upload.service'
 
 export interface AnalyzeContextResult {
   /** Whether the AI detected a meaningful conflict with the existing data. */
@@ -35,6 +36,7 @@ export class ProductContextService {
     private prisma: PrismaService,
     private catalog: CatalogService,
     private llm: LlmFactoryService,
+    private uploadService: UploadService,
   ) {}
 
   // ─── Context: list / fetch ───
@@ -282,7 +284,42 @@ Règles :
         : Promise.resolve(),
     ])
 
+    // Persist the linked posts' cover images: Meta's `full_picture` /
+    // `thumbnail_url` links expire, so mirror them to our own storage now that
+    // the post is tied to a catalog article.
+    await this.storeLinkedPostImages(filteredPostIds)
+
     return { linkedPostIds: filteredPostIds }
+  }
+
+  /**
+   * Mirror each linked post's cover image into our own storage. Best-effort:
+   * a failed download must never block the linking itself.
+   */
+  private async storeLinkedPostImages(postIds: string[]) {
+    try {
+      const posts = await this.prisma.post.findMany({
+        where: { id: { in: postIds }, imageUrl: { not: null } },
+        select: { id: true, imageUrl: true },
+      })
+
+      await Promise.all(
+        posts.map(async (post) => {
+          if (!post.imageUrl || this.uploadService.isOwnUrl(post.imageUrl)) return
+          const stored = await this.uploadService.uploadFromUrl(post.imageUrl, 'posts')
+          if (stored) {
+            await this.prisma.post.update({
+              where: { id: post.id },
+              data: { imageUrl: stored },
+            })
+          }
+        }),
+      )
+    } catch (error) {
+      this.logger.warn(
+        `storeLinkedPostImages failed: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
   }
 
   async listProductPostLinks(

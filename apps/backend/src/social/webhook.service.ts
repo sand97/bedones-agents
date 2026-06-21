@@ -335,8 +335,12 @@ export class WebhookService {
     const isOwnComment = commentFrom?.id === pageId
 
     // ─── Fetch post details (always, to ensure we have real data) ───
+    // Re-fetch when the stored cover is still a temporary Facebook URL
+    // (`full_picture` links expire), so we can mirror it to our own storage
+    // before it disappears.
     const existingPost = await this.prisma.post.findUnique({ where: { id: postId } })
-    const needsPostFetch = !existingPost || !existingPost.imageUrl
+    const hasStoredCover = this.uploadService.isOwnUrl(existingPost?.imageUrl)
+    const needsPostFetch = !existingPost || !existingPost.imageUrl || !hasStoredCover
 
     let postMessage = existingPost?.message || null
     let postImageUrl = existingPost?.imageUrl || null
@@ -354,8 +358,9 @@ export class WebhookService {
           (postData as { permalink_url?: string }).permalink_url || postPermalinkUrl
         const fullPicture = (postData as { full_picture?: string }).full_picture
 
-        // Upload post image to Minio if we don't have one yet (fallback to original URL)
-        if (fullPicture && !postImageUrl) {
+        // Mirror the post image to Minio unless it's already stored there
+        // (fallback to the original URL if the upload fails).
+        if (fullPicture && !this.uploadService.isOwnUrl(postImageUrl)) {
           postImageUrl =
             (await this.uploadService.uploadFromUrl(fullPicture, 'posts')) || fullPicture
         }
@@ -486,9 +491,12 @@ export class WebhookService {
     if (!account) throw new NotFoundException('Social account not found')
     const accessToken = await this.encryptionService.decrypt(account.accessToken)
 
-    // Fetch media details if we don't have them yet
+    // Fetch media details if we don't have them yet, or if the stored cover is
+    // still a temporary Instagram URL (media_url / thumbnail_url links expire)
+    // that must be mirrored to our own storage.
     const existingPost = await this.prisma.post.findUnique({ where: { id: mediaId } })
-    const needsMediaFetch = !existingPost || !existingPost.imageUrl
+    const hasStoredCover = this.uploadService.isOwnUrl(existingPost?.imageUrl)
+    const needsMediaFetch = !existingPost || !existingPost.imageUrl || !hasStoredCover
 
     let postMessage = existingPost?.message || null
     let postImageUrl = existingPost?.imageUrl || null
@@ -514,7 +522,9 @@ export class WebhookService {
         const imageSource =
           mediaData.media_type === 'VIDEO' ? mediaData.thumbnail_url : mediaData.media_url
 
-        if (imageSource && !postImageUrl) {
+        // Mirror the media image to Minio unless it's already stored there
+        // (fallback to the original URL if the upload fails).
+        if (imageSource && !this.uploadService.isOwnUrl(postImageUrl)) {
           postImageUrl =
             (await this.uploadService.uploadFromUrl(imageSource, 'posts')) || imageSource
         }
