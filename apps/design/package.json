@@ -13,10 +13,11 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\""
   },
   "dependencies": {
-    "fabric": "^6.7.1",
+    "fabric": "^7.4.0",
     "jszip": "^3.10.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "westures": "^1.1.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",
