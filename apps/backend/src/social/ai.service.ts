@@ -43,16 +43,21 @@ interface CommentContext {
     isPageReply: boolean
   }>
   /**
-   * Products referenced by the post (resolved from product codes found in the post
-   * caption against the catalog linked to the page). Lets the agent answer
-   * price / availability questions on the commented product instead of replying
-   * generically.
+   * Products the post is about — resolved primarily from the catalog articles the
+   * merchant EXPLICITLY linked to the post, and supplemented by any product codes
+   * found in the caption. Each carries the seller's own details (name, price,
+   * description) and any custom context the seller wrote, so the agent answers
+   * price / availability / feature questions on the right item instead of replying
+   * generically — the same product knowledge the WhatsApp agent gets.
    */
   products?: Array<{
     retailerId: string
     name: string | null
     price: number | null
     currency: string | null
+    description?: string | null
+    /** Custom context the merchant wrote for this product (ProductContext.content). */
+    customContext?: string | null
   }>
 }
 
@@ -192,11 +197,18 @@ Guidelines:
       const productText = products
         .map((p) => {
           const price = p.price != null ? ` — ${p.price}${p.currency ? ` ${p.currency}` : ''}` : ''
-          return `- ${p.name || p.retailerId} (code: ${p.retailerId})${price}`
+          const lines = [`- ${p.name || p.retailerId} (code: ${p.retailerId})${price}`]
+          if (p.description?.trim()) {
+            lines.push(`  Description: ${p.description.trim().replace(/\n/g, '\n  ')}`)
+          }
+          if (p.customContext?.trim()) {
+            lines.push(`  Seller context: ${p.customContext.trim().replace(/\n/g, '\n  ')}`)
+          }
+          return lines.join('\n')
         })
         .join('\n')
       sections.push(
-        `Products referenced in the post (use these exact details for price/availability questions; do not invent prices):\n${productText}`,
+        `Products this post is about (use these exact details for price / availability / feature questions; do not invent prices or facts). When a product has a "Seller context", you MUST follow it and never contradict it:\n${productText}`,
       )
     }
 

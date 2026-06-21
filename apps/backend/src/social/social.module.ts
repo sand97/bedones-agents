@@ -4,6 +4,7 @@ import { Queue } from 'bullmq'
 import { AuthModule } from '../auth/auth.module'
 import { UploadModule } from '../upload/upload.module'
 import { CatalogModule } from '../catalog/catalog.module'
+import { ImageProcessingModule } from '../image-processing/image-processing.module'
 import {
   QueueModule,
   SOCIAL_AVATAR_SYNC_QUEUE,
@@ -35,6 +36,7 @@ import { SocialHealthModule } from './social-health.module'
     AuthModule,
     UploadModule,
     CatalogModule,
+    ImageProcessingModule,
     SocialHealthModule,
     QueueModule,
     BullModule.registerQueue({ name: SOCIAL_AVATAR_SYNC_QUEUE }),

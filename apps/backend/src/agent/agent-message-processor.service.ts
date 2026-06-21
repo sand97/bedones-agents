@@ -593,6 +593,8 @@ export class AgentMessageProcessorService {
           price?: number
           currency?: string
           retailerId?: string
+          description?: string
+          customContext?: string
           source: 'post-link' | 'semantic'
         } | null
       }
@@ -614,6 +616,24 @@ export class AgentMessageProcessorService {
         return null
       })
 
+    // Pull the merchant's custom context for the matched product so the agent answers
+    // with the seller's own rules (sizes, advice…) and never contradicts them.
+    let customContext: string | undefined
+    if (match) {
+      const ctx = await this.prisma.productContext
+        .findUnique({
+          where: {
+            catalogId_providerProductId: {
+              catalogId: match.catalogId,
+              providerProductId: match.productId,
+            },
+          },
+          select: { content: true },
+        })
+        .catch(() => null)
+      customContext = ctx?.content?.trim() || undefined
+    }
+
     return {
       headline: referral.headline,
       body: referral.body,
@@ -623,6 +643,8 @@ export class AgentMessageProcessorService {
             price: match.price,
             currency: match.currency,
             retailerId: match.retailerId,
+            description: match.description,
+            customContext,
             source: match.source,
           }
         : null,
