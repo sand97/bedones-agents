@@ -11,6 +11,7 @@ import { CatalogService } from '../catalog/catalog.service'
 import { EventsGateway } from '../gateway/events.gateway'
 import { FACEBOOK_GRAPH_API_VERSION } from '../common/config/facebook-scopes.config'
 import { SocialHealthService } from './social-health.service'
+import { ReferralProductMatchingService } from '../image-processing/referral-product-matching.service'
 import { setRequestContext } from '../posthog/request-context'
 
 /**
@@ -69,6 +70,7 @@ export class WebhookService {
     private eventsGateway: EventsGateway,
     private eventEmitter: EventEmitter2,
     private socialHealth: SocialHealthService,
+    private referralProductMatching: ReferralProductMatchingService,
   ) {
     this.facebookAppSecret = this.configService.getOrThrow<string>('FACEBOOK_APP_SECRET')
     this.instagramAppSecret = this.configService.getOrThrow<string>('INSTAGRAM_APP_SECRET')
@@ -3138,10 +3140,14 @@ export class WebhookService {
         accessToken,
       })
 
-      // If a catalog is linked to this page, resolve any product code mentioned in the
-      // post so the agent can answer price/availability questions on the right item.
+      // Resolve the products this post is about — the articles the merchant explicitly
+      // linked to it (primary) plus any product code mentioned in the caption — so the
+      // agent can answer price/availability/feature questions on the right item with the
+      // seller's own description and custom context.
       const products = await this.resolvePostProducts({
         catalogId: settings.catalogId,
+        organisationId: orgId,
+        postId: dbComment?.postId ?? null,
         postMessage: post?.message ?? null,
         accessToken,
       })
@@ -3413,20 +3419,27 @@ export class WebhookService {
     return chain
   }
 
-  // ─── Product codes referenced in the post ───
+  // ─── Products the post is about ───
 
   /**
-   * When a catalog is linked to the commented page, scan the post caption for product
-   * codes (merchant/retailer IDs) and resolve them against Meta so the agent can answer
-   * with the real product name/price instead of replying generically. Returns [] when
-   * no catalog is linked, no code is found, or nothing matches.
+   * Resolve the products a commented post is about, so the agent answers price /
+   * availability / feature questions on the right item instead of replying generically.
    *
-   * Meta lets us look products up by `retailer_id` directly (no full-catalog scan), and
-   * the lookup is cached in CatalogService so repeated comments on the same post don't
-   * hammer the Graph API.
+   * Two sources, merged (explicit links win, deduped by id):
+   *  1. The catalog articles the merchant EXPLICITLY linked to this post
+   *     (ProductPostLink) — the same source the WhatsApp agent uses. These carry the
+   *     seller's name, price, description AND custom context (ProductContext).
+   *  2. Product codes (retailer IDs) found in the post caption, resolved against Meta —
+   *     a best-effort supplement for posts with no explicit link. Meta lets us look
+   *     products up by `retailer_id` directly and CatalogService caches the lookup.
+   *
+   * Returns [] when nothing resolves. Best-effort throughout: a failure in one source
+   * never drops the other.
    */
   private async resolvePostProducts(args: {
     catalogId: string | null
+    organisationId: string
+    postId: string | null
     postMessage: string | null
     accessToken: string
   }): Promise<
@@ -3435,40 +3448,81 @@ export class WebhookService {
       name: string | null
       price: number | null
       currency: string | null
+      description: string | null
+      customContext: string | null
     }>
   > {
-    if (!args.catalogId || !args.postMessage) return []
+    const products: Array<{
+      retailerId: string
+      name: string | null
+      price: number | null
+      currency: string | null
+      description: string | null
+      customContext: string | null
+    }> = []
+    const seen = new Set<string>()
 
-    const codes = this.extractProductCodes(args.postMessage)
-    if (codes.length === 0) return []
-
-    const catalog = await this.prisma.catalog.findUnique({
-      where: { id: args.catalogId },
-      select: { providerId: true },
-    })
-    if (!catalog?.providerId) return []
-
-    try {
-      const hydrated = await this.catalogService.hydrateProductsByRetailerIdsWithAccessToken(
-        catalog.providerId,
-        codes,
-        args.accessToken,
-      )
-      // Keep only entries Meta actually resolved (a real product name means it matched).
-      return hydrated
-        .filter((p) => p.name)
-        .map((p) => ({
-          retailerId: p.retailerId,
-          name: p.name,
-          price: p.price,
-          currency: p.currency,
-        }))
-    } catch (error) {
-      this.logger.warn(
-        `[AI] Product code resolution failed: ${error instanceof Error ? error.message : error}`,
-      )
-      return []
+    // 1. Articles the merchant explicitly linked to this post (primary).
+    if (args.postId) {
+      const linked = await this.referralProductMatching.resolveLinkedProductsForPost({
+        organisationId: args.organisationId,
+        postId: args.postId,
+      })
+      for (const p of linked) {
+        const key = (p.retailerId || p.productId).toLowerCase()
+        if (seen.has(key)) continue
+        seen.add(key)
+        products.push({
+          retailerId: p.retailerId || p.productId,
+          name: p.name ?? null,
+          price: p.price ?? null,
+          currency: p.currency ?? null,
+          description: p.description ?? null,
+          customContext: p.customContext ?? null,
+        })
+      }
     }
+
+    // 2. Product codes mentioned in the caption (supplement, name/price only).
+    if (args.catalogId && args.postMessage) {
+      const codes = this.extractProductCodes(args.postMessage)
+      if (codes.length > 0) {
+        const catalog = await this.prisma.catalog.findUnique({
+          where: { id: args.catalogId },
+          select: { providerId: true },
+        })
+        if (catalog?.providerId) {
+          try {
+            const hydrated = await this.catalogService.hydrateProductsByRetailerIdsWithAccessToken(
+              catalog.providerId,
+              codes,
+              args.accessToken,
+            )
+            // Keep only entries Meta actually resolved (a real product name means it matched).
+            for (const p of hydrated) {
+              if (!p.name) continue
+              const key = p.retailerId.toLowerCase()
+              if (seen.has(key)) continue
+              seen.add(key)
+              products.push({
+                retailerId: p.retailerId,
+                name: p.name,
+                price: p.price,
+                currency: p.currency,
+                description: null,
+                customContext: null,
+              })
+            }
+          } catch (error) {
+            this.logger.warn(
+              `[AI] Product code resolution failed: ${error instanceof Error ? error.message : error}`,
+            )
+          }
+        }
+      }
+    }
+
+    return products
   }
 
   /**
