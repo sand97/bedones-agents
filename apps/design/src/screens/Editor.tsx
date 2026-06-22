@@ -15,7 +15,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { Canvas, Ellipse, FabricImage, Group, Rect, Textbox, type FabricObject } from 'fabric'
-import { initAligningGuidelines } from 'fabric/extensions'
+import { AligningGuidelines } from 'fabric/extensions'
 import { I, type IconProps } from '../components/icons'
 import { FORMATS, FORMAT_KEYS, DYN_FIELDS, TONE } from '../lib/data'
 import { resolveText } from '../components/TemplateCanvas'
@@ -410,7 +410,7 @@ export function Editor({
     fabricRef.current = canvas
 
     // Guides d'alignement + magnétisme (bordures du cadre, centre, autres éléments)
-    const stopGuides = initAligningGuidelines(canvas, { color: '#111b21', width: 1, margin: 5 })
+    const guidelines = new AligningGuidelines(canvas, { color: '#111b21', width: 1, margin: 5 })
 
     const onSel = () => {
       const a = canvas.getActiveObject()
@@ -453,7 +453,7 @@ export function Editor({
 
     return () => {
       window.removeEventListener('keydown', onKey)
-      stopGuides()
+      guidelines.dispose()
       canvas.dispose()
       fabricRef.current = null
     }
