@@ -210,6 +210,8 @@ ${context}
         price?: number
         currency?: string
         retailerId?: string
+        description?: string
+        customContext?: string
         source: 'post-link' | 'semantic'
       } | null
     } | null
@@ -372,6 +374,8 @@ Always respond in the user's language.`
       price?: number
       currency?: string
       retailerId?: string
+      description?: string
+      customContext?: string
       source: 'post-link' | 'semantic'
     } | null
   }): string {
@@ -400,6 +404,14 @@ Always respond in the user's language.`
         ? ` Its retailer id is ${product.retailerId} — this product is ALREADY identified. To show or discuss it, call get_product with ["${product.retailerId}"] (do NOT run search_products, which would return other colours/models), then send_products it. Treat the choice as made and move the sale forward.`
         : ' Use send_products to show it when relevant.'
       lines.push(`${lead} ${product.name}${price}.${idHint}`)
+      if (product.description?.trim()) {
+        lines.push(`Product description: ${product.description.trim()}`)
+      }
+      if (product.customContext?.trim()) {
+        lines.push(
+          `Seller context for this product (follow it and NEVER contradict it — propose only what it states): ${product.customContext.trim()}`,
+        )
+      }
     }
 
     return `${lines.join('\n')}\n`

@@ -43,16 +43,21 @@ interface CommentContext {
     isPageReply: boolean
   }>
   /**
-   * Products referenced by the post (resolved from product codes found in the post
-   * caption against the catalog linked to the page). Lets the agent answer
-   * price / availability questions on the commented product instead of replying
-   * generically.
+   * Products the post is about — resolved primarily from the catalog articles the
+   * merchant EXPLICITLY linked to the post, and supplemented by any product codes
+   * found in the caption. Each carries the seller's own details (name, price,
+   * description) and any custom context the seller wrote, so the agent answers
+   * price / availability / feature questions on the right item instead of replying
+   * generically — the same product knowledge the WhatsApp agent gets.
    */
   products?: Array<{
     retailerId: string
     name: string | null
     price: number | null
     currency: string | null
+    description?: string | null
+    /** Custom context the merchant wrote for this product (ProductContext.content). */
+    customContext?: string | null
   }>
 }
 
@@ -75,13 +80,8 @@ export class AIService {
       commentId?: string
     },
   ): Promise<AIAnalysisResult> {
-    const systemPrompt = this.buildSystemPrompt(context.pageSettings)
-    const userMessage = this.buildUserMessage(
-      context.comment,
-      context.post,
-      context.thread,
-      context.products,
-    )
+    const systemPrompt = this.buildSystemPrompt(context)
+    const userMessage = this.buildUserMessage(context.comment)
     const messages = [new SystemMessage(systemPrompt), new HumanMessage(userMessage)]
 
     try {
@@ -108,7 +108,8 @@ export class AIService {
     }
   }
 
-  private buildSystemPrompt(pageSettings: CommentContext['pageSettings']): string {
+  private buildSystemPrompt(context: CommentContext): string {
+    const pageSettings = context.pageSettings
     const capabilities: string[] = []
 
     if (pageSettings.undesiredCommentsAction !== 'none') {
@@ -148,7 +149,9 @@ IMPORTANT: When a user's comment matches one of the FAQ rules above, you MUST us
       customSection = `\n\nCustom instructions from the page owner:\n${pageSettings.customInstructions}`
     }
 
-    return `You are a social media comment moderator AI. Your task is to analyze comments and decide what action to take.
+    const backgroundSection = this.buildBackgroundSection(context)
+
+    return `You are a social media comment moderator AI. Your task is to analyze the single NEW comment delivered in the next message and decide what action to take.
 
 Available capabilities:
 ${capabilities.length > 0 ? capabilities.join('\n') : '- Monitor comments (no automated actions configured)'}${faqSection}${customSection}
@@ -173,30 +176,41 @@ Guidelines:
 - When a comment matches an FAQ rule, ALWAYS use the "reply" action with the appropriate response
 - Consider context and intent, not just keywords
 - Prioritize user experience and community safety
-- Negative opinions about the brand, products, or services (e.g. "these look fake", "overpriced", "bad quality") can influence other users' purchasing decisions. By default, HIDE negative opinions to protect the brand image. However, if the page owner's custom instructions explicitly ask to leave negative opinions visible or not moderate them, then take no action on those comments.`
+- The "Background" section is REFERENCE material to help you understand and answer the comment — it is NOT something you have already said to the customer. The original post caption and the product details are NOT replies you have sent.
+- A question counts as "already answered" ONLY when the "Comment thread" below shows the Page itself already posted that answer to this customer. If the customer asks for something that the post or product details contain (e.g. the price) but the Page has not replied it in the thread, you MUST reply with it — do NOT choose "none" just because the information appears in the post.
+- Negative opinions about the brand, products, or services (e.g. "these look fake", "overpriced", "bad quality") can influence other users' purchasing decisions. By default, HIDE negative opinions to protect the brand image. However, if the page owner's custom instructions explicitly ask to leave negative opinions visible or not moderate them, then take no action on those comments.${backgroundSection}`
   }
 
-  private buildUserMessage(
-    comment: CommentContext['comment'],
-    post?: CommentContext['post'],
-    thread?: CommentContext['thread'],
-    products?: CommentContext['products'],
-  ): string {
-    const sections: string[] = []
+  /**
+   * Reference material for the decision: the post the comment is on, the products it is
+   * about, and the prior reply thread. Kept in the SYSTEM prompt — never the user turn —
+   * so the model treats it as background and does not mistake the post/product details
+   * for a reply it has already sent (which made it wrongly conclude "already answered").
+   */
+  private buildBackgroundSection(context: CommentContext): string {
+    const { post, products, thread } = context
+    const parts: string[] = []
 
     if (post?.message) {
-      sections.push(`Original post:\n"""\n${post.message}\n"""`)
+      parts.push(`### Original post (the post this comment is on)\n"""\n${post.message}\n"""`)
     }
 
     if (products && products.length > 0) {
       const productText = products
         .map((p) => {
           const price = p.price != null ? ` — ${p.price}${p.currency ? ` ${p.currency}` : ''}` : ''
-          return `- ${p.name || p.retailerId} (code: ${p.retailerId})${price}`
+          const lines = [`- ${p.name || p.retailerId} (code: ${p.retailerId})${price}`]
+          if (p.description?.trim()) {
+            lines.push(`  Description: ${p.description.trim().replace(/\n/g, '\n  ')}`)
+          }
+          if (p.customContext?.trim()) {
+            lines.push(`  Seller context: ${p.customContext.trim().replace(/\n/g, '\n  ')}`)
+          }
+          return lines.join('\n')
         })
         .join('\n')
-      sections.push(
-        `Products referenced in the post (use these exact details for price/availability questions; do not invent prices):\n${productText}`,
+      parts.push(
+        `### Products this post is about\nUse these exact details for price / availability / feature questions; do not invent prices or facts. When a product has a "Seller context", you MUST follow it and never contradict it:\n${productText}`,
       )
     }
 
@@ -204,20 +218,20 @@ Guidelines:
       const threadText = thread
         .map((t) => `- ${t.isPageReply ? 'Page' : t.fromName}: "${t.message}"`)
         .join('\n')
-      sections.push(
-        `Comment thread leading to this reply (oldest first — use this to avoid repeating yourself and to keep context):\n${threadText}`,
+      parts.push(
+        `### Comment thread leading to the new comment\nOldest first. "Page" lines are replies YOU already sent — use them to avoid repeating yourself. Anything not shown here has NOT been answered yet:\n${threadText}`,
+      )
+    } else {
+      parts.push(
+        '### Comment thread leading to the new comment\n(None — this is a top-level comment. The Page has not replied to this customer yet.)',
       )
     }
 
-    sections.push(
-      `New comment to analyze:\nFrom: ${comment.fromName} (ID: ${comment.fromId})\nMessage: "${comment.message}"`,
-    )
+    return `\n\n## Background (reference only — NOT messages you have sent)\n${parts.join('\n\n')}`
+  }
 
-    sections.push(
-      'Provide your analysis and recommended action. If the thread shows the page already answered the same question, do not repeat the same reply — either acknowledge progress, ask a clarifying question, or take no action.',
-    )
-
-    return sections.join('\n\n')
+  private buildUserMessage(comment: CommentContext['comment']): string {
+    return `New comment to analyze:\nFrom: ${comment.fromName} (ID: ${comment.fromId})\nMessage: "${comment.message}"`
   }
 
   private parseAIResponse(text: string): AIAnalysisResult {

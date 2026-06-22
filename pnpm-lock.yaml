@@ -69,6 +69,9 @@ importers:
       '@langchain/langgraph':
         specifier: ^1.2.8
         version: 1.2.8(@langchain/core@1.1.38(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.8.0(@opentelemetry/api@1.9.1))(openai@6.33.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod-to-json-schema@3.25.2(zod@4.3.6))(zod@4.3.6)
+      '@langchain/mistralai':
+        specifier: ^1.2.0
+        version: 1.2.0(@langchain/core@1.1.38(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.8.0(@opentelemetry/api@1.9.1))(openai@6.33.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))
       '@langchain/openai':
         specifier: ^1.4.1
         version: 1.4.1(@langchain/core@1.1.38(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.8.0(@opentelemetry/api@1.9.1))(openai@6.33.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))(ws@8.21.0)
@@ -1561,6 +1564,12 @@ packages:
       zod-to-json-schema:
         optional: true
 
+  '@langchain/mistralai@1.2.0':
+    resolution: {integrity: sha512-SRtCSDIBzcQc6ZK5qa1V2ZhqSdZomXOt4VzBWXkD//IYYhbMJHhbrlYuCIuHktwpF/1ME5a7Euyk+BujN9hkTA==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@langchain/core': ^1.0.0
+
   '@langchain/openai@1.4.1':
     resolution: {integrity: sha512-jaHk4TnLqWrQ1KYmavvwCImW6x8pBy6LLTK73tzSMg7HBLbq0g/l7EkpMcxZWDOvyufuCXUqO2bj47apcOhw6Q==}
     engines: {node: '>=20'}
@@ -1576,6 +1585,9 @@ packages:
 
   '@microsoft/tsdoc@0.16.0':
     resolution: {integrity: sha512-xgAyonlVVS+q7Vc7qLW0UrJU7rSFcETRWsqdXZtjzRU8dF+6CkozTK4V4y1LwOX7j8r/vHphjDeMeGI4tNGeGA==}
+
+  '@mistralai/mistralai@2.2.1':
+    resolution: {integrity: sha512-uKU8CZmL2RzYKmplsU01hii4p3pe4HqJefpWNRWXm1Tcm0Sm4xXfwSLIy4k7ZCPlbETCGcp69E7hZs+WOJ5itQ==}
 
   '@modelcontextprotocol/sdk@1.29.0':
     resolution: {integrity: sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==}
@@ -7647,6 +7659,14 @@ snapshots:
       - svelte
       - vue
 
+  '@langchain/mistralai@1.2.0(@langchain/core@1.1.38(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.8.0(@opentelemetry/api@1.9.1))(openai@6.33.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))':
+    dependencies:
+      '@langchain/core': 1.1.38(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.8.0(@opentelemetry/api@1.9.1))(openai@6.33.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
+      '@mistralai/mistralai': 2.2.1
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@langchain/openai@1.4.1(@langchain/core@1.1.38(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.8.0(@opentelemetry/api@1.9.1))(openai@6.33.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))(ws@8.21.0)':
     dependencies:
       '@langchain/core': 1.1.38(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.8.0(@opentelemetry/api@1.9.1))(openai@6.33.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
@@ -7661,6 +7681,15 @@ snapshots:
   '@lukeed/csprng@1.1.0': {}
 
   '@microsoft/tsdoc@0.16.0': {}
+
+  '@mistralai/mistralai@2.2.1':
+    dependencies:
+      ws: 8.21.0
+      zod: 4.4.3
+      zod-to-json-schema: 3.25.2(zod@4.4.3)
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   '@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.3.6)':
     dependencies:
@@ -13237,6 +13266,10 @@ snapshots:
   zod-to-json-schema@3.25.2(zod@4.3.6):
     dependencies:
       zod: 4.3.6
+
+  zod-to-json-schema@3.25.2(zod@4.4.3):
+    dependencies:
+      zod: 4.4.3
 
   zod@3.25.76: {}
 
