@@ -5,9 +5,9 @@ import {
   type BaseMessage,
 } from '@langchain/core/messages'
 import type { BaseCallbackHandler } from '@langchain/core/callbacks/base'
-import type { ChatGoogleGenerativeAI } from '@langchain/google-genai'
-import type { ChatOpenAI } from '@langchain/openai'
 import { createRequire } from 'module'
+
+import type { ProviderChatModel } from '../common/llm/llm-factory.service'
 
 import type { PrismaService } from '../prisma/prisma.service'
 import type { EventsGateway } from '../gateway/events.gateway'
@@ -175,7 +175,7 @@ export interface RunLiveAgentInput {
   /** Prior turns, oldest first, excluding the current incoming message. */
   history: BaseMessage[]
   userMessageContent: string
-  model: ChatGoogleGenerativeAI | ChatOpenAI
+  model: ProviderChatModel
   toolContext: LiveAgentToolContext
   recursionLimit: number
   callbacks?: BaseCallbackHandler[]

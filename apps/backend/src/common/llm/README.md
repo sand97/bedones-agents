@@ -4,13 +4,14 @@ Le `LlmFactoryService` construit chaque modèle de chat à partir d'un **provide
 primaire** + les autres en **fallback automatique** (seuls ceux dont la clé API
 est renseignée sont utilisés).
 
-Trois providers sont supportés :
+Quatre providers sont supportés :
 
 | Provider | Valeur | Détail |
 | --- | --- | --- |
 | Google Gemini | `gemini` | Défaut historique |
 | OpenAI / ChatGPT | `openai` | — |
 | Xiaomi MiMo | `xiaomi` | API compatible OpenAI (via `XIAOMI_BASE_URL`) |
+| Mistral AI | `mistral` | SDK natif `@langchain/mistralai` |
 
 ## 1. Choix du provider
 
@@ -20,7 +21,7 @@ moins cher Xiaomi MiMo.
 
 | Variable | Défaut | Cas d'usage | Valeurs |
 | --- | --- | --- | --- |
-| `LLM_DEFAULT_PROVIDER` | `gemini` | Défaut global (fallback des deux ci-dessous) | `gemini` \| `openai` \| `xiaomi` |
+| `LLM_DEFAULT_PROVIDER` | `gemini` | Défaut global (fallback des deux ci-dessous) | `gemini` \| `openai` \| `xiaomi` \| `mistral` |
 | `LLM_PROVIDER_THINKING` | `LLM_DEFAULT_PROVIDER` | **Configuration de l'agent** (tier `thinking` : onboarding, analyse catalogue, feedback, décision ticket) | idem |
 | `LLM_PROVIDER_LIVE` | `LLM_DEFAULT_PROVIDER` | **Réponse aux messages** (agent live, tiers `flash`/`pro`/`ultra`) | idem |
 
@@ -34,6 +35,8 @@ moins cher Xiaomi MiMo.
 | `OPENAI_API_KEY` | _(vide)_ | Active OpenAI si renseignée |
 | `XIAOMI_API_KEY` | _(vide)_ | Active Xiaomi MiMo si renseignée (format `sk-xxxxx`) |
 | `XIAOMI_BASE_URL` | `https://api.xiaomimimo.com/v1` | Endpoint OpenAI-compatible de MiMo |
+| `MISTRAL_API_KEY` | _(vide)_ | Active Mistral AI si renseignée |
+| `MISTRAL_BASE_URL` | `https://api.mistral.ai` | Endpoint Mistral (override gateways / self-hosted) |
 
 ## 3. Modèles par tier
 
@@ -55,6 +58,10 @@ surchargeable :
 | `XIAOMI_MODEL_FLASH` | `mimo-v2.5` |
 | `XIAOMI_MODEL_PRO` | `mimo-v2.5-pro` |
 | `XIAOMI_MODEL_ULTRA` | `mimo-v2.5-pro` |
+| `MISTRAL_MODEL_THINKING` | `mistral-large-latest` |
+| `MISTRAL_MODEL_FLASH` | `mistral-small-latest` |
+| `MISTRAL_MODEL_PRO` | `mistral-medium-latest` |
+| `MISTRAL_MODEL_ULTRA` | `mistral-large-latest` |
 
 ## 4. Raisonnement / thinking
 
@@ -63,8 +70,9 @@ surchargeable :
 | `GEMINI_THINKING_BUDGET` | `0` sur `flash`, sinon `-1` | Gemini | Budget de thinking (`-1` = dynamique, `0` = off) |
 | `OPENAI_REASONING_EFFORT` | `medium` | OpenAI | `minimal` \| `low` \| `medium` \| `high` ; appliqué à tous les tiers sauf `flash` |
 
-> Xiaomi MiMo n'envoie **pas** le paramètre `reasoning` propre à OpenAI (un
-> endpoint non-OpenAI pourrait le rejeter).
+> Ni Xiaomi MiMo ni Mistral n'envoient le paramètre `reasoning` propre à OpenAI
+> (endpoints non-OpenAI ; côté Mistral, les modèles de raisonnement « magistral »
+> raisonnent d'eux-mêmes).
 
 ## 5. Limites de l'agent live
 
