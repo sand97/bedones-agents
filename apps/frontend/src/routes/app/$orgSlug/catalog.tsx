@@ -742,7 +742,8 @@ function CatalogPage() {
           </div>
         )}
 
-        <CatalogSyncBanner orgSlug={orgSlug} catalogId={selectedCatalogId} />
+        {/* Temporary disabled */}
+        {/*<CatalogSyncBanner orgSlug={orgSlug} catalogId={selectedCatalogId} />*/}
 
         <TablePagination
           current={currentPage}

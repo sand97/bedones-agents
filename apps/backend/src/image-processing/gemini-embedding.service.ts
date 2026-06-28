@@ -109,10 +109,7 @@ export class GeminiEmbeddingService {
 
   // ─── Private ───
 
-  private async callEmbedApi(
-    body: Record<string, unknown>,
-    attempt = 0,
-  ): Promise<EmbeddingResult> {
+  private async callEmbedApi(body: Record<string, unknown>, attempt = 0): Promise<EmbeddingResult> {
     const url = `${GEMINI_API_BASE}/models/${this.model}:embedContent?key=${this.apiKey}`
 
     const response = await fetch(url, {
