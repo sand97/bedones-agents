@@ -175,7 +175,7 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
           condition: product.condition,
           collectionId: product.collectionId,
         }
-      : { currency: 'XAF' }
+      : { currency: 'XAF', availability: 'available', condition: 'new' }
 
     /** Add files to the pending list — no upload yet */
     const handleAddFile = (file: File) => {
@@ -441,7 +441,7 @@ const ProductModalContent = forwardRef<ProductModalContentHandle, ProductModalCo
                 allowClear
                 placeholder={t('catalog.product_availability')}
                 options={[
-                  { label: t('catalog.in_stock'), value: 'in stock' },
+                  { label: t('catalog.in_stock'), value: 'available' },
                   { label: t('catalog.out_of_stock'), value: 'out of stock' },
                 ]}
               />
