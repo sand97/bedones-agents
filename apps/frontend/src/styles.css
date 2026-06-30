@@ -1520,7 +1520,7 @@ a {
 }
 
 .tickets-table .ant-table {
-  border: 1px solid #f0f0f0;
+  /*border: 1px solid #f0f0f0;*/
   border-radius: 14px;
   overflow: hidden;
 }
